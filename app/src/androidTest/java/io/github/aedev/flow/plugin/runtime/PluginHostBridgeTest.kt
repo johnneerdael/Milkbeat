@@ -27,6 +27,32 @@ private const val CALLS = 32
 @RunWith(AndroidJUnit4::class)
 class PluginHostBridgeTest {
     @Test
+    fun backgroundHostChainKeepsOwnershipUntilRootEvaluationCompletes() =
+        runBlocking {
+            val calls = mutableListOf<String>()
+            withBridge({ path, _ ->
+                calls += path
+                "reply:$path"
+            }) { js, bridge ->
+                js.evaluate<Any?>(
+                    """
+                    __mbDispatch = async () => {
+                        __mbHost('record-listen', '{}')
+                            .then(() => __mbHost('log-result', '{}'))
+                            .finally(() => __mbHost('close-browser', '{}'));
+                        return 'stream-ready';
+                    };
+                    """.trimIndent(),
+                    "background-dispatch.js",
+                    false,
+                )
+
+                assertEquals("stream-ready", call(js, bridge, 1, "audio.resolve", "{}"))
+                assertEquals(listOf("record-listen", "log-result", "close-browser"), calls)
+            }
+        }
+
+    @Test
     fun discardedLargeResponsesDoNotAccumulate() =
         runBlocking {
             withBridge({ _, json -> json.padEnd(PAYLOAD_BYTES, 'x') }) { js, bridge ->

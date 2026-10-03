@@ -45,6 +45,7 @@ internal class PluginHostBridge(
     fun close() = responses.close()
 
     private companion object {
+        // Native evaluation drains background host chains after the dispatcher returns.
         const val BOOTSTRAP = """
             var __mbHostOwner = 0;
             async function __mbHost(path, requestJson) {
@@ -54,11 +55,7 @@ internal class PluginHostBridge(
             }
             async function __mbDispatchScoped(owner, path, requestJson) {
                 __mbHostOwner = owner;
-                try {
-                    return await __mbDispatch(path, requestJson);
-                } finally {
-                    if (__mbHostOwner === owner) __mbHostOwner = 0;
-                }
+                return await __mbDispatch(path, requestJson);
             }
         """
     }
