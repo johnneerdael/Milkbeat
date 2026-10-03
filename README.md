@@ -221,9 +221,9 @@ The player fills the screen with projectM: 9,606 presets from Jason Fletcher's *
 Crop* collection, blending from one to the next. The visuals take their sound straight from
 Milkbeat's player, so they follow the track you hear and not the TV's output.
 
-The embedded ProjectM TV core uses its upstream defaults: a 30 fps target, automatic render
-resolution and transitions, memory limits and slow-preset skipping. Rendering stops when the
-visualizer leaves the screen or the app goes into the background.
+The embedded ProjectM TV core starts on its defaults for your device: a 30 fps target, automatic
+render resolution and transitions, a memory limit and slow-preset skipping. Rendering stops when
+the visualizer leaves the screen or the app goes into the background.
 
 - **Left and Right** step through presets while the controls are hidden.
 - **OK** shows the controls: seek bar, shuffle, previous, play/pause, next, repeat, like, the
@@ -232,6 +232,10 @@ visualizer leaves the screen or the app goes into the background.
   sound, from -100 ms to +200 ms (on an Ugoos AM6, +75 ms is about right).
 - **Diagnostics**: an optional status line with frame rate, render size, blend state, audio level
   and preset name.
+- **ProjectM TV's settings** in Settings > Visualizations: automatic preset changes, preset
+  duration, music category, cuts on loud beats, skipping blank or slow presets (and resetting
+  them), transition length and style, render resolution, frame rate, detail and the memory limit.
+  See the [user guide](docs/user-guide/settings.md#visualizations).
 
 <table>
   <tr>
@@ -252,7 +256,7 @@ playing. It is dimmed on tracks without a video.
 <table>
   <tr>
     <td><img src="docs/screenshots/music-video.jpg" alt="A live performance playing as full-screen video"></td>
-    <td><img src="docs/user-guide/images/settings-visualizations-enabled.png" alt="Settings > Visualizations with the music video and timing options"></td>
+    <td><img src="docs/user-guide/images/settings-visualizations-enabled.png" alt="Settings > Visualizations with the music video and projectM preset options"></td>
   </tr>
 </table>
 

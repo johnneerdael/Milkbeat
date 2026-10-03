@@ -7,7 +7,9 @@ import android.opengl.GLSurfaceView
 import android.os.Handler
 import android.os.Looper
 import io.github.aedev.flow.player.audio.visualizer.VisualizerRenderStats
+import io.github.aedev.flow.player.audio.visualizer.VisualizerSettings
 import io.github.aedev.flow.player.audio.visualizer.WaveformLeveler
+import io.github.aedev.flow.player.audio.visualizer.frameDivisor
 import nl.neerdael.projectm.core.DisplayInfo
 import nl.neerdael.projectm.core.ProjectMJNI
 import nl.neerdael.projectm.core.QualityController
@@ -15,7 +17,6 @@ import nl.neerdael.projectm.core.VisualizerRenderer
 import nl.neerdael.projectm.core.VisualizerView
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
-import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /**
@@ -26,6 +27,7 @@ import kotlin.math.roundToInt
 internal class TvVisualizerHost(
     context: Context,
     private val viewModel: TvVisualizerViewModel,
+    private var settings: VisualizerSettings,
 ) : ComponentCallbacks2 {
     private val engine = viewModel.engine
     private val main = Handler(Looper.getMainLooper())
@@ -53,21 +55,55 @@ internal class TvVisualizerHost(
     var timingOffsetUs = 0L
 
     init {
-        engine.start()
-        val profile = engine.profile
-        val divisor = frameDivisor(display.refreshRate, profile.defaultFrameRateCap())
-        targetFps = (display.refreshRate / divisor).roundToInt()
-        quality =
-            QualityController(display, profile, profile.memorySafeHeight(), ::applyRenderHeight).apply {
-                setTransitionSeconds(profile.defaultTransitionSeconds())
-                setSkipSlowPresets(profile.defaultSkipSlowPresets())
-                setTargetFps(display.refreshRate / divisor)
-                setMode(0, engine.lastAutoHeight)
-            }
+        engine.start(settings)
+        quality = createQuality()
         val displayDelayUs = (DISPLAY_DELAY_VSYNCS * MICROS_PER_SECOND / display.refreshRate).toLong()
         view.start(AudioFedRenderer(renderer) { window -> viewModel.readAudible(window, displayDelayUs + timingOffsetUs) })
-        view.setFrameDivisor(divisor)
+        // The view's render mode needs the GL thread that start() creates.
+        applyFrameRateCap(settings.frameRateCap)
         ProjectMJNI.setForceHardCut(false)
+    }
+
+    /** Settings changed while on screen: projectM takes its own, the rest reshapes how this view renders. */
+    fun apply(next: VisualizerSettings) {
+        val last = settings
+        if (next == last) return
+        settings = next
+        engine.apply(next)
+        if (next.frameRateCap != last.frameRateCap) {
+            applyFrameRateCap(next.frameRateCap)
+            ProjectMJNI.setForceHardCut(false)
+        }
+        if (next.memoryLimit != last.memoryLimit) {
+            quality = createQuality()
+            return
+        }
+        val quality = quality ?: return
+        if (next.renderHeight != last.renderHeight) quality.setMode(fixedHeight(next), engine.lastAutoHeight)
+        if (next.skipSlowPresets != last.skipSlowPresets) quality.setSkipSlowPresets(next.skipSlowPresets)
+        if (next.clampedTransitionSeconds != last.clampedTransitionSeconds) {
+            quality.setTransitionSeconds(next.clampedTransitionSeconds)
+        }
+    }
+
+    private fun memoryLimit(): Int = if (settings.memoryLimit) engine.profile.memorySafeHeight() else 0
+
+    private fun fixedHeight(settings: VisualizerSettings): Int =
+        QualityController.validFixedHeight(display, memoryLimit(), settings.renderHeight)
+
+    private fun createQuality(): QualityController =
+        QualityController(display, engine.profile, memoryLimit(), ::applyRenderHeight).apply {
+            setTransitionSeconds(settings.clampedTransitionSeconds)
+            setSkipSlowPresets(settings.skipSlowPresets)
+            setTargetFps(display.refreshRate / frameDivisor(display.refreshRate, settings.frameRateCap))
+            setMode(fixedHeight(settings), engine.lastAutoHeight)
+        }
+
+    private fun applyFrameRateCap(cap: Int) {
+        val divisor = frameDivisor(display.refreshRate, cap)
+        targetFps = (display.refreshRate / divisor).roundToInt()
+        view.setFrameDivisor(divisor)
+        quality?.setTargetFps(display.refreshRate / divisor)
     }
 
     fun resume() {
@@ -114,14 +150,6 @@ internal class TvVisualizerHost(
     @Deprecated("Deprecated in Java")
     override fun onLowMemory() = Unit
 }
-
-/** Renders on every n-th vsync, n in 1, 2 or 4, whichever rate lands closest to [cap] without dropping below 24 fps. */
-internal fun frameDivisor(
-    refreshRate: Float,
-    cap: Int,
-): Int = listOf(1, 2, 4).filter { it == 1 || refreshRate / it >= MIN_FPS }.minBy { abs(refreshRate / it - cap) }
-
-private const val MIN_FPS = 24f
 
 // projectM 4.1 takes at most this many samples per frame; the engine keeps only the newest.
 private const val WINDOW_SAMPLES = 576

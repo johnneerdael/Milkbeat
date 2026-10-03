@@ -45,7 +45,7 @@ class TvVisualizerCoreDeviceTest {
         lateinit var host: TvVisualizerHost
         compose.setContent {
             AndroidView(factory = { context ->
-                host = TvVisualizerHost(context, viewModel)
+                host = TvVisualizerHost(context, viewModel, engine.defaults)
                 host.resume()
                 host.view
             }, modifier = Modifier.fillMaxSize())
