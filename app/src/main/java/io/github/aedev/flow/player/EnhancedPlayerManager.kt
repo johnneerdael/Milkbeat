@@ -629,12 +629,6 @@ class EnhancedPlayerManager private constructor() {
 
         val prefs = PlayerPreferences(context)
         scope.launch {
-            prefs.sponsorBlockEnabled.collect { isEnabled ->
-                sponsorBlockHandler?.setEnabled(isEnabled)
-            }
-        }
-
-        scope.launch {
             prefs.videoLoopEnabled.collect { isEnabled ->
                 globalLoopEnabled = isEnabled
                 player?.repeatMode = if (isEnabled) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
@@ -950,7 +944,7 @@ class EnhancedPlayerManager private constructor() {
 
         sponsorBlockHandler?.reset()
         if (skipSegments != null) {
-            sponsorBlockHandler?.useProvidedSegments(videoId, skipSegments)
+            sponsorBlockHandler?.useProvidedSegments(skipSegments)
         } else {
             sponsorBlockHandler?.loadSegments(videoId)
         }
@@ -1745,7 +1739,7 @@ class EnhancedPlayerManager private constructor() {
         sponsorBlockHandler?.reset()
         val providedSegments = data.skipSegments
         if (providedSegments != null) {
-            sponsorBlockHandler?.useProvidedSegments(data.enrichedVideo.id, providedSegments)
+            sponsorBlockHandler?.useProvidedSegments(providedSegments)
         } else {
             sponsorBlockHandler?.loadSegments(data.enrichedVideo.id)
         }

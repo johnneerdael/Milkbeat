@@ -6,8 +6,7 @@ import io.github.aedev.flow.data.local.LikedVideoInfo
 import io.github.aedev.flow.data.local.LikedVideosRepository
 import io.github.aedev.flow.data.local.SubscriptionRepository
 import io.github.aedev.flow.data.model.Video
-import io.github.aedev.flow.data.recommendation.InteractionType
-import io.mockk.coEvery
+import io.github.aedev.flow.data.stats.VideoStatsRecorder
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
@@ -22,10 +21,7 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 
-/**
- * Pins the engagement sequence every surface now shares: the local write lands first, the caller
- * is told immediately, and only then does the recommendation engine learn from it.
- */
+/** Pins the engagement writes every surface shares: the local write lands and the caller is told. */
 @OptIn(ExperimentalCoroutinesApi::class)
 class VideoEngagementUseCaseTest {
     private val testDispatcher = StandardTestDispatcher()
@@ -36,14 +32,13 @@ class VideoEngagementUseCaseTest {
 
     private val subscriptionRepository: SubscriptionRepository = mockk(relaxed = true)
     private val likedVideosRepository: LikedVideosRepository = mockk(relaxed = true)
-    private val signals: VideoEngagementSignals = mockk(relaxed = true)
+    private val videoStats: VideoStatsRecorder = mockk(relaxed = true)
 
     private val useCase =
         VideoEngagementUseCase(
             subscriptionRepository = subscriptionRepository,
             likedVideosRepository = likedVideosRepository,
-            signals = signals,
-            videoStats = mockk(relaxed = true),
+            videoStats = videoStats,
         )
 
     private val order = mutableListOf<String>()
@@ -52,11 +47,6 @@ class VideoEngagementUseCaseTest {
         every { subscriptionRepository.isSubscribed(any()) } returns isSubscribed
         every { subscriptionRepository.getSubscription(any()) } returns subscription
         every { likedVideosRepository.getLikeState(any()) } returns likeState
-    }
-
-    private fun recordSignalOrder() {
-        coEvery { signals.channelSubscriptionChanged(any(), any(), any()) } answers { order += "subscriptionSignal" }
-        coEvery { signals.videoInteraction(any(), any()) } answers { order += "interaction" }
     }
 
     private fun video(id: String) =
@@ -72,9 +62,8 @@ class VideoEngagementUseCaseTest {
         )
 
     @Test
-    fun `subscribing writes the channel, reports it, then records the signal`() =
+    fun `subscribing writes the channel and reports it`() =
         runTest(testDispatcher) {
-            recordSignalOrder()
             isSubscribed.value = false
             val written = slot<ChannelSubscription>()
 
@@ -85,33 +74,19 @@ class VideoEngagementUseCaseTest {
             assertThat(written.captured.channelName).isEqualTo("Channel One")
             assertThat(written.captured.channelThumbnail).isEqualTo("avatar.jpg")
             coVerify(exactly = 0) { subscriptionRepository.unsubscribe(any()) }
-            coVerify(exactly = 1) { signals.channelSubscriptionChanged("ch_1", "Channel One", true) }
-            assertThat(order).containsExactly("applied:true", "subscriptionSignal").inOrder()
+            assertThat(order).containsExactly("applied:true")
         }
 
     @Test
-    fun `unsubscribing removes the channel and records the signal`() =
+    fun `unsubscribing removes the channel and reports it`() =
         runTest(testDispatcher) {
-            recordSignalOrder()
             isSubscribed.value = true
 
             useCase.toggleSubscription("ch_1", "Channel One", "avatar.jpg") { order += "applied:$it" }
 
             coVerify(exactly = 1) { subscriptionRepository.unsubscribe("ch_1") }
             coVerify(exactly = 0) { subscriptionRepository.subscribe(any()) }
-            coVerify(exactly = 1) { signals.channelSubscriptionChanged("ch_1", "Channel One", false) }
-            assertThat(order).containsExactly("applied:false", "subscriptionSignal").inOrder()
-        }
-
-    @Test
-    fun `a failing subscription signal still leaves the subscription written`() =
-        runTest(testDispatcher) {
-            coEvery { signals.channelSubscriptionChanged(any(), any(), any()) } throws IllegalStateException("engine down")
-            isSubscribed.value = false
-
-            useCase.toggleSubscription("ch_1", "Channel One", "avatar.jpg")
-
-            coVerify(exactly = 1) { subscriptionRepository.subscribe(any()) }
+            assertThat(order).containsExactly("applied:false")
         }
 
     @Test
@@ -135,42 +110,29 @@ class VideoEngagementUseCaseTest {
         }
 
     @Test
-    fun `liking stores the video and learns from the richer signal video`() =
+    fun `liking stores the video and reports it`() =
         runTest(testDispatcher) {
-            recordSignalOrder()
             val stored = slot<LikedVideoInfo>()
-            val rich = video("vid_1").copy(tags = listOf("kotlin"))
 
-            useCase.like(video("vid_1"), signalVideo = rich) { order += "applied" }
+            useCase.like(video("vid_1")) { order += "applied" }
 
             coVerify(exactly = 1) { likedVideosRepository.likeVideo(capture(stored)) }
             assertThat(stored.captured.videoId).isEqualTo("vid_1")
             assertThat(stored.captured.title).isEqualTo("Title vid_1")
             assertThat(stored.captured.thumbnail).isEqualTo("https://example.invalid/vid_1.jpg")
-            coVerify(exactly = 1) { signals.videoInteraction(rich, InteractionType.LIKED) }
-            assertThat(order).containsExactly("applied", "interaction").inOrder()
+            assertThat(order).containsExactly("applied")
         }
 
     @Test
-    fun `liking without a signal video stores it and records nothing`() =
-        runTest(testDispatcher) {
-            useCase.like(video("vid_1"))
-
-            coVerify(exactly = 1) { likedVideosRepository.likeVideo(any()) }
-            coVerify(exactly = 0) { signals.videoInteraction(any(), any()) }
-        }
-
-    @Test
-    fun `disliking records the interaction only when a signal video is given`() =
+    fun `disliking stores the dislike and names it in the recap when the video is known`() =
         runTest(testDispatcher) {
             useCase.dislike("vid_1")
             coVerify(exactly = 1) { likedVideosRepository.dislikeVideo("vid_1") }
-            coVerify(exactly = 0) { signals.videoInteraction(any(), any()) }
+            verify { videoStats.onDislike(match { it.videoId == "vid_1" && it.title.isEmpty() }) }
 
-            val rich = video("vid_2")
-            useCase.dislike("vid_2", signalVideo = rich)
+            useCase.dislike("vid_2", video = video("vid_2"))
             coVerify(exactly = 1) { likedVideosRepository.dislikeVideo("vid_2") }
-            coVerify(exactly = 1) { signals.videoInteraction(rich, InteractionType.DISLIKED) }
+            verify { videoStats.onDislike(match { it.videoId == "vid_2" && it.title == "Title vid_2" }) }
         }
 
     @Test

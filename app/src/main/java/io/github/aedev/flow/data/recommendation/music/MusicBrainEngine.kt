@@ -9,7 +9,6 @@ package io.github.aedev.flow.data.recommendation.music
 import android.content.Context
 import android.util.Log
 import dagger.hilt.android.qualifiers.ApplicationContext
-import io.github.aedev.flow.data.local.PlayerPreferences
 import io.github.aedev.flow.data.localmedia.LocalMediaIds
 import io.github.aedev.flow.data.music.model.ArtistDetails
 import io.github.aedev.flow.data.music.model.MusicArtist
@@ -51,7 +50,6 @@ class MusicBrainEngine
 
         private val storage = MusicBrainStorage(appContext)
         private val statsStorage = MusicStatsStorage(appContext)
-        private val playerPreferences by lazy { PlayerPreferences(appContext) }
 
         private val mutex = Mutex()
         private val saveScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -114,7 +112,6 @@ class MusicBrainEngine
         ) {
             if (track.videoId.isBlank() || LocalMediaIds.isLocal(track.videoId)) return
             val pct = playedFraction.coerceIn(0.0, 1.0)
-            if (playerPreferences.isDeepFlowCurrentlyActive()) return
             ensureInitialized()
 
             val signal =
@@ -184,7 +181,6 @@ class MusicBrainEngine
         /** An explicit like counts as a full play regardless of progress and floors the score at 0.8. */
         suspend fun onExplicitLike(track: MusicTrack) {
             if (track.videoId.isBlank() || LocalMediaIds.isLocal(track.videoId)) return
-            if (playerPreferences.isDeepFlowCurrentlyActive()) return
             ensureInitialized()
 
             val signal = track.toMusicSignal(0.0).copy(isExplicitLike = true)

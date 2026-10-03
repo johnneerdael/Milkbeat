@@ -35,11 +35,8 @@ import io.github.aedev.flow.ui.tv.components.TvScreenScaffold
 import io.github.aedev.flow.ui.tv.focus.tvInitialFocus
 import io.github.aedev.flow.ui.tv.screens.folders.TvMusicFoldersSettingsPane
 import io.github.aedev.flow.ui.tv.screens.settings.TvAboutSettingsPane
-import io.github.aedev.flow.ui.tv.screens.settings.TvContentSettingsPane
-import io.github.aedev.flow.ui.tv.screens.settings.TvFlowEngineSettingsPane
 import io.github.aedev.flow.ui.tv.screens.settings.TvPlaybackSettingsPane
 import io.github.aedev.flow.ui.tv.screens.settings.TvPluginsSettingsPane
-import io.github.aedev.flow.ui.tv.screens.settings.TvQualitySettingsPane
 import io.github.aedev.flow.ui.tv.screens.settings.TvSettingsCategory
 import io.github.aedev.flow.ui.tv.screens.settings.TvVisualizerSettingsPane
 import io.github.aedev.flow.ui.tv.theme.LocalTvDimens
@@ -109,9 +106,6 @@ fun TvSettingsScreen(
                     TvSettingsCategory.MUSIC_FOLDERS -> TvMusicFoldersSettingsPane()
                     TvSettingsCategory.PLAYBACK -> TvPlaybackSettingsPane(playerPreferences)
                     TvSettingsCategory.VISUALIZATIONS -> TvVisualizerSettingsPane()
-                    TvSettingsCategory.QUALITY -> TvQualitySettingsPane(playerPreferences)
-                    TvSettingsCategory.CONTENT -> TvContentSettingsPane(playerPreferences)
-                    TvSettingsCategory.FLOW_ENGINE -> TvFlowEngineSettingsPane(playerPreferences)
                     TvSettingsCategory.ABOUT -> TvAboutSettingsPane()
                 }
             }

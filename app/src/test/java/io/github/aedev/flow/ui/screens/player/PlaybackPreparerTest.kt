@@ -50,8 +50,6 @@ class PlaybackPreparerTest {
         every { playerPreferences.rememberPlaybackSpeed } returns flowOf(false)
         every { playerPreferences.playbackSpeed } returns flowOf(1f)
         every { playerPreferences.autoplayEnabled } returns flowOf(true)
-        every { playerPreferences.videoCodecPriority } returns flowOf("auto")
-        every { playerPreferences.defaultQuality } returns flowOf(VideoQuality.Q_1080P)
         coEvery { offlineSubtitleStore.load(any()) } returns emptyList()
 
         preparer = PlaybackPreparer(context, playerManager, playerPreferences, offlineSubtitleStore)
@@ -90,7 +88,7 @@ class PlaybackPreparerTest {
                     streamType = StreamType.LIVE_STREAM,
                     startPosition = 0L,
                     preferredVideoCodec = "auto",
-                    preferredLiveQualityHeight = VideoQuality.Q_1080P.height,
+                    preferredLiveQualityHeight = VideoQuality.AUTO.height,
                 )
                 playerManager.setPlaybackSpeed(1.0f)
                 playerManager.play()

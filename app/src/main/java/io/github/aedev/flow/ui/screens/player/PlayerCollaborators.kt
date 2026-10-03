@@ -50,11 +50,9 @@ internal class PlayerCollaborators(
     private val uiState: MutableStateFlow<VideoPlayerUiState>,
     scope: CoroutineScope,
     networkDispatcher: CoroutineDispatcher,
-    ioDispatcher: CoroutineDispatcher,
     isLoadCurrent: (Long) -> Boolean,
     currentLoadToken: () -> Long,
     shortsEnabled: () -> Boolean,
-    blockedChannelIds: () -> Set<String>,
 ) {
     val comments =
         CommentsPager(
@@ -93,7 +91,6 @@ internal class PlayerCollaborators(
             currentState = { uiState.value },
             relatedVideosFor = ::relatedVideosFor,
             shortsEnabled = shortsEnabled,
-            blockedChannelIds = blockedChannelIds,
             isPlaybackCurrent = isLoadCurrent,
             onResult = { result -> sessionApplier.applySecondary(result) },
             fetchRelated = pluginVideo::related,
@@ -101,7 +98,6 @@ internal class PlayerCollaborators(
 
     val watchSessions =
         WatchSessionTracker(
-            context = context,
             viewHistory = viewHistory,
             fetchRelated = pluginVideo::related,
             homeFeedCacheRepository = homeFeedCacheRepository,
@@ -156,7 +152,6 @@ internal class PlayerCollaborators(
             liveChat = liveChat,
             viewHistory = viewHistory,
             playerPreferences = playerPreferences,
-            recordWatchClick = { video -> sessionApplier.recordWatchClick(video) },
         )
 
     val sessionApplier: PlaybackSessionApplier =
@@ -175,7 +170,6 @@ internal class PlayerCollaborators(
             playerManager = playerManager,
             scope = scope,
             networkDispatcher = networkDispatcher,
-            ioDispatcher = ioDispatcher,
             enterUpcoming = upcomingPremiere::enterCountdown,
         )
 

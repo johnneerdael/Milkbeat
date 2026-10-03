@@ -70,7 +70,6 @@ class PlaybackSessionApplierTest {
             playerManager = harness.playerManager,
             scope = this,
             networkDispatcher = testDispatcher,
-            ioDispatcher = testDispatcher,
             enterUpcoming = { videoId, releaseMs, relatedVideos, _, _ ->
                 enteredUpcoming += Triple(videoId, releaseMs, relatedVideos)
                 true

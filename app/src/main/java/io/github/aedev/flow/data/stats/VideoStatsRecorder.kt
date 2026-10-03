@@ -3,10 +3,7 @@ package io.github.aedev.flow.data.stats
 import android.content.Context
 import android.util.Log
 import dagger.hilt.android.qualifiers.ApplicationContext
-import io.github.aedev.flow.data.local.PlayerPreferences
 import io.github.aedev.flow.data.local.dao.WatchHistoryDao
-import io.github.aedev.flow.data.model.Video
-import io.github.aedev.flow.data.recommendation.FlowNeuroEngine
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -21,7 +18,7 @@ import javax.inject.Singleton
 /**
  * The one place viewing activity enters the recap ledger. Every call is fire-and-forget on the
  * recorder's own scope, so a player or ViewModel tearing down never loses its last session.
- * Deep Flow sessions and local files are never recorded, matching the music ledger.
+ * Local files are never recorded, matching the music ledger.
  */
 @Singleton
 class VideoStatsRecorder
@@ -38,27 +35,18 @@ class VideoStatsRecorder
                 coldFileName = "flow_video_stats_v1.json",
                 monthSerializer = VideoMonthRecord.serializer(),
             )
-        private val playerPreferences by lazy { PlayerPreferences(appContext) }
         private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         private val mutex = Mutex()
         private var ledger = VideoStatsLedger()
         private var initialized = false
         private var pendingSave: Job? = null
 
-        /** A finished view. [video] supplies the topics; without it the view still counts, topic-less. */
-        fun onView(
-            event: ViewEvent,
-            video: Video?,
-        ) = record(requiresRecording = true) {
-            val topics =
-                if (event.counted && video != null) {
-                    runCatching { FlowNeuroEngine.topTopicsFor(video, VideoStatsParams.TOPICS_PER_VIEW) }.getOrDefault(emptyList())
-                } else {
-                    emptyList()
-                }
-            val now = System.currentTimeMillis()
-            locked { VideoStatsLedgerOps.recordView(it, now, event, topics) }
-        }
+        /** A finished view. */
+        fun onView(event: ViewEvent) =
+            record {
+                val now = System.currentTimeMillis()
+                locked { VideoStatsLedgerOps.recordView(it, now, event) }
+            }
 
         fun onDislike(video: DislikedVideo) = record { locked { VideoStatsLedgerOps.recordDislike(it, video.at, video) } }
 
@@ -91,13 +79,9 @@ class VideoStatsRecorder
             }
         }
 
-        private fun record(
-            requiresRecording: Boolean = false,
-            block: suspend () -> Unit,
-        ) {
+        private fun record(block: suspend () -> Unit) {
             scope.launch {
                 runCatching {
-                    if (requiresRecording && playerPreferences.isDeepFlowCurrentlyActive()) return@launch
                     ensureInitialized()
                     block()
                     scheduleSave()

@@ -12,10 +12,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.aedev.flow.R
 import io.github.aedev.flow.data.local.PlayerPreferences
-import io.github.aedev.flow.data.local.VideoCodec
-import io.github.aedev.flow.data.local.VideoQuality
-import io.github.aedev.flow.ui.tv.components.TvSectionHeader
-import io.github.aedev.flow.ui.tv.components.TvSelectionRow
 import io.github.aedev.flow.ui.tv.components.TvToggleRow
 import kotlinx.coroutines.launch
 
@@ -81,76 +77,6 @@ fun TvPlaybackSettingsPane(
                 supportingText = stringResource(R.string.player_settings_ambient_mode_subtitle),
                 checked = ambientMode,
                 onCheckedChange = { scope.launch { playerPreferences.setVideoAmbientModeEnabled(it) } },
-            )
-        }
-    }
-}
-
-@Composable
-fun TvQualitySettingsPane(
-    playerPreferences: PlayerPreferences,
-    modifier: Modifier = Modifier,
-) {
-    val scope = rememberCoroutineScope()
-    val defaultQuality by playerPreferences.defaultQuality.collectAsStateWithLifecycle(initialValue = VideoQuality.AUTO)
-    val codec by playerPreferences.defaultVideoCodec.collectAsStateWithLifecycle(initialValue = VideoCodec.AUTO)
-
-    LazyColumn(
-        modifier = modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        item(key = "quality-header") {
-            TvSectionHeader(title = stringResource(R.string.tv_settings_default_quality))
-        }
-        items(count = VideoQuality.entries.size, key = { "quality:${VideoQuality.entries[it].name}" }) { index ->
-            val quality = VideoQuality.entries[index]
-            TvSelectionRow(
-                label = quality.label,
-                selected = quality == defaultQuality,
-                onClick = { scope.launch { playerPreferences.setDefaultQuality(quality) } },
-            )
-        }
-        item(key = "codec-header") {
-            TvSectionHeader(title = stringResource(R.string.tv_settings_codec))
-        }
-        items(count = VideoCodec.entries.size, key = { "codec:${VideoCodec.entries[it].name}" }) { index ->
-            val option = VideoCodec.entries[index]
-            TvSelectionRow(
-                label = option.label,
-                selected = option == codec,
-                onClick = { scope.launch { playerPreferences.setDefaultVideoCodec(option) } },
-            )
-        }
-    }
-}
-
-@Composable
-fun TvContentSettingsPane(
-    playerPreferences: PlayerPreferences,
-    modifier: Modifier = Modifier,
-) {
-    val scope = rememberCoroutineScope()
-    val sponsorBlock by playerPreferences.sponsorBlockEnabled.collectAsStateWithLifecycle(initialValue = true)
-    val deArrow by playerPreferences.deArrowEnabled.collectAsStateWithLifecycle(initialValue = false)
-
-    LazyColumn(
-        modifier = modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        item(key = "sponsor-block") {
-            TvToggleRow(
-                label = stringResource(R.string.player_settings_sponsorblock),
-                supportingText = stringResource(R.string.player_settings_sponsorblock_subtitle),
-                checked = sponsorBlock,
-                onCheckedChange = { scope.launch { playerPreferences.setSponsorBlockEnabled(it) } },
-            )
-        }
-        item(key = "dearrow") {
-            TvToggleRow(
-                label = stringResource(R.string.player_settings_dearrow),
-                supportingText = stringResource(R.string.player_settings_dearrow_subtitle),
-                checked = deArrow,
-                onCheckedChange = { scope.launch { playerPreferences.setDeArrowEnabled(it) } },
             )
         }
     }

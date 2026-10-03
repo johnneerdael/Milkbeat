@@ -20,7 +20,6 @@ import kotlinx.coroutines.withContext
 
 private val Context.playerPreferencesDataStore: DataStore<Preferences> by safePreferencesDataStore(name = "player_preferences")
 
-const val DEEP_FLOW_NEVER_EXPIRES_HOURS = 0
 private const val PLAYLIST_SORT_SEPARATOR = "|"
 const val DEFAULT_PORTRAIT_SEEKBAR_PADDING_DP = 16
 const val MAX_PORTRAIT_SEEKBAR_PADDING_DP = 64
@@ -43,10 +42,6 @@ class PlayerPreferences(
     private val context: Context = context.applicationContext
 
     private object Keys {
-        // Stored under the old Wi-Fi key, so a quality chosen before stays chosen.
-        val DEFAULT_QUALITY = stringPreferencesKey("default_quality_wifi")
-        val DEFAULT_VIDEO_CODEC = stringPreferencesKey("default_video_codec")
-        val FALLBACK_VIDEO_CODEC = stringPreferencesKey("fallback_video_codec")
         val BACKGROUND_PLAY_ENABLED = booleanPreferencesKey("background_play_enabled")
         val AUTOPLAY_ENABLED = booleanPreferencesKey("autoplay_enabled")
         val QUEUE_AUTOPLAY_ENABLED = booleanPreferencesKey("queue_autoplay_enabled")
@@ -69,7 +64,6 @@ class PlayerPreferences(
         val CONTENT_LANGUAGE = stringPreferencesKey("content_language")
         val MUSIC_LOUDNESS_NORMALIZATION_ENABLED = booleanPreferencesKey("music_loudness_normalization_enabled")
         val SKIP_SILENCE_ENABLED = booleanPreferencesKey("skip_silence_enabled")
-        val SPONSOR_BLOCK_ENABLED = booleanPreferencesKey("sponsor_block_enabled")
         val AUTO_PIP_ENABLED = booleanPreferencesKey("auto_pip_enabled")
         val MANUAL_PIP_BUTTON_ENABLED = booleanPreferencesKey("manual_pip_button_enabled")
         val STABLE_VOLUME_ENABLED = booleanPreferencesKey("stable_volume_enabled")
@@ -196,7 +190,6 @@ class PlayerPreferences(
         val SB_USER_ID = stringPreferencesKey("sb_user_id")
 
         // DeArrow
-        val DEARROW_ENABLED = booleanPreferencesKey("dearrow_enabled")
         val DEARROW_BADGE_ENABLED = booleanPreferencesKey("dearrow_badge_enabled")
 
         // Notification preferences
@@ -322,12 +315,6 @@ class PlayerPreferences(
         // Newest-first, newline-delimited so the list can be trimmed to a bounded size.
         val UNPLAYABLE_VIDEO_IDS = stringPreferencesKey("unplayable_video_ids")
         val HIDE_UNPLAYABLE_SUBSCRIPTIONS = booleanPreferencesKey("hide_unplayable_subscriptions")
-
-        // Deep Flow (Incognito / No-Engine) mode
-        val DEEP_FLOW_ACTIVE = booleanPreferencesKey("deep_flow_active")
-        val DEEP_FLOW_ACTIVATED_AT = longPreferencesKey("deep_flow_activated_at")
-        val DEEP_FLOW_EXPIRE_HOURS = intPreferencesKey("deep_flow_expire_hours")
-        val DEEP_FLOW_SAVE_HISTORY = booleanPreferencesKey("deep_flow_save_history")
 
         // Home subscription feed rotation cursor
         val HOME_SUBS_ROTATION_CURSOR = intPreferencesKey("home_subs_rotation_cursor")
@@ -513,59 +500,6 @@ class PlayerPreferences(
                 preferences[Keys.MUSIC_LOUDNESS_NORMALIZATION_ENABLED] ?: true
             }
 
-    /**
-     * The quality videos start in. Auto adapts to the connection up to the display; a height caps it.
-     * The network type never lowers it.
-     */
-    val defaultQuality: Flow<VideoQuality> =
-        context.playerPreferencesDataStore.data
-            .map { preferences ->
-                VideoQuality.fromString(preferences[Keys.DEFAULT_QUALITY] ?: VideoQuality.AUTO.label)
-            }
-
-    suspend fun setDefaultQuality(quality: VideoQuality) {
-        context.playerPreferencesDataStore.edit { preferences ->
-            preferences[Keys.DEFAULT_QUALITY] = quality.label
-        }
-    }
-
-    val defaultVideoCodec: Flow<VideoCodec> =
-        context.playerPreferencesDataStore.data
-            .map { preferences ->
-                VideoCodec.fromString(preferences[Keys.DEFAULT_VIDEO_CODEC] ?: VideoCodec.AUTO.label)
-            }
-
-    suspend fun setDefaultVideoCodec(codec: VideoCodec) {
-        context.playerPreferencesDataStore.edit { preferences ->
-            preferences[Keys.DEFAULT_VIDEO_CODEC] = codec.label
-        }
-    }
-
-    /** Codec to use when a video carries no [defaultVideoCodec] variant. AUTO keeps the built-in order. */
-    val fallbackVideoCodec: Flow<VideoCodec> =
-        context.playerPreferencesDataStore.data
-            .map { preferences ->
-                VideoCodec.fromString(preferences[Keys.FALLBACK_VIDEO_CODEC] ?: VideoCodec.AUTO.label)
-            }
-
-    /**
-     * Both codec preferences as one comma-separated priority string ("av1,vp9"), which is what every
-     * stream selector ranks against. "auto" means no preference, leaving the built-in codec order.
-     * A fallback without a preferred codec is meaningless, so AUTO on the primary wins outright.
-     */
-    val videoCodecPriority: Flow<String> =
-        combine(defaultVideoCodec, fallbackVideoCodec) { preferred, fallback ->
-            if (preferred == VideoCodec.AUTO) {
-                VideoCodec.AUTO.codecKey
-            } else {
-                listOf(preferred, fallback)
-                    .filter { it != VideoCodec.AUTO }
-                    .map { it.codecKey }
-                    .distinct()
-                    .joinToString(",")
-            }
-        }.distinctUntilChanged()
-
     val musicAudioQuality: Flow<MusicAudioQuality> =
         context.playerPreferencesDataStore.data
             .map { preferences ->
@@ -664,32 +598,6 @@ class PlayerPreferences(
     suspend fun setStableVolumeEnabled(enabled: Boolean) {
         context.playerPreferencesDataStore.edit { preferences ->
             preferences[Keys.STABLE_VOLUME_ENABLED] = enabled
-        }
-    }
-
-    // SponsorBlock
-    val sponsorBlockEnabled: Flow<Boolean> =
-        context.playerPreferencesDataStore.data
-            .map { preferences ->
-                preferences[Keys.SPONSOR_BLOCK_ENABLED] ?: true
-            }
-
-    suspend fun setSponsorBlockEnabled(enabled: Boolean) {
-        context.playerPreferencesDataStore.edit { preferences ->
-            preferences[Keys.SPONSOR_BLOCK_ENABLED] = enabled
-        }
-    }
-
-    // DeArrow
-    val deArrowEnabled: Flow<Boolean> =
-        context.playerPreferencesDataStore.data
-            .map { preferences ->
-                preferences[Keys.DEARROW_ENABLED] ?: false
-            }
-
-    suspend fun setDeArrowEnabled(enabled: Boolean) {
-        context.playerPreferencesDataStore.edit { preferences ->
-            preferences[Keys.DEARROW_ENABLED] = enabled
         }
     }
 
@@ -1015,44 +923,6 @@ class PlayerPreferences(
                 preferences[Keys.PLAY_DURING_CALLS] ?: false
             }
 
-    // DEEP FLOW (INCOGNITO / NO-ENGINE) MODE
-
-    val deepFlowActive: Flow<Boolean> =
-        context.playerPreferencesDataStore.data
-            .map { preferences -> preferences[Keys.DEEP_FLOW_ACTIVE] ?: false }
-
-    val deepFlowActivatedAt: Flow<Long> =
-        context.playerPreferencesDataStore.data
-            .map { preferences -> preferences[Keys.DEEP_FLOW_ACTIVATED_AT] ?: 0L }
-
-    val deepFlowExpireHours: Flow<Int> =
-        context.playerPreferencesDataStore.data
-            .map { preferences -> preferences[Keys.DEEP_FLOW_EXPIRE_HOURS] ?: 4 }
-
-    val deepFlowSaveToHistory: Flow<Boolean> =
-        context.playerPreferencesDataStore.data
-            .map { preferences -> preferences[Keys.DEEP_FLOW_SAVE_HISTORY] ?: false }
-
-    suspend fun setDeepFlowSaveToHistory(enabled: Boolean) {
-        context.playerPreferencesDataStore.edit { preferences ->
-            preferences[Keys.DEEP_FLOW_SAVE_HISTORY] = enabled
-        }
-    }
-
-    suspend fun isDeepFlowSaveToHistoryEnabled(): Boolean =
-        context.playerPreferencesDataStore.data.first()[Keys.DEEP_FLOW_SAVE_HISTORY] ?: false
-
-    suspend fun setDeepFlowActive(enabled: Boolean) {
-        context.playerPreferencesDataStore.edit { preferences ->
-            preferences[Keys.DEEP_FLOW_ACTIVE] = enabled
-            if (enabled) {
-                preferences[Keys.DEEP_FLOW_ACTIVATED_AT] = System.currentTimeMillis()
-            } else {
-                preferences[Keys.DEEP_FLOW_ACTIVATED_AT] = 0L
-            }
-        }
-    }
-
     // AUTO-BACKUP SETTINGS
     val autoBackupFrequency: Flow<LocalDataManager.AutoBackupFrequency> =
         context.playerPreferencesDataStore.data
@@ -1077,21 +947,6 @@ class PlayerPreferences(
                     )
                 }.getOrDefault(LocalDataManager.AutoBackupType.APP_DATA)
             }
-
-    suspend fun isDeepFlowCurrentlyActive(): Boolean {
-        val prefs = context.playerPreferencesDataStore.data.first()
-        val active = prefs[Keys.DEEP_FLOW_ACTIVE] ?: false
-        if (!active) return false
-        val activatedAt = prefs[Keys.DEEP_FLOW_ACTIVATED_AT] ?: 0L
-        val expireHours = prefs[Keys.DEEP_FLOW_EXPIRE_HOURS] ?: 4
-        if (expireHours == DEEP_FLOW_NEVER_EXPIRES_HOURS) return true
-        val elapsedHours = (System.currentTimeMillis() - activatedAt) / 3_600_000.0
-        val stillActive = elapsedHours < expireHours
-        if (!stillActive) {
-            setDeepFlowActive(false)
-        }
-        return stillActive
-    }
 
     suspend fun getExportData(): SettingsBackup {
         val prefs = context.playerPreferencesDataStore.data.first()
@@ -1191,21 +1046,6 @@ enum class VideoQuality(
             values()
                 .filter { it != AUTO }
                 .minByOrNull { kotlin.math.abs(it.height - height) } ?: Q_720P
-    }
-}
-
-enum class VideoCodec(
-    val label: String,
-    val codecKey: String,
-) {
-    AUTO("Auto", "auto"),
-    H264("H.264", "h264"),
-    VP9("VP9", "vp9"),
-    AV1("AV1", "av1"),
-    ;
-
-    companion object {
-        fun fromString(label: String): VideoCodec = values().find { it.label == label } ?: H264
     }
 }
 

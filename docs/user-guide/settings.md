@@ -99,25 +99,9 @@ The projectM settings from ProjectM TV, applied to Milkbeat's own visualizer. An
 
 See [Playback and visuals](playback.md) for what these settings look like in now playing.
 
-## Quality
+## Video playback without settings
 
-Set the preferred video resolution and codec. Auto lets the player choose for the device and available streams. This category concerns video playback; it is not the projectM visualizer's render-resolution setting. Provider streams and hardware decoding capabilities still determine what is available.
-
-![Preferred video resolution](images/settings-quality.png)
-
-![Automatic video resolution and codec choices](images/settings-codecs.png)
-
-## Content & Playback
-
-**SponsorBlock** controls skipping of supported community-marked video segments. **DeArrow** controls supported alternative title/thumbnail handling. These options concern supported video content, not local-file tags.
-
-![SponsorBlock and DeArrow settings](images/settings-content.png)
-
-## Milkbeat Engine
-
-Enable **Deep Flow Mode** to pause recommendation learning while you browse. **Save to watch history** keeps history without teaching recommendations while that mode is active. These controls are separate from a provider's own account history reporting.
-
-![Deep Flow Mode and watch-history preferences](images/settings-engine.png)
+Video tracks pick their own quality and codec automatically for your TV and the available streams, and SponsorBlock is always on for supported videos. Neither has a setting.
 
 ## About
 

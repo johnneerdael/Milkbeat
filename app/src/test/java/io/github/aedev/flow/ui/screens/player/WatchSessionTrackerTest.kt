@@ -1,12 +1,9 @@
 package io.github.aedev.flow.ui.screens.player
 
-import android.content.Context
 import com.google.common.truth.Truth.assertThat
 import io.github.aedev.flow.data.local.HomeFeedCacheRepository
 import io.github.aedev.flow.data.local.ViewHistory
 import io.github.aedev.flow.data.model.Video
-import io.github.aedev.flow.data.recommendation.FlowNeuroEngine
-import io.github.aedev.flow.data.recommendation.InteractionType
 import io.github.aedev.flow.data.stats.ViewFormat
 import io.github.aedev.flow.player.state.PlaybackCompletion
 import io.mockk.Runs
@@ -15,7 +12,6 @@ import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
-import io.mockk.mockkObject
 import io.mockk.unmockkAll
 import io.mockk.verify
 import kotlinx.coroutines.CoroutineScope
@@ -39,7 +35,6 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class WatchSessionTrackerTest {
     private val testDispatcher = StandardTestDispatcher()
-    private val context: Context = mockk(relaxed = true)
     private val viewHistory: ViewHistory = mockk(relaxed = true)
     private val repository: RelatedFetcher = mockk(relaxed = true)
     private val homeFeedCacheRepository: HomeFeedCacheRepository = mockk(relaxed = true)
@@ -53,8 +48,6 @@ class WatchSessionTrackerTest {
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
-        mockkObject(FlowNeuroEngine.Companion)
-        every { FlowNeuroEngine.onVideoInteractionAsync(any(), any(), any(), any()) } just Runs
         coEvery { repository.getRelatedCandidates(any()) } returns emptyList()
     }
 
@@ -67,7 +60,6 @@ class WatchSessionTrackerTest {
 
     private fun tracker(): WatchSessionTracker =
         WatchSessionTracker(
-            context = context,
             viewHistory = viewHistory,
             fetchRelated = { videoId -> repository.getRelatedCandidates(videoId) },
             homeFeedCacheRepository = homeFeedCacheRepository,
@@ -98,28 +90,22 @@ class WatchSessionTrackerTest {
 
     @Test
     fun `an unknown duration earns no signal`() {
-        assertThat(watchSignalFor(positionMs = 30_000L, durationMs = 0L)).isNull()
+        assertThat(watchOutcomeFor(positionMs = 30_000L, durationMs = 0L)).isNull()
     }
 
     @Test
     fun `an instant bounce is navigation noise rather than a skip`() {
-        assertThat(watchSignalFor(positionMs = 5_000L, durationMs = 120_000L)).isNull()
+        assertThat(watchOutcomeFor(positionMs = 5_000L, durationMs = 120_000L)).isNull()
     }
 
     @Test
     fun `a real attempt abandoned under a fifth of the video is a skip`() {
-        val signal = watchSignalFor(positionMs = 11_000L, durationMs = 120_000L)
-
-        assertThat(signal?.type).isEqualTo(InteractionType.SKIPPED)
-        assertThat(signal?.fractionWatched).isWithin(TOLERANCE).of(11_000f / 120_000f)
+        assertThat(watchOutcomeFor(positionMs = 11_000L, durationMs = 120_000L)).isEqualTo(WatchOutcome.SKIPPED)
     }
 
     @Test
     fun `a fifth of the video or more is watched`() {
-        val signal = watchSignalFor(positionMs = 24_000L, durationMs = 120_000L)
-
-        assertThat(signal?.type).isEqualTo(InteractionType.WATCHED)
-        assertThat(signal?.fractionWatched).isWithin(TOLERANCE).of(0.2f)
+        assertThat(watchOutcomeFor(positionMs = 24_000L, durationMs = 120_000L)).isEqualTo(WatchOutcome.WATCHED)
     }
 
     @Test
@@ -135,9 +121,9 @@ class WatchSessionTrackerTest {
     @Test
     fun `a watched view counts, a skip is named, a bounce keeps only its time`() {
         val video = video("v1")
-        val watched = viewEventFor(video, ViewFormat.LONG, 90_000L, watchSignalFor(60_000L, 120_000L))
-        val skipped = viewEventFor(video, ViewFormat.LONG, 12_000L, watchSignalFor(12_000L, 120_000L))
-        val bounce = viewEventFor(video, ViewFormat.LONG, 4_000L, watchSignalFor(4_000L, 120_000L))
+        val watched = viewEventFor(video, ViewFormat.LONG, 90_000L, watchOutcomeFor(60_000L, 120_000L))
+        val skipped = viewEventFor(video, ViewFormat.LONG, 12_000L, watchOutcomeFor(12_000L, 120_000L))
+        val bounce = viewEventFor(video, ViewFormat.LONG, 4_000L, watchOutcomeFor(4_000L, 120_000L))
 
         assertThat(watched?.counted).isTrue()
         assertThat(skipped?.counted).isFalse()
@@ -166,7 +152,7 @@ class WatchSessionTrackerTest {
             advanceUntilIdle()
 
             verify(exactly = 1) {
-                videoStats.onView(match { it.videoId == "v1" && it.counted && it.format == ViewFormat.LONG }, any())
+                videoStats.onView(match { it.videoId == "v1" && it.counted && it.format == ViewFormat.LONG })
             }
         }
 
@@ -175,7 +161,7 @@ class WatchSessionTrackerTest {
         runTest(testDispatcher) {
             val tracker = tracker()
             val events = mutableListOf<io.github.aedev.flow.data.stats.ViewEvent>()
-            every { videoStats.onView(capture(events), any()) } just Runs
+            every { videoStats.onView(capture(events)) } just Runs
 
             tracker.report("v1", positionMs = 0L)
             clockMs += 10_000L
@@ -192,7 +178,7 @@ class WatchSessionTrackerTest {
         }
 
     @Test
-    fun `a live session reaches the recap but never the engine`() =
+    fun `a live session reaches the recap`() =
         runTest(testDispatcher) {
             val tracker = tracker()
 
@@ -207,10 +193,8 @@ class WatchSessionTrackerTest {
             verify(exactly = 1) {
                 videoStats.onView(
                     match { it.videoId == "live" && it.format == ViewFormat.LIVE && it.counted && it.watchedMs == 70_000L },
-                    any(),
                 )
             }
-            verify(exactly = 0) { FlowNeuroEngine.onVideoInteractionAsync(any(), any(), any(), any()) }
         }
 
     @Test
@@ -223,9 +207,7 @@ class WatchSessionTrackerTest {
             tracker.report("v2", positionMs = 1_000L)
             advanceUntilIdle()
 
-            verify(exactly = 1) {
-                FlowNeuroEngine.onVideoInteractionAsync(any(), match { it.id == "v1" }, InteractionType.WATCHED, any())
-            }
+            verify(exactly = 1) { videoStats.onView(match { it.videoId == "v1" && it.counted }) }
         }
 
     @Test
@@ -238,24 +220,20 @@ class WatchSessionTrackerTest {
             tracker.finalizeActiveSession()
             advanceUntilIdle()
 
-            verify(exactly = 1) {
-                FlowNeuroEngine.onVideoInteractionAsync(any(), match { it.id == "v1" }, any(), any())
-            }
+            verify(exactly = 1) { videoStats.onView(match { it.videoId == "v1" && it.counted }) }
         }
 
     @Test
     fun `the rich video the screen still holds is graded instead of the session stub`() =
         runTest(testDispatcher) {
-            richVideo = video("v1").copy(description = "rich")
+            richVideo = video("v1").copy(title = "Rich title")
             val tracker = tracker()
 
             tracker.report("v1", positionMs = 30_000L)
             tracker.finalizeActiveSession()
             advanceUntilIdle()
 
-            verify(exactly = 1) {
-                FlowNeuroEngine.onVideoInteractionAsync(any(), match { it.description == "rich" }, any(), any())
-            }
+            verify(exactly = 1) { videoStats.onView(match { it.title == "Rich title" }) }
         }
 
     @Test
@@ -317,8 +295,6 @@ class WatchSessionTrackerTest {
         }
 
     private companion object {
-        const val TOLERANCE = 0.0001f
-
         fun video(id: String): Video =
             Video(
                 id = id,

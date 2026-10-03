@@ -1,7 +1,6 @@
 package io.github.aedev.flow.ui.screens.player
 
 import android.content.Context
-import io.github.aedev.flow.data.engagement.VideoEngagementSignals
 import io.github.aedev.flow.data.engagement.VideoEngagementUseCase
 import io.github.aedev.flow.data.local.ChannelSubscription
 import io.github.aedev.flow.data.local.HomeFeedCacheRepository
@@ -9,12 +8,10 @@ import io.github.aedev.flow.data.local.LikedVideosRepository
 import io.github.aedev.flow.data.local.PlayerPreferences
 import io.github.aedev.flow.data.local.PlaylistRepository
 import io.github.aedev.flow.data.local.SubscriptionRepository
-import io.github.aedev.flow.data.local.VideoQuality
 import io.github.aedev.flow.data.local.ViewHistory
 import io.github.aedev.flow.data.local.entity.WatchHistoryEntity
 import io.github.aedev.flow.data.model.Video
 import io.github.aedev.flow.data.music.model.MusicTrack
-import io.github.aedev.flow.data.recommendation.FlowNeuroEngine
 import io.github.aedev.flow.data.repository.SponsorBlockRepository
 import io.github.aedev.flow.data.transcript.TranscriptRepository
 import io.github.aedev.flow.data.video.DownloadedVideo
@@ -76,7 +73,6 @@ internal class VideoPlayerViewModelHarness(
         VideoEngagementUseCase(
             subscriptionRepository = subscriptionRepository,
             likedVideosRepository = likedVideosRepository,
-            signals = VideoEngagementSignals(context),
             videoStats = videoStats,
         )
     }
@@ -127,10 +123,6 @@ internal class VideoPlayerViewModelHarness(
         mockkObject(PlayerDiagnostics)
         every { PlayerDiagnostics.logWarning(any(), any()) } just Runs
 
-        mockkObject(FlowNeuroEngine.Companion)
-        coEvery { FlowNeuroEngine.onVideoInteraction(any<Context>(), any(), any(), any()) } just Runs
-        every { FlowNeuroEngine.onVideoInteractionAsync(any(), any(), any(), any()) } just Runs
-
         every { context.applicationContext } returns context
         every { context.getString(any()) } answers { "res:${firstArg<Int>()}" }
         every { context.getString(any(), *anyVararg()) } answers { "res:${firstArg<Int>()}" }
@@ -140,10 +132,8 @@ internal class VideoPlayerViewModelHarness(
         every { playerPreferences.miniPlayerContinueWatchingEnabled } returns continueWatchingEnabled
         every { playerPreferences.autoplayEnabled } returns autoplayEnabled
         every { playerPreferences.upcomingVideoReminderIds } returns flowOf(emptySet())
-        every { playerPreferences.defaultQuality } returns flowOf(VideoQuality.AUTO)
         every { playerPreferences.preferredAudioLanguage } returns flowOf("original")
         every { playerPreferences.preferredSubtitleLanguage } returns flowOf(CaptionTrackResolver.NO_PREFERRED_LANGUAGE)
-        every { playerPreferences.videoCodecPriority } returns flowOf("auto")
         every { playerPreferences.rememberPlaybackSpeed } returns flowOf(false)
         every { playerPreferences.playbackSpeed } returns flowOf(1f)
 

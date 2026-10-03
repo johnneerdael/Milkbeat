@@ -130,7 +130,7 @@ class PluginVideo
                     videoRequest(
                         videoId = videoId,
                         maxHeight = limits.maxHeight,
-                        codecs = limits.codecs(preferences.videoCodecPriority.first()),
+                        codecs = limits.codecs(VideoCodecUtils.NO_PREFERENCE),
                         audioLanguage = preferences.preferredAudioLanguage.first(),
                         captionLanguage = preferences.preferredSubtitleLanguage.first(),
                         failure = failures.remove(videoId),

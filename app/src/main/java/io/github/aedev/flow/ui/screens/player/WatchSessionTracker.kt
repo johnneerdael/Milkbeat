@@ -1,14 +1,11 @@
 package io.github.aedev.flow.ui.screens.player
 
-import android.content.Context
 import android.os.SystemClock
 import android.util.Log
 import io.github.aedev.flow.data.local.CachedHomeVideo
 import io.github.aedev.flow.data.local.HomeFeedCacheRepository
 import io.github.aedev.flow.data.local.ViewHistory
 import io.github.aedev.flow.data.model.Video
-import io.github.aedev.flow.data.recommendation.FlowNeuroEngine
-import io.github.aedev.flow.data.recommendation.InteractionType
 import io.github.aedev.flow.data.stats.VideoStatsRecorder
 import io.github.aedev.flow.data.stats.ViewEvent
 import io.github.aedev.flow.data.stats.ViewFormat
@@ -50,7 +47,7 @@ internal fun viewEventFor(
     video: Video,
     format: ViewFormat,
     watchedMs: Long,
-    signal: WatchSignal?,
+    outcome: WatchOutcome?,
     unsentMs: Long = watchedMs,
     viewAlreadySent: Boolean = false,
     final: Boolean = true,
@@ -58,10 +55,10 @@ internal fun viewEventFor(
     val countsAsView =
         when (format) {
             ViewFormat.LIVE -> watchedMs >= LIVE_VIEW_MS
-            else -> signal?.type == InteractionType.WATCHED
+            else -> outcome == WatchOutcome.WATCHED
         }
     val counted = countsAsView && !viewAlreadySent
-    val skipped = final && !viewAlreadySent && format != ViewFormat.LIVE && signal?.type == InteractionType.SKIPPED
+    val skipped = final && !viewAlreadySent && format != ViewFormat.LIVE && outcome == WatchOutcome.SKIPPED
     if (!counted && !skipped && unsentMs <= 0L) return null
     return ViewEvent(
         videoId = video.id,
@@ -77,29 +74,22 @@ internal fun viewEventFor(
     )
 }
 
-/** The terminal learning signal a view earned, with the share of the video it covered. */
-internal class WatchSignal(
-    val type: InteractionType,
-    val fractionWatched: Float,
-)
+/** How a finished view ended: watched through, or abandoned after a real attempt. */
+internal enum class WatchOutcome { WATCHED, SKIPPED }
 
 /**
  * Grades a finished view. Anything below [WATCHED_FRACTION] that still ran past
- * [MIN_SKIP_SIGNAL_POSITION_MS] is a real abandonment; a shorter bounce carries no signal at all,
- * and neither does a video of unknown length.
- *
- * At or above the threshold the signal is WATCHED, whose percent-scaled learning already grades a
- * 20-40% view as weak-positive — no separate tier is needed.
+ * [MIN_SKIP_SIGNAL_POSITION_MS] is a real abandonment; a shorter bounce is neither, and neither is
+ * a video of unknown length.
  */
-internal fun watchSignalFor(
+internal fun watchOutcomeFor(
     positionMs: Long,
     durationMs: Long,
-): WatchSignal? {
+): WatchOutcome? {
     if (durationMs <= 0L) return null
     val fraction = positionMs.toDouble() / durationMs
     if (fraction < WATCHED_FRACTION && positionMs < MIN_SKIP_SIGNAL_POSITION_MS) return null
-    val type = if (fraction >= WATCHED_FRACTION) InteractionType.WATCHED else InteractionType.SKIPPED
-    return WatchSignal(type, fraction.toFloat())
+    return if (fraction >= WATCHED_FRACTION) WatchOutcome.WATCHED else WatchOutcome.SKIPPED
 }
 
 /**
@@ -113,15 +103,14 @@ internal fun positionBelongsTo(
 ): Boolean = playerVideoId == null || playerVideoId == videoId
 
 /**
- * Everything a view leaves behind: the history row, the resume position, the one terminal signal
- * the recommendation engine learns from, and the related-video prewarm that fills the home feed's
+ * Everything a view leaves behind: the history row, the resume position, the recap ledger entry,
+ * and the related-video prewarm that fills the home feed's
  * reserve while the user is still watching.
  *
  * A session spans one video: positions are folded into it as they arrive, and it is graded exactly
  * once — when the next video takes over, or when the screen goes away.
  */
 internal class WatchSessionTracker(
-    private val context: Context,
     private val viewHistory: ViewHistory,
     private val fetchRelated: suspend (String) -> List<Video>,
     private val homeFeedCacheRepository: HomeFeedCacheRepository,
@@ -155,7 +144,6 @@ internal class WatchSessionTracker(
     }
 
     private var session: Session? = null
-    private var lastReportedVideoId: String? = null
     private val prewarmedVideoIds = ConcurrentHashMap.newKeySet<String>()
 
     fun saveHistoryEntry(video: Video) {
@@ -235,7 +223,7 @@ internal class WatchSessionTracker(
     }
 
     /**
-     * Live streams write no history row and earn no engine signal, but their watching time still
+     * Live streams write no history row, but their watching time still
      * belongs in the recap. The progress loop reports them here instead of [savePlaybackPosition].
      */
     fun trackLive(
@@ -306,24 +294,8 @@ internal class WatchSessionTracker(
     }
 
     private fun finalize(session: Session) {
-        // Prefer the rich (tags/description) video the screen still holds over the session stub.
-        val video = richVideoFor(session.video.id) ?: session.video
-        val signal = watchSignalFor(session.maxPositionMs, session.durationMs)
         recordView(session, final = true)
-        if (session.format != ViewFormat.SHORT) onViewFinished(video.id, session.watchedMs, session.durationMs)
-
-        // Shorts played here teach the engine through the Shorts classifier's rules, not these.
-        if (session.format != ViewFormat.LONG || signal == null || video.id == lastReportedVideoId) return
-
-        lastReportedVideoId = video.id
-
-        // Engine-scope dispatch: survives ViewModel teardown.
-        FlowNeuroEngine.onVideoInteractionAsync(
-            context,
-            video,
-            signal.type,
-            percentWatched = signal.fractionWatched,
-        )
+        if (session.format != ViewFormat.SHORT) onViewFinished(session.video.id, session.watchedMs, session.durationMs)
     }
 
     /** Sends the recap the time not yet sent, and the view itself once, the first time it counts. */
@@ -332,18 +304,17 @@ internal class WatchSessionTracker(
         final: Boolean,
     ) {
         val video = richVideoFor(session.video.id) ?: session.video
-        val signal = watchSignalFor(session.maxPositionMs, session.durationMs)
         val event =
             viewEventFor(
                 video = video,
                 format = session.format,
                 watchedMs = session.watchedMs,
-                signal = signal,
+                outcome = watchOutcomeFor(session.maxPositionMs, session.durationMs),
                 unsentMs = session.watchedMs - session.sentMs,
                 viewAlreadySent = session.viewSent,
                 final = final,
             ) ?: return
-        videoStats.onView(event, video)
+        videoStats.onView(event)
         session.sentMs = session.watchedMs
         if (event.counted) session.viewSent = true
     }

@@ -10,7 +10,7 @@ data class ViewEvent(
     val channelName: String,
     val format: ViewFormat,
     val watchedMs: Long,
-    /** A deliberate view: it counts toward views, channels, videos and topics. */
+    /** A deliberate view: it counts toward views, channels and videos. */
     val counted: Boolean,
     /** Abandoned early after a real look; named in the recap's "passed on" section. */
     val skipped: Boolean,
@@ -25,7 +25,6 @@ object VideoStatsLedgerOps {
         ledger: VideoStatsLedger,
         nowMs: Long,
         event: ViewEvent,
-        topics: List<String>,
         zone: ZoneId = ZoneId.systemDefault(),
     ) {
         if (event.videoId.isBlank() || (event.watchedMs <= 0L && !event.counted)) return
@@ -51,7 +50,6 @@ object VideoStatsLedgerOps {
             month.formatViews.add(event.format, 1)
             month.videoViews.add(event.videoId, 1)
             nameIn(month, event)
-            topics.take(VideoStatsParams.TOPICS_PER_VIEW).forEach { month.topicViews.add(it, 1) }
             month.dayViews.add(moment.dayOfMonth, 1)
             month.hourViews.add(moment.hourOfDay, 1)
             if (channel != null) {
@@ -131,7 +129,6 @@ object VideoStatsLedgerOps {
     }
 
     private fun pruneMonth(month: MonthViewing) {
-        LedgerTime.capWeakest(month.topicViews, VideoStatsParams.TOPICS_PER_MONTH)
         LedgerTime.capWeakest(month.queries, VideoStatsParams.QUERIES_PER_MONTH)
         LedgerTime.capWeakest(month.videoSkips, VideoStatsParams.SKIPS_PER_MONTH)
         LedgerTime.capWeakest(month.channelSkips, VideoStatsParams.SKIPS_PER_MONTH)

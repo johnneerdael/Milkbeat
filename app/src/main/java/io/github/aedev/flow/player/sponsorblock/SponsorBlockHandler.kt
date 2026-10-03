@@ -44,92 +44,37 @@ class SponsorBlockHandler(
     private var loadJob: Job? = null
     private var lastSkippedSegmentUuid: String? = null
     private var currentMutedSegmentUuid: String? = null
-    private var currentVideoId: String? = null
-
-    /** True when segments were loaded via [loadSegmentsFromList] (offline DB). Prevents
-     * [setEnabled] from wiping them with a network refresh that will fail offline.
-     */
-    private var offlineSegmentsLoaded: Boolean = false
-
-    /** Segments the stream's source handed over with it; they follow the setting without a network lookup. */
-    private var providedSegments: List<SponsorBlockSegment>? = null
-
-    var isEnabled: Boolean = false
-        private set
 
     /** Map from category string (e.g. "sponsor") to the action to take. Defaults to SKIP for all. */
     var categoryActions: Map<String, SponsorBlockAction> = emptyMap()
 
     /**
-     * Set whether SponsorBlock is enabled.
-     */
-    fun setEnabled(enabled: Boolean) {
-        if (isEnabled != enabled) {
-            isEnabled = enabled
-            if (enabled) {
-                val provided = providedSegments
-                if (provided != null) {
-                    _sponsorSegments.value = provided
-                } else if (!offlineSegmentsLoaded) {
-                    currentVideoId?.let { loadSegments(it) }
-                } else {
-                    Log.d(TAG, "setEnabled(true): keeping offline segments, skipping network refresh")
-                }
-            } else {
-                loadJob?.cancel()
-                _sponsorSegments.value = emptyList()
-                lastSkippedSegmentUuid = null
-                currentMutedSegmentUuid = null
-                offlineSegmentsLoaded = false
-            }
-        }
-    }
-
-    /**
      * Load SponsorBlock segments directly from a pre-fetched list (e.g. saved offline).
-     * Bypasses the network API call. Safe to call even when [isEnabled] is false —
-     * the segments are stored and will be used if SponsorBlock is later enabled.
+     * Bypasses the network API call.
      */
     fun loadSegmentsFromList(
         videoId: String,
         segments: List<SponsorBlockSegment>,
     ) {
-        currentVideoId = videoId
         loadJob?.cancel()
         lastSkippedSegmentUuid = null
         currentMutedSegmentUuid = null
-        offlineSegmentsLoaded = segments.isNotEmpty()
-        providedSegments = null
         _sponsorSegments.value = segments
         Log.d(TAG, "Loaded ${segments.size} offline SponsorBlock segments for video $videoId")
     }
 
-    /**
-     * Uses [segments] the stream's source resolved with the video instead of asking SponsorBlock. Unlike
-     * [loadSegmentsFromList], they are skipped only while the setting is on.
-     */
-    fun useProvidedSegments(
-        videoId: String,
-        segments: List<SponsorBlockSegment>,
-    ) {
-        currentVideoId = videoId
+    /** Uses [segments] the stream's source resolved with the video instead of asking SponsorBlock. */
+    fun useProvidedSegments(segments: List<SponsorBlockSegment>) {
         loadJob?.cancel()
         lastSkippedSegmentUuid = null
         currentMutedSegmentUuid = null
-        offlineSegmentsLoaded = false
-        providedSegments = segments
-        _sponsorSegments.value = if (isEnabled) segments else emptyList()
+        _sponsorSegments.value = segments
     }
 
     /**
      * Load SponsorBlock segments for a video.
      */
     fun loadSegments(videoId: String) {
-        currentVideoId = videoId
-        providedSegments = null
-
-        if (!isEnabled) return
-
         // Cancel previous load and clear state
         loadJob?.cancel()
         _sponsorSegments.value = emptyList()
@@ -161,9 +106,6 @@ class SponsorBlockHandler(
         _sponsorSegments.value = emptyList()
         lastSkippedSegmentUuid = null
         currentMutedSegmentUuid = null
-        currentVideoId = null
-        offlineSegmentsLoaded = false
-        providedSegments = null
     }
 
     /**
@@ -172,7 +114,6 @@ class SponsorBlockHandler(
      * MUTE and SHOW_TOAST actions are handled via their respective flows.
      */
     fun checkForSkip(currentPositionMs: Long): Long? {
-        if (!isEnabled && !offlineSegmentsLoaded) return null
         val segments = _sponsorSegments.value
         if (segments.isEmpty()) return null
 

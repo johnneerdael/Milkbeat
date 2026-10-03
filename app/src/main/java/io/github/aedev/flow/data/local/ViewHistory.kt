@@ -83,12 +83,9 @@ class ViewHistory private constructor(
         isMusic: Boolean = false,
         isShort: Boolean = false,
         // A device file's row stays local whichever caller writes it, or it would join the online
-        // history, the engine's signals and sync under an id that names no YouTube video.
+        // history and sync under an id that names no YouTube video.
         isLocal: Boolean = LocalMediaIds.isLocal(videoId),
     ) {
-        val prefs = PlayerPreferences(context)
-        if (prefs.isDeepFlowCurrentlyActive() && !prefs.isDeepFlowSaveToHistoryEnabled()) return
-
         val thumbnail = if (isLocal) thumbnailUrl else ThumbnailUrlResolver.normalizeVideoThumbnail(videoId, thumbnailUrl)
         dao.upsert(
             WatchHistoryEntity(
@@ -116,8 +113,6 @@ class ViewHistory private constructor(
         durationMs: Long,
     ) {
         if (durationMs <= 0L) return
-        val prefs = PlayerPreferences(context)
-        if (prefs.isDeepFlowCurrentlyActive() && !prefs.isDeepFlowSaveToHistoryEnabled()) return
         dao.markCompleted(videoId, durationMs)
     }
 
@@ -137,9 +132,6 @@ class ViewHistory private constructor(
         duration: Long = 0L,
         isShort: Boolean = false,
     ) {
-        val prefs = PlayerPreferences(context)
-        if (prefs.isDeepFlowCurrentlyActive() && !prefs.isDeepFlowSaveToHistoryEnabled()) return
-
         val thumbnail = ThumbnailUrlResolver.normalizeVideoThumbnail(videoId, thumbnailUrl)
         val existingPosition = dao.getPosition(videoId) ?: 0L // preserve saved progress
         // Opening a video before its stream resolves passes no duration, and taking that 0 would

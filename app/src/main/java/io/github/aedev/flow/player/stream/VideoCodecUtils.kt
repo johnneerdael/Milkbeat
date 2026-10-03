@@ -4,6 +4,9 @@ import android.net.Uri
 import org.schabi.newpipe.extractor.stream.VideoStream
 
 object VideoCodecUtils {
+    /** The codec preference that leaves every ranking on the built-in order. */
+    const val NO_PREFERENCE = "auto"
+
     private val QUALITY_HEIGHT_REGEX = Regex("""(\d+)p""")
     private val FRAME_RATE_LABEL_REGEX = Regex("""\d+p(\d+)""")
 
@@ -163,19 +166,16 @@ object VideoCodecUtils {
         }
 
     /**
-     * Parses the user's codec preference into an ordered priority list, most-preferred first.
-     *
-     * The preference is a comma-separated list of codec keys ("av1,vp9") so a single string can
-     * carry the preferred codec plus the fallback the user picked for videos that do not offer it.
-     * "auto" and blanks mean "no preference" and yield an empty list, which leaves every ranking on
-     * the built-in [playbackCodecRank] order.
+     * Parses a codec preference, a comma-separated list of codec keys ("av1,vp9"), into an ordered
+     * priority list, most-preferred first. [NO_PREFERENCE] and blanks yield an empty list, which
+     * leaves every ranking on the built-in [playbackCodecRank] order.
      */
     fun codecPriorityList(preference: String?): List<String> {
         if (preference.isNullOrBlank()) return emptyList()
         return preference
             .split(',')
             .map { it.trim().lowercase() }
-            .filter { it.isNotEmpty() && it != "auto" }
+            .filter { it.isNotEmpty() && it != NO_PREFERENCE }
             .distinct()
     }
 

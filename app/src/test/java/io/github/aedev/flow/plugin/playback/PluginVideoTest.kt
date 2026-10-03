@@ -43,7 +43,6 @@ class PluginVideoTest {
         every { limits.maxHeight } returns 2160
         every { limits.codecs("auto") } returns listOf("vp9", "h264")
         every { limits.hdr } returns true
-        every { preferences.videoCodecPriority } returns flowOf("auto")
         every { preferences.preferredAudioLanguage } returns flowOf("de")
         every { preferences.preferredSubtitleLanguage } returns flowOf("nl")
         coEvery { provider.resolve(capture(requests)) } returns Result.success(playback().copy(expiresInMs = 6 * 3_600_000L))
