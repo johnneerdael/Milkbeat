@@ -52,8 +52,6 @@ internal class PlayerSessionController(
     private val presence: PlaybackPresenceController,
     private val notes: PlayerNotes,
     private val shortsEnabled: () -> Boolean,
-    private val blockedChannelIds: () -> Set<String>,
-    private val refreshBlockedChannels: () -> Unit,
 ) {
     private val sessionApplier = collaborators.sessionApplier
     private val watchSessions = collaborators.watchSessions
@@ -280,7 +278,6 @@ internal class PlayerSessionController(
             return
         }
 
-        refreshBlockedChannels()
         navigationHistory.push(videoId)
         _canGoPrevious.value = navigationHistory.canGoPrevious
 
@@ -294,7 +291,6 @@ internal class PlayerSessionController(
                 videoId = videoId,
                 resumePositionOverrideMs = resumePositionOverrideMs,
                 allowShorts = shortsEnabled(),
-                blockedChannelIds = blockedChannelIds(),
             )
         loads.launch(videoId) { load ->
             resolver.resolve(

@@ -29,8 +29,7 @@ class VideoStatsLedgerTest {
     private fun VideoStatsLedger.record(
         event: ViewEvent,
         time: Long = now,
-        topics: List<String> = listOf("space", "physics", "science", "extra"),
-    ) = VideoStatsLedgerOps.recordView(this, time, event, topics, zone)
+    ) = VideoStatsLedgerOps.recordView(this, time, event, zone)
 
     private fun VideoStatsLedger.month(time: Long = now) = months.getValue(LedgerTime.at(time, zone).monthKey)
 
@@ -49,7 +48,6 @@ class VideoStatsLedgerTest {
         assertThat(month.channelNames["UCa"]).isEqualTo("Channel UCa")
         assertThat(month.videoViews["v1"]).isEqualTo(1)
         assertThat(month.videoTitles["v1"]).isEqualTo("Title v1")
-        assertThat(month.topicViews.keys).containsExactly("space", "physics", "science")
         assertThat(month.dayViews).containsExactly(14, 1)
         assertThat(month.dayMs).containsExactly(14, 120_000L)
         assertThat(month.hourViews).containsExactly(21, 1)
@@ -76,7 +74,6 @@ class VideoStatsLedgerTest {
         assertThat(month.videoSkips["v1"]).isEqualTo(1)
         assertThat(month.channelSkips["UCa"]).isEqualTo(1)
         assertThat(month.videoTitles["v1"]).isEqualTo("Title v1")
-        assertThat(month.topicViews).isEmpty()
     }
 
     @Test

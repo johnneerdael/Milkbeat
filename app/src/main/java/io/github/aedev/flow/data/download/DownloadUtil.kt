@@ -330,7 +330,7 @@ class DownloadUtil
             val descriptor = MusicVideoItems.descriptor(uri)
             if (runCatching { completeDownload(descriptor.ref.providerId) }.getOrDefault(false)) return QueuePreparationResult.Ready
             val picture = uri.scheme == MusicVideoItems.SCHEME
-            val limits = if (picture) PictureLimits(maxVideoHeight, pictureCodecs(playerPreferences.videoCodecPriority.first())) else null
+            val limits = if (picture) PictureLimits(maxVideoHeight, pictureCodecs(VideoCodecUtils.NO_PREFERENCE)) else null
             val quality = AudioQuality.valueOf(playerPreferences.musicAudioQuality.first().name)
             return pluginAudio.prepareQueue(descriptor, limits, quality, MusicVideoItems.preferredProvider(uri))
         }
@@ -339,7 +339,7 @@ class DownloadUtil
             uri: Uri,
             picture: Boolean,
         ): ResolvedAudio {
-            val limits = if (picture) PictureLimits(maxVideoHeight, pictureCodecs(playerPreferences.videoCodecPriority.first())) else null
+            val limits = if (picture) PictureLimits(maxVideoHeight, pictureCodecs(VideoCodecUtils.NO_PREFERENCE)) else null
             val quality = playerPreferences.musicAudioQuality.first()
             val descriptor = MusicVideoItems.descriptor(uri)
             return pluginAudio.resolve(

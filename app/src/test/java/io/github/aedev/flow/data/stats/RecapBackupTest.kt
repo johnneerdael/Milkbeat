@@ -16,7 +16,6 @@ class RecapBackupTest {
             video,
             now,
             ViewEvent("v1", "T", "UCa", "A", ViewFormat.LONG, 60_000L, counted = true, skipped = false),
-            listOf("space"),
         )
         val music = MusicStatsLedger()
         MusicStatsLedgerOps.record(music, now, "UCm", "M", "t1", "Song", null, 60_000L, counted = true, newArtist = true)

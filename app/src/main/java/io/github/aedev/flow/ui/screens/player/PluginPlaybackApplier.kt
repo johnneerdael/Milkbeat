@@ -5,10 +5,10 @@ import io.github.aedev.flow.R
 import io.github.aedev.flow.data.local.PlayerPreferences
 import io.github.aedev.flow.data.local.VideoQuality
 import io.github.aedev.flow.data.local.ViewHistory
-import io.github.aedev.flow.data.model.Video
 import io.github.aedev.flow.player.GlobalPlayerState
 import io.github.aedev.flow.player.stream.ResolvedPlayback
 import io.github.aedev.flow.player.stream.ServicePlaybackStreamSelector
+import io.github.aedev.flow.player.stream.VideoCodecUtils
 import io.github.aedev.flow.player.stream.VideoQualityOptions
 import io.github.aedev.flow.plugin.catalog.NoVideoPluginException
 import io.github.aedev.flow.plugin.catalog.listenerMessage
@@ -36,7 +36,6 @@ internal class PluginPlaybackApplier(
     private val liveChat: LiveChatController,
     private val viewHistory: ViewHistory,
     private val playerPreferences: PlayerPreferences,
-    private val recordWatchClick: (Video) -> Unit,
 ) {
     suspend fun apply(
         load: LoadContext,
@@ -46,7 +45,6 @@ internal class PluginPlaybackApplier(
         val playable = step.playable
         val video = playable.video
         GlobalPlayerState.setCurrentVideo(video)
-        recordWatchClick(video)
         playbackPreparer.beginSession(load.videoId, video.title, video.channelName, video.thumbnailUrl)
         val autoplay = playbackPreparer.applyAutoplayCandidates(videoId = load.videoId, videos = emptyList())
         if (playable.isLive) {
@@ -82,20 +80,17 @@ internal class PluginPlaybackApplier(
         autoplay: Boolean,
     ) {
         val playable = step.playable
-        val quality = playerPreferences.defaultQuality.first()
-        val codec = playerPreferences.videoCodecPriority.first()
         val (videoStream, audioStream) =
             ServicePlaybackStreamSelector.selectStreams(
                 videoCandidates = playable.videoStreams,
                 audioCandidatesAll = playable.audioStreams,
-                preferredQuality = quality,
+                preferredQuality = VideoQuality.AUTO,
                 preferredAudioLanguage = playerPreferences.preferredAudioLanguage.first(),
-                preferredCodecKey = codec,
+                preferredCodecKey = VideoCodecUtils.NO_PREFERENCE,
             )
         val savedPositionMs =
             step.resumePositionOverrideMs?.takeIf { it > 0L }
                 ?: viewHistory.getPlaybackPosition(load.videoId).first()
-        val isAdaptiveMode = quality == VideoQuality.AUTO
         uiState.update {
             it
                 .applyVodStreams(
@@ -106,7 +101,7 @@ internal class PluginPlaybackApplier(
                     audioStream = audioStream,
                     availableQualities = VideoQualityOptions.availableQualities(playable.videoStreams),
                     savedPositionMs = savedPositionMs,
-                    isAdaptiveMode = isAdaptiveMode,
+                    isAdaptiveMode = true,
                     autoplayEnabled = autoplay,
                 ).copy(chapters = playable.chapters)
         }
@@ -122,9 +117,9 @@ internal class PluginPlaybackApplier(
             durationSeconds = playable.durationSeconds,
             savedPositionMs = savedPositionMs,
             resumeOverrideRequested = step.resumePositionOverrideMs != null,
-            isAdaptiveMode = isAdaptiveMode,
-            preferredVideoCodec = codec,
-            preferredLiveQualityHeight = quality.height,
+            isAdaptiveMode = true,
+            preferredVideoCodec = VideoCodecUtils.NO_PREFERENCE,
+            preferredLiveQualityHeight = VideoQuality.AUTO.height,
             isCurrent = { isLoadCurrent(load.token) },
             requestHeaders = playable.requestHeaders,
             skipSegments = playable.skipSegments,

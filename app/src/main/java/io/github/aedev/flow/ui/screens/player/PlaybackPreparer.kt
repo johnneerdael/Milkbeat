@@ -2,12 +2,14 @@ package io.github.aedev.flow.ui.screens.player
 
 import android.content.Context
 import io.github.aedev.flow.data.local.PlayerPreferences
+import io.github.aedev.flow.data.local.VideoQuality
 import io.github.aedev.flow.data.model.SponsorBlockSegment
 import io.github.aedev.flow.data.model.Video
 import io.github.aedev.flow.data.video.OfflineSubtitleStore
 import io.github.aedev.flow.player.EnhancedPlayerManager
 import io.github.aedev.flow.player.PlaybackResumePolicy
 import io.github.aedev.flow.player.StreamRequestHeaders
+import io.github.aedev.flow.player.stream.VideoCodecUtils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
@@ -83,8 +85,8 @@ internal class PlaybackPreparer(
                 hlsUrl = hlsUrl,
                 streamType = StreamType.LIVE_STREAM,
                 startPosition = 0L,
-                preferredVideoCodec = playerPreferences.videoCodecPriority.first(),
-                preferredLiveQualityHeight = preferredDefaultQualityHeight(),
+                preferredVideoCodec = VideoCodecUtils.NO_PREFERENCE,
+                preferredLiveQualityHeight = VideoQuality.AUTO.height,
                 requestHeaders = requestHeaders,
             )
             applyRememberedPlaybackSpeed(isLive = true)
@@ -185,8 +187,6 @@ internal class PlaybackPreparer(
             playerManager.setPlaybackSpeed(playerPreferences.playbackSpeed.first())
         }
     }
-
-    private suspend fun preferredDefaultQualityHeight(): Int = playerPreferences.defaultQuality.first().height
 
     private companion object {
         const val TAG = "PlaybackPreparer"

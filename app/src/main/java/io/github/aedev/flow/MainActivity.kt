@@ -33,7 +33,6 @@ import androidx.lifecycle.lifecycleScope
 import dagger.hilt.android.AndroidEntryPoint
 import io.github.aedev.flow.data.local.LocalDataManager
 import io.github.aedev.flow.data.playlist.PlaylistTransfer
-import io.github.aedev.flow.data.recommendation.FlowNeuroEngine
 import io.github.aedev.flow.notification.NotificationHelper
 import io.github.aedev.flow.player.BackgroundPlaybackPolicy
 import io.github.aedev.flow.player.EnhancedPlayerManager
@@ -52,7 +51,6 @@ import io.github.aedev.flow.ui.tv.FlowTvApp
 import io.github.aedev.flow.utils.AppLanguageManager
 import io.github.aedev.flow.utils.FlowCrashHandler
 import io.github.aedev.flow.utils.PLAYLIST_FILE_MIME_TYPE
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -140,10 +138,6 @@ class MainActivity : ComponentActivity() {
         // still see it after a recreation it runs inside of (#817).
         lifecyclePlaybackPreferences.observeIn(lifecycleScope)
 
-        lifecycleScope.launch(Dispatchers.IO) {
-            FlowNeuroEngine.initialize(applicationContext)
-        }
-
         val dataManager = LocalDataManager(applicationContext)
 
         isRestoringState = savedInstanceState != null
@@ -175,10 +169,6 @@ class MainActivity : ComponentActivity() {
                     )
                 }
                 return@setContent
-            }
-
-            LaunchedEffect(Unit) {
-                FlowNeuroEngine.initialize(applicationContext)
             }
 
             FlowTheme(theme) {

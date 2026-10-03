@@ -133,15 +133,15 @@ class TvPluginsFocusTest {
         compose.setContent {
             val input = LocalInputModeManager.current
             LaunchedEffect(Unit) { input.requestInputMode(InputMode.Keyboard) }
-            TvTheme { TvSettingsScreen(initialCategory = TvSettingsCategory.QUALITY) }
+            TvTheme { TvSettingsScreen(initialCategory = TvSettingsCategory.PLAYBACK) }
         }
-        focus("Quality")
+        focus("Playback")
         val categoryRight =
             compose
-                .onNodeWithText("Quality")
+                .onNodeWithText("Playback")
                 .fetchSemanticsNode()
                 .boundsInRoot.right
-        compose.onNodeWithText("Quality").performClick()
+        compose.onNodeWithText("Playback").performClick()
         compose.waitForIdle()
         val focused = compose.onAllNodes(isFocused()).fetchSemanticsNodes().single()
         assertThat(focused.boundsInRoot.left).isGreaterThan(categoryRight)

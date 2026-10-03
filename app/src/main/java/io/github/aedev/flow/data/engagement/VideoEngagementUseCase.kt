@@ -1,12 +1,10 @@
 package io.github.aedev.flow.data.engagement
 
-import android.util.Log
 import io.github.aedev.flow.data.local.ChannelSubscription
 import io.github.aedev.flow.data.local.LikedVideoInfo
 import io.github.aedev.flow.data.local.LikedVideosRepository
 import io.github.aedev.flow.data.local.SubscriptionRepository
 import io.github.aedev.flow.data.model.Video
-import io.github.aedev.flow.data.recommendation.InteractionType
 import io.github.aedev.flow.data.stats.DislikedVideo
 import io.github.aedev.flow.data.stats.LedgerAction
 import io.github.aedev.flow.data.stats.VideoStatsRecorder
@@ -16,8 +14,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 
-private const val TAG = "VideoEngagement"
-
 /** Everything a surface shows about the viewer's relationship with one video and its channel. */
 data class VideoEngagement(
     val isSubscribed: Boolean = false,
@@ -26,25 +22,17 @@ data class VideoEngagement(
 )
 
 /**
- * Subscribe, notification and like/dislike for one video, with the learning signals each action
- * owes the recommendation engine.
+ * Subscribe, notification and like/dislike for one video, with the recap entry each action adds.
  *
- * The player, Shorts and the quick-actions sheet all performed the same writes followed by the
- * same [VideoEngagementSignals] calls; this is that sequence, once. It holds no state of its own —
- * every read is a cold flow and every write is a suspend call — so it is unscoped and the caller's
- * own scope owns any collection.
- *
- * Mutators take an `onApplied` callback rather than returning: the local write must be reflected in
- * the UI immediately, and the signals that follow it include a network channel-tag fetch, so a
- * caller that updated its state on return would leave the button stale for the length of that
- * fetch.
+ * It holds no state of its own — every read is a cold flow and every write is a suspend call — so
+ * it is unscoped and the caller's own scope owns any collection. Mutators report through an
+ * `onApplied` callback so the UI reflects the local write as soon as it lands.
  */
 class VideoEngagementUseCase
     @Inject
     constructor(
         private val subscriptionRepository: SubscriptionRepository,
         private val likedVideosRepository: LikedVideosRepository,
-        private val signals: VideoEngagementSignals,
         private val videoStats: VideoStatsRecorder,
     ) {
         fun subscriptionState(channelId: String): Flow<Boolean> = subscriptionRepository.isSubscribed(channelId)
@@ -114,9 +102,6 @@ class VideoEngagementUseCase
                 subscriptionRepository.unsubscribe(channelId)
             }
             onApplied(subscribed)
-            runCatching {
-                signals.channelSubscriptionChanged(channelId, channelName, subscribed)
-            }.onFailure { Log.w(TAG, "Failed to record subscription signal", it) }
         }
 
         suspend fun setNotificationEnabled(
@@ -124,13 +109,8 @@ class VideoEngagementUseCase
             enabled: Boolean,
         ) = subscriptionRepository.updateNotificationState(channelId, enabled)
 
-        /**
-         * Likes [video]. [signalVideo] is the item the engine learns from — the richest version of
-         * the video the caller holds — and a null one means the action carries no learning signal.
-         */
         suspend fun like(
             video: Video,
-            signalVideo: Video? = null,
             onApplied: () -> Unit = {},
         ) {
             likedVideosRepository.likeVideo(
@@ -145,17 +125,12 @@ class VideoEngagementUseCase
             )
             onApplied()
             videoStats.onAction(LedgerAction.LIKE)
-            if (signalVideo == null) return
-            try {
-                signals.videoInteraction(signalVideo, InteractionType.LIKED)
-            } catch (e: Exception) {
-                Log.w(TAG, "Failed to record like signal", e)
-            }
         }
 
+        /** Dislikes [videoId]; [video], when the caller holds it, names the dislike in the recap. */
         suspend fun dislike(
             videoId: String,
-            signalVideo: Video? = null,
+            video: Video? = null,
             onApplied: () -> Unit = {},
         ) {
             likedVideosRepository.dislikeVideo(videoId)
@@ -163,17 +138,11 @@ class VideoEngagementUseCase
             videoStats.onDislike(
                 DislikedVideo(
                     videoId = videoId,
-                    title = signalVideo?.title.orEmpty(),
-                    channelName = signalVideo?.channelName.orEmpty(),
+                    title = video?.title.orEmpty(),
+                    channelName = video?.channelName.orEmpty(),
                     at = System.currentTimeMillis(),
                 ),
             )
-            if (signalVideo == null) return
-            try {
-                signals.videoInteraction(signalVideo, InteractionType.DISLIKED)
-            } catch (e: Exception) {
-                Log.w(TAG, "Failed to record dislike", e)
-            }
         }
 
         suspend fun removeLike(videoId: String) {

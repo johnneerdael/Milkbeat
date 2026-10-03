@@ -38,7 +38,6 @@ internal class PlayerSecondaryMetadataLoader(
     private val currentState: () -> VideoPlayerUiState,
     private val relatedVideosFor: (String) -> List<Video>,
     private val shortsEnabled: () -> Boolean,
-    private val blockedChannelIds: () -> Set<String>,
     private val isPlaybackCurrent: (Long) -> Boolean,
     private val onResult: (SecondaryMetadata) -> Unit,
     /** The related lane's source: the video plugin. */
@@ -105,7 +104,6 @@ internal class PlayerSecondaryMetadataLoader(
                 fallback = playerManager.relatedCandidatesFor(videoId),
                 current = relatedVideosFor(videoId),
                 shortsEnabled = shortsEnabled(),
-                blockedChannelIds = blockedChannelIds(),
             )
         if (selected.isNotEmpty()) {
             relatedLoad.takeOver(videoId, loadToken)
@@ -141,7 +139,6 @@ internal class PlayerSecondaryMetadataLoader(
                         fallback = fallbackCandidates,
                         current = currentState().relatedVideos,
                         shortsEnabled = shortsEnabled(),
-                        blockedChannelIds = blockedChannelIds(),
                     )
                 if (resolved.isNotEmpty()) {
                     publish(videoId, resolved, loadToken)

@@ -7,8 +7,6 @@ import io.github.aedev.flow.data.local.ViewHistory
 import io.github.aedev.flow.data.localmedia.LocalMediaIds
 import io.github.aedev.flow.data.model.SponsorBlockSegment
 import io.github.aedev.flow.data.model.Video
-import io.github.aedev.flow.data.recommendation.FlowNeuroEngine
-import io.github.aedev.flow.data.recommendation.InteractionType
 import io.github.aedev.flow.data.repository.SponsorBlockRepository
 import io.github.aedev.flow.data.video.OfflineSubtitleStore
 import io.github.aedev.flow.data.video.VideoDownloadManager
@@ -60,7 +58,6 @@ internal class PlaybackSessionApplier(
     private val playerManager: EnhancedPlayerManager,
     private val scope: CoroutineScope,
     private val networkDispatcher: CoroutineDispatcher,
-    private val ioDispatcher: CoroutineDispatcher,
     private val enterUpcoming: (
         videoId: String,
         releaseMs: Long?,
@@ -145,20 +142,6 @@ internal class PlaybackSessionApplier(
                     offlineSegments = prepare.offlineSegments,
                     savedPosition = prepare.savedPosition ?: viewHistory.getPlaybackPosition(videoId).first(),
                 )
-            }
-        }
-    }
-
-    /**
-     * The engine's click signal. Off the startup path because it takes the brain mutex and updates
-     * vectors, none of which first frame needs.
-     */
-    fun recordWatchClick(video: Video) {
-        scope.launch(ioDispatcher) {
-            try {
-                FlowNeuroEngine.onVideoInteraction(context, video, InteractionType.CLICK)
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to record interaction", e)
             }
         }
     }

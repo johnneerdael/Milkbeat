@@ -13,7 +13,6 @@ import io.github.aedev.flow.data.local.*
 import io.github.aedev.flow.data.localmedia.LocalMediaIds
 import io.github.aedev.flow.data.model.Comment
 import io.github.aedev.flow.data.model.Video
-import io.github.aedev.flow.data.recommendation.FlowNeuroEngine
 import io.github.aedev.flow.data.repository.SponsorBlockRepository
 import io.github.aedev.flow.data.transcript.TranscriptRepository
 import io.github.aedev.flow.data.video.VideoDownloadManager
@@ -98,11 +97,9 @@ class VideoPlayerViewModel
                 uiState = _uiState,
                 scope = viewModelScope,
                 networkDispatcher = networkDispatcher,
-                ioDispatcher = ioDispatcher,
                 isLoadCurrent = loads::isCurrent,
                 currentLoadToken = { loads.token },
                 shortsEnabled = { shortsContentEnabled },
-                blockedChannelIds = { blockedChannelIds },
             )
 
         private val comments = collaborators.comments
@@ -173,8 +170,6 @@ class VideoPlayerViewModel
                 presence = presence,
                 notes = notes,
                 shortsEnabled = { shortsContentEnabled },
-                blockedChannelIds = { blockedChannelIds },
-                refreshBlockedChannels = ::refreshBlockedChannels,
             )
 
         val canGoPrevious: StateFlow<Boolean> = session.canGoPrevious
@@ -202,24 +197,7 @@ class VideoPlayerViewModel
         @Volatile
         private var shortsContentEnabled: Boolean = true
 
-        /**
-         * Channels the viewer has blocked, so the related list drops them the way search and the
-         * home feed do. The engine publishes no change signal, so this is re-read when a video
-         * loads — the same cadence search re-reads it at, and cheap beside the work a load already
-         * does.
-         */
-        @Volatile
-        private var blockedChannelIds: Set<String> = emptySet()
-
-        private fun refreshBlockedChannels() {
-            viewModelScope.launch {
-                blockedChannelIds = FlowNeuroEngine.getInstance(context).getBlockedChannels()
-            }
-        }
-
         init {
-            refreshBlockedChannels()
-
             // The first value is the empty queue of a fresh process; saving it would erase the one to restore.
             combine(playerManager.queueVideos, playerManager.currentQueueIndexState, ::Pair)
                 .drop(1)

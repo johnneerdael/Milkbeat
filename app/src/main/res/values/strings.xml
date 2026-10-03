@@ -73,15 +73,6 @@
     <string name="remove_from_history">Remove from history</string>
     <!-- Notifications Screen -->
     <string name="dismiss">Dismiss</string>
-    <!-- Deep Flow Mode -->
-    <string name="deep_flow_mode_title">Deep Flow Mode</string>
-    <string name="deep_flow_mode_subtitle">Pause learning while you browse</string>
-    <string name="deep_flow_save_history_title">Save to watch history</string>
-    <string name="deep_flow_save_history_subtitle">Keep watch history without teaching recommendations</string>
-    <string name="deep_flow_enabled_message">Deep Flow enabled</string>
-    <string name="deep_flow_disabled_message">Deep Flow disabled</string>
-    <string name="deep_flow_expired_message">Deep Flow timer ended</string>
-    <string name="settings_header_content_playback">Content &amp; Playback</string>
     <string name="settings_export_success">Data exported successfully</string>
     <string name="settings_export_failed">Export failed: %1$s</string>
     <!-- Player Settings -->
@@ -96,10 +87,6 @@
     <string name="player_settings_ambient_mode">Ambient mode</string>
     <string name="player_settings_ambient_mode_subtitle">A soft glow of the video\'s colors around it</string>
     <string name="loop_video">Loop video</string>
-    <string name="player_settings_sponsorblock">SponsorBlock</string>
-    <string name="player_settings_sponsorblock_subtitle">Skip sponsored segments</string>
-    <string name="player_settings_dearrow">DeArrow</string>
-    <string name="player_settings_dearrow_subtitle">Swap clickbait titles and thumbnails for community ones</string>
     <!-- Import Data Screen -->
     <string name="import_flow_backup_success">Milkbeat backup imported successfully</string>
     <string name="import_flow_backup_failed_template">Failed to import Milkbeat backup: %1$s</string>
@@ -182,27 +169,6 @@
     <!-- Onboarding -->
     <string name="onboarding_import_source_flow">Milkbeat backup</string>
     <string name="onboarding_import_source_youtube">YouTube</string>
-    <!-- Flow Personality Screen -->
-    <string name="persona_initiate_title">The Initiate</string>
-    <string name="persona_initiate_description">Just getting started. Your profile is still forming.</string>
-    <string name="persona_audiophile_title">The Audiophile</string>
-    <string name="persona_audiophile_description">You use Milkbeat mostly for Music. The vibe is everything.</string>
-    <string name="persona_livewire_title">The Livewire</string>
-    <string name="persona_livewire_description">You love the raw energy of Livestreams and premieres.</string>
-    <string name="persona_night_owl_title">The Night Owl</string>
-    <string name="persona_night_owl_description">You thrive in the dark. Most watching happens after midnight.</string>
-    <string name="persona_binger_title">The Binger</string>
-    <string name="persona_binger_description">Once you start, you can\'t stop. Massive content waves.</string>
-    <string name="persona_scholar_title">The Scholar</string>
-    <string name="persona_scholar_description">High-complexity content. Here to grow, not just be entertained.</string>
-    <string name="persona_deep_diver_title">The Deep Diver</string>
-    <string name="persona_deep_diver_description">Long-form video essays and documentaries are your world.</string>
-    <string name="persona_skimmer_title">The Skimmer</string>
-    <string name="persona_skimmer_description">Fast-paced, short content. Dopamine on demand.</string>
-    <string name="persona_specialist_title">The Specialist</string>
-    <string name="persona_specialist_description">Laser-focused on a few niches. You know what you like.</string>
-    <string name="persona_explorer_title">The Explorer</string>
-    <string name="persona_explorer_description">Chaotic and beautiful. A bit of everything.</string>
     <!-- Music Playlists Screen -->
     <string name="unknown_error">Unknown error</string>
     <!-- Enhanced Music Screen -->
@@ -263,18 +229,9 @@
     <string name="subtitle_auto_generated_template">%1$s (%2$s)</string>
     <string name="off">Off</string>
     <string name="playback_speed">Playback Speed</string>
-    <!-- Export / Import Flow Engine data (Settings + ImportDataScreen) -->
-    <string name="export_engine_data">Export Engine Profile</string>
-    <string name="export_engine_data_subtitle">Back up your AI personality &amp; learning data</string>
-    <string name="export_engine_success">Engine profile exported successfully</string>
-    <string name="export_engine_failed">Failed to export engine profile</string>
-    <string name="import_engine_data">Import Milkbeat Engine Data</string>
-    <string name="import_engine_data_desc">Restore your AI personality profile from a backup file</string>
-    <string name="import_engine_success">Engine profile restored successfully</string>
-    <string name="import_engine_failed">Failed to import engine profile</string>
     <!-- Master Backup -->
     <string name="master_backup_title">Master Backup</string>
-    <string name="master_backup_subtitle">App data, the video engine and the music engine in one file</string>
+    <string name="master_backup_subtitle">App data and the music engine in one file</string>
     <string name="master_backup_export_success">Master backup saved successfully</string>
     <string name="master_backup_export_failed">Failed to export master backup</string>
     <string name="import_master_backup_title">Import Master Backup</string>
@@ -380,7 +337,6 @@
     </plurals>
     <string name="tv_music_expand">Open full player</string>
     <string name="tv_music_radio">Radio</string>
-    <string name="tv_settings_flow_engine">Milkbeat Engine</string>
     <string name="tv_settings_visualizations">Visualizations</string>
     <string name="visualizer_enabled">Enable visualizations</string>
     <string name="visualizer_enabled_subtitle">projectM visuals that move with the music behind now playing</string>
@@ -564,8 +520,6 @@
     <string name="tv_account_recently_played">Recently played</string>
     <string name="tv_account_liked_music">Liked music</string>
     <string name="tv_account_playlists">Your playlists</string>
-    <string name="tv_settings_default_quality">Default quality</string>
-    <string name="tv_settings_codec">Preferred codec</string>
     <!-- Localization follow-up (#738) -->
     <string name="crash_title">Milkbeat closed unexpectedly</string>
     <string name="crash_subtitle">This report stays on your device until you share it.</string>

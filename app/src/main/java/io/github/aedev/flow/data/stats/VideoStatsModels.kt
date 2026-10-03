@@ -38,7 +38,6 @@ class MonthViewing(
     val videoViews: MutableMap<String, Int> = HashMap(),
     val videoTitles: MutableMap<String, String> = HashMap(),
     val videoChannels: MutableMap<String, String> = HashMap(),
-    val topicViews: MutableMap<String, Int> = HashMap(),
     /** Channels whose first view ever happened this month. */
     val discoveredChannels: MutableSet<String> = HashSet(),
     val videoSkips: MutableMap<String, Int> = HashMap(),
@@ -77,12 +76,10 @@ object VideoStatsParams {
     const val MONTHS_MAX = 36
     const val CHANNELS_PER_MONTH = 300
     const val VIDEOS_PER_MONTH = 300
-    const val TOPICS_PER_MONTH = 60
     const val DISCOVERED_PER_MONTH = 500
     const val SKIPS_PER_MONTH = 150
     const val DISLIKES_PER_MONTH = 100
     const val QUERIES_PER_MONTH = 20
-    const val TOPICS_PER_VIEW = 3
 }
 
 @Serializable
@@ -99,7 +96,6 @@ data class VideoMonthRecord(
     val videoViews: Map<String, Int> = emptyMap(),
     val videoTitles: Map<String, String> = emptyMap(),
     val videoChannels: Map<String, String> = emptyMap(),
-    val topicViews: Map<String, Int> = emptyMap(),
     val discoveredChannels: List<String> = emptyList(),
     val videoSkips: Map<String, Int> = emptyMap(),
     val channelSkips: Map<String, Int> = emptyMap(),
@@ -133,7 +129,6 @@ fun MonthViewing.toRecord(): VideoMonthRecord =
         videoViews = videoViews.toMap(),
         videoTitles = videoTitles.toMap(),
         videoChannels = videoChannels.toMap(),
-        topicViews = topicViews.toMap(),
         discoveredChannels = discoveredChannels.toList(),
         videoSkips = videoSkips.toMap(),
         channelSkips = channelSkips.toMap(),
@@ -160,7 +155,6 @@ fun VideoMonthRecord.toMonth(): MonthViewing =
         videoViews = HashMap(videoViews),
         videoTitles = HashMap(videoTitles),
         videoChannels = HashMap(videoChannels),
-        topicViews = HashMap(topicViews),
         discoveredChannels = HashSet(discoveredChannels),
         videoSkips = HashMap(videoSkips),
         channelSkips = HashMap(channelSkips),

@@ -9,8 +9,6 @@ data class PlaybackResolutionRequest(
     val videoId: String,
     val resumePositionOverrideMs: Long?,
     val allowShorts: Boolean,
-    /** Creators the viewer has blocked; their videos never enter the related list. */
-    val blockedChannelIds: Set<String> = emptySet(),
 )
 
 /** Why a resolution produced nothing to play, and therefore which error string the screen shows. */

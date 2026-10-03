@@ -16,8 +16,7 @@ import kotlinx.coroutines.launch
  * Only one channel/video pair is observed at a time — asking again for the pair already collecting
  * is dropped, and any other pair cancels the collector rather than adding a second one.
  *
- * The learning signal each write carries comes from [richVideoFor], so a like recorded from a card
- * with nothing but a title still reaches the engine with the tags and description the screen holds.
+ * A dislike's recap entry takes its title and channel from [richVideoFor], the video the screen holds.
  */
 internal class PlayerEngagementController(
     private val engagement: VideoEngagementUseCase,
@@ -70,7 +69,7 @@ internal class PlayerEngagementController(
                     viewCount = 0,
                     uploadDate = "",
                 )
-            engagement.like(video = liked, signalVideo = richVideoFor(videoId) ?: liked) {
+            engagement.like(video = liked) {
                 state.value = state.value.copy(likeState = "LIKED")
             }
         }
@@ -78,7 +77,7 @@ internal class PlayerEngagementController(
 
     fun dislike(videoId: String) {
         scope.launch {
-            engagement.dislike(videoId, signalVideo = richVideoFor(videoId)) {
+            engagement.dislike(videoId, video = richVideoFor(videoId)) {
                 state.value = state.value.copy(likeState = "DISLIKED")
             }
         }
