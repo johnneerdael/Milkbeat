@@ -15,23 +15,23 @@
     {
       "id": "nl.neerdael.spotify",
       "name": "Spotify",
-      "version": "0.1.2",
-      "versionCode": 3,
-      "sha256": "e83f82f71b1e202cb4494cf1eab9d448cf930d783fc011e53eac84a03f45fd60",
-      "size": 12935,
+      "version": "0.2.1",
+      "versionCode": 5,
+      "sha256": "d01c962346db6c93f50e9db144ed89709c190f785da7aabed786e81260782b26",
+      "size": 13294,
       "fingerprint": "39dca3d132c56262c0873ec96faf22cc8ed9ca30c7ed1f135049f8570b943adc",
-      "contentDigest": "b069f878c72e06b666c032070545628be5178f85ef8cec73d20b4649fbc3707e",
+      "contentDigest": "5d145b27a8fbee95b468c22ccb19bafdfe63283aa69676ee186411500007be48",
       "code": "981"
     },
     {
       "id": "nl.neerdael.youtube-music",
       "name": "YouTube Music",
-      "version": "0.1.3",
-      "versionCode": 4,
-      "sha256": "6769be430e9959be0f196cda1be986b835487a02b023fb49505b08a4e9735faa",
-      "size": 118143,
+      "version": "0.2.1",
+      "versionCode": 6,
+      "sha256": "5813de282777fb7c15779dc54cd911876cc24068bd3dee09c873ca268f8b1fca",
+      "size": 124379,
       "fingerprint": "39dca3d132c56262c0873ec96faf22cc8ed9ca30c7ed1f135049f8570b943adc",
-      "contentDigest": "dc9bfa88ac2dbfaf9eae41bc20bba3871027e7fb1ea1be9c70ace68fa06942d4",
+      "contentDigest": "e156bff17bbf4820a87fe5d1612c67a1b855be88db38c444ecaf396e2194b427",
       "code": "494"
     }
   ]
