@@ -28,8 +28,8 @@ internal class PluginRuntimeContexts<Context : Any>(
         timeoutMs: Long,
         block: suspend (Context) -> Result,
     ): Result =
-        withTimeout(timeoutMs) {
-            lock.withLock {
+        lock.withLock {
+            withTimeout(timeoutMs) {
                 val ownedJob = currentCoroutineContext().job
                 synchronized(stateLock) {
                     if (closed) throw CancellationException("Plugin runtime closed")

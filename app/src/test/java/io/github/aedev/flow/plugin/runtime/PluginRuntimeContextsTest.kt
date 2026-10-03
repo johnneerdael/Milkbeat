@@ -11,6 +11,7 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.job
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withTimeout
 import org.junit.Test
 
 class PluginRuntimeContextsTest {
@@ -39,7 +40,81 @@ class PluginRuntimeContextsTest {
         }
 
     @Test
-    fun `queued timeout leaves the active context open and reusable`() =
+    fun `queued calls receive their full execution budget after acquiring ownership`() =
+        runTest {
+            val created = mutableListOf<Context>()
+            val contexts = contexts(created)
+            val entered = CompletableDeferred<Unit>()
+            val active =
+                async {
+                    contexts.call(1_000) {
+                        entered.complete(Unit)
+                        delay(100)
+                        it
+                    }
+                }
+            entered.await()
+            val queued =
+                async {
+                    runCatching {
+                        contexts.call(10) {
+                            delay(9)
+                            it
+                        }
+                    }
+                }
+
+            assertThat(active.await()).isSameInstanceAs(created.single())
+            val result = queued.await()
+            assertThat(result.exceptionOrNull()).isNull()
+            assertThat(result.getOrNull()).isSameInstanceAs(created.single())
+            assertThat(testScheduler.currentTime).isEqualTo(109)
+            assertThat(created.single().closed).isFalse()
+            contexts.close()
+        }
+
+    @Test
+    fun `execution timeout after a long queue wait retires the acquired context`() =
+        runTest {
+            val created = mutableListOf<Context>()
+            val contexts = contexts(created)
+            val entered = CompletableDeferred<Unit>()
+            val executionStarted = CompletableDeferred<Long>()
+            val executionStopped = CompletableDeferred<Long>()
+            val active =
+                async {
+                    contexts.call(1_000) {
+                        entered.complete(Unit)
+                        delay(100)
+                        it
+                    }
+                }
+            entered.await()
+            val queued =
+                async {
+                    runCatching {
+                        contexts.call(10) {
+                            executionStarted.complete(testScheduler.currentTime)
+                            try {
+                                delay(11)
+                            } finally {
+                                executionStopped.complete(testScheduler.currentTime)
+                            }
+                        }
+                    }.exceptionOrNull()
+                }
+
+            assertThat(active.await()).isSameInstanceAs(created.single())
+            assertThat(queued.await()).isInstanceOf(TimeoutCancellationException::class.java)
+            assertThat(executionStarted.await()).isEqualTo(100)
+            assertThat(executionStopped.await()).isEqualTo(110)
+            assertThat(created.single().closed).isTrue()
+            assertThat(contexts.call(1_000) { it }).isSameInstanceAs(created[1])
+            contexts.close()
+        }
+
+    @Test
+    fun `caller timeout while queued leaves the active context open and reusable`() =
         runTest {
             val created = mutableListOf<Context>()
             val contexts = contexts(created)
@@ -54,7 +129,7 @@ class PluginRuntimeContextsTest {
                     }
                 }
             entered.await()
-            val failure = async { runCatching { contexts.call(10) { it } }.exceptionOrNull() }
+            val failure = async { runCatching { withTimeout(10) { contexts.call(1_000) { it } } }.exceptionOrNull() }
 
             assertThat(failure.await()).isInstanceOf(TimeoutCancellationException::class.java)
             assertThat(created.single().closed).isFalse()
@@ -96,7 +171,7 @@ class PluginRuntimeContextsTest {
         }
 
     @Test
-    fun `call wall-clock deadline includes cold context creation`() =
+    fun `execution deadline includes cold context creation`() =
         runTest {
             val contexts =
                 PluginRuntimeContexts(
