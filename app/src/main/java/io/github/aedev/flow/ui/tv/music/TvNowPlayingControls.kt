@@ -12,6 +12,7 @@ import androidx.compose.material.icons.automirrored.outlined.QueueMusic
 import androidx.compose.material.icons.outlined.Favorite
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.GraphicEq
+import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.MusicVideo
 import androidx.compose.material.icons.outlined.Pause
 import androidx.compose.material.icons.outlined.PlayArrow
@@ -37,6 +38,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import io.github.aedev.flow.R
+import io.github.aedev.flow.data.local.NowPlayingView
 import io.github.aedev.flow.player.RepeatMode
 import io.github.aedev.flow.ui.components.musicplayer.controls.PlayerProgressSlider
 import io.github.aedev.flow.ui.tv.components.TvIconButton
@@ -57,8 +59,9 @@ internal data class TvNowPlayingControlsState(
     val isLiked: Boolean,
     val shuffleEnabled: Boolean,
     val repeatMode: RepeatMode,
-    val videoAvailable: Boolean,
-    val videoOn: Boolean,
+    /** The view on screen, and the one the view button steps to. */
+    val view: NowPlayingView,
+    val nextView: NowPlayingView,
     val queueOpen: Boolean,
 )
 
@@ -71,7 +74,7 @@ internal class TvNowPlayingControlsActions(
     val onNext: () -> Unit,
     val onToggleRepeat: () -> Unit,
     val onToggleLike: () -> Unit,
-    val onToggleVideo: () -> Unit,
+    val onNextView: () -> Unit,
     val onToggleQueue: () -> Unit,
 )
 
@@ -175,16 +178,24 @@ internal fun TvNowPlayingControls(
                     colors = buttonColors,
                     size = ControlButtonSize,
                 )
-                // A choice between two views rather than an on/off feature: it shows the view on screen,
-                // unfilled. A track without a video keeps it in place, dimmed, so the row never shifts.
+                // A choice between views rather than an on/off feature: it shows the view on screen,
+                // unfilled, and names the one it steps to.
                 TvIconButton(
-                    icon = if (state.videoOn) Icons.Outlined.MusicVideo else Icons.Outlined.GraphicEq,
+                    icon =
+                        when (state.view) {
+                            NowPlayingView.VISUALIZER -> Icons.Outlined.GraphicEq
+                            NowPlayingView.VIDEO -> Icons.Outlined.MusicVideo
+                            NowPlayingView.STATIC -> Icons.Outlined.Image
+                        },
                     contentDescription =
                         stringResource(
-                            if (state.videoOn) R.string.tv_music_show_visualizer else R.string.tv_music_show_video,
+                            when (state.nextView) {
+                                NowPlayingView.VISUALIZER -> R.string.tv_music_show_visualizer
+                                NowPlayingView.VIDEO -> R.string.tv_music_show_video
+                                NowPlayingView.STATIC -> R.string.tv_music_show_artwork
+                            },
                         ),
-                    onClick = actions.onToggleVideo,
-                    enabled = state.videoAvailable,
+                    onClick = actions.onNextView,
                     colors = buttonColors,
                     size = ControlButtonSize,
                 )

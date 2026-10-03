@@ -4,6 +4,7 @@ import android.view.KeyEvent
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import io.github.aedev.flow.data.local.NowPlayingView
 import io.github.aedev.flow.data.local.VisualizerPreferences
 import io.github.aedev.flow.player.audio.visualizer.VisualizerAudioTap
 import io.github.aedev.flow.player.audio.visualizer.VisualizerEngine
@@ -11,6 +12,7 @@ import io.github.aedev.flow.player.audio.visualizer.VisualizerSettings
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import nl.neerdael.projectm.core.ProjectMJNI
 import javax.inject.Inject
 
@@ -21,7 +23,7 @@ class TvVisualizerViewModel
     constructor(
         val engine: VisualizerEngine,
         private val tap: VisualizerAudioTap,
-        preferences: VisualizerPreferences,
+        private val preferences: VisualizerPreferences,
     ) : ViewModel() {
         val active: StateFlow<Boolean> = engine.active.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
@@ -35,6 +37,14 @@ class TvVisualizerViewModel
 
         val timingOffsetMs: StateFlow<Int> =
             preferences.timingOffsetMs.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
+
+        /** The view now-playing shows, as its view button last left it; null until read. */
+        val nowPlayingView: StateFlow<NowPlayingView?> =
+            preferences.nowPlayingView.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+        fun setNowPlayingView(view: NowPlayingView) {
+            viewModelScope.launch { preferences.setNowPlayingView(view) }
+        }
 
         val diagnosticsShown: StateFlow<Boolean> =
             preferences.diagnostics.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)

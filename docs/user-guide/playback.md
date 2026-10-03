@@ -4,7 +4,7 @@
 
 ## Player controls
 
-Press OK in the full music player to show seeking, shuffle, previous, play/pause, next, repeat, like, the video/visualizer switch and the queue. Back closes the current panel or player surface.
+Press OK in the full music player to show seeking, shuffle, previous, play/pause, next, repeat, like, the view button and the queue. Back closes the current panel or player surface.
 
 ![Player controls over projectM visuals](images/player-controls.png)
 
@@ -40,7 +40,7 @@ Rendering and audio monitoring stop when the visualizer leaves the screen or the
 
 ## Timing and diagnostics
 
-Settings → Visualizations contains the visualizer switch, music-video default, the projectM settings, diagnostics and the timing offset. Raise the timing value if the visuals arrive after the beat; lower it if they arrive before. Adjust by listening and watching on your own audio setup.
+Settings → Visualizations contains the visualizer switch, the projectM settings, diagnostics and the timing offset. Raise the timing value if the visuals arrive after the beat; lower it if they arrive before. Adjust by listening and watching on your own audio setup.
 
 Diagnostics show measured fps, target fps, render dimensions and whether the size is automatic or fixed, transition state, audio level and preset. Use these values when investigating slow visuals instead of judging performance from a still screenshot.
 
@@ -62,8 +62,10 @@ With **Change presets automatically** off, a preset stays until you press Left o
 
 ![A preset reached by a cut on a loud beat](images/visualizer-effect-beat-cuts.png)
 
-## Music videos
+## Visualizer, music video or artwork
 
-Supported music-video tracks can switch from visuals to their picture while audio continues. Unsupported or unavailable video can fall back to audio and visuals. **Show music videos** changes the starting preference; the player switch changes it for the current session.
+The view button in the player steps through three views while audio continues: the visualizer (the default), the music video, and the track's static artwork. Milkbeat remembers the view you leave it on for later tracks and later sessions.
+
+A track without a video skips from the visualizer straight to the artwork, and with the video view chosen it shows the visualizer instead. With visualizations turned off, the button moves between the video and the artwork. Unsupported or unavailable video falls back to audio and visuals.
 
 ![Full-screen music-video example from the existing README](images/music-video.jpg)

@@ -53,13 +53,6 @@ class TvVisualizerSettingsViewModel
             viewModelScope.launch { preferences.setTimingOffsetMs(offsetMs) }
         }
 
-        val showMusicVideos: StateFlow<Boolean> =
-            preferences.showMusicVideos.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
-
-        fun setShowMusicVideos(show: Boolean) {
-            viewModelScope.launch { preferences.setShowMusicVideos(show) }
-        }
-
         fun setDiagnostics(enabled: Boolean) {
             viewModelScope.launch { preferences.setDiagnostics(enabled) }
         }
