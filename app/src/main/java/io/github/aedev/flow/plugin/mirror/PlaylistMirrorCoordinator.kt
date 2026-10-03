@@ -154,6 +154,7 @@ class PlaylistMirrorCoordinator
             background: Boolean,
             artwork: Artwork?,
             forPlayback: Boolean = false,
+            onWaiting: () -> Unit = {},
         ): MirrorRecord {
             val preparation =
                 synchronized(tasks) {
@@ -221,6 +222,7 @@ class PlaylistMirrorCoordinator
                     active
                 }
             return try {
+                if (forPlayback && preparation.job.isActive) onWaiting()
                 preparation.job.await()
             } finally {
                 synchronized(tasks) {
@@ -248,13 +250,14 @@ class PlaylistMirrorCoordinator
         suspend fun prepareForPlayback(
             key: MirrorKey,
             title: String,
+            onWaiting: () -> Unit = {},
         ): MirrorRecord =
             gate.foreground(key.id) {
                 if (selectedKey(key.sourcePlugin, key.source) != key) {
                     synchronized(tasks) { playbackHandoff.clear() }
                     throw MirrorPreparationException(MirrorFailure.UNSUPPORTED)
                 }
-                awaitPreparation(key, title, false, null, forPlayback = true)
+                awaitPreparation(key, title, false, null, forPlayback = true, onWaiting = onWaiting)
             }
 
         fun open(

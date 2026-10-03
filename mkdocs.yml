@@ -26,6 +26,7 @@ nav:
   - Playback and visuals: playback.md
   - Settings reference: settings.md
   - Troubleshooting: troubleshooting.md
+  - Release notes: releases.md
 validation:
   links:
     not_found: warn

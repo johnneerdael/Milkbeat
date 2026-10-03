@@ -12,7 +12,9 @@ import androidx.work.WorkManager
 import androidx.work.workDataOf
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.aedev.flow.plugin.catalog.PluginAccounts
+import io.github.aedev.flow.plugin.registry.InstalledPlugin
 import io.github.aedev.flow.plugin.registry.PluginRegistry
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -101,14 +103,22 @@ class PlaylistMirrorJobs
                 }
             }
             scope.launch {
+                var previous = emptyMap<String, InstalledPlugin>()
                 combine(store.enabledPairs, registry.state) { pairs, registry ->
-                    pairs to
-                        registry.plugins.map { it.id to it.manifest.versionCode }
+                    val mirrored = pairs.flatMap { it.split('|') }.toSet()
+                    registry.plugins
+                        .filter { it.enabled && (it.manifest.signIn.isNotEmpty() || it.id in mirrored) }
+                        .associateBy { it.id }
                 }.distinctUntilChanged()
-                    .collect { (pairs, _) ->
-                        pairs.flatMap { it.split('|') }.distinct().forEach { id ->
-                            if (registry.state.value.plugin(id) != null) runCatching { accounts.refresh(id) }
+                    .collect { current ->
+                        current.filter { (id, plugin) -> previous[id] != plugin }.forEach { (id, _) ->
+                            try {
+                                accounts.refresh(id)
+                            } catch (error: Exception) {
+                                if (error is CancellationException) throw error
+                            }
                         }
+                        previous = current
                     }
             }
         }

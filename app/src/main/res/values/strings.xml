@@ -644,6 +644,7 @@
     <string name="music_folders_save">Save</string>
     <string name="music_folders_editor_back">Back</string>
     <string name="playlist_mirror_starting">Starting playlist preparation…</string>
+    <string name="playlist_mirror_playback_waiting">Playlist syncing. Playback will start when it is ready.</string>
     <string name="playlist_mirror_title">Private playlist preparation</string>
     <string name="playlist_mirror_background">Preparing your playlists for native playback and radio</string>
     <string name="playlist_mirror_option">Prepare private playlists in %1$s</string>

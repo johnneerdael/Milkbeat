@@ -24,8 +24,10 @@ import io.github.aedev.flow.player.EnhancedMusicPlayerManager
 import io.github.aedev.flow.player.MusicFolderPlaybackMetadata
 import io.github.aedev.flow.utils.PerformanceDispatcher
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -50,6 +52,8 @@ class MusicPlayerViewModel
     ) : ViewModel() {
         private val _uiState = MutableStateFlow(MusicPlayerUiState())
         val uiState: StateFlow<MusicPlayerUiState> = _uiState.asStateFlow()
+        private val _mirrorPlaybackWaiting = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+        val mirrorPlaybackWaiting = _mirrorPlaybackWaiting.asSharedFlow()
 
         /**
          * Playback position is kept out of [MusicPlayerUiState] on purpose. It changes several times a
@@ -339,6 +343,7 @@ class MusicPlayerViewModel
                                     queue,
                                     radioPlaylistId,
                                     displaySourceName?.takeIf { it.isNotBlank() } ?: finalSourceName,
+                                    onWaiting = { _mirrorPlaybackWaiting.tryEmit(Unit) },
                                 )
                             }
                         } catch (e: kotlinx.coroutines.CancellationException) {

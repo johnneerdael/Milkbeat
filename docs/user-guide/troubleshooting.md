@@ -44,3 +44,10 @@ Enable diagnostics and note the preset, fps, target and render dimensions. Autom
 ## A plugin update was not installed with an app update
 
 Enter the plugin's current download link again in Settings → Plugins and review the update. Plugin packages must retain their signing author. Sign-in data is managed separately from the plugin code.
+
+
+## Private playlist preparation fails
+
+Check that both Spotify and YouTube Music are enabled, signed in and updated to versions that support playlist preparation. If a sign-in expired, reopen that plugin's details and sign in through the phone viewer, then select **Retry preparation** on the playlist page.
+
+Interrupted preparation resumes from saved progress. Confirmed unavailable songs are omitted; temporary connection errors can be retried. Your own playlists and Liked Songs can prepare in the background, while other playlists prepare when opened. Albums use normal playback and are not mirrored. See [Prepare private playlists](providers.md#prepare-private-playlists).

@@ -126,13 +126,20 @@ For Spotify, select **Spotify** for metadata and **YouTube Music** for audio. Sp
 catalog; the audio provider supplies playback. Spotify tracks can continue with YouTube's mix
 through their matched YouTube track.
 
-With both providers signed in and current plugins installed, Spotify's details also offer
-**Prepare private playlists in YouTube Music**. This optional setting is off by default. Your own
+With both providers signed in and compatible plugin versions installed, Spotify's details also offer
+**Prepare private playlists in YouTube Music**. This optional setting is off by default. Its purpose
+is a mix that reflects the playlist: normal Spotify playback seeds YouTube radio from the first
+playing song; preparation gives YouTube a native playlist containing all matched songs for
+playlist-context autoplay. Known YouTube IDs also let Milkbeat exclude those songs from the radio
+continuation. Your own
 playlists and Liked Songs prepare in advance; other playlists prepare when opened. A private copy
 is created with the source cover and fills as songs are matched, one at a time. Copies refresh
 one way from Spotify. Initial playback can wait for matching, then uses the complete
-prepared YouTube playlist while keeping Spotify's song metadata and artwork. See the
-[preparation guide](docs/user-guide/providers.md#prepare-private-playlists).
+prepared YouTube playlist while keeping Spotify's song metadata and artwork. Managed copies are
+reused after restarting Milkbeat and updated in place when Spotify changes. YouTube's radio
+suggestions stay in the playback queue; they are not added to the private copy. Albums are not mirrored.
+See the [preparation guide](docs/user-guide/providers.md#prepare-private-playlists) and
+[what changed in 0.9.0](docs/user-guide/releases.md#milkbeat-090).
 
 Open an installed plugin's details to sign in. Web sign-ins use the
 [streamed phone viewer](docs/phone-sign-in-remote-view.md): scan the TV's QR code with a phone on

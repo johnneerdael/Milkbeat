@@ -131,7 +131,9 @@ class PlaylistMirrorCoordinatorTest {
             val f = PlaybackFixture()
             f.plugins.value = PluginRegistryState(listOf(plugin("source", true), plugin("target")))
             f.coordinator.prepare(f.key, "Playlist")
-            assertThat(f.coordinator.prepareForPlayback(f.key, "Playlist")).isSameInstanceAs(f.record)
+            var notices = 0
+            assertThat(f.coordinator.prepareForPlayback(f.key, "Playlist") { notices++ }).isSameInstanceAs(f.record)
+            assertThat(notices).isEqualTo(0)
             coVerify(exactly = 1) { f.runner.prepare(any(), any(), any(), any(), any()) }
             f.coordinator.prepareForPlayback(f.key, "Playlist")
             coVerify(exactly = 2) { f.runner.prepare(any(), any(), any(), any(), any()) }
@@ -176,10 +178,59 @@ class PlaylistMirrorCoordinatorTest {
             }
             val page = async { f.coordinator.prepare(f.key, "Playlist") }
             started.await()
-            val play = async { f.coordinator.prepareForPlayback(f.key, "Playlist") }
+            var notices = 0
+            val play = async { f.coordinator.prepareForPlayback(f.key, "Playlist") { notices++ } }
             runCurrent()
+            assertThat(notices).isEqualTo(1)
+            assertThat(play.isCompleted).isFalse()
             finish.complete(f.record)
             assertThat(play.await()).isSameInstanceAs(page.await())
+            assertThat(notices).isEqualTo(1)
+            coVerify(exactly = 1) { f.runner.prepare(any(), any(), any(), any(), any()) }
+        }
+
+    @Test
+    fun `Play reports waiting when starting a new preparation`() =
+        runTest {
+            val f = PlaybackFixture()
+            f.plugins.value = PluginRegistryState(listOf(plugin("source", true), plugin("target")))
+            val started = CompletableDeferred<Unit>()
+            val finish = CompletableDeferred<MirrorRecord>()
+            coEvery { f.runner.prepare(any(), any(), any(), any(), any()) } coAnswers {
+                started.complete(Unit)
+                finish.await()
+            }
+            var notices = 0
+            val play = async { f.coordinator.prepareForPlayback(f.key, "Playlist") { notices++ } }
+            started.await()
+            assertThat(notices).isEqualTo(1)
+            assertThat(play.isCompleted).isFalse()
+            finish.complete(f.record)
+            assertThat(play.await()).isSameInstanceAs(f.record)
+            assertThat(notices).isEqualTo(1)
+            coVerify(exactly = 1) { f.runner.prepare(any(), any(), any(), any(), any()) }
+        }
+
+    @Test
+    fun `Play waiting consumer can cancel without cancelling the page preparation`() =
+        runTest {
+            val f = PlaybackFixture()
+            f.plugins.value = PluginRegistryState(listOf(plugin("source", true), plugin("target")))
+            val started = CompletableDeferred<Unit>()
+            val finish = CompletableDeferred<MirrorRecord>()
+            coEvery { f.runner.prepare(any(), any(), any(), any(), any()) } coAnswers {
+                started.complete(Unit)
+                finish.await()
+            }
+            val page = async { f.coordinator.prepare(f.key, "Playlist") }
+            started.await()
+            var notices = 0
+            val play = async { f.coordinator.prepareForPlayback(f.key, "Playlist") { notices++ } }
+            runCurrent()
+            play.cancelAndJoin()
+            assertThat(notices).isEqualTo(1)
+            finish.complete(f.record)
+            assertThat(page.await()).isSameInstanceAs(f.record)
             coVerify(exactly = 1) { f.runner.prepare(any(), any(), any(), any(), any()) }
         }
 
@@ -208,7 +259,9 @@ class PlaylistMirrorCoordinatorTest {
                     f.accountStates.value =
                         f.accountStates.value + ("target" to ProviderAccount.Expired)
                 }
-                assertThat(runCatching { f.coordinator.prepareForPlayback(f.key, "Playlist") }.isFailure).isTrue()
+                var notices = 0
+                assertThat(runCatching { f.coordinator.prepareForPlayback(f.key, "Playlist") { notices++ } }.isFailure).isTrue()
+                assertThat(notices).isEqualTo(0)
                 coVerify(exactly = 1) { f.runner.prepare(any(), any(), any(), any(), any()) }
             }
         }
@@ -270,12 +323,14 @@ class PlaylistMirrorCoordinatorTest {
             }
             val page = async { f.coordinator.prepare(f.key, "Playlist") }
             started.await()
-            val play = async { f.coordinator.prepareForPlayback(f.key, "Playlist") }
+            var notices = 0
+            val play = async { f.coordinator.prepareForPlayback(f.key, "Playlist") { notices++ } }
             playEntered.await()
             finish.complete(f.record)
             page.await()
             releasePlay.complete(Unit)
             assertThat(play.await()).isSameInstanceAs(f.record)
+            assertThat(notices).isEqualTo(0)
             coVerify(exactly = 1) { f.runner.prepare(any(), any(), any(), any(), any()) }
         }
 

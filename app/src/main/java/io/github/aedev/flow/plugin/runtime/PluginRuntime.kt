@@ -4,7 +4,6 @@ import android.os.SystemClock
 import android.util.Log
 import com.dokar.quickjs.QuickJs
 import com.dokar.quickjs.QuickJsException
-import com.dokar.quickjs.binding.AsyncFunctionBinding
 import com.dokar.quickjs.binding.FunctionBinding
 import io.github.aedev.flow.plugin.host.CallEnvelope
 import io.github.aedev.flow.plugin.host.PluginBrowser
@@ -14,13 +13,12 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExecutorCoroutineDispatcher
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
@@ -77,7 +75,12 @@ internal class PluginRuntime(
     private val scope: CoroutineScope,
 ) {
     private val shortName = plugin.id.substringAfterLast('.')
-    private val contextLock = Mutex()
+    private val contexts =
+        PluginRuntimeContexts(
+            create = { start(MEMORY_LIMIT, CALL_TIMEOUT_MS) },
+            close = { it.close() },
+            isTainted = { it.tainted },
+        )
     private val inFlight = Semaphore(MAX_IN_FLIGHT)
     private val requests = ConcurrentHashMap<Long, Pair<String, String>>()
     private val nextRequest = AtomicLong()
@@ -87,7 +90,6 @@ internal class PluginRuntime(
 
     @Volatile
     private var disabled = false
-    private var context: PluginContext? = null
     private var idleJob: Job? = null
 
     suspend fun <Request, Response> call(
@@ -98,8 +100,12 @@ internal class PluginRuntime(
         return inFlight.withPermit {
             running.incrementAndGet()
             try {
-                val js = contextLock.withLock { (context ?: start(MEMORY_LIMIT, CALL_TIMEOUT_MS).also { context = it }).js }
-                invoke(js, operation, request, CALL_TIMEOUT_MS)
+                contexts.call(CALL_TIMEOUT_MS) { active -> invoke(active, operation, request, CALL_TIMEOUT_MS) }
+            } catch (e: TimeoutCancellationException) {
+                throw PluginCallException(
+                    plugin.id,
+                    PluginError(PluginErrorCode.TIMEOUT, "${operation.path} took longer than $CALL_TIMEOUT_MS ms"),
+                )
             } finally {
                 running.decrementAndGet()
                 scheduleIdleStop()
@@ -113,7 +119,7 @@ internal class PluginRuntime(
         val startedMs = SystemClock.elapsedRealtime()
         val warm = start(WARM_UP_MEMORY_LIMIT, WARM_UP_TIMEOUT_MS)
         try {
-            invoke(warm.js, PluginOperations.warmUp, Unit, WARM_UP_TIMEOUT_MS)
+            invoke(warm, PluginOperations.warmUp, Unit, WARM_UP_TIMEOUT_MS)
             Log.i(TAG, "Warm-up of ${plugin.id} took ${SystemClock.elapsedRealtime() - startedMs} ms")
         } catch (e: PluginCallException) {
             if (e.error.code != PluginErrorCode.UNSUPPORTED) Log.w(TAG, "Warm-up of ${plugin.id} failed: ${e.error.message}")
@@ -134,15 +140,12 @@ internal class PluginRuntime(
 
     suspend fun close() {
         idleJob?.cancel()
-        contextLock.withLock {
-            context?.close()
-            context = null
-        }
+        contexts.close()
         browser.closeAll()
     }
 
     private suspend fun <Request, Response> invoke(
-        js: QuickJs,
+        context: PluginContext,
         operation: PluginOperation<Request, Response>,
         request: Request,
         timeoutMs: Long,
@@ -151,26 +154,35 @@ internal class PluginRuntime(
         requests[id] = operation.path to PluginJson.encodeToString(operation.request, request)
         val envelope =
             try {
+                context.bridge.beginCall(id)
                 val text =
                     withTimeout(timeoutMs) {
-                        js.evaluate<Any?>("await __mbDispatch(__mbRequest($id, 0), __mbRequest($id, 1))", "call.js", false) as String
+                        context.js.evaluate<Any?>(
+                            "await __mbDispatchScoped($id, __mbRequest($id, 0), __mbRequest($id, 1))",
+                            "call.js",
+                            false,
+                        ) as String
                     }
                 PluginJson.decodeFromString(CallEnvelope.serializer(), text)
             } catch (e: TimeoutCancellationException) {
+                context.tainted = true
                 CallEnvelope(error = PluginError(PluginErrorCode.TIMEOUT, "${operation.path} took longer than $timeoutMs ms"))
             } catch (e: QuickJsException) {
                 // QuickJS's own time limit ends a runaway script before the coroutine's does.
                 val code = if (e.message.orEmpty().contains("interrupted")) PluginErrorCode.TIMEOUT else PluginErrorCode.INTERNAL
+                context.tainted = true
                 CallEnvelope(error = PluginError(code, e.message ?: "Script error", detail = e.stack))
             } catch (e: SerializationException) {
                 CallEnvelope(error = PluginError(PluginErrorCode.INTERNAL, "Unreadable answer: ${e.message}"))
             } finally {
+                context.bridge.finishCall(id)
                 requests.remove(id)
             }
         // QuickJS interrupts a script at its time limit with an exception the plugin's dispatcher catches.
         envelope.error?.let { reported ->
             val error =
                 if (reported.code == PluginErrorCode.INTERNAL && reported.message == "interrupted") {
+                    context.tainted = true
                     reported.copy(code = PluginErrorCode.TIMEOUT, message = "${operation.path} took longer than $timeoutMs ms")
                 } else {
                     reported
@@ -197,33 +209,43 @@ internal class PluginRuntime(
             Executors
                 .newSingleThreadExecutor { runnable -> Thread(null, runnable, "plugin-$shortName", STACK_BYTES) }
                 .asCoroutineDispatcher()
+        var initialized: PluginContext? = null
         return try {
             withContext(thread) {
                 val js = QuickJsInstances.create(thread)
-                js.memoryLimit = memoryLimit
-                js.maxStackSize = JS_STACK_BYTES
-                js.evaluationTimeoutMillis = timeoutMs
-                js.defineBinding(
-                    "__mbRequest",
-                    FunctionBinding { args ->
-                        val (path, json) = requests[(args[0] as Number).toLong()] ?: error("Unknown request")
-                        if ((args[1] as Number).toInt() == 0) path else json
-                    },
-                )
-                js.defineBinding(
-                    "__mbHost",
-                    AsyncFunctionBinding { args -> host(js, args[0] as String, args[1] as String) },
-                )
-                val entry = plugin.manifest.entry
-                val entryKey = "entry:${plugin.manifest.versionCode}"
-                js.evaluate<Any?>(codeCache.get(entryKey) ?: compile(js, entryKey, File(directory, entry).readText(), entry))
-                PluginContext(js, thread)
+                val bridge = PluginHostBridge(js) { path, json -> host(js, path, json) }
+                try {
+                    js.memoryLimit = memoryLimit
+                    js.maxStackSize = JS_STACK_BYTES
+                    js.evaluationTimeoutMillis = timeoutMs
+                    js.defineBinding(
+                        "__mbRequest",
+                        FunctionBinding { args ->
+                            val (path, json) = requests[(args[0] as Number).toLong()] ?: error("Unknown request")
+                            if ((args[1] as Number).toInt() == 0) path else json
+                        },
+                    )
+                    bridge.install()
+                    bridge.beginCall(0)
+                    try {
+                        val entry = plugin.manifest.entry
+                        val entryKey = "entry:${plugin.manifest.versionCode}"
+                        js.evaluate<Any?>(codeCache.get(entryKey) ?: compile(js, entryKey, File(directory, entry).readText(), entry))
+                    } finally {
+                        bridge.finishCall(0)
+                    }
+                    PluginContext(js, thread, bridge).also { initialized = it }
+                } catch (e: Exception) {
+                    bridge.close()
+                    withContext(NonCancellable) { QuickJsInstances.close(js) }
+                    throw e
+                }
             }
         } catch (e: CancellationException) {
-            thread.close()
+            initialized?.close() ?: thread.close()
             throw e
         } catch (e: Exception) {
-            thread.close()
+            initialized?.close() ?: thread.close()
             throw PluginCallException(plugin.id, PluginError(PluginErrorCode.INTERNAL, "Could not start: ${e.message}"))
         }
     }
@@ -285,22 +307,24 @@ internal class PluginRuntime(
         idleJob =
             scope.launch {
                 delay(IDLE_MS)
-                contextLock.withLock {
-                    if (holds.get() <= 0 && running.get() == 0) {
-                        context?.close()
-                        context = null
-                    }
-                }
+                contexts.closeIf { holds.get() <= 0 && running.get() == 0 }
             }
     }
 
     private class PluginContext(
         val js: QuickJs,
         private val thread: ExecutorCoroutineDispatcher,
+        val bridge: PluginHostBridge,
     ) {
+        var tainted = false
+
         suspend fun close() {
-            withContext(thread) { QuickJsInstances.close(js) }
-            thread.close()
+            bridge.close()
+            try {
+                withContext(NonCancellable + thread) { QuickJsInstances.close(js) }
+            } finally {
+                thread.close()
+            }
         }
     }
 }

@@ -18,7 +18,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -55,6 +57,12 @@ fun BoxScope.TvMusicQueuePanel(
     val openingIndex = remember(visible) { currentIndex.coerceIn(0, (queue.size - 1).coerceAtLeast(0)) }
     val listState = rememberLazyListState()
     val openingFocus = remember { FocusRequester() }
+    val listFocus = remember { FocusRequester() }
+    val presetFocus = remember { FocusRequester() }
+    val rowFocusModifier =
+        Modifier.focusProperties {
+            if (tuning.choices.isNotEmpty()) right = presetFocus
+        }
     LaunchedEffect(visible, queue.isNotEmpty()) {
         if (visible && queue.isNotEmpty()) {
             listState.scrollToItem(openingIndex)
@@ -80,17 +88,24 @@ fun BoxScope.TvMusicQueuePanel(
             return@TvSidePanel
         }
         Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            TvRadioFilterControls(tuning, onTune)
+            TvRadioFilterControls(tuning, onTune, presetFocus, listFocus)
             LazyColumn(
                 state = listState,
-                modifier = Modifier.weight(1f).fillMaxWidth().tvAcceleratedDpad(),
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .tvAcceleratedDpad()
+                        .focusRequester(listFocus)
+                        .focusRestorer(),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 itemsIndexed(queue, key = { index, item -> "queue:$index:${item.videoId}" }) { index, item ->
                     TvMusicTrackRow(
                         track = item,
                         selected = index == currentIndex,
-                        modifier = if (index == openingIndex) Modifier.focusRequester(openingFocus) else Modifier,
+                        modifier =
+                            rowFocusModifier.then(if (index == openingIndex) Modifier.focusRequester(openingFocus) else Modifier),
                         onClick = { manager.playFromQueue(index) },
                         containerAlpha = QUEUE_ROW_ALPHA,
                     )
@@ -106,6 +121,7 @@ fun BoxScope.TvMusicQueuePanel(
                     itemsIndexed(automix, key = { index, item -> "automix:$index:${item.videoId}" }) { _, item ->
                         TvMusicTrackRow(
                             track = item,
+                            modifier = rowFocusModifier,
                             onClick = { onPlayRadioTrack(item) },
                             containerAlpha = QUEUE_ROW_ALPHA,
                         )
@@ -120,11 +136,23 @@ fun BoxScope.TvMusicQueuePanel(
 private fun TvRadioFilterControls(
     state: RadioTuningState,
     onSelect: (String) -> Unit,
+    presetFocus: FocusRequester,
+    listFocus: FocusRequester,
 ) {
     if (state.choices.isEmpty()) return
+    val entryIndex = state.choices.indexOfFirst { it.id == state.selectedId }.coerceAtLeast(0)
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        state.choices.forEach { option ->
-            TvFilterChip(option.label, option.id == state.selectedId, { if (!state.loading) onSelect(option.id) }, compact = true)
+        state.choices.forEachIndexed { index, option ->
+            TvFilterChip(
+                option.label,
+                option.id == state.selectedId,
+                { if (!state.loading) onSelect(option.id) },
+                modifier =
+                    Modifier
+                        .then(if (index == entryIndex) Modifier.focusRequester(presetFocus) else Modifier)
+                        .focusProperties { down = listFocus },
+                compact = true,
+            )
         }
     }
 }

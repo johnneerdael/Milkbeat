@@ -28,11 +28,12 @@ class MirrorPlaybackPreparation
             queue: List<MusicTrack>,
             sourceId: String?,
             title: String,
+            onWaiting: () -> Unit = {},
         ): MirrorPlayback {
             if (track.playbackContext != null || sourceId == null) return MirrorPlayback(track, queue)
             val source = ProviderEntityReference.decode(sourceId) ?: return MirrorPlayback(track, queue)
             val key = mirrors.selectedKey(source.pluginId, source.entity) ?: return MirrorPlayback(track, queue)
-            val record = mirrors.prepareForPlayback(key, title)
+            val record = mirrors.prepareForPlayback(key, title, onWaiting)
             val space =
                 registry.state.value
                     .plugin(key.targetPlugin)

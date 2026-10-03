@@ -16,7 +16,10 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import nl.neerdael.milkbeat.catalog.Artwork
 import nl.neerdael.milkbeat.catalog.EntityKind
@@ -26,6 +29,7 @@ import nl.neerdael.milkbeat.plugin.MetadataRole
 import nl.neerdael.milkbeat.plugin.PluginJson
 import org.junit.Test
 
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class MirrorPlaybackPreparationTest {
     @Test
     fun `playback uses the verified handoff and keeps its native collection context`() =
@@ -45,7 +49,7 @@ class MirrorPlaybackPreparationTest {
                 )
             val mirrors = mockk<PlaylistMirrorCoordinator>()
             coEvery { mirrors.selectedKey("spotify", key.source) } returns key
-            coEvery { mirrors.prepareForPlayback(key, "my_playlist") } returns record
+            coEvery { mirrors.prepareForPlayback(key, "my_playlist", any()) } returns record
             val plugin = mockk<InstalledPlugin>(relaxed = true)
             every { plugin.id } returns "youtube"
             every { plugin.enabled } returns true
@@ -61,8 +65,78 @@ class MirrorPlaybackPreparationTest {
             ).isEqualTo(ProviderEntityReference.encode("youtube", record.destination!!))
             assertThat(result.track.playbackContext?.audioProviderId).isEqualTo("youtube")
             assertThat(MusicVideoItems.descriptor(result.track).ids["ytm"]).isEqualTo("youtube-song")
-            coVerify(exactly = 1) { mirrors.prepareForPlayback(key, "my_playlist") }
+            coVerify(exactly = 1) { mirrors.prepareForPlayback(key, "my_playlist", any()) }
             coVerify(exactly = 0) { mirrors.prepare(any(), any(), any(), any()) }
+        }
+
+    @Test
+    fun `pending preparation reports waiting before the prepared track is available`() =
+        runTest {
+            val key = MirrorKey("spotify", "a", "youtube", "b", EntityRef(EntityKind.PLAYLIST, "source"))
+            val descriptor = TrackDescriptor(EntityRef(EntityKind.TRACK, "song"), "Song")
+            val record =
+                MirrorRecord(
+                    key,
+                    "Playlist",
+                    "r1",
+                    listOf(descriptor),
+                    listOf(MirrorMatch(0, descriptor, descriptor.copy(ref = EntityRef(EntityKind.TRACK, "native")))),
+                    destination = EntityRef(EntityKind.PLAYLIST, "private-copy"),
+                    ready = true,
+                )
+            val finish = CompletableDeferred<MirrorRecord>()
+            val mirrors = mockk<PlaylistMirrorCoordinator>()
+            coEvery { mirrors.selectedKey("spotify", key.source) } returns key
+            coEvery { mirrors.prepareForPlayback(key, "Playlist", any()) } coAnswers {
+                thirdArg<() -> Unit>().invoke()
+                finish.await()
+            }
+            val plugin = mockk<InstalledPlugin>(relaxed = true)
+            every { plugin.id } returns "youtube"
+            every { plugin.enabled } returns true
+            every { plugin.manifest.roles.metadata } returns MetadataRole(emptySet(), emptySet(), "ytm")
+            val registry = mockk<PluginRegistry>()
+            every { registry.state } returns MutableStateFlow(PluginRegistryState(listOf(plugin)))
+            val preparation = MirrorPlaybackPreparation(mirrors, registry)
+            val track = descriptor.toMusicTrack("spotify").copy(sourcePosition = 0)
+            var notices = 0
+            val play =
+                async {
+                    preparation.prepare(track, listOf(track), ProviderEntityReference.encode("spotify", key.source), "Playlist") {
+                        notices++
+                    }
+                }
+            runCurrent()
+            assertThat(notices).isEqualTo(1)
+            assertThat(play.isCompleted).isFalse()
+            finish.complete(record)
+            assertThat(
+                play
+                    .await()
+                    .track.playbackContext
+                    ?.audioProviderId,
+            ).isEqualTo("youtube")
+            assertThat(notices).isEqualTo(1)
+        }
+
+    @Test
+    fun `ordinary playback and disabled mirroring never report waiting`() =
+        runTest {
+            val entity = EntityRef(EntityKind.PLAYLIST, "source")
+            val sourceId = ProviderEntityReference.encode("spotify", entity)
+            val track = TrackDescriptor(EntityRef(EntityKind.TRACK, "song"), "Song").toMusicTrack("spotify")
+            val mirrored = track.copy(playbackContext = MusicPlaybackContext(sourceId, "native", "youtube"))
+            val mirrors = mockk<PlaylistMirrorCoordinator>()
+            coEvery { mirrors.selectedKey("spotify", entity) } returns null
+            val preparation = MirrorPlaybackPreparation(mirrors, mockk())
+            var notices = 0
+            val requests = listOf(track to null, track to "not-a-provider-reference", mirrored to sourceId, track to sourceId)
+            for ((requested, source) in requests) {
+                val result = preparation.prepare(requested, listOf(requested), source, "Playlist") { notices++ }
+                assertThat(result.track).isSameInstanceAs(requested)
+            }
+            assertThat(notices).isEqualTo(0)
+            coVerify(exactly = 0) { mirrors.prepareForPlayback(any(), any(), any()) }
         }
 
     @Test
