@@ -46,6 +46,22 @@ internal suspend fun downloadPlugin(
         followDownload(session, downloadUrl, MAX_PLUGIN_BYTES, buzzheavier).bytes
     }
 
+/** A small file the plugin publisher keeps current, by the same bounded download path as plugins. */
+internal suspend fun downloadPublished(
+    client: OkHttpClient,
+    url: HttpUrl,
+): ByteArray =
+    withContext(Dispatchers.IO) {
+        val session =
+            client
+                .newBuilder()
+                .followRedirects(false)
+                .followSslRedirects(false)
+                .callTimeout(DOWNLOAD_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                .build()
+        followDownload(session, url, MAX_PAGE_BYTES, secureBuzzheavier = false).bytes
+    }
+
 private suspend fun resolveBuzzheavier(
     client: OkHttpClient,
     source: HttpUrl,

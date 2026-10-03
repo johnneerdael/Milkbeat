@@ -43,7 +43,11 @@ class PluginInstaller
         private val registry: PluginRegistry,
         private val codes: PluginDownloadCodes,
     ) {
-        suspend fun fetch(url: String): PendingInstall {
+        /** Fetches the plugin [url] names; [expectedId], when known, is the only plugin it may turn out to be. */
+        suspend fun fetch(
+            url: String,
+            expectedId: String? = null,
+        ): PendingInstall {
             val source = codes.resolve(url)
             val bytes = downloadPlugin(client, source.url)
             val pack =
@@ -54,7 +58,8 @@ class PluginInstaller
                         throw PluginInstallException(e.message ?: "Not a valid plugin", e)
                     }
                 }
-            if (source.pluginId != null && pack.manifest.id != source.pluginId) {
+            val expected = expectedId ?: source.pluginId
+            if (expected != null && pack.manifest.id != expected) {
                 throw PluginInstallException(messageResource = R.string.tv_plugins_code_package_mismatch)
             }
             return check(pack, source.url)

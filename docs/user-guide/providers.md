@@ -113,7 +113,9 @@ In a signed-in metadata plugin's details, select **Index playlists**. Tracks and
 
 ## Update or remove a plugin
 
-Enter its download link again to fetch the current package. Milkbeat presents the update for review; it must have the same signing author and cannot be older than the installed version. Plugin updates are separate from app updates.
+Select **Check for updates** under the installed plugins. Milkbeat asks the plugin publisher for the current version of each installed plugin and lists every newer one by the same author as **Update** with its version; select one to download it. Milkbeat presents the update for review; it must have the same signing author and cannot be older than the installed version. Entering a plugin's download code or link again still works too. Plugin updates are separate from app updates.
+
+![Check for updates offering YouTube Music 0.2.1 over the installed 0.1.3](images/plugin-update-available.png)
 
 ![Reviewing a signed YouTube Music plugin update](images/plugin-update-consent.png)
 
