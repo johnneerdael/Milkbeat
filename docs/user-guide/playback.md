@@ -32,7 +32,7 @@ Local folder playback is independent of provider radio. **Play folder** queues t
 
 The visualizer uses projectM through ProjectM TV, with 9,606 Cream of the Crop presets. Its input comes from Milkbeat's player. With controls hidden, Left and Right step through presets.
 
-The embedded engine targets 30 fps and uses automatic resolution, automatic transitions, memory limits and slow-preset skipping. These settings adapt to the device; the target is not a promise that every preset reaches 30 fps. Performance varies by preset and device.
+Out of the box the engine uses ProjectM TV's defaults for your device: 30 fps, automatic resolution, automatic transitions, a memory limit and slow-preset skipping. The target is not a promise that every preset reaches 30 fps; performance varies by preset and device. Every one of these can be changed in [Settings → Visualizations](settings.md#visualizations).
 
 Rendering and audio monitoring stop when the visualizer leaves the screen or the app goes into the background. A visible visualizer can keep drifting on silence when music is paused.
 
@@ -40,9 +40,27 @@ Rendering and audio monitoring stop when the visualizer leaves the screen or the
 
 ## Timing and diagnostics
 
-Settings → Visualizations contains the visualizer switch, music-video default, diagnostics and timing offset. Raise the timing value if the visuals arrive after the beat; lower it if they arrive before. Adjust by listening and watching on your own audio setup.
+Settings → Visualizations contains the visualizer switch, music-video default, the projectM settings, diagnostics and the timing offset. Raise the timing value if the visuals arrive after the beat; lower it if they arrive before. Adjust by listening and watching on your own audio setup.
 
-Diagnostics show measured fps, target fps, render dimensions, transition state, audio level and preset. Use these values when investigating slow visuals instead of judging performance from a still screenshot.
+Diagnostics show measured fps, target fps, render dimensions and whether the size is automatic or fixed, transition state, audio level and preset. Use these values when investigating slow visuals instead of judging performance from a still screenshot.
+
+![Diagnostics with the defaults: 30 fps target, automatic resolution, adaptive blend](images/visualizer-diagnostics-defaults.png)
+
+## What the visualizer settings change
+
+The diagnostics line shows each setting at work. With **Render resolution** at 720p and **Frame rate** at 60 fps, the line reads `of 60 fps · 1280×720 fixed`:
+
+![Fixed 720p at 60 fps](images/visualizer-effect-720p-60fps.png)
+
+With **Transition style** set to Lightweight, presets cut and the old one fades out on top; the line reads `lightweight` instead of `blend`:
+
+![Lightweight transitions](images/visualizer-effect-lightweight-transition.png)
+
+With **Change presets automatically** off, a preset stays until you press Left or Right. With **Cut on loud beats** on, a loud beat can cut to the next preset before its duration is up.
+
+![A preset held with automatic changes off](images/visualizer-effect-auto-change-off.png)
+
+![A preset reached by a cut on a loud beat](images/visualizer-effect-beat-cuts.png)
 
 ## Music videos
 

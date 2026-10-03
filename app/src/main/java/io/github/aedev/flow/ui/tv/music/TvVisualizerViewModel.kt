@@ -7,6 +7,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.aedev.flow.data.local.VisualizerPreferences
 import io.github.aedev.flow.player.audio.visualizer.VisualizerAudioTap
 import io.github.aedev.flow.player.audio.visualizer.VisualizerEngine
+import io.github.aedev.flow.player.audio.visualizer.VisualizerSettings
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
@@ -23,6 +24,14 @@ class TvVisualizerViewModel
         preferences: VisualizerPreferences,
     ) : ViewModel() {
         val active: StateFlow<Boolean> = engine.active.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+        /**
+         * The stored settings; null until read, so the visualizer never starts on defaults and then reloads.
+         * The last value is dropped once no visualizer shows: this view model outlives now-playing, and a
+         * reopened visualizer must not start on what the settings said before they were changed.
+         */
+        val settings: StateFlow<VisualizerSettings?> =
+            engine.settings.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000, replayExpirationMillis = 0), null)
 
         val timingOffsetMs: StateFlow<Int> =
             preferences.timingOffsetMs.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)

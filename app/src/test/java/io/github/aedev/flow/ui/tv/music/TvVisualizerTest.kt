@@ -2,6 +2,7 @@ package io.github.aedev.flow.ui.tv.music
 
 import android.view.KeyEvent
 import com.google.common.truth.Truth.assertThat
+import io.github.aedev.flow.player.audio.visualizer.frameDivisor
 import nl.neerdael.projectm.core.DeviceProfile
 import org.junit.Test
 

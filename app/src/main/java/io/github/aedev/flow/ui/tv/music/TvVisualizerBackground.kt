@@ -13,6 +13,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import io.github.aedev.flow.player.audio.visualizer.VisualizerSettings
 
 /**
  * The projectM visualizer as the now-playing backdrop. It runs for as long as now-playing is open,
@@ -24,11 +25,24 @@ internal fun TvVisualizerBackground(
     viewModel: TvVisualizerViewModel,
     modifier: Modifier = Modifier,
 ) {
+    val settings by viewModel.settings.collectAsStateWithLifecycle()
+    settings?.let { TvVisualizerSurface(viewModel, it, modifier) }
+}
+
+@Composable
+private fun TvVisualizerSurface(
+    viewModel: TvVisualizerViewModel,
+    settings: VisualizerSettings,
+    modifier: Modifier,
+) {
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
-    val host = remember(viewModel) { TvVisualizerHost(context, viewModel) }
+    val host = remember(viewModel) { TvVisualizerHost(context, viewModel, settings) }
     val timingOffsetMs by viewModel.timingOffsetMs.collectAsStateWithLifecycle()
-    SideEffect { host.timingOffsetUs = timingOffsetMs * 1_000L }
+    SideEffect {
+        host.timingOffsetUs = timingOffsetMs * 1_000L
+        host.apply(settings)
+    }
     DisposableEffect(lifecycle, host) {
         val observer =
             LifecycleEventObserver { _, event ->
