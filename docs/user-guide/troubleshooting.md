@@ -10,6 +10,8 @@ Home requires a metadata plugin. Select one in Settings → Plugins and complete
 
 The message below the title is the provider's reason. A temporary failure, such as a dropped connection, a rate limit or a one-off server error, is retried automatically up to three times over about a minute, or later if the provider asks to wait. Select **Retry** to try again at once; the button reads **Trying again…** while it does. Other failures, such as a missing sign-in, are not retried automatically: press Left to reach the navigation rail and open Settings → Plugins.
 
+Automatic Home retries wait while you are on another screen or the app is in the background, then resume when you return to Music. This only pauses requests for the Home feed; music playback and queue preparation continue.
+
 ## An SMB test fails
 
 1. Check the server IP or hostname, share name and port. Enter the server without `smb://`.

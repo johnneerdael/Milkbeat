@@ -165,6 +165,9 @@ class MusicHomeFeedViewModel
                 }
                 if (_state.value.blocks.isNotEmpty()) return null
                 delay(transientRetryDelayMs(error, attempt++) ?: return null)
+                // The screen collects only while it is shown, so a listener who left the tab costs no fetch
+                // until they come back to it.
+                _state.subscriptionCount.first { it > 0 }
                 _state.update { it.copy(isLoading = true) }
             }
         }

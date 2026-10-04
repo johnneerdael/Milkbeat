@@ -9,11 +9,13 @@ import io.github.aedev.flow.plugin.runtime.TransientRetryBackoffMs
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -67,6 +69,9 @@ class MusicHomeFeedViewModelTest {
         get() = state.value.blocks.map { (it as CollectionBlock).header?.title }
 
     private fun viewModel() = MusicHomeFeedViewModel(provider, CatalogPlayback { null })
+
+    /** Collects the state as the shown screen does; cancel the job to leave the tab. */
+    private fun TestScope.show(vm: MusicHomeFeedViewModel): Job = backgroundScope.launch { vm.state.collect {} }
 
     private fun pluginFailure(
         code: PluginErrorCode,
@@ -301,6 +306,7 @@ class MusicHomeFeedViewModelTest {
                 if (calls++ == 0) Result.failure(pluginFailure(PluginErrorCode.NETWORK)) else Result.success(page("Recovered"))
             }
             val vm = viewModel()
+            show(vm)
 
             vm.load()
             runCurrent()
@@ -321,6 +327,7 @@ class MusicHomeFeedViewModelTest {
         runTest(dispatcher) {
             provider.pages = { Result.failure(pluginFailure(PluginErrorCode.RATE_LIMITED, retryAfterMs = 60_000)) }
             val vm = viewModel()
+            show(vm)
 
             vm.load()
             advanceUntilIdle()
@@ -338,6 +345,7 @@ class MusicHomeFeedViewModelTest {
                 provider.requests.clear()
                 provider.pages = { Result.failure(pluginFailure(code)) }
                 val vm = viewModel()
+                show(vm)
 
                 vm.load()
                 advanceUntilIdle()
@@ -354,6 +362,7 @@ class MusicHomeFeedViewModelTest {
             var calls = 0
             provider.pages = { if (calls++ == 0) Result.failure(pluginFailure(PluginErrorCode.TIMEOUT)) else retried.await() }
             val vm = viewModel()
+            show(vm)
             vm.load()
             runCurrent()
 
@@ -377,6 +386,7 @@ class MusicHomeFeedViewModelTest {
                 if (calls++ == 0) Result.success(page("Before")) else Result.failure(pluginFailure(PluginErrorCode.NETWORK))
             }
             val vm = viewModel()
+            show(vm)
             vm.load()
             advanceUntilIdle()
 
@@ -385,6 +395,58 @@ class MusicHomeFeedViewModelTest {
 
             assertThat(provider.requests).hasSize(2)
             assertThat(vm.titles).containsExactly("Before")
+        }
+
+    @Test
+    fun `a pending retry waits while the home is not shown and runs when the listener comes back`() =
+        runTest(dispatcher) {
+            var calls = 0
+            provider.pages = {
+                if (calls++ == 0) Result.failure(pluginFailure(PluginErrorCode.NETWORK)) else Result.success(page("Recovered"))
+            }
+            val vm = viewModel()
+            val shown = show(vm)
+            vm.load()
+            runCurrent()
+
+            shown.cancel()
+            advanceTimeBy(10 * 60_000L)
+            assertThat(provider.requests).hasSize(1)
+            assertThat(vm.state.value.isLoading).isFalse()
+            assertThat(vm.state.value.error).isNotNull()
+
+            show(vm)
+            vm.load()
+            runCurrent()
+            advanceUntilIdle()
+            assertThat(provider.requests).hasSize(2)
+            assertThat(vm.titles).containsExactly("Recovered")
+        }
+
+    @Test
+    fun `a manual reload replaces an automatic retry waiting for the home to return`() =
+        runTest(dispatcher) {
+            var calls = 0
+            provider.pages = {
+                if (calls++ == 0) Result.failure(pluginFailure(PluginErrorCode.NETWORK)) else Result.success(page("Reloaded"))
+            }
+            val vm = viewModel()
+            val shown = show(vm)
+            vm.load()
+            runCurrent()
+
+            shown.cancel()
+            advanceTimeBy(10 * 60_000L)
+            vm.load(force = true)
+            advanceUntilIdle()
+            assertThat(vm.titles).containsExactly("Reloaded")
+
+            show(vm)
+            vm.load()
+            runCurrent()
+            advanceUntilIdle()
+            assertThat(provider.requests).hasSize(2)
+            assertThat(vm.titles).containsExactly("Reloaded")
         }
 
     @Test

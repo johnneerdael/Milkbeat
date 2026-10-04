@@ -371,6 +371,8 @@ A plugin throws `mb.error(code, message)`. The host reacts by code:
 
 Background runs (playlist preparation and library indexing) treat `network`, `timeout` and `rateLimited` as transient. They pause and retry the same step up to three times, waiting 5, 15 and 45 s or the plugin's longer `retryAfter`, continue from saved progress, and only then surface the failure to the worker's own backoff. `unavailable` is never retried this way: it means "try another provider", not "try again later".
 
+Music Home also retries these transient failures up to three times on that schedule when page one has no content to display. It shows the failure and a Retry action immediately. After each backoff, the next automatic request waits for the Music route's lifecycle-aware state collector; leaving the route or backgrounding the app suspends pending retries until Music is shown again. A forced reload replaces the pending sequence. This gate belongs only to Home catalog fetching and does not suspend playback or queue preparation. A failed refresh with existing blocks keeps them without automatic retries.
+
 ## 6. Identity and cross-provider playback
 
 This is the core of the design: **a metadata provider asks for an album, and the audio provider
