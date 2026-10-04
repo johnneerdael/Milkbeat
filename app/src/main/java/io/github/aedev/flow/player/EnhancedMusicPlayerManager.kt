@@ -64,8 +64,8 @@ object EnhancedMusicPlayerManager {
     var pendingRadioSeedId: String? = null
 
     /**
-     * The collection a new queue was played from, whose own YouTube mix follows it. Travels with
-     * the queue change like [pendingRadioSeedId] and is consumed by the service with it.
+     * The collection a new queue was played from, which always opens a new radio session. Travels
+     * with the queue change like [pendingRadioSeedId] and is consumed by the service with it.
      */
     @Volatile
     var pendingRadioPlaylistId: String? = null

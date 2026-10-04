@@ -18,11 +18,11 @@ Confirmed unmatched tracks can be removed from the future queue. Temporary failu
 
 ## Mixes
 
-Streaming queues seed a mix from the first song that actually starts playing. When the metadata provider has no radio, Milkbeat tries compatible audio providers in priority order.
+Once a streaming queue starts playing, Milkbeat seeds a mix from the queue's first song. When the metadata provider has no radio, Milkbeat tries compatible audio providers in priority order.
 
 For normal Spotify playback through YouTube, that first song's matched YouTube ID seeds the radio. [Private playlist preparation](providers.md#why-prepare-a-youtube-playlist) instead gives YouTube the whole matched playlist as its native autoplay context. Milkbeat can then exclude the playlist's matched songs from later suggestions, helping avoid repeats as the radio continuation begins.
 
-When the provider offers them, **All**, **Familiar**, **Popular** and **Discover** controls appear above the queue. Changing the mode replaces upcoming radio-added songs while keeping the playing song, the original playlist and tracks you added yourself. Continuations stay in the selected mode, and the controls remain visible as more suggestions load. The controls stay pinned above the scrolling rows; press Back to close the queue. Radio suggestions are not saved into a [prepared private playlist](providers.md#prepare-private-playlists).
+Every queue continues as a radio: a [prepared private playlist](providers.md#prepare-private-playlists) from its YouTube copy, anything else from its first song. All the presets YouTube Music offers for that radio (**All**, **Popular**, **Discover**, **Deep cuts**, moods and decades) appear in one scrolling line above the queue; press Right on a queue track to reach them and Down to return to it. Changing the mode replaces upcoming radio-added songs while keeping the playing song, the original playlist and tracks you added yourself. Continuations stay in the selected mode, and the controls remain visible as more suggestions load. The controls stay pinned above the scrolling rows; press Back to close the queue. Radio suggestions are not saved into a [prepared private playlist](providers.md#prepare-private-playlists).
 
 Press Right on a queue track to focus the pinned radio presets. Move Left or Right between presets, then press Down to return to the track you left, with the queue's scroll position retained. If that track was removed while you changed the mix, focus falls back to an available row.
 

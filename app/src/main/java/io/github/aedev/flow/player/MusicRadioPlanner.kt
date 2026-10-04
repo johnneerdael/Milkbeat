@@ -44,6 +44,59 @@ internal object MusicRadioPlanner {
         return QueueContext(reseed = false, explicit = false, knownIds = knownIds)
     }
 
+    /** What a station is built from: the private YouTube copy of a mirrored playlist, or a track. */
+    sealed interface RadioSeed {
+        data class Playlist(
+            val id: String,
+        ) : RadioSeed
+
+        data class Track(
+            val id: String,
+        ) : RadioSeed
+    }
+
+    /**
+     * The seeds to try, in order, until one gives a station: a mirrored playlist always seeds from its
+     * YouTube copy, anything else from the first track of the queue. The playing track closes the
+     * list, so whatever plays always gets a radio.
+     */
+    fun radioSeeds(
+        mirrorPlaylistId: String?,
+        queueIds: List<String>,
+        currentId: String,
+    ): List<RadioSeed> =
+        listOfNotNull(
+            mirrorPlaylistId?.let(RadioSeed::Playlist),
+            queueIds.firstOrNull()?.let(RadioSeed::Track),
+            RadioSeed.Track(currentId),
+        ).distinct()
+
+    data class SeededStation<P, T>(
+        val seed: RadioSeed,
+        val page: P,
+        val tracks: List<T>,
+    )
+
+    /**
+     * Tries [seeds] in order and keeps the first whose [station] still has a track once the queue and
+     * hidden artists are taken out: a page made only of songs already queued must not end the search.
+     * When none has one, the first page that came back is kept for its continuation and presets.
+     */
+    suspend fun <P : Any, T> firstStation(
+        seeds: List<RadioSeed>,
+        page: suspend (RadioSeed) -> P?,
+        station: suspend (RadioSeed, P) -> List<T>,
+    ): SeededStation<P, T>? {
+        var fallback: SeededStation<P, T>? = null
+        for (seed in seeds) {
+            val result = page(seed) ?: continue
+            val seeded = SeededStation(seed, result, station(seed, result))
+            if (seeded.tracks.isNotEmpty()) return seeded
+            if (fallback == null) fallback = seeded
+        }
+        return fallback
+    }
+
     /**
      * The list under the toggle is the up-next buffer, so it is ordered once here and consumed
      * from the head. Ordering it for display and re-ordering it again at append time is what made
