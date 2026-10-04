@@ -9,10 +9,7 @@ import org.dcache.nfs.status.StaleException
 import org.dcache.oncrpc4j.rpc.OncRpcAcceptedException
 import org.dcache.oncrpc4j.rpc.OncRpcRejectedException
 import org.dcache.oncrpc4j.rpc.RpcAccepsStatus
-import org.dcache.oncrpc4j.rpc.RpcAuthType
-import org.dcache.oncrpc4j.rpc.RpcAuthTypeUnix
 import org.dcache.oncrpc4j.rpc.RpcRejectStatus
-import org.dcache.oncrpc4j.xdr.Xdr
 import org.junit.Assert.assertThrows
 import org.junit.Test
 import java.io.EOFException
@@ -138,24 +135,5 @@ class NfsProtocolPolicyTest {
         assertThat(isNfsReconnectable(NoEntException())).isFalse()
         assertThat(isNfsReconnectable(NfsInsecurePortRequiredException("refused"))).isFalse()
         assertThat(isNfsReconnectable(IllegalStateException())).isFalse()
-    }
-
-    @Test fun authSysCredentialsDecodeWithTheLibraryDecoder() {
-        val encoded =
-            Xdr(Xdr.INITIAL_XDR_SIZE).use { xdr ->
-                xdr.beginEncoding()
-                NfsAuthSys(uid = 1026, gid = 100).xdrEncode(xdr)
-                xdr.endEncoding()
-                xdr.bytes
-            }
-        Xdr(encoded).use { xdr ->
-            xdr.beginDecoding()
-            assertThat(xdr.xdrDecodeInt()).isEqualTo(RpcAuthType.UNIX)
-            val decoded = RpcAuthTypeUnix().apply { xdrDecode(xdr) }
-            assertThat(decoded.uid()).isEqualTo(1026)
-            assertThat(decoded.gid()).isEqualTo(100)
-            assertThat(decoded.gids()).asList().containsExactly(100)
-            assertThat(xdr.hasMoreData()).isFalse()
-        }
     }
 }

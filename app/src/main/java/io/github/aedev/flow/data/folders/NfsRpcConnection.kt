@@ -4,14 +4,9 @@ import org.dcache.oncrpc4j.rpc.IoStrategy
 import org.dcache.oncrpc4j.rpc.OncRpcClient
 import org.dcache.oncrpc4j.rpc.OncRpcException
 import org.dcache.oncrpc4j.rpc.RpcAuth
-import org.dcache.oncrpc4j.rpc.RpcAuthType
-import org.dcache.oncrpc4j.rpc.RpcAuthVerifier
 import org.dcache.oncrpc4j.rpc.RpcCall
 import org.dcache.oncrpc4j.rpc.RpcTransport
-import org.dcache.oncrpc4j.xdr.Xdr
 import org.dcache.oncrpc4j.xdr.XdrAble
-import org.dcache.oncrpc4j.xdr.XdrDecodingStream
-import org.dcache.oncrpc4j.xdr.XdrEncodingStream
 import java.io.Closeable
 import java.io.IOException
 import java.io.InterruptedIOException
@@ -20,7 +15,6 @@ import java.net.SocketTimeoutException
 import java.net.UnknownHostException
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
-import javax.security.auth.Subject
 
 /** One TCP connection to an ONC RPC server, owning the oncrpc4j client and its Grizzly threads. */
 internal class NfsRpcConnection private constructor(
@@ -90,47 +84,6 @@ internal class NfsRpcConnection private constructor(
             Thread.currentThread().interrupt()
             return InterruptedException("NFS request interrupted").apply { initCause(error) }
         }
-    }
-}
-
-/**
- * AUTH_SYS credentials. oncrpc4j's RpcAuthTypeUnix builds a JAAS Subject from com.sun.security.auth principals
- * in its constructor, and those classes do not exist on Android, so the credential body is encoded here with
- * oncrpc4j's own XDR stream instead.
- */
-internal class NfsAuthSys(
-    uid: Int,
-    gid: Int,
-) : RpcAuth {
-    private val body: ByteArray =
-        Xdr(Xdr.INITIAL_XDR_SIZE).use { xdr ->
-            xdr.beginEncoding()
-            xdr.xdrEncodeInt((System.currentTimeMillis() / 1_000).toInt())
-            xdr.xdrEncodeString(MACHINE_NAME)
-            xdr.xdrEncodeInt(uid)
-            xdr.xdrEncodeInt(gid)
-            xdr.xdrEncodeIntVector(intArrayOf(gid))
-            xdr.endEncoding()
-            xdr.bytes
-        }
-    private val verifier = RpcAuthVerifier(RpcAuthType.NONE, ByteArray(0))
-
-    override fun type(): Int = RpcAuthType.UNIX
-
-    override fun getVerifier(): RpcAuthVerifier = verifier
-
-    override fun getSubject(): Subject = Subject()
-
-    override fun xdrEncode(xdr: XdrEncodingStream) {
-        xdr.xdrEncodeInt(RpcAuthType.UNIX)
-        xdr.xdrEncodeDynamicOpaque(body)
-        verifier.xdrEncode(xdr)
-    }
-
-    override fun xdrDecode(xdr: XdrDecodingStream): Unit = throw UnsupportedOperationException("Client credentials are never decoded")
-
-    private companion object {
-        const val MACHINE_NAME = "milkbeat"
     }
 }
 
