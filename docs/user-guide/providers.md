@@ -109,7 +109,7 @@ Disable the option to return to normal matching and radio based on the first pla
 
 Open the installed plugin's details and choose its sign-in method. Scan the TV's QR code with a phone on the same network. The phone viewer streams the actual provider page on the TV: use touch and typing to complete sign-in and provider verification.
 
-The viewer handles sign-in. Music browsing and playback remain in Milkbeat's TV interface. An expired account needs sign-in again; local folders remain usable.
+The viewer handles sign-in. Music browsing and playback remain in Milkbeat's TV interface. When a provider reports that a sign-in expired, Milkbeat immediately asks the plugin again in the background whether the account still signs in, retrying temporary connection failures, and restores it without any action when it does; private playlist preparation then resumes on its own. With YouTube Music 0.2.4 or later, a single refused request, such as a saved playlist YouTube will not open, no longer signs the account out. An account the provider confirms expired needs sign-in again; local folders remain usable.
 
 ## Index playlists
 
