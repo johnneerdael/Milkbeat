@@ -215,12 +215,6 @@ configurations.matching { it.name.endsWith("UnitTestRuntimeClasspath") }.configu
     exclude(group = "org.conscrypt", module = "conscrypt-android")
 }
 
-// smbj resolves bcprov to 1.85.2 while bcpkix drags in bcutil 1.84; both jars ship IANAObjectIdentifiers, which fails
-// the duplicate-class check in release builds and shadows bcprov's copy inside Robolectric.
-configurations.configureEach {
-    resolutionStrategy.force("org.bouncycastle:bcutil-jdk18on:1.85", "org.bouncycastle:bcpkix-jdk18on:1.85")
-}
-
 // ProjectM-TV's core engine AAR. "latest" follows ProjectM-TV's newest stable release (re-checked
 // daily, or with --refresh-dependencies); CI passes the exact version it resolved.
 val projectmCoreVersion = providers.gradleProperty("projectmCoreVersion").get()
