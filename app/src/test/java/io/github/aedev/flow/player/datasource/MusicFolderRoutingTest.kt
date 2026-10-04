@@ -119,7 +119,7 @@ class MusicFolderRoutingTest {
                     ByteArrayDataSource(byteArrayOf(1))
                 },
                 { ByteArrayDataSource(byteArrayOf(2)) },
-                {
+                documents = {
                     documents++
                     ByteArrayDataSource(byteArrayOf(3))
                 },

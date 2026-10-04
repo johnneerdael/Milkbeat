@@ -171,6 +171,7 @@ android {
                     "/META-INF/INDEX.LIST",
                     "/META-INF/DEPENDENCIES",
                     "/META-INF/*.version",
+                    "/META-INF/LICENSE.md",
                 )
         }
     }
@@ -212,6 +213,12 @@ composeCompiler {
 // Robolectric supplies the JVM Conscrypt artifact; Android's duplicate classes load Android-only JNI.
 configurations.matching { it.name.endsWith("UnitTestRuntimeClasspath") }.configureEach {
     exclude(group = "org.conscrypt", module = "conscrypt-android")
+}
+
+// smbj resolves bcprov to 1.85.2 while bcpkix drags in bcutil 1.84; both jars ship IANAObjectIdentifiers, which fails
+// the duplicate-class check in release builds and shadows bcprov's copy inside Robolectric.
+configurations.configureEach {
+    resolutionStrategy.force("org.bouncycastle:bcutil-jdk18on:1.85", "org.bouncycastle:bcpkix-jdk18on:1.85")
 }
 
 // ProjectM-TV's core engine AAR. "latest" follows ProjectM-TV's newest stable release (re-checked
@@ -323,6 +330,7 @@ dependencies {
     testImplementation(libs.kxml2)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.mockk)
+    testImplementation(libs.okhttp.mockwebserver)
     testImplementation(libs.truth)
     testImplementation(libs.turbine)
     testImplementation(libs.hilt.android.testing)

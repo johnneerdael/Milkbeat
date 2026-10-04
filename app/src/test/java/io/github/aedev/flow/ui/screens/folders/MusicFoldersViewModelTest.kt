@@ -90,7 +90,7 @@ class MusicFoldersViewModelTest {
             Dispatchers.setMain(StandardTestDispatcher(testScheduler))
             val repository = mockk<MusicFolderRepository>()
             coEvery { repository.folders } returns flowOf(emptyList())
-            coEvery { repository.test(any(), any()) } returns Unit
+            coEvery { repository.test(any(), any()) } returns mockk(relaxed = true)
             val vm = MusicFoldersViewModel(repository, mockk(relaxed = true))
             vm.edit(MusicFolder(name = "NAS", kind = MusicFolderKind.SMB, host = "nas", share = "Music"))
             vm.testAccess()
