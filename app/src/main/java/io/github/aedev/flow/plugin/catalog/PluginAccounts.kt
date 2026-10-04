@@ -9,6 +9,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -46,6 +47,7 @@ class PluginAccounts internal constructor(
 
     private val revalidations = mutableMapOf<String, Job>()
     private val lastRevalidationMs = mutableMapOf<String, Long>()
+    private val expiredDuringCheck = mutableSetOf<String>()
 
     suspend fun refresh(pluginId: String): ProviderAccount {
         val account = ask(pluginId)
@@ -73,12 +75,29 @@ class PluginAccounts internal constructor(
     fun expired(pluginId: String) {
         _accounts.update { it + (pluginId to ProviderAccount.Expired) }
         synchronized(revalidations) {
-            if (revalidations[pluginId]?.isActive == true) return
+            if (revalidations[pluginId]?.isActive == true) {
+                expiredDuringCheck += pluginId
+                return
+            }
             revalidations[pluginId] = scope.launch { revalidate(pluginId) }
         }
     }
 
     private suspend fun revalidate(pluginId: String) {
+        val job = currentCoroutineContext()[Job]
+        while (true) {
+            checkOnce(pluginId)
+            synchronized(revalidations) {
+                // An expiry reported while this check ran may postdate its answer, so it earns another check.
+                if (!expiredDuringCheck.remove(pluginId)) {
+                    if (revalidations[pluginId] === job) revalidations.remove(pluginId)
+                    return
+                }
+            }
+        }
+    }
+
+    private suspend fun checkOnce(pluginId: String) {
         val last = synchronized(revalidations) { lastRevalidationMs[pluginId] }
         if (last != null) delay((last + REVALIDATION_COOLDOWN_MS - nowMs()).coerceAtLeast(0))
         for (attempt in 0..RETRY_BACKOFF_MS.size) {
@@ -110,7 +129,10 @@ class PluginAccounts internal constructor(
         }
 
     private fun cancelRevalidation(pluginId: String) {
-        synchronized(revalidations) { revalidations.remove(pluginId)?.cancel() }
+        synchronized(revalidations) {
+            expiredDuringCheck -= pluginId
+            revalidations.remove(pluginId)?.cancel()
+        }
     }
 
     private companion object {

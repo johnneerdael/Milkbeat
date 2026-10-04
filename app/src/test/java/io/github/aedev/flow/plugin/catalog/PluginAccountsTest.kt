@@ -7,7 +7,10 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -71,6 +74,25 @@ class PluginAccountsTest {
             advanceTimeBy(1_001)
             coVerify(exactly = 2) { host.call("youtube", PluginOperations.account, Unit) }
             assertThat(accounts.accounts.value["youtube"]).isEqualTo(ProviderAccount.SignedIn("listener"))
+        }
+
+    @Test
+    fun `an expiry reported while a check finishes earns another check`() =
+        runTest {
+            coEvery { host.call("youtube", PluginOperations.account, Unit) } returns ProviderAccount.SignedIn("listener")
+            val accounts = accounts()
+            backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+                accounts.accounts.first { it["youtube"] is ProviderAccount.SignedIn }
+                accounts.expired("youtube")
+            }
+
+            accounts.expired("youtube")
+            runCurrent()
+            assertThat(accounts.accounts.value["youtube"]).isEqualTo(ProviderAccount.Expired)
+
+            advanceTimeBy(30_001)
+            assertThat(accounts.accounts.value["youtube"]).isEqualTo(ProviderAccount.SignedIn("listener"))
+            coVerify(exactly = 2) { host.call("youtube", PluginOperations.account, Unit) }
         }
 
     @Test
