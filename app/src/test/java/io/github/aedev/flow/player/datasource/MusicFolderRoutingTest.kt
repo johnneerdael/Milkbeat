@@ -15,23 +15,31 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(manifest = Config.NONE, sdk = [28])
 class MusicFolderRoutingTest {
-    @Test fun smbBypassesPluginAndCacheWhileAllOtherSchemesDelegate() {
+    @Test fun folderSchemesBypassPluginAndCacheWhileAllOtherSchemesDelegate() {
         var delegated = 0
-        var openedSmb = 0
+        var openedRemote = 0
+        var openedWebDav = 0
         val source =
             MusicFolderRoutingDataSource(
                 DataSource.Factory {
                     delegated++
                     ByteArrayDataSource(byteArrayOf(1))
                 },
-                smb = {
-                    openedSmb++
+                remote = {
+                    openedRemote++
                     ByteArrayDataSource(byteArrayOf(2))
+                },
+                webDav = {
+                    openedWebDav++
+                    ByteArrayDataSource(byteArrayOf(3))
                 },
             )
         val bytes = ByteArray(1)
         for ((uri, expected) in listOf(
             "smbmusic://source/song.wav" to 2,
+            "sftpmusic://source/song.wav" to 2,
+            "nfsmusic://source/song.wav" to 2,
+            "davmusic://source/song.wav" to 3,
             "music://track" to 1,
             "https://audio.test/track" to 1,
             "content://music/track" to 1,
@@ -42,14 +50,15 @@ class MusicFolderRoutingTest {
             assertThat(bytes.single().toInt()).isEqualTo(expected)
             source.close()
         }
-        assertThat(openedSmb).isEqualTo(1)
+        assertThat(openedRemote).isEqualTo(3)
+        assertThat(openedWebDav).isEqualTo(1)
         assertThat(delegated).isEqualTo(4)
     }
 
     @Test fun transferEventsAreBalancedAndOpenFailureDoesNotSignalStart() {
         val events = mutableListOf<String>()
         val source =
-            SmbMusicDataSource {
+            RemoteMusicDataSource {
                 object : RemoteMusicFile {
                     override val length = 1L
 
@@ -118,8 +127,8 @@ class MusicFolderRoutingTest {
                     cached++
                     ByteArrayDataSource(byteArrayOf(1))
                 },
-                { ByteArrayDataSource(byteArrayOf(2)) },
-                {
+                remote = { ByteArrayDataSource(byteArrayOf(2)) },
+                documents = {
                     documents++
                     ByteArrayDataSource(byteArrayOf(3))
                 },

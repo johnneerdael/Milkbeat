@@ -68,7 +68,7 @@ class TvMusicFoldersFocusTest {
         val source = MusicFolder(name = "NAS", kind = MusicFolderKind.SMB, host = "nas", share = "Music", guest = true)
         val repository = mockk<MusicFolderRepository>()
         every { repository.folders } returns MutableStateFlow(listOf(source))
-        coEvery { repository.test(any(), any()) } returns Unit
+        coEvery { repository.test(any(), any(), any()) } returns source
         val viewModel = MusicFoldersViewModel(repository, mockk(relaxed = true))
         viewModel.edit(source)
         compose.setContent {

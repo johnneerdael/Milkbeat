@@ -171,6 +171,7 @@ android {
                     "/META-INF/INDEX.LIST",
                     "/META-INF/DEPENDENCIES",
                     "/META-INF/*.version",
+                    "/META-INF/LICENSE.md",
                 )
         }
     }
@@ -225,6 +226,15 @@ dependencies {
     implementation(project(":plugin-api"))
     implementation(libs.quickjs.kt)
     implementation(libs.smbj)
+    implementation(libs.sshj)
+    implementation(libs.bouncycastle.bcprov)
+    // Berkeley DB backs only nfs4j's server-side state store; the client never loads it.
+    implementation(libs.nfs4j.core) { exclude(group = "com.sleepycat") }
+    constraints {
+        // smbj resolves bcprov to 1.85.x while sshj asks for bcpkix/bcutil 1.84; mixed BouncyCastle lines fail at provider init.
+        implementation(libs.bouncycastle.pkix)
+        implementation(libs.bouncycastle.util)
+    }
     // --- Core Android ---
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.core.splashscreen)
@@ -322,6 +332,7 @@ dependencies {
     testImplementation(libs.kxml2)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.mockk)
+    testImplementation(libs.okhttp.mockwebserver)
     testImplementation(libs.truth)
     testImplementation(libs.turbine)
     testImplementation(libs.hilt.android.testing)

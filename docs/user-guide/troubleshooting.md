@@ -17,6 +17,26 @@ Home requires a metadata plugin. Select one in Settings → Plugins and complete
 
 A successful network connection does not imply permission to read the share. Test access checks directory access too.
 
+## A WebDAV test fails
+
+1. Enter the full folder address including `http://` or `https://`, and leave the username and password out of the URL.
+2. Open the same address in a browser on another device to confirm the folder exists and your account can read it.
+3. A server with a self-signed certificate or Digest-only sign-in is not supported; use a trusted certificate or Basic authentication.
+
+## An SFTP test fails
+
+1. Check the server, port and username, and that the account may use SFTP.
+2. With key sign-in, choose the key file again and enter its passphrase. Keys in the older `BEGIN EC PRIVATE KEY` format must be converted first, for example with `ssh-keygen -p -f <key>`, which rewrites them in OpenSSH format.
+3. If Milkbeat reports that the server key has changed and you did not replace the server, do not continue: someone may be intercepting the connection. Otherwise select **Forget server key** and confirm the new fingerprint.
+4. Check the folder path: start it with `/` for an absolute path.
+
+## An NFS test fails
+
+1. If Milkbeat says the server only accepts privileged ports, allow non-privileged ports on the export (`insecure` on Linux, the matching checkbox on Synology and QNAP).
+2. Check the export path. NFSv4 servers can publish exports under a different path than NFSv3; try `/`, or set the NFS version explicitly.
+3. Make sure the export allows the TV's IP address.
+4. If folders list but files cannot be read, set a User ID and Group ID that can read the files.
+
 ## A USB folder is missing
 
 Check that Android has mounted the drive and exposes it in the folder picker. Reconnect storage or grant access to the folder again if necessary. Device firmware controls which locations the picker exposes.

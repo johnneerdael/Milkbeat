@@ -18,23 +18,12 @@ import java.io.IOException
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
-interface RemoteMusicFile : Closeable {
-    val length: Long
-
-    fun read(
-        buffer: ByteArray,
-        position: Long,
-        offset: Int,
-        length: Int,
-    ): Int
-}
-
 class SmbMusicClient
     @Inject
-    constructor() {
+    constructor() : RemoteMusicClient {
         private fun connect(
             source: MusicFolder,
-            password: String,
+            secrets: MusicFolderSecrets,
         ): SmbConnection {
             require(source.kind == MusicFolderKind.SMB && source.isValid())
             val config =
@@ -57,7 +46,7 @@ class SmbMusicClient
                     } else {
                         AuthenticationContext(
                             source.username,
-                            password.toCharArray(),
+                            secrets.password.toCharArray(),
                             source.domain,
                         )
                     }
@@ -81,11 +70,11 @@ class SmbMusicClient
             }
         }
 
-        fun test(
+        override fun test(
             source: MusicFolder,
-            password: String,
-        ) {
-            connect(source, password).use { connection ->
+            secrets: MusicFolderSecrets,
+        ): MusicFolder {
+            connect(source, secrets).use { connection ->
                 connection.share
                     .openDirectory(
                         source.smbPath(""),
@@ -98,15 +87,16 @@ class SmbMusicClient
                         it.iterator().hasNext()
                     }
             }
+            return source
         }
 
-        fun list(
+        override fun list(
             source: MusicFolder,
-            password: String,
+            secrets: MusicFolderSecrets,
             path: String,
-            includePlaylists: Boolean = false,
+            includePlaylists: Boolean,
         ): List<MusicFolderEntry> =
-            connect(source, password).use { connection ->
+            connect(source, secrets).use { connection ->
                 connection.share
                     .openDirectory(
                         source.smbPath(path),
@@ -131,13 +121,13 @@ class SmbMusicClient
                     }
             }
 
-        fun open(
+        override fun open(
             source: MusicFolder,
-            password: String,
+            secrets: MusicFolderSecrets,
             path: String,
         ): RemoteMusicFile {
             val remotePath = source.smbPath(path)
-            val connection = connect(source, password)
+            val connection = connect(source, secrets)
             try {
                 val file =
                     connection.share.openFile(

@@ -27,7 +27,6 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.aedev.flow.R
-import io.github.aedev.flow.data.folders.MusicFolderKind
 import io.github.aedev.flow.data.music.model.MusicTrack
 import io.github.aedev.flow.ui.screens.folders.MusicFoldersViewModel
 import io.github.aedev.flow.ui.tv.components.TvButton
@@ -149,16 +148,7 @@ internal fun TvMusicFoldersContent(
                                     folder.name,
                                     { viewModel.openSource(folder) },
                                     leadingIcon = Icons.Outlined.Folder,
-                                    supportingText =
-                                        stringResource(
-                                            if (folder.kind ==
-                                                MusicFolderKind.SMB
-                                            ) {
-                                                R.string.music_folders_smb
-                                            } else {
-                                                R.string.music_folders_local
-                                            },
-                                        ),
+                                    supportingText = stringResource(folder.kind.labelRes()),
                                 )
                             }
                         } else {

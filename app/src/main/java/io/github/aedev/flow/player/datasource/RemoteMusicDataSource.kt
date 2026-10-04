@@ -13,7 +13,7 @@ import java.io.EOFException
 import java.io.IOException
 
 @OptIn(UnstableApi::class)
-internal class SmbMusicDataSource(
+internal class RemoteMusicDataSource(
     private val openFile: (Uri) -> RemoteMusicFile,
 ) : BaseDataSource(true) {
     private var file: RemoteMusicFile? = null
@@ -38,7 +38,7 @@ internal class SmbMusicDataSource(
             return remaining
         } catch (error: Exception) {
             runCatching { close() }
-            throw if (error is IOException) error else IOException("Could not open SMB music", error)
+            throw if (error is IOException) error else IOException("Could not open remote music", error)
         }
     }
 
@@ -51,13 +51,13 @@ internal class SmbMusicDataSource(
         if (remaining == 0L) return C.RESULT_END_OF_INPUT
         try {
             val count = checkNotNull(file).read(buffer, position, offset, minOf(length.toLong(), remaining).toInt())
-            if (count <= 0) throw EOFException("SMB music ended before its declared length")
+            if (count <= 0) throw EOFException("Remote music ended before its declared length")
             position += count
             remaining -= count
             bytesTransferred(count)
             return count
         } catch (error: Exception) {
-            throw if (error is IOException) error else IOException("Could not read SMB music", error)
+            throw if (error is IOException) error else IOException("Could not read remote music", error)
         }
     }
 

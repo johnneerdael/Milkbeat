@@ -82,6 +82,25 @@ class DocumentMusicFolders
             }
         }
 
+        fun readText(
+            uri: Uri,
+            maxBytes: Int,
+        ): String {
+            val bytes =
+                context.contentResolver.openInputStream(uri)?.use { input ->
+                    val buffer = ByteArray(maxBytes + 1)
+                    var total = 0
+                    while (total < buffer.size) {
+                        val count = input.read(buffer, total, buffer.size - total)
+                        if (count < 0) break
+                        total += count
+                    }
+                    require(total <= maxBytes) { "File too large" }
+                    buffer.copyOf(total)
+                } ?: throw FileNotFoundException("File no longer available")
+            return String(bytes, Charsets.UTF_8)
+        }
+
         fun hasAccess(uri: Uri): Boolean = context.contentResolver.persistedUriPermissions.any { it.uri == uri && it.isReadPermission }
 
         fun release(source: MusicFolder) = release(Uri.parse(source.treeUri))

@@ -68,7 +68,9 @@ internal fun TvMusicFoldersSettingsPane(viewModel: MusicFoldersViewModel = hiltV
                             }
                         })
                     }
-                    item(key = "smb") { TvButton(stringResource(R.string.music_folders_add_smb), { viewModel.edit() }) }
+                    items(NETWORK_KINDS, key = { it.name }) { kind ->
+                        TvButton(stringResource(kind.addLabelRes()), { viewModel.create(kind) })
+                    }
                     if (folders.isNotEmpty()) {
                         item(key = "library-scan") {
                             val scanViewModel: LibraryScanViewModel = hiltViewModel()
@@ -80,16 +82,7 @@ internal fun TvMusicFoldersSettingsPane(viewModel: MusicFoldersViewModel = hiltV
                     items(folders, key = { it.id }) { source ->
                         TvNavRow(
                             label = source.name,
-                            value =
-                                stringResource(
-                                    if (source.kind ==
-                                        MusicFolderKind.LOCAL
-                                    ) {
-                                        R.string.music_folders_local
-                                    } else {
-                                        R.string.music_folders_smb
-                                    },
-                                ),
+                            value = stringResource(source.kind.labelRes()),
                             leadingIcon = Icons.Outlined.Folder,
                             onClick = { viewModel.edit(source) },
                         )
@@ -99,3 +92,5 @@ internal fun TvMusicFoldersSettingsPane(viewModel: MusicFoldersViewModel = hiltV
         }
     }
 }
+
+private val NETWORK_KINDS = MusicFolderKind.entries.filter { it != MusicFolderKind.LOCAL }

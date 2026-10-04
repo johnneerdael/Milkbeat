@@ -17,7 +17,7 @@ internal class MusicFolderMetadataReader
     constructor(
         @ApplicationContext private val context: Context,
         private val store: MusicFolderStore,
-        private val smb: SmbMusicClient,
+        private val clients: RemoteMusicClients,
     ) {
         suspend fun read(ref: FolderAudioRef): FolderAudioMetadata {
             val access = store.access(ref.sourceId, ref.revision)
@@ -34,7 +34,7 @@ internal class MusicFolderMetadataReader
                         )
                         retriever.setDataSource(context, uri)
                     } else {
-                        remote = smb.open(access.source, access.password, ref.location)
+                        remote = clients[access.source.kind].open(access.source, access.secrets, ref.location)
                         retriever.setDataSource(RemoteMetadataSource(remote))
                     }
                     readTags(retriever)

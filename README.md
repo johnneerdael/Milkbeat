@@ -19,11 +19,13 @@
 
 ---
 
-Milkbeat plays music from your TV's storage, USB drives and SMB network shares without plugins.
+Milkbeat plays music from your TV's storage, USB drives and network folders (SMB, WebDAV, SFTP
+and NFS) without plugins.
 Add optional metadata, audio and video plugins to browse streaming catalogs, match tracks across
 services and play music videos. Everything is built for the TV remote.
 
-- **Your own music:** local folders and SMB 2/3 shares, with embedded tags and album artwork.
+- **Your own music:** local folders and SMB 2/3, WebDAV, SFTP and NFS (v3, v4.0, v4.1) servers,
+  with embedded tags and album artwork.
 - **Streaming catalogs:** YouTube Music, Spotify and Beatport plugins are available now.
 - **One library:** app and provider playlists together, including Liked songs; folder music has
   its own Folders section.
@@ -43,7 +45,7 @@ MilkDrop. It reacts to the track you are playing, and a music video can take its
 </p>
 
 **[Read the illustrated user guide](docs/user-guide/index.md)** for setup, remote controls,
-providers, local/SMB music, every settings category and troubleshooting.
+providers, local and network folder music, every settings category and troubleshooting.
 
 ## Install on Android TV
 
@@ -75,6 +77,9 @@ No plugin or streaming account is needed for folder playback.
    the default port is 445.
 4. Enter the share's credentials, or enable **Guest access** if the server permits it. Select
    **Test access**, then **Save**.
+   **Add WebDAV server**, **Add SFTP server** and **Add NFS export** work the same way; see the
+   [Folders guide](docs/user-guide/folders.md) for their fields, SFTP server-key confirmation and
+   the NFS non-privileged-port requirement.
 5. Open **Library > Folders**, select the source and browse its folders. Play a track or choose
    **Play folder** to queue the music in the current folder.
 
@@ -270,7 +275,7 @@ you leave it on for every track after.
 - **Library > Playlists** combines app playlists with playlists from every enabled, signed-in
   metadata provider. **Liked songs** brings music likes together; liked videos are omitted.
   Opening a provider playlist keeps its original provider, even if another is selected for Home.
-- **Library > Folders** browses configured local and SMB sources. History and Watch later remain
+- **Library > Folders** browses configured local and network sources. History and Watch later remain
   separate sections.
 - Background playback is on by default, so music can keep playing when you leave the app.
 - Milkbeat's recommendation engine runs on the device. Optional provider play-history reporting

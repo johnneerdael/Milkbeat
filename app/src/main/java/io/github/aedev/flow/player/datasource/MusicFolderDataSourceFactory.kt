@@ -8,14 +8,15 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.DefaultDataSource
+import androidx.media3.datasource.ResolvingDataSource
 import androidx.media3.datasource.TransferListener
+import androidx.media3.datasource.okhttp.OkHttpDataSource
 import dagger.hilt.android.qualifiers.ApplicationContext
-import io.github.aedev.flow.data.folders.MusicFolder
+import io.github.aedev.flow.data.folders.MusicFolderAccess
 import io.github.aedev.flow.data.folders.MusicFolderKind
 import io.github.aedev.flow.data.folders.MusicFolderStore
-import io.github.aedev.flow.data.folders.SmbMusicClient
+import io.github.aedev.flow.data.folders.RemoteMusicClients
 import io.github.aedev.flow.utils.PerformanceDispatcher
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import java.io.FileNotFoundException
 import javax.inject.Inject
@@ -26,33 +27,48 @@ class MusicFolderDataSourceFactory
     constructor(
         @ApplicationContext private val context: Context,
         private val store: MusicFolderStore,
-        private val smb: SmbMusicClient,
+        private val clients: RemoteMusicClients,
     ) {
-        fun wrap(delegate: DataSource.Factory): DataSource.Factory =
-            DataSource.Factory {
+        private fun access(uri: Uri): MusicFolderAccess {
+            val access =
+                runBlocking(PerformanceDispatcher.diskIO) {
+                    store.access(
+                        uri.host ?: throw FileNotFoundException("Missing folder identity"),
+                        uri.getQueryParameter("revision").orEmpty(),
+                    )
+                }
+            if (MusicFolderKind.forScheme(uri.scheme) != access.source.kind) throw FileNotFoundException("Music folder kind changed")
+            return access
+        }
+
+        fun wrap(delegate: DataSource.Factory): DataSource.Factory {
+            val webDavStreams =
+                ResolvingDataSource.Factory(OkHttpDataSource.Factory(clients.webDav.httpClient)) { dataSpec ->
+                    val access = access(dataSpec.uri)
+                    val stream = clients.webDav.stream(access.source, access.secrets, dataSpec.uri.path.orEmpty())
+                    dataSpec.withUri(Uri.parse(stream.url)).withAdditionalHeaders(stream.headers)
+                }
+            return DataSource.Factory {
                 MusicFolderRoutingDataSource(
                     delegate = delegate,
-                    smb = {
-                        SmbMusicDataSource { uri ->
-                            val access =
-                                runBlocking(PerformanceDispatcher.diskIO) {
-                                    store.access(
-                                        uri.host ?: throw FileNotFoundException("Missing folder identity"),
-                                        uri.getQueryParameter("revision").orEmpty(),
-                                    )
-                                }
-                            smb.open(access.source, access.password, uri.path.orEmpty())
+                    remote = {
+                        RemoteMusicDataSource { uri ->
+                            val access = access(uri)
+                            clients[access.source.kind].open(access.source, access.secrets, uri.path.orEmpty())
                         }
                     },
+                    webDav = webDavStreams::createDataSource,
                     documents = { DefaultDataSource.Factory(context).createDataSource() },
                 )
             }
+        }
     }
 
 @OptIn(UnstableApi::class)
 internal class MusicFolderRoutingDataSource(
     private val delegate: DataSource.Factory,
-    private val smb: () -> DataSource,
+    private val remote: () -> DataSource,
+    private val webDav: () -> DataSource = { delegate.createDataSource() },
     private val documents: () -> DataSource = { delegate.createDataSource() },
 ) : DataSource {
     private val listeners = mutableListOf<TransferListener>()
@@ -67,7 +83,8 @@ internal class MusicFolderRoutingDataSource(
         check(active == null)
         val source =
             when {
-                dataSpec.uri.scheme == MusicFolder.SMB_SCHEME -> smb()
+                dataSpec.uri.scheme == MusicFolderKind.WEBDAV.scheme -> webDav()
+                dataSpec.uri.scheme in MusicFolderKind.remoteSchemes -> remote()
                 dataSpec.uri.scheme == "content" && DocumentsContract.isTreeUri(dataSpec.uri) -> documents()
                 else -> delegate.createDataSource()
             }

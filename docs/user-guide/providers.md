@@ -10,7 +10,7 @@
 | Audio | Streams and matches for tracks described by metadata providers |
 | Video | Video search and playback |
 
-A plugin can provide more than one role. Local and SMB playback are built in and need none of these roles.
+A plugin can provide more than one role. Local and network folder playback (SMB, WebDAV, SFTP and NFS) are built in and need none of these roles.
 
 ## Install a third-party plugin
 

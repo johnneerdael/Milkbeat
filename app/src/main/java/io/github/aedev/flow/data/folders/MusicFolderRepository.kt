@@ -15,7 +15,7 @@ class MusicFolderRepository
     constructor(
         private val store: MusicFolderStore,
         private val documents: DocumentMusicFolders,
-        private val smb: SmbMusicClient,
+        private val clients: RemoteMusicClients,
     ) {
         val folders = store.folders
 
@@ -35,7 +35,23 @@ class MusicFolderRepository
         suspend fun save(
             source: MusicFolder,
             password: String?,
-        ) = store.save(source, password)
+            privateKey: String? = null,
+        ) {
+            val trusted =
+                if (source.kind == MusicFolderKind.SFTP &&
+                    source.hostKey.isBlank()
+                ) {
+                    test(source, password, privateKey)
+                } else {
+                    source
+                }
+            store.save(trusted, password, privateKey)
+        }
+
+        suspend fun readPrivateKey(uri: Uri): String =
+            runInterruptible(PerformanceDispatcher.diskIO) { documents.readText(uri, MAX_PRIVATE_KEY_BYTES) }.also {
+                require(it.isNotBlank())
+            }
 
         suspend fun remove(source: MusicFolder) {
             store.remove(source.id)
@@ -47,9 +63,18 @@ class MusicFolderRepository
         suspend fun test(
             source: MusicFolder,
             password: String?,
-        ) {
-            val secret = password ?: store.access(source.id, source.revision).password
-            runInterruptible(PerformanceDispatcher.networkIO) { smb.test(source, secret) }
+            privateKey: String? = null,
+        ): MusicFolder {
+            val stored =
+                if (password == null ||
+                    privateKey == null
+                ) {
+                    store.access(source.id, source.revision).secrets
+                } else {
+                    MusicFolderSecrets()
+                }
+            val secrets = MusicFolderSecrets(password ?: stored.password, privateKey ?: stored.privateKey)
+            return runInterruptible(PerformanceDispatcher.networkIO) { clients[source.kind].test(source, secrets) }
         }
 
         suspend fun list(
@@ -64,7 +89,7 @@ class MusicFolderRepository
                     val access = store.access(source.id, source.revision)
                     runInterruptible(
                         PerformanceDispatcher.networkIO,
-                    ) { smb.list(access.source, access.password, location, includePlaylists) }
+                    ) { clients[access.source.kind].list(access.source, access.secrets, location, includePlaylists) }
                 }
             return withContext(PerformanceDispatcher.diskIO) {
                 entries.sortedWith(
@@ -73,5 +98,9 @@ class MusicFolderRepository
                         .thenBy { it.location },
                 )
             }
+        }
+
+        private companion object {
+            const val MAX_PRIVATE_KEY_BYTES = 64 * 1024
         }
     }
