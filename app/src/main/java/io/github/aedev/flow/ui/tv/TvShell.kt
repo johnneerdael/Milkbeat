@@ -60,6 +60,7 @@ fun TvShell(
     modifier: Modifier = Modifier,
     focusMusicStrip: Boolean = false,
     onMusicStripFocused: () -> Unit = {},
+    badged: TvDestination? = null,
 ) {
     val dimens = LocalTvDimens.current
     val backStackEntry by navController.currentBackStackEntryAsState()
@@ -166,6 +167,7 @@ fun TvShell(
             onFocusChanged = { railHasFocus = it },
             selectedFocusRequester = railFocusRequester,
             acceptsEnteringFocus = contentFocusedOnce,
+            badged = badged,
             modifier =
                 Modifier
                     .align(Alignment.CenterStart)

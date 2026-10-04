@@ -64,6 +64,7 @@ fun TvPluginsSettingsPane(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val playHistory by viewModel.playHistoryEnabled.collectAsStateWithLifecycle()
+    val automaticUpdates by viewModel.automaticUpdates.collectAsStateWithLifecycle()
     var openPlugin by rememberSaveable { mutableStateOf<String?>(null) }
     var choosing by rememberSaveable { mutableStateOf<ProviderRole?>(null) }
     var url by rememberSaveable { mutableStateOf("") }
@@ -173,7 +174,9 @@ fun TvPluginsSettingsPane(
                         onFetch = { viewModel.fetch(url) },
                         onChoose = { choosing = it },
                         onOpen = { openPlugin = it },
-                        onCheckUpdates = viewModel::checkForUpdates,
+                        automaticUpdates = automaticUpdates,
+                        onAutomaticUpdatesChange = viewModel::setAutomaticUpdates,
+                        onUpdateAll = viewModel::updateAll,
                         onUpdate = viewModel::update,
                     )
                 }
@@ -204,7 +207,9 @@ private fun LazyListScope.overviewItems(
     onFetch: () -> Unit,
     onChoose: (ProviderRole) -> Unit,
     onOpen: (String) -> Unit,
-    onCheckUpdates: () -> Unit,
+    automaticUpdates: Boolean,
+    onAutomaticUpdatesChange: (Boolean) -> Unit,
+    onUpdateAll: () -> Unit,
     onUpdate: (PluginUpdate) -> Unit,
 ) {
     item(key = "providers-header") { TvSectionHeader(stringResource(R.string.tv_plugins_providers)) }
@@ -238,7 +243,15 @@ private fun LazyListScope.overviewItems(
             onClick = { onOpen(plugin.id) },
         )
     }
-    if (state.plugins.isNotEmpty()) pluginUpdateItems(state.updates, onCheck = onCheckUpdates, onUpdate = onUpdate)
+    if (state.plugins.isNotEmpty()) {
+        pluginUpdateItems(
+            state = state.updates,
+            automatic = automaticUpdates,
+            onAutomaticChange = onAutomaticUpdatesChange,
+            onUpdateAll = onUpdateAll,
+            onUpdate = onUpdate,
+        )
+    }
     item(key = "add-header") { TvSectionHeader(stringResource(R.string.tv_plugins_add), modifier = Modifier.padding(top = 12.dp)) }
     item(key = "add-url") {
         TvSearchField(

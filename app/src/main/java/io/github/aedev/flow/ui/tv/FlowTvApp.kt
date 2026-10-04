@@ -4,6 +4,9 @@ import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Extension
+import androidx.compose.material.icons.outlined.SystemUpdate
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
@@ -34,6 +37,8 @@ import io.github.aedev.flow.player.EnhancedMusicPlayerManager
 import io.github.aedev.flow.player.GlobalPlayerState
 import io.github.aedev.flow.ui.screens.music.MusicPlayerViewModel
 import io.github.aedev.flow.ui.screens.player.VideoPlayerViewModel
+import io.github.aedev.flow.ui.tv.components.TvNoticeSnackbar
+import io.github.aedev.flow.ui.tv.components.showNotice
 import io.github.aedev.flow.ui.tv.music.TvMusicNowPlayingScreen
 import io.github.aedev.flow.ui.tv.music.TvVisualizerViewModel
 import io.github.aedev.flow.ui.tv.music.rememberTvNowPlayingVisual
@@ -103,6 +108,7 @@ fun FlowTvApp(
     }
 
     val updatesViewModel: TvUpdatesViewModel = hiltViewModel(activity)
+    val settingsNeedsAttention by updatesViewModel.needsAttention.collectAsStateWithLifecycle()
     val lifecycleOwner = LocalLifecycleOwner.current
     LaunchedEffect(lifecycleOwner, musicPlayerViewModel, snackbarHostState) {
         lifecycleOwner.repeatOnLifecycle(Lifecycle.State.RESUMED) {
@@ -118,12 +124,26 @@ fun FlowTvApp(
     LaunchedEffect(lifecycleOwner) {
         lifecycleOwner.repeatOnLifecycle(Lifecycle.State.RESUMED) {
             launch { updatesViewModel.checkWhileForeground() }
+            launch { updatesViewModel.checkPluginsWhileForeground() }
             // Only a notice the user saw counts as shown; one that lands while the app is away waits for its return.
+            launch {
+                updatesViewModel.pluginReports.collect { report ->
+                    if (report.installed.isNotEmpty()) {
+                        val names = report.installed.joinToString { it.name }
+                        snackbarHostState.showNotice(context.getString(R.string.tv_plugins_notice_updated, names), Icons.Outlined.Extension)
+                    }
+                    if (report.needsReview.isNotEmpty()) {
+                        val count = report.needsReview.size
+                        snackbarHostState.showNotice(
+                            context.resources.getQuantityString(R.plurals.tv_plugins_notice_review, count, count),
+                            Icons.Outlined.Extension,
+                        )
+                    }
+                    updatesViewModel.markReported(report)
+                }
+            }
             updatesViewModel.readyToInstall.collect { version ->
-                snackbarHostState.showSnackbar(
-                    message = context.getString(R.string.tv_update_ready, version),
-                    duration = SnackbarDuration.Long,
-                )
+                snackbarHostState.showNotice(context.getString(R.string.tv_update_ready, version), Icons.Outlined.SystemUpdate)
                 updatesViewModel.markAnnounced(version)
             }
         }
@@ -229,6 +249,7 @@ fun FlowTvApp(
                         },
                         focusMusicStrip = focusMusicStrip,
                         onMusicStripFocused = { focusMusicStrip = false },
+                        badged = TvDestination.SETTINGS.takeIf { settingsNeedsAttention },
                     )
                 } else {
                     TvPlayerScreen(
@@ -247,6 +268,7 @@ fun FlowTvApp(
                         Modifier
                             .align(Alignment.BottomCenter)
                             .padding(horizontal = dimens.overscanHorizontal, vertical = dimens.overscanVertical),
+                    snackbar = { TvNoticeSnackbar(it) },
                 )
             }
         }

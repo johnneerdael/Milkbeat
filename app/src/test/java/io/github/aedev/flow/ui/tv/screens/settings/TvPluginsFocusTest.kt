@@ -68,6 +68,7 @@ class TvPluginsFocusTest {
     private fun show() {
         every { viewModel.state } returns state
         every { viewModel.playHistoryEnabled } returns MutableStateFlow(true)
+        every { viewModel.automaticUpdates } returns MutableStateFlow(true)
         every { viewModel.consumeHomeRequest(any()) } returns false
         every { viewModel.mutateSelection(any()) } answers {
             val change = firstArg<(ProviderSelection) -> ProviderSelection>()
