@@ -26,26 +26,35 @@ import javax.inject.Inject
 class SftpMusicClient
     @Inject
     constructor() : RemoteMusicClient {
+        private fun transport(
+            source: MusicFolder,
+            verifier: SftpHostKeyVerifier,
+        ): SSHClient {
+            SftpSecurity.install()
+            val ssh = SSHClient(DefaultConfig().apply { timeoutMs = TIMEOUT_MS })
+            try {
+                ssh.connectTimeout = TIMEOUT_MS
+                ssh.addHostKeyVerifier(verifier)
+                ssh.connect(source.host.removeSurrounding("[", "]"), source.port)
+                return ssh
+            } catch (error: Exception) {
+                runCatching { ssh.close() }
+                if (error is TransportException && verifier.pinned != null &&
+                    error.disconnectReason == DisconnectReason.HOST_KEY_NOT_VERIFIABLE
+                ) {
+                    throw SftpHostKeyMismatchException(error)
+                }
+                throw error
+            }
+        }
+
         private fun connect(
             source: MusicFolder,
             secrets: MusicFolderSecrets,
             verifier: SftpHostKeyVerifier,
         ): SftpConnection {
-            SftpSecurity.install()
-            val config =
-                DefaultConfig().apply { timeoutMs = TIMEOUT_MS }
-            val ssh = SSHClient(config)
+            val ssh = transport(source, verifier)
             try {
-                ssh.connectTimeout = TIMEOUT_MS
-                ssh.addHostKeyVerifier(verifier)
-                try {
-                    ssh.connect(source.host.removeSurrounding("[", "]"), source.port)
-                } catch (error: TransportException) {
-                    if (verifier.pinned != null && error.disconnectReason == DisconnectReason.HOST_KEY_NOT_VERIFIABLE) {
-                        throw SftpHostKeyMismatchException(error)
-                    }
-                    throw error
-                }
                 ssh.auth(source.username, authMethods(ssh, source, secrets))
                 val sftp = ssh.newSFTPClient()
                 sftp.sftpEngine.timeoutMs = TIMEOUT_MS
@@ -61,16 +70,20 @@ class SftpMusicClient
             secrets: MusicFolderSecrets,
         ): MusicFolder {
             require(source.kind == MusicFolderKind.SFTP && source.isValid())
-            val trustOnFirstUse = source.hostKey.isBlank()
-            val verifier = SftpHostKeyVerifier(source.hostKey.takeUnless { trustOnFirstUse })
-            connect(source, secrets, verifier).use { connection ->
+            if (source.hostKey.isBlank()) {
+                // First contact only learns the server key: credentials are sent once the user has seen it and it is pinned.
+                val verifier = SftpHostKeyVerifier(null)
+                transport(source, verifier).close()
+                return source.copy(hostKey = checkNotNull(verifier.presented))
+            }
+            connect(source, secrets, SftpHostKeyVerifier(source.hostKey)).use { connection ->
                 val root = serverPath(source, "")
                 if (connection.sftp.stat(root).type != FileMode.Type.DIRECTORY) throw IOException("Not a directory")
                 connection.sftp.sftpEngine
                     .openDir(root)
                     .close()
             }
-            return if (trustOnFirstUse) source.copy(hostKey = checkNotNull(verifier.presented)) else source
+            return source
         }
 
         override fun list(
@@ -86,18 +99,10 @@ class SftpMusicClient
                         if (Thread.currentThread().isInterrupted) throw InterruptedException()
                         val name = info.name
                         if (name == "." || name == "..") continue
+                        // A link target can lie outside the configured root or loop back into it, so links are not followed.
+                        if (info.attributes.type == FileMode.Type.SYMLINK) continue
                         val location = runCatching { source.childLocation(path, name) }.getOrNull() ?: continue
-                        val attributes =
-                            if (info.attributes.type == FileMode.Type.SYMLINK) {
-                                try {
-                                    connection.sftp.stat(serverPath(source, location))
-                                } catch (_: SFTPException) {
-                                    continue
-                                }
-                            } else {
-                                info.attributes
-                            }
-                        sftpEntry(name, location, attributes, includePlaylists)?.let(::add)
+                        sftpEntry(name, location, info.attributes, includePlaylists)?.let(::add)
                     }
                 }
             }

@@ -24,7 +24,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
-internal enum class FolderAccess { IDLE, RUNNING, SUCCESS, FAILED }
+internal enum class FolderAccess { IDLE, RUNNING, SUCCESS, FAILED, CONFIRM_KEY }
 
 internal data class MusicFolderEditor(
     val source: MusicFolder,
@@ -133,8 +133,12 @@ internal class MusicFoldersViewModel
                     mutableEditor.value = draft.copy(access = FolderAccess.RUNNING, error = null)
                     try {
                         val tested = repository.test(source, draft.password, draft.privateKey)
+                        val learnedKey = source.hostKey.isBlank() && tested.hostKey.isNotBlank()
                         mutableEditor.update {
-                            it?.copy(source = it.source.copy(hostKey = tested.hostKey), access = FolderAccess.SUCCESS)
+                            it?.copy(
+                                source = it.source.copy(hostKey = tested.hostKey),
+                                access = if (learnedKey) FolderAccess.CONFIRM_KEY else FolderAccess.SUCCESS,
+                            )
                         }
                     } catch (
                         cancelled: CancellationException,

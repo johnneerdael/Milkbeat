@@ -60,13 +60,13 @@ Open Settings → Music folders → **Add SFTP server**. Any server that offers 
 | Username | The SSH account |
 | Sign in with a private key | Off: sign in with the password. On: select **Choose private key file** and pick an OpenSSH, PEM or PuTTY key; the password field then holds the key's passphrase, if it has one |
 
-The first **Test access** or **Save** shows the server's key fingerprint, for example `ssh-ed25519 SHA256:…`. Compare it with the server's own fingerprint (`ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub` on the server), then select **Save** to trust it. Milkbeat refuses to connect if the server later presents a different key. If you replaced or reinstalled the server, select **Forget server key** and confirm the new fingerprint the same way.
+The first **Test access** or **Save** only fetches the server's key fingerprint, for example `ssh-ed25519 SHA256:…`; your password or key is not used yet. Compare it with the server's own fingerprint (`ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub` on the server). If it matches, select **Test access** to sign in or **Save** to trust it. Milkbeat refuses to connect if the server later presents a different key. If you replaced or reinstalled the server, select **Forget server key** and confirm the new fingerprint the same way.
 
 ![SFTP editor showing the server key fingerprint and Forget server key](images/sftp-server-key.png)
 
 ## Add an NFS export
 
-Open Settings → Music folders → **Add NFS export**. NFS versions 3, 4.0 and 4.1/4.2 are supported.
+Open Settings → Music folders → **Add NFS export**. NFS versions 3, 4.0 and 4.1 are supported. A server that also offers NFSv4.2 works over 4.1; one that accepts only 4.2 does not.
 
 | Field | Enter |
 | --- | --- |
@@ -82,7 +82,7 @@ The export must accept connections from non-privileged ports, because Android ap
 
 ![NFS editor with the non-privileged port hint, server, port and export fields](images/nfs-form.png)
 
-Network folders are read-only: Milkbeat never changes files on the server. Names that contain `:` are supported on WebDAV, SFTP and NFS.
+Network folders are read-only: Milkbeat never changes files on the server. Names that contain `:` are supported on WebDAV, SFTP and NFS. Symbolic links inside SFTP and NFS folders are not followed, because their targets can lie outside the configured folder; set the folder path to the real location instead.
 
 ## Browse and play
 

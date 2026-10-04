@@ -22,7 +22,10 @@ class MusicFolderSecrets(
 
 /** Blocking network access to one kind of remote music folder. Callers run it on an interruptible IO dispatcher. */
 interface RemoteMusicClient {
-    /** Proves the folder is readable and returns it as it should be saved, e.g. with a newly trusted server key. */
+    /**
+     * Proves the folder is readable and returns it as it should be saved. A source that must first pin something the
+     * user should confirm (SFTP's server key) instead returns it with that value filled in, without signing in.
+     */
     fun test(
         source: MusicFolder,
         secrets: MusicFolderSecrets,

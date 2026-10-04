@@ -88,6 +88,7 @@ private fun AccessActions(
             when (draft.access) {
                 FolderAccess.SUCCESS -> R.string.music_folders_access_ok
                 FolderAccess.FAILED -> R.string.music_folders_access_failed
+                FolderAccess.CONFIRM_KEY -> R.string.music_folders_host_key_confirm
                 else -> null
             }
         status?.let { Text(stringResource(it), style = MaterialTheme.typography.bodyMedium) }

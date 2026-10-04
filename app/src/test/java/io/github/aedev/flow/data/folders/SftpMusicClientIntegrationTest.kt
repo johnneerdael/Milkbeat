@@ -41,8 +41,6 @@ class SftpMusicClientIntegrationTest {
         keyAuth = keyAuth,
     )
 
-    private fun symlinks() = params.getProperty("symlinks", "true").toBoolean()
-
     private fun password() = MusicFolderSecrets(password = params.getProperty("password"))
 
     private fun hostKeys(): Map<String, String> =
@@ -57,10 +55,17 @@ class SftpMusicClientIntegrationTest {
         root: String = params.getProperty("root"),
         keyAuth: Boolean = false,
         secrets: MusicFolderSecrets = password(),
-    ): MusicFolder = client.test(folder(root = root, keyAuth = keyAuth), secrets)
+    ): MusicFolder = signIn(folder(root = root, keyAuth = keyAuth), secrets)
 
-    @Test fun trustOnFirstUseReturnsTheFingerprintOfAServerKey() {
-        val saved = client.test(folder(), password())
+    // Pins the known key instead of probing: OpenSSH 9.8+ PerSourcePenalties throttles a source that keeps
+    // connecting without authenticating, which a probe per test would do.
+    private fun signIn(
+        source: MusicFolder,
+        secrets: MusicFolderSecrets,
+    ): MusicFolder = client.test(source.copy(hostKey = hostKeys().getValue("ssh-ed25519")), secrets)
+
+    @Test fun firstContactReturnsTheServerKeyWithoutSigningIn() {
+        val saved = client.test(folder(), MusicFolderSecrets(password = "never-sent"))
         assertThat(hostKeys().values).contains(saved.hostKey)
     }
 
@@ -81,7 +86,7 @@ class SftpMusicClientIntegrationTest {
     }
 
     @Test fun aWrongPasswordIsRejected() {
-        assertThrows(IOException::class.java) { client.test(folder(), MusicFolderSecrets(password = "nope")) }
+        assertThrows(IOException::class.java) { signIn(folder(), MusicFolderSecrets(password = "nope")) }
     }
 
     @Test fun listAndOpenRefuseAnUnpinnedFolder() {
@@ -93,21 +98,21 @@ class SftpMusicClientIntegrationTest {
         val source = trusted()
         val entries = client.list(source, password(), "").associateBy { it.name }
         assertThat(entries.keys).containsAtLeast("Big Noise.wav", "Café del Mar", "Empty Folder", "Spaced Out Album", "root track.opus")
-        assertThat(entries.keys).containsNoneOf("broken.mp3", "Track: colon.mp3", "readme.txt")
+        assertThat(entries.keys).containsNoneOf("broken.mp3", "readme.txt")
+        assertThat(entries.getValue("Track: colon.mp3").location).isEqualTo("Track: colon.mp3")
         assertThat(entries.getValue("Café del Mar").isDirectory).isTrue()
-        if (symlinks()) assertThat(entries.getValue("LinkedAlbum").isDirectory).isTrue()
+        assertThat(entries.keys).doesNotContain("LinkedAlbum")
         val big = entries.getValue("Big Noise.wav")
         assertThat(big.isDirectory).isFalse()
         assertThat(big.size).isEqualTo(File(dir, "music/Big Noise.wav").length())
         assertThat(big.modified).isGreaterThan(0L)
     }
 
-    @Test fun listsNestedUnicodeAndSymlinkedFolders() {
+    @Test fun listsNestedUnicodeFolders() {
         val source = trusted()
         val nested = client.list(source, password(), "Café del Mar/Sébastien – Ünïcode")
         assertThat(nested.map { it.name }).containsExactly("01 Tröck één.flac")
         assertThat(nested.single().location).isEqualTo("Café del Mar/Sébastien – Ünïcode/01 Tröck één.flac")
-        if (symlinks()) assertThat(client.list(source, password(), "LinkedAlbum").map { it.name }).containsExactly("Disc 1")
         assertThat(client.list(source, password(), "Spaced Out Album/Disc 1").map { it.name }).containsExactly("02 Second track.mp3")
         assertThat(client.list(source, password(), "Empty Folder")).isEmpty()
     }
@@ -119,8 +124,8 @@ class SftpMusicClientIntegrationTest {
     }
 
     @Test fun aRootThatIsAFileOrMissingFailsTheTest() {
-        assertThrows(IOException::class.java) { client.test(folder(root = "${params.getProperty("root")}/Big Noise.wav"), password()) }
-        assertThrows(IOException::class.java) { client.test(folder(root = "does/not/exist"), password()) }
+        assertThrows(IOException::class.java) { signIn(folder(root = "${params.getProperty("root")}/Big Noise.wav"), password()) }
+        assertThrows(IOException::class.java) { signIn(folder(root = "does/not/exist"), password()) }
     }
 
     @Test fun sequentialAndSeekingReadsMatchTheOriginalBytes() {
@@ -197,7 +202,7 @@ class SftpMusicClientIntegrationTest {
     }
 
     @Test fun aWrongPassphraseOrKeyIsRejected() {
-        assertThrows(IOException::class.java) { client.test(folder(keyAuth = true), keySecrets("id_rsa_pass", "wrong")) }
-        assertThrows(IOException::class.java) { client.test(folder(keyAuth = true), keySecrets("id_ed25519_pass", "")) }
+        assertThrows(IOException::class.java) { signIn(folder(keyAuth = true), keySecrets("id_rsa_pass", "wrong")) }
+        assertThrows(IOException::class.java) { signIn(folder(keyAuth = true), keySecrets("id_ed25519_pass", "")) }
     }
 }

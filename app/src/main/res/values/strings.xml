@@ -739,7 +739,8 @@
     <string name="music_folders_passphrase">Key passphrase (optional)</string>
     <string name="music_folders_passphrase_keep">Key passphrase (leave unchanged to keep the saved one)</string>
     <string name="music_folders_host_key">Server key: %1$s</string>
-    <string name="music_folders_host_key_unknown">The server key is not trusted yet. Test access or Save shows it first; check it, then select Save to trust it.</string>
+    <string name="music_folders_host_key_unknown">The server key is not trusted yet. Test access or Save first shows it, without sending your password or key.</string>
+    <string name="music_folders_host_key_confirm">Compare this server key with your server\'s own. If it matches, select Test access to sign in, or Save to trust it.</string>
     <string name="music_folders_host_key_forget">Forget server key</string>
     <string name="music_folders_host_key_changed">The server key has changed since it was trusted. If you replaced or reinstalled the server, choose Forget server key and test again; otherwise someone may be intercepting the connection.</string>
     <string name="music_folders_nfs_insecure_required">The server only accepts connections from privileged ports, which apps cannot use. Enable the \'insecure\' export option, or \'Allow connections from non-privileged ports\' on Synology and QNAP.</string>
@@ -750,7 +751,7 @@
     <string name="music_folders_nfs_version_auto">Automatic</string>
     <string name="music_folders_nfs_version_v3">NFSv3</string>
     <string name="music_folders_nfs_version_v4">NFSv4.0</string>
-    <string name="music_folders_nfs_version_v4_1">NFSv4.1 or later</string>
+    <string name="music_folders_nfs_version_v4_1">NFSv4.1</string>
     <string name="music_folders_nfs_uid">User ID (UID)</string>
     <string name="music_folders_nfs_gid">Group ID (GID)</string>
     <string name="music_folders_nfs_hint">The export must allow connections from non-privileged ports: the \'insecure\' export option, or \'Allow connections from non-privileged ports\' on Synology and QNAP.</string>

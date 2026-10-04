@@ -127,7 +127,7 @@ class MusicFoldersViewModelTest {
             vm.updateDraft { copy(source = source.copy(name = "Box", host = "box", username = "me"), password = "pw") }
             vm.testAccess()
             advanceUntilIdle()
-            assertThat(vm.editor.value?.access).isEqualTo(FolderAccess.SUCCESS)
+            assertThat(vm.editor.value?.access).isEqualTo(FolderAccess.CONFIRM_KEY)
             assertThat(
                 vm.editor.value
                     ?.source

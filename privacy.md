@@ -242,9 +242,11 @@ project-operated proxy or relay in between.
 - Local network addresses: DLNA renderers on the LAN, the peer device during Device Sync, and the
   user's phone during TV sign-in.
 - Music folder servers the user adds (SMB, WebDAV, SFTP or NFS), only the host and port entered in
-  Settings → Music folders, and only while browsing, indexing or playing that folder. Their
-  passwords and SFTP private keys are sealed with the Android Keystore on the device and are sent only
-  to that server; WebDAV over `http://` sends them unencrypted, which the editor warns about.
+  Settings → Music folders, and only while browsing, indexing or playing that folder. Passwords and
+  SFTP private keys are sealed with the Android Keystore on the device. A password is sent only to
+  that server (unencrypted for WebDAV over `http://`, which the editor warns about). An SFTP private
+  key never leaves the device: only a signature made with it is sent, after the user has confirmed
+  the server's key fingerprint.
 
 ## What Milkbeat does not do
 

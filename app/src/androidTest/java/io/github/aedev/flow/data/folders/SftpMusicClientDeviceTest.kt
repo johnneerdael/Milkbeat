@@ -111,7 +111,9 @@ class SftpMusicClientDeviceTest {
     @Test fun passwordAuthenticationListsAndReadsWithMatchingChecksum() {
         val source = client.test(folder(), password())
         assertListsAndReads(source, password())
-        assertThrows(IOException::class.java) { client.test(folder(), MusicFolderSecrets(password = "nope")) }
+        assertThrows(IOException::class.java) {
+            client.test(client.test(folder(), MusicFolderSecrets()), MusicFolderSecrets(password = "nope"))
+        }
     }
 
     @Test fun ed25519KeyAuthenticationListsAndReadsWithMatchingChecksum() {
