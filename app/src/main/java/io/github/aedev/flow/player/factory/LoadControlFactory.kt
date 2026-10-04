@@ -6,6 +6,7 @@ import android.util.Log
 import androidx.media3.common.C
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.DefaultLoadControl
+import androidx.media3.exoplayer.LoadControl
 import androidx.media3.exoplayer.upstream.DefaultAllocator
 import io.github.aedev.flow.data.local.BufferDurations
 import io.github.aedev.flow.player.config.PlayerConfig
@@ -94,19 +95,24 @@ object LoadControlFactory {
 
     /**
      * Music service: loads ahead until [PlayerConfig.MUSIC_TARGET_BUFFER_BYTES], which holds a whole song,
-     * with a low playback threshold so the first note still comes out quickly. Size wins over time so a
-     * music video's picture cannot grow the buffer past that budget. No back buffer.
+     * topping it up as playback releases what it played, with a low playback threshold so the first note
+     * still comes out quickly. Size wins over time so a music video's picture cannot grow the buffer
+     * past that budget, and [MusicLoadControl]'s floor still keeps [PlayerConfig.MUSIC_FLOOR_BUFFER_MS]
+     * ahead when the picture fills the budget first. No back buffer.
      */
-    fun forMusic(): DefaultLoadControl =
-        build(
-            minMs = PlayerConfig.MUSIC_MIN_BUFFER_MS,
-            maxMs = PlayerConfig.MUSIC_MAX_BUFFER_MS,
-            playbackMs = PlayerConfig.MUSIC_BUFFER_FOR_PLAYBACK_MS,
-            rebufferMs = PlayerConfig.MUSIC_BUFFER_FOR_REBUFFER_MS,
-            backBufferMs = 0,
-            retainBackBufferFromKeyframe = false,
-            targetBufferBytes = PlayerConfig.MUSIC_TARGET_BUFFER_BYTES,
-            prioritizeTimeOverSizeThresholds = false,
+    fun forMusic(): LoadControl =
+        MusicLoadControl(
+            build(
+                minMs = PlayerConfig.MUSIC_MIN_BUFFER_MS,
+                maxMs = PlayerConfig.MUSIC_MAX_BUFFER_MS,
+                playbackMs = PlayerConfig.MUSIC_BUFFER_FOR_PLAYBACK_MS,
+                rebufferMs = PlayerConfig.MUSIC_BUFFER_FOR_REBUFFER_MS,
+                backBufferMs = 0,
+                retainBackBufferFromKeyframe = false,
+                targetBufferBytes = PlayerConfig.MUSIC_TARGET_BUFFER_BYTES,
+                prioritizeTimeOverSizeThresholds = false,
+            ),
+            floorUs = PlayerConfig.MUSIC_FLOOR_BUFFER_MS * 1_000L,
         )
 
     /**

@@ -10,6 +10,7 @@ import androidx.media3.exoplayer.analytics.PlayerId
 import androidx.media3.exoplayer.source.MediaSource.MediaPeriodId
 import androidx.media3.exoplayer.source.SinglePeriodTimeline
 import io.github.aedev.flow.player.config.PlayerConfig
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -72,6 +73,12 @@ class LoadControlFactoryTest {
 
         repeat(PlayerConfig.MUSIC_TARGET_BUFFER_BYTES / C.DEFAULT_BUFFER_SEGMENT_SIZE) { control.getAllocator(player).allocate() }
         assertFalse("the byte budget bounds the buffer", control.shouldContinueLoading(buffered(600)))
+        assertFalse("past the floor the budget still holds", control.shouldContinueLoading(buffered(31)))
+        assertTrue(
+            "a picture filling the budget first still leaves the floor loaded",
+            control.shouldContinueLoading(buffered(PlayerConfig.MUSIC_FLOOR_BUFFER_MS / 1_000L - 1)),
+        )
+        assertEquals(0L, control.getBackBufferDurationUs(player))
     }
 
     @Test(expected = IllegalArgumentException::class)

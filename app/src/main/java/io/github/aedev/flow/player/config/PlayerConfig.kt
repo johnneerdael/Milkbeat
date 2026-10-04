@@ -58,6 +58,9 @@ object PlayerConfig {
     /** About 13 minutes of 160 kbps audio; also bounds a music video, which shares the music player. */
     const val MUSIC_TARGET_BUFFER_BYTES = 16 * 1024 * 1024
 
+    /** Always loaded ahead, even when a music video's picture has used up the byte budget. */
+    const val MUSIC_FLOOR_BUFFER_MS = 30_000
+
     /** Preferred delay from the true live edge. Keeps YouTube live playback stable. */
     const val LIVE_EDGE_GAP_MS = 10_000L
 
