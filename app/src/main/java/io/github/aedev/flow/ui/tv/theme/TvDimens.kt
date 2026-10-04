@@ -24,6 +24,7 @@ data class TvDimens(
     val coverPaneWidth: Dp = 380.dp,
     val coverArtSize: Dp = 200.dp,
     val attributionAvatarSize: Dp = 28.dp,
+    val sourceBadgeSize: Dp = 20.dp,
     val portraitSize: Dp = 200.dp,
     val rowSpacing: Dp = 36.dp,
     val itemSpacing: Dp = 20.dp,

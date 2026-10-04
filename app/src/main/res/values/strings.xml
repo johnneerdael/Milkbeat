@@ -768,6 +768,7 @@
     <string name="playlist_mirror_progress_percent">Preparing: %1$d%% · %2$d of %3$d matched · %4$d unavailable</string>
     <string name="playlist_mirror_writing">Writing playlist: %1$d%% · %2$d unavailable</string>
     <string name="playlist_mirror_verifying">Verifying playlist: %1$d%% · %2$d unavailable</string>
+    <string name="playlist_mirror_youtube_source">Plays from your YouTube Music copy</string>
     <string name="playlist_mirror_ready">Private playlist ready · %1$d matched · %2$d unavailable</string>
     <string name="playlist_mirror_failed">Playlist preparation failed. Select Retry to try again.</string>
     <string name="playlist_mirror_retry">Retry preparation</string>
