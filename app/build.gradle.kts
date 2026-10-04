@@ -228,6 +228,11 @@ dependencies {
     implementation(libs.sshj)
     // Berkeley DB backs only nfs4j's server-side state store; the client never loads it.
     implementation(libs.nfs4j.core) { exclude(group = "com.sleepycat") }
+    constraints {
+        // smbj resolves bcprov to 1.85.x while sshj asks for bcpkix/bcutil 1.84; mixed BouncyCastle lines fail at provider init.
+        implementation(libs.bouncycastle.pkix)
+        implementation(libs.bouncycastle.util)
+    }
     // --- Core Android ---
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.core.splashscreen)

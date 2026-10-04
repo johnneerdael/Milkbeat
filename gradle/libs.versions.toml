@@ -46,6 +46,7 @@ rhino = "1.8.1"
 smbj = "0.15.0"
 sshj = "0.41.1"
 nfs4j = "0.28.5"
+bouncycastle = "1.85"
 jsoup = "1.23.2"
 
 [libraries]
@@ -53,6 +54,8 @@ jsoup = { group = "org.jsoup", name = "jsoup", version.ref = "jsoup" }
 smbj = { group = "com.hierynomus", name = "smbj", version.ref = "smbj" }
 sshj = { group = "com.hierynomus", name = "sshj", version.ref = "sshj" }
 nfs4j-core = { group = "org.dcache", name = "nfs4j-core", version.ref = "nfs4j" }
+bouncycastle-pkix = { group = "org.bouncycastle", name = "bcpkix-jdk18on", version.ref = "bouncycastle" }
+bouncycastle-util = { group = "org.bouncycastle", name = "bcutil-jdk18on", version.ref = "bouncycastle" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 androidx-core-splashscreen = { group = "androidx.core", name = "core-splashscreen", version.ref = "core-splashscreen" }
 androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
