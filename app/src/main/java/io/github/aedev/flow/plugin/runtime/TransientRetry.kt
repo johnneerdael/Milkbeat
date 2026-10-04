@@ -3,9 +3,12 @@ package io.github.aedev.flow.plugin.runtime
 import kotlinx.coroutines.delay
 import nl.neerdael.milkbeat.plugin.PluginErrorCode
 
-/** Failures a provider may answer differently in a moment: a refused or throttled request, a dropped connection. */
+/**
+ * Failures a provider may answer differently in a moment: a throttled request, a dropped connection, a
+ * slow answer. UNAVAILABLE is not one: it says this provider cannot serve the item, so another should.
+ */
 internal val TransientPluginErrors =
-    setOf(PluginErrorCode.NETWORK, PluginErrorCode.TIMEOUT, PluginErrorCode.RATE_LIMITED, PluginErrorCode.UNAVAILABLE)
+    setOf(PluginErrorCode.NETWORK, PluginErrorCode.TIMEOUT, PluginErrorCode.RATE_LIMITED)
 
 internal val TransientRetryBackoffMs = listOf(5_000L, 15_000L, 45_000L)
 

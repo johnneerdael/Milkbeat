@@ -59,15 +59,18 @@ class TransientRetryTest {
     fun `other failures are thrown at once and retries stop when the run's context changed`() =
         runTest {
             var calls = 0
-            val permanent =
-                runCatching {
-                    retryingTransient {
-                        calls++
-                        throw failure(PluginErrorCode.SIGN_IN_EXPIRED)
-                    }
-                }.exceptionOrNull()
-            assertThat((permanent as PluginCallException).error.code).isEqualTo(PluginErrorCode.SIGN_IN_EXPIRED)
-            assertThat(calls).isEqualTo(1)
+            for (code in listOf(PluginErrorCode.SIGN_IN_EXPIRED, PluginErrorCode.UNAVAILABLE, PluginErrorCode.NOT_FOUND)) {
+                calls = 0
+                val permanent =
+                    runCatching {
+                        retryingTransient {
+                            calls++
+                            throw failure(code)
+                        }
+                    }.exceptionOrNull()
+                assertThat((permanent as PluginCallException).error.code).isEqualTo(code)
+                assertThat(calls).isEqualTo(1)
+            }
 
             calls = 0
             val stopped =
