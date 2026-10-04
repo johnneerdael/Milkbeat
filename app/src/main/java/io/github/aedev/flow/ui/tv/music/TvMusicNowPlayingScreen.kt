@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -31,16 +30,12 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import io.github.aedev.flow.data.local.MusicPlayerBackgroundStyle
 import io.github.aedev.flow.data.local.NowPlayingView
-import io.github.aedev.flow.data.local.PlayerPreferences
 import io.github.aedev.flow.data.local.nextNowPlayingView
 import io.github.aedev.flow.data.local.shownNowPlayingView
 import io.github.aedev.flow.player.EnhancedMusicPlayerManager
-import io.github.aedev.flow.ui.components.musicplayer.full.PlayerBackground
 import io.github.aedev.flow.ui.components.shared.rememberMediaPalette
 import io.github.aedev.flow.ui.screens.music.MusicPlayerViewModel
 import io.github.aedev.flow.ui.tv.components.TvIconButtonColors
@@ -75,7 +70,6 @@ fun TvMusicNowPlayingScreen(
 ) {
     val tuning by viewModel.radioTuning.state.collectAsStateWithLifecycle()
     val manager = EnhancedMusicPlayerManager
-    val context = LocalContext.current
     val track by manager.currentTrack.collectAsStateWithLifecycle()
     val playerState by manager.playerState.collectAsStateWithLifecycle()
     val radioLoading by manager.radioLoading.collectAsStateWithLifecycle()
@@ -97,10 +91,6 @@ fun TvMusicNowPlayingScreen(
         nextNowPlayingView(shownView, videoAvailable = track?.isVideoSong == true, visualizerAvailable = visualizer != null)
     val dimens = LocalTvDimens.current
 
-    val playerPreferences = remember { PlayerPreferences(context) }
-    val backgroundStyle by playerPreferences.musicPlayerBackgroundStyle.collectAsState(
-        initial = MusicPlayerBackgroundStyle.BLUR_GRADIENT,
-    )
     val artworkUrl = track?.highResThumbnailUrl
     val palette = rememberMediaPalette(artworkUrl)
     // Translucent chips over the always-dark backdrop; latched toggles
@@ -298,13 +288,7 @@ fun TvMusicNowPlayingScreen(
             }
 
             NowPlayingView.STATIC -> {
-                PlayerBackground(
-                    thumbnailUrl = artworkUrl,
-                    style = backgroundStyle,
-                    paletteBaseColor = palette.base,
-                    paletteAccentColor = palette.accent,
-                    modifier = Modifier.fillMaxSize(),
-                )
+                TvNowPlayingArtwork(artworkUrl = artworkUrl)
             }
         }
 

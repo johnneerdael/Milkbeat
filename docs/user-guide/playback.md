@@ -64,8 +64,14 @@ With **Change presets automatically** off, a preset stays until you press Left o
 
 ## Visualizer, music video or artwork
 
-The view button in the player steps through three views while audio continues: the visualizer (the default), the music video, and the track's static artwork. Milkbeat remembers the view you leave it on for later tracks and later sessions.
+The view button in the player steps through three views while audio continues: the visualizer (the default), the music video, and the track's cover filling the screen. Milkbeat remembers the view you leave it on for later tracks and later sessions.
 
 A track without a video skips from the visualizer straight to the artwork, and with the video view chosen it shows the visualizer instead. With visualizations turned off, the button moves between the video and the artwork. Unsupported or unavailable video falls back to audio and visuals.
+
+![The view button on the visualizer](images/now-playing-view-visualizer.png)
+
+![The music video view](images/now-playing-view-video.png)
+
+![The artwork view: the cover filling the screen](images/now-playing-view-artwork.png)
 
 ![Full-screen music-video example from the existing README](images/music-video.jpg)
