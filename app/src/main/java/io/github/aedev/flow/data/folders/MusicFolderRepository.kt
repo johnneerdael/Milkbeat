@@ -55,13 +55,16 @@ class MusicFolderRepository
         suspend fun list(
             source: MusicFolder,
             location: String,
+            includePlaylists: Boolean = false,
         ): List<MusicFolderEntry> {
             val entries =
                 if (source.kind == MusicFolderKind.LOCAL) {
-                    runInterruptible(PerformanceDispatcher.diskIO) { documents.list(source, location) }
+                    runInterruptible(PerformanceDispatcher.diskIO) { documents.list(source, location, includePlaylists) }
                 } else {
                     val access = store.access(source.id, source.revision)
-                    runInterruptible(PerformanceDispatcher.networkIO) { smb.list(access.source, access.password, location) }
+                    runInterruptible(
+                        PerformanceDispatcher.networkIO,
+                    ) { smb.list(access.source, access.password, location, includePlaylists) }
                 }
             return withContext(PerformanceDispatcher.diskIO) {
                 entries.sortedWith(

@@ -289,6 +289,7 @@ dependencies {
     implementation(libs.androidx.media3.exoplayer.dash)
     implementation(libs.androidx.media3.datasource)
     implementation(libs.androidx.media3.datasource.okhttp)
+    implementation(libs.androidx.media3.inspector)
 
     // --- Database & Storage ---
     implementation(libs.androidx.room.runtime)
@@ -304,6 +305,7 @@ dependencies {
     implementation(libs.androidx.paging.compose)
 
     implementation(libs.androidx.work.runtime.ktx)
+    implementation(libs.androidx.concurrent.futures.ktx)
 
     // --- Baseline profiles ---
     // Runtime installer for the merged baseline profile. AGP merges profiles shipped inside
