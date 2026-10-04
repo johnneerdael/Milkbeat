@@ -4,6 +4,8 @@ import com.google.common.truth.Truth.assertThat
 import io.github.aedev.flow.data.catalog.CatalogPlayback
 import io.github.aedev.flow.data.library.catalog.LocalLibraryEmptyException
 import io.github.aedev.flow.plugin.catalog.NoMetadataPluginException
+import io.github.aedev.flow.plugin.runtime.PluginCallException
+import io.github.aedev.flow.plugin.runtime.TransientRetryBackoffMs
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -12,8 +14,10 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import kotlinx.coroutines.withContext
@@ -28,6 +32,8 @@ import nl.neerdael.milkbeat.catalog.ItemView
 import nl.neerdael.milkbeat.catalog.MetadataPage
 import nl.neerdael.milkbeat.catalog.MetadataProvider
 import nl.neerdael.milkbeat.catalog.ProviderAccount
+import nl.neerdael.milkbeat.plugin.PluginError
+import nl.neerdael.milkbeat.plugin.PluginErrorCode
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
@@ -61,6 +67,14 @@ class MusicHomeFeedViewModelTest {
         get() = state.value.blocks.map { (it as CollectionBlock).header?.title }
 
     private fun viewModel() = MusicHomeFeedViewModel(provider, CatalogPlayback { null })
+
+    private fun pluginFailure(
+        code: PluginErrorCode,
+        retryAfterMs: Long? = null,
+    ) = PluginCallException(
+        "dev.example.spotify",
+        PluginError(code, "$code Spotify returned HTTP 500", retryAfterMs = retryAfterMs),
+    )
 
     @Before
     fun setUp() {
@@ -277,6 +291,100 @@ class MusicHomeFeedViewModelTest {
             vm.load()
             advanceUntilIdle()
             assertThat(vm.titles).containsExactly("Recovered")
+        }
+
+    @Test
+    fun `a transient first-page failure stays on screen and is fetched again on its own`() =
+        runTest(dispatcher) {
+            var calls = 0
+            provider.pages = {
+                if (calls++ == 0) Result.failure(pluginFailure(PluginErrorCode.NETWORK)) else Result.success(page("Recovered"))
+            }
+            val vm = viewModel()
+
+            vm.load()
+            runCurrent()
+            assertThat(vm.state.value.error).isEqualTo("NETWORK Spotify returned HTTP 500")
+            assertThat(vm.state.value.isLoading).isFalse()
+
+            advanceTimeBy(TransientRetryBackoffMs.first() - 1)
+            assertThat(provider.requests).hasSize(1)
+
+            advanceUntilIdle()
+            assertThat(provider.requests).hasSize(2)
+            assertThat(vm.titles).containsExactly("Recovered")
+            assertThat(vm.state.value.error).isNull()
+        }
+
+    @Test
+    fun `the automatic retries end with the backoff schedule and honour the provider's delay`() =
+        runTest(dispatcher) {
+            provider.pages = { Result.failure(pluginFailure(PluginErrorCode.RATE_LIMITED, retryAfterMs = 60_000)) }
+            val vm = viewModel()
+
+            vm.load()
+            advanceUntilIdle()
+
+            assertThat(provider.requests).hasSize(TransientRetryBackoffMs.size + 1)
+            assertThat(testScheduler.currentTime).isEqualTo(TransientRetryBackoffMs.sumOf { maxOf(it, 60_000) })
+            assertThat(vm.state.value.error).isNotNull()
+            assertThat(vm.state.value.isLoading).isFalse()
+        }
+
+    @Test
+    fun `a lasting failure is not fetched again on its own`() =
+        runTest(dispatcher) {
+            for (code in listOf(PluginErrorCode.SIGN_IN_EXPIRED, PluginErrorCode.UNAVAILABLE, PluginErrorCode.INTERNAL)) {
+                provider.requests.clear()
+                provider.pages = { Result.failure(pluginFailure(code)) }
+                val vm = viewModel()
+
+                vm.load()
+                advanceUntilIdle()
+
+                assertThat(provider.requests).hasSize(1)
+                assertThat(vm.state.value.error).isNotNull()
+            }
+        }
+
+    @Test
+    fun `a retry the listener asks for replaces the pending one and keeps the failure shown until it ends`() =
+        runTest(dispatcher) {
+            val retried = CompletableDeferred<Result<MetadataPage>>()
+            var calls = 0
+            provider.pages = { if (calls++ == 0) Result.failure(pluginFailure(PluginErrorCode.TIMEOUT)) else retried.await() }
+            val vm = viewModel()
+            vm.load()
+            runCurrent()
+
+            vm.load(force = true)
+            runCurrent()
+            assertThat(vm.state.value.error).isNotNull()
+            assertThat(vm.state.value.isLoading).isTrue()
+
+            retried.complete(Result.success(page("Recovered")))
+            advanceUntilIdle()
+            assertThat(provider.requests).hasSize(2)
+            assertThat(vm.titles).containsExactly("Recovered")
+            assertThat(vm.state.value.error).isNull()
+        }
+
+    @Test
+    fun `a failed refresh keeps the shown blocks and is not fetched again on its own`() =
+        runTest(dispatcher) {
+            var calls = 0
+            provider.pages = {
+                if (calls++ == 0) Result.success(page("Before")) else Result.failure(pluginFailure(PluginErrorCode.NETWORK))
+            }
+            val vm = viewModel()
+            vm.load()
+            advanceUntilIdle()
+
+            vm.load(force = true)
+            advanceUntilIdle()
+
+            assertThat(provider.requests).hasSize(2)
+            assertThat(vm.titles).containsExactly("Before")
         }
 
     @Test

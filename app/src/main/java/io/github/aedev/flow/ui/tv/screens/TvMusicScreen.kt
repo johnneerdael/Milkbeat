@@ -2,7 +2,6 @@ package io.github.aedev.flow.ui.tv.screens
 
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -74,14 +73,31 @@ fun TvMusicScreen(
                 onOpen = { open(it) },
             )
         }
-    // An empty library's scan button takes focus once; its shelves take it again when the first songs are indexed.
+    // An empty library's scan button, or a failed or empty home's retry, takes focus once; the shelves take
+    // it again when they arrive. Without it the rail is all there is, and it waits for the content first.
     var openedOnScan by rememberSaveable { mutableStateOf(false) }
-    LaunchedEffect(hasShelves, state.needsPlugin, state.libraryEmpty) {
-        val scanOnly = state.libraryEmpty && !hasShelves
-        if ((hasShelves || state.needsPlugin || scanOnly) && !openedOnContent && !(scanOnly && openedOnScan)) {
+    var openedOnRetry by rememberSaveable { mutableStateOf(false) }
+    val scanOnly = state.libraryEmpty && !hasShelves
+    val retryOnly =
+        !hasShelves && !state.needsPlugin && !state.libraryEmpty &&
+            (state.error != null || (!state.isLoading && !state.isLoadingMore))
+    LaunchedEffect(hasShelves, state.needsPlugin, scanOnly, retryOnly) {
+        val opened = openedOnContent || (scanOnly && openedOnScan) || (retryOnly && openedOnRetry)
+        if ((hasShelves || state.needsPlugin || scanOnly || retryOnly) && !opened) {
             withFrameNanos { }
             runCatching { firstShelfFocus.requestFocus() }
-            if (scanOnly) openedOnScan = true else openedOnContent = true
+            when {
+                scanOnly -> openedOnScan = true
+                retryOnly -> openedOnRetry = true
+                else -> openedOnContent = true
+            }
+        }
+    }
+    // The retry the user pressed takes the focus back if the page comes back without shelves again.
+    val retry: () -> Unit = {
+        if (!state.isLoading) {
+            openedOnRetry = false
+            viewModel.load(force = true)
         }
     }
 
@@ -103,10 +119,6 @@ fun TvMusicScreen(
                     contentPadding = PaddingValues(bottom = dimens.overscanVertical),
                 ) {
                     when {
-                        state.isLoading && blocks.isEmpty() -> {
-                            item(key = "music-loading") { TvShimmerRow() }
-                        }
-
                         state.needsPlugin && blocks.isEmpty() -> {
                             item(key = "music-needs-plugin") {
                                 Column(
@@ -140,19 +152,31 @@ fun TvMusicScreen(
                             }
                         }
 
+                        // Kept while a retry runs, so the focus on its button stays put.
                         state.error != null && blocks.isEmpty() -> {
                             item(key = "music-error") {
-                                Box(Modifier.fillMaxWidth().padding(horizontal = dimens.overscanHorizontal)) {
-                                    TvMessageState(title = stringResource(R.string.tv_error_loading), message = state.error)
-                                }
+                                TvMusicRetryState(
+                                    title = stringResource(R.string.tv_error_loading),
+                                    message = state.error,
+                                    retrying = state.isLoading,
+                                    onRetry = retry,
+                                    actionModifier = Modifier.focusRequester(firstShelfFocus),
+                                )
                             }
+                        }
+
+                        state.isLoading && blocks.isEmpty() -> {
+                            item(key = "music-loading") { TvShimmerRow() }
                         }
 
                         blocks.isEmpty() && !state.isLoadingMore -> {
                             item(key = "music-empty") {
-                                Box(Modifier.fillMaxWidth().padding(horizontal = dimens.overscanHorizontal)) {
-                                    TvMessageState(title = stringResource(R.string.tv_music_empty))
-                                }
+                                TvMusicRetryState(
+                                    title = stringResource(R.string.tv_music_empty),
+                                    retrying = false,
+                                    onRetry = retry,
+                                    actionModifier = Modifier.focusRequester(firstShelfFocus),
+                                )
                             }
                         }
 
@@ -171,5 +195,26 @@ fun TvMusicScreen(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun TvMusicRetryState(
+    title: String,
+    retrying: Boolean,
+    onRetry: () -> Unit,
+    actionModifier: Modifier,
+    message: String? = null,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = LocalTvDimens.current.overscanHorizontal),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        TvMessageState(title = title, message = message)
+        TvButton(
+            text = stringResource(if (retrying) R.string.tv_music_retrying else R.string.retry),
+            onClick = onRetry,
+            modifier = actionModifier,
+        )
     }
 }
