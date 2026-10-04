@@ -171,6 +171,7 @@ android {
                     "/META-INF/INDEX.LIST",
                     "/META-INF/DEPENDENCIES",
                     "/META-INF/*.version",
+                    "/META-INF/LICENSE.md",
                 )
         }
     }
@@ -328,6 +329,7 @@ dependencies {
     testImplementation(libs.kxml2)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.mockk)
+    testImplementation(libs.okhttp.mockwebserver)
     testImplementation(libs.truth)
     testImplementation(libs.turbine)
     testImplementation(libs.hilt.android.testing)
