@@ -44,6 +44,33 @@ internal object MusicRadioPlanner {
         return QueueContext(reseed = false, explicit = false, knownIds = knownIds)
     }
 
+    /** What a station is built from: the private YouTube copy of a mirrored playlist, or a track. */
+    sealed interface RadioSeed {
+        data class Playlist(
+            val id: String,
+        ) : RadioSeed
+
+        data class Track(
+            val id: String,
+        ) : RadioSeed
+    }
+
+    /**
+     * The seeds to try, in order, until one gives a station: a mirrored playlist always seeds from its
+     * YouTube copy, anything else from the first track of the queue. The playing track closes the
+     * list, so whatever plays always gets a radio.
+     */
+    fun radioSeeds(
+        mirrorPlaylistId: String?,
+        queueIds: List<String>,
+        currentId: String,
+    ): List<RadioSeed> =
+        listOfNotNull(
+            mirrorPlaylistId?.let(RadioSeed::Playlist),
+            queueIds.firstOrNull()?.let(RadioSeed::Track),
+            RadioSeed.Track(currentId),
+        ).distinct()
+
     /**
      * The list under the toggle is the up-next buffer, so it is ordered once here and consumed
      * from the head. Ordering it for display and re-ordering it again at append time is what made

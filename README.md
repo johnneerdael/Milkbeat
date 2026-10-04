@@ -30,7 +30,7 @@ services and play music videos. Everything is built for the TV remote.
 - **Ordered audio providers:** try one provider first, then fall back to the next.
 - **Playback preparation:** index provider playlists in advance and resolve upcoming queue tracks
   one at a time across the remaining queue.
-- **Radio discovery:** switch between All, Familiar, Popular and Discover when the provider offers them.
+- **Radio discovery:** every queue continues as a radio, steered by every preset YouTube Music offers for it (All, Popular, Discover, Deep cuts, moods and decades).
 - **Optional private playlists:** prepare Spotify playlists in a signed-in YouTube Music account for
   native collection playback and autoplay. This is off by default.
 - **MilkDrop visuals:** projectM reacts to the audio from Milkbeat's player.

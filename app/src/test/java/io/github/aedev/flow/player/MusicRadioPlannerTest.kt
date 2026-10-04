@@ -223,4 +223,29 @@ class MusicRadioPlannerTest {
 
         assertThat(pool.map { it.videoId }).containsExactly("a1", "a2", "b1", "a3").inOrder()
     }
+
+    @Test
+    fun `a mirrored playlist seeds from its YouTube copy, then its first track, then the playing one`() {
+        assertThat(MusicRadioPlanner.radioSeeds("PLmirror", listOf("first", "second"), currentId = "second"))
+            .containsExactly(
+                MusicRadioPlanner.RadioSeed.Playlist("PLmirror"),
+                MusicRadioPlanner.RadioSeed.Track("first"),
+                MusicRadioPlanner.RadioSeed.Track("second"),
+            ).inOrder()
+    }
+
+    @Test
+    fun `anything not mirrored seeds from the first track of its queue, not the one it started on`() {
+        assertThat(MusicRadioPlanner.radioSeeds(null, listOf("first", "fifth"), currentId = "fifth"))
+            .containsExactly(MusicRadioPlanner.RadioSeed.Track("first"), MusicRadioPlanner.RadioSeed.Track("fifth"))
+            .inOrder()
+    }
+
+    @Test
+    fun `a single song or an all-local queue still gets a radio from the playing track`() {
+        assertThat(MusicRadioPlanner.radioSeeds(null, listOf("only"), currentId = "only"))
+            .containsExactly(MusicRadioPlanner.RadioSeed.Track("only"))
+        assertThat(MusicRadioPlanner.radioSeeds(null, emptyList(), currentId = "playing"))
+            .containsExactly(MusicRadioPlanner.RadioSeed.Track("playing"))
+    }
 }

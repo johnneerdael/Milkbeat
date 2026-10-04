@@ -13,6 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.InputMode
 import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.hasScrollAction
@@ -126,6 +127,36 @@ class TvQueuePresetFocusTest {
     }
 
     @Test
+    fun `all of YouTube's presets sit on one scrolling line and right reaches the selected one at its far end`() {
+        val labels =
+            listOf(
+                "All",
+                "Popular",
+                "Discover",
+                "Deep cuts",
+                "Party",
+                "2010s",
+                "Pump-up",
+                "Workout",
+                "2000s",
+                "Electronic",
+                "Focus",
+                "Instrumental",
+            )
+        val many = labels.map { FilterOption("opaque-$it", it) }
+        showPanel(queueSize = 100, currentIndex = 97, selectedId = "opaque-Instrumental", presets = many)
+        press(KeyEvent.KEYCODE_DPAD_DOWN)
+        press(KeyEvent.KEYCODE_DPAD_RIGHT)
+        compose.onNodeWithText("Instrumental").assertIsFocused().assertIsDisplayed()
+        repeat(labels.size - 1) { press(KeyEvent.KEYCODE_DPAD_LEFT) }
+        compose.onNodeWithText("All").assertIsFocused().assertIsDisplayed()
+        press(KeyEvent.KEYCODE_DPAD_DOWN)
+        compose.onNodeWithText("Song 98").assertIsFocused()
+        press(KeyEvent.KEYCODE_DPAD_RIGHT)
+        compose.onNodeWithText("Instrumental").assertIsFocused().assertIsDisplayed()
+    }
+
+    @Test
     fun `right without presets keeps focus on the queue row`() {
         showPanel(queueSize = 100, currentIndex = 97, presets = emptyList())
         press(KeyEvent.KEYCODE_DPAD_DOWN)
@@ -161,7 +192,7 @@ class TvQueuePresetFocusTest {
 
     private fun scrollPosition(): Float =
         compose
-            .onNode(hasScrollAction())
+            .onNode(hasScrollAction() and SemanticsMatcher.keyIsDefined(SemanticsProperties.VerticalScrollAxisRange))
             .fetchSemanticsNode()
             .config[SemanticsProperties.VerticalScrollAxisRange]
             .value()
