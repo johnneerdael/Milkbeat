@@ -1,12 +1,16 @@
 package io.github.aedev.flow.plugin.registry
 
 import android.content.Context
+import android.util.Log
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.aedev.flow.plugin.pkg.PluginPackage
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -69,6 +73,28 @@ class PluginRegistry
         private val _state = MutableStateFlow(load())
 
         val state: StateFlow<PluginRegistryState> = _state.asStateFlow()
+
+        init {
+            CoroutineScope(SupervisorJob() + Dispatchers.IO).launch { refreshInstalledManifests() }
+        }
+
+        /**
+         * Reads each manifest again from its installed package: the saved copy was written by whichever app
+         * version installed the plugin, and would hide anything that version's manifest model did not know,
+         * such as a role capability the plugin declares, after an app update.
+         */
+        internal suspend fun refreshInstalledManifests() =
+            mutex.withLock {
+                val current =
+                    withContext(Dispatchers.IO) {
+                        withInstalledManifests(
+                            _state.value,
+                        ) { plugin -> File(directory(plugin), MANIFEST).takeIf { it.isFile }?.readText() }
+                    }
+                if (current != _state.value) {
+                    runCatching { update { current } }.onFailure { Log.w(TAG, "Could not save refreshed plugin manifests", it) }
+                }
+            }
 
         /** Where [plugin]'s unpacked files are. */
         fun directory(plugin: InstalledPlugin): File = File(File(root, plugin.id), plugin.manifest.versionCode.toString())
@@ -168,16 +194,44 @@ class PluginRegistry
 
         private suspend fun update(change: (PluginRegistryState) -> PluginRegistryState) {
             val next = change(_state.value)
-            withContext(Dispatchers.IO) {
-                root.mkdirs()
-                val temp = File(root, "registry.json.tmp")
-                temp.writeText(PluginJson.encodeToString(PluginRegistryState.serializer(), next))
-                check(temp.renameTo(file)) { "Could not save the plugin registry" }
-            }
+            withContext(Dispatchers.IO) { save(next) }
             _state.value = next
+        }
+
+        private fun save(state: PluginRegistryState) {
+            root.mkdirs()
+            val temp = File(root, "registry.json.tmp")
+            temp.writeText(PluginJson.encodeToString(PluginRegistryState.serializer(), state))
+            check(temp.renameTo(file)) { "Could not save the plugin registry" }
         }
 
         private fun load(): PluginRegistryState =
             runCatching { PluginJson.decodeFromString(PluginRegistryState.serializer(), file.readText()) }
                 .getOrDefault(PluginRegistryState())
+
+        private companion object {
+            const val TAG = "PluginRegistry"
+            const val MANIFEST = "manifest.json"
+        }
     }
+
+/**
+ * [state] with each plugin's manifest replaced by the one its installed package holds, read by [read],
+ * when that one parses and is the same plugin and version; otherwise the saved manifest stays.
+ */
+internal fun withInstalledManifests(
+    state: PluginRegistryState,
+    read: (InstalledPlugin) -> String?,
+): PluginRegistryState =
+    state.copy(
+        plugins =
+            state.plugins.map { plugin ->
+                val installed =
+                    runCatching { read(plugin)?.let { PluginJson.decodeFromString(PluginManifest.serializer(), it) } }.getOrNull()
+                if (installed != null && installed.id == plugin.id && installed.versionCode == plugin.manifest.versionCode) {
+                    plugin.copy(manifest = installed)
+                } else {
+                    plugin
+                }
+            },
+    )
