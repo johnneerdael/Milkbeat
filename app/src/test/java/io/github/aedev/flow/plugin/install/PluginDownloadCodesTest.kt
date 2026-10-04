@@ -21,6 +21,29 @@ class PluginDownloadCodesTest {
     }
 
     @Test
+    fun `every code a plugin was given installs its current release from the live catalog`() {
+        val bundled =
+            mapOf(
+                "416" to PluginDownloadCode("416", "nl.neerdael.youtube-music", "YouTube Music", "https://buzzheavier.com/oldold123456"),
+                "494" to PluginDownloadCode("494", "nl.neerdael.youtube-music", "YouTube Music", "https://buzzheavier.com/olderurl1234"),
+            )
+        val live =
+            Publication(
+                PublishedPlugins(listOf(PublishedPlugin("nl.neerdael.youtube-music", "0.2.2", 7, "f", "494", "sha"))),
+                bundled +
+                    (
+                        "494" to
+                            PluginDownloadCode("494", "nl.neerdael.youtube-music", "YouTube Music", "https://buzzheavier.com/current12345")
+                    ) +
+                    ("555" to PluginDownloadCode("555", "dev.example.newer", "Newer", "https://buzzheavier.com/newcode12345")),
+            )
+        assertThat(pluginDownloadSource("416", live) { bundled }.url).isEqualTo("https://buzzheavier.com/current12345")
+        assertThat(pluginDownloadSource("494", live) { bundled }.url).isEqualTo("https://buzzheavier.com/current12345")
+        assertThat(pluginDownloadSource("555", live) { bundled }.pluginId).isEqualTo("dev.example.newer")
+        assertThat(pluginDownloadSource("416", null) { bundled }.url).isEqualTo("https://buzzheavier.com/oldold123456")
+    }
+
+    @Test
     fun `ordinary URLs do not require decrypting the catalog`() {
         val source = pluginDownloadSource("  ntsk.app/spot  ") { error("Catalog must stay unloaded") }
         assertThat(source.url).isEqualTo("https://ntsk.app/spot")

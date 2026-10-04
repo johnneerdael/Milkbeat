@@ -10,6 +10,8 @@ import io.github.aedev.flow.plugin.install.PendingInstall
 import io.github.aedev.flow.plugin.install.PluginInstallException
 import io.github.aedev.flow.plugin.install.PluginInstaller
 import io.github.aedev.flow.plugin.install.PluginLinks
+import io.github.aedev.flow.plugin.install.PluginUpdate
+import io.github.aedev.flow.plugin.install.PluginUpdateChecker
 import io.github.aedev.flow.plugin.preload.PlaylistPreloadJobs
 import io.github.aedev.flow.plugin.registry.InstalledPlugin
 import io.github.aedev.flow.plugin.registry.PluginRegistry
@@ -42,12 +44,29 @@ sealed interface AddPluginState {
     ) : AddPluginState
 }
 
+/** Where checking for plugin updates stands: not asked, checking, the updates found among [Checked.checked], or failed. */
+sealed interface PluginUpdatesState {
+    data object Idle : PluginUpdatesState
+
+    data object Checking : PluginUpdatesState
+
+    data class Checked(
+        val updates: List<PluginUpdate>,
+        val checked: Set<String>,
+    ) : PluginUpdatesState
+
+    data class Failed(
+        val messageResource: Int?,
+    ) : PluginUpdatesState
+}
+
 data class TvPluginsState(
     val plugins: List<InstalledPlugin> = emptyList(),
     val selection: ProviderSelection = ProviderSelection(),
     val accounts: Map<String, ProviderAccount> = emptyMap(),
     val adding: AddPluginState = AddPluginState.Idle,
     val mirrorPairs: Set<String> = emptySet(),
+    val updates: PluginUpdatesState = PluginUpdatesState.Idle,
 )
 
 /** Settings, Plugins: what is installed, which plugin provides what, adding, signing in and removing. */
@@ -57,6 +76,7 @@ class TvPluginsViewModel
     constructor(
         private val registry: PluginRegistry,
         private val installer: PluginInstaller,
+        private val updateChecker: PluginUpdateChecker,
         private val accounts: PluginAccounts,
         private val playHistory: AccountPlayHistory,
         links: PluginLinks,
@@ -66,10 +86,18 @@ class TvPluginsViewModel
     ) : ViewModel() {
         private val adding = MutableStateFlow<AddPluginState>(AddPluginState.Idle)
         private var fetchJob: Job? = null
+        private val updates = MutableStateFlow<PluginUpdatesState>(PluginUpdatesState.Idle)
+        private var updateCheckJob: Job? = null
 
         val state: StateFlow<TvPluginsState> =
-            combine(registry.state, accounts.accounts, adding, mirrors.store.enabledPairs) { registryState, known, add, pairs ->
-                TvPluginsState(registryState.plugins, registryState.selection, known, add, pairs)
+            combine(
+                registry.state,
+                accounts.accounts,
+                adding,
+                mirrors.store.enabledPairs,
+                updates,
+            ) { registryState, known, add, pairs, found ->
+                TvPluginsState(registryState.plugins, registryState.selection, known, add, pairs, found.forInstalled(registryState.plugins))
             }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), TvPluginsState())
 
         init {
@@ -83,9 +111,29 @@ class TvPluginsViewModel
 
         fun fetch(url: String) = fetch(url, links = null)
 
+        /** Asks the plugin publisher for newer versions of the installed plugins. */
+        fun checkForUpdates() {
+            updateCheckJob?.cancel()
+            updates.value = PluginUpdatesState.Checking
+            val installed = registry.state.value.plugins
+            updateCheckJob =
+                viewModelScope.launch {
+                    updates.value =
+                        try {
+                            PluginUpdatesState.Checked(updateChecker.check(installed), installed.mapTo(HashSet()) { it.id })
+                        } catch (e: PluginInstallException) {
+                            PluginUpdatesState.Failed(e.messageResource)
+                        }
+                }
+        }
+
+        /** Downloads [update] for the same review and install as any plugin added by hand. */
+        fun update(update: PluginUpdate) = fetch(update.url, links = null, update = update)
+
         private fun fetch(
             url: String,
             links: PluginLinks?,
+            update: PluginUpdate? = null,
         ) {
             links?.consume()
             val trimmed = url.trim()
@@ -96,7 +144,7 @@ class TvPluginsViewModel
                 viewModelScope.launch {
                     adding.value =
                         try {
-                            AddPluginState.Consent(installer.fetch(trimmed))
+                            AddPluginState.Consent(installer.fetch(trimmed, update))
                         } catch (e: PluginInstallException) {
                             AddPluginState.Failed(e.message.orEmpty(), e.messageResource)
                         }
@@ -167,5 +215,25 @@ class TvPluginsViewModel
                     adding.value = AddPluginState.Failed(e.error.userMessage ?: e.error.message)
                 }
             }
+        }
+    }
+
+/**
+ * The check's findings for the plugins [installed] now: a plugin added since was not checked, so the
+ * findings no longer hold; an update stays offered only while its plugin is installed and older.
+ */
+internal fun PluginUpdatesState.forInstalled(installed: List<InstalledPlugin>): PluginUpdatesState =
+    when {
+        this !is PluginUpdatesState.Checked -> {
+            this
+        }
+
+        installed.any { it.id !in checked } -> {
+            PluginUpdatesState.Idle
+        }
+
+        else -> {
+            val versions = installed.associate { it.id to it.manifest.versionCode }
+            copy(updates = updates.filter { update -> versions[update.pluginId]?.let { it < update.versionCode } == true })
         }
     }
