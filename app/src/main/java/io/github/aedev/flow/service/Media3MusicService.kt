@@ -940,13 +940,13 @@ class Media3MusicService : MediaLibraryService() {
         positionMs: Long,
     ): Boolean {
         val currentItem = player.getMediaItemAt(index)
-        val scheme = currentItem.localConfiguration?.uri?.scheme
-        if (scheme != MUSIC_URI_SCHEME && scheme != MusicVideoItems.SCHEME) return false
+        val uri = currentItem.localConfiguration?.uri ?: return false
+        if (uri.scheme != MUSIC_URI_SCHEME && uri.scheme != MusicVideoItems.SCHEME) return false
 
         val refreshedItem =
             currentItem
                 .buildUpon()
-                .setUri("$MUSIC_URI_SCHEME://$mediaId")
+                .setUri(MusicVideoItems.songUri(uri, mediaId))
                 .setMediaId(mediaId)
                 .setCustomCacheKey(mediaId)
                 .build()

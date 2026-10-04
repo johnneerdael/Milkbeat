@@ -49,6 +49,10 @@ Give visible tracks time to load their embedded metadata. Check that the file ac
 
 Spotify is metadata-only. Enable at least one audio provider, check its account/subscription, and verify the priority order. Catalogs may not contain the same recording; an unavailable match can fall back to another provider. Temporary failures can be retried.
 
+## Music stops in the middle of a song
+
+Milkbeat loads each streamed song in full and, when a stream link fails, requests a fresh one for the same recording and resumes at the same position. If playback still stops, the audio provider could not supply a new stream in time: retry later, or check whether YouTube is limiting your network. For tracks longer than the buffer budget, Milkbeat keeps up to that budget loaded ahead and tops it up as the track plays.
+
 ## Provider sign-in needs verification
 
 Use the streamed phone sign-in viewer and complete the provider's verification there. The phone and TV must be on the same network. Do not expect a native Spotify password form in Milkbeat.

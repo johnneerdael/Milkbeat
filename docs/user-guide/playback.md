@@ -14,6 +14,8 @@ Open the queue to inspect upcoming tracks or jump to one. Holding Up or Down acc
 
 Confirmed unmatched tracks can be removed from the future queue. Temporary failures remain retryable. Preparation reduces the work needed at a transition, but does not guarantee gapless playback under every network, format or provider condition.
 
+Streamed songs load ahead in full: Milkbeat keeps up to about 16 MB (roughly 13 minutes of typical audio) loaded ahead of the playing position and tops it up as playback moves on, so a stream link that stops answering partway through a song does not interrupt it. If a stream fails anyway, Milkbeat asks the audio provider for a fresh link to the same recording and resumes where it stopped.
+
 ![Upcoming queue beside the player controls](images/queue-open.png)
 
 ## Mixes

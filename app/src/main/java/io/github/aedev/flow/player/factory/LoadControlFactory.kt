@@ -93,9 +93,9 @@ object LoadControlFactory {
     }
 
     /**
-     * Music service: audio-only, so a long window costs little memory and a low playback threshold
-     * gets the first note out quickly. No back buffer, and no byte cap — the duration window is the
-     * only budget it needs.
+     * Music service: loads ahead until [PlayerConfig.MUSIC_TARGET_BUFFER_BYTES], which holds a whole song,
+     * with a low playback threshold so the first note still comes out quickly. Size wins over time so a
+     * music video's picture cannot grow the buffer past that budget. No back buffer.
      */
     fun forMusic(): DefaultLoadControl =
         build(
@@ -105,7 +105,8 @@ object LoadControlFactory {
             rebufferMs = PlayerConfig.MUSIC_BUFFER_FOR_REBUFFER_MS,
             backBufferMs = 0,
             retainBackBufferFromKeyframe = false,
-            targetBufferBytes = C.LENGTH_UNSET,
+            targetBufferBytes = PlayerConfig.MUSIC_TARGET_BUFFER_BYTES,
+            prioritizeTimeOverSizeThresholds = false,
         )
 
     /**
@@ -120,6 +121,7 @@ object LoadControlFactory {
         backBufferMs: Int,
         retainBackBufferFromKeyframe: Boolean,
         targetBufferBytes: Int,
+        prioritizeTimeOverSizeThresholds: Boolean = true,
     ): DefaultLoadControl {
         // Widen rather than throw: a profile that violates the contract should cost buffer, not a crash loop.
         val resolvedMin = maxOf(minMs, playbackMs, rebufferMs)
@@ -130,7 +132,7 @@ object LoadControlFactory {
             .setAllocator(DefaultAllocator(true, PlayerConfig.ALLOCATOR_BUFFER_SIZE))
             .setBufferDurationsMs(resolvedMin, resolvedMax, playbackMs, rebufferMs)
             .setBackBuffer(backBufferMs, retainBackBufferFromKeyframe)
-            .setPrioritizeTimeOverSizeThresholds(true)
+            .setPrioritizeTimeOverSizeThresholds(prioritizeTimeOverSizeThresholds)
             .setTargetBufferBytes(targetBufferBytes)
             .build()
     }
