@@ -142,7 +142,7 @@ jobs:
           cd plugins
           cp published.json ../app/src/androidTest/assets/published-plugins.json
           npm test
-          node scripts/stage-published-plugins.mjs
+          node scripts/verify-published-plugins.mjs
 
       # Instrumentation tests are not executed in CI, but they must still
       # compile: breakage here otherwise lands on main unnoticed.

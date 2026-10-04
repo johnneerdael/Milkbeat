@@ -1258,11 +1258,11 @@ class Media3MusicService : MediaLibraryService() {
         radioTopUpJob?.cancel()
         manager.updateAutomixItems(emptyList())
         radioCollectionId =
-            (
-                manager.currentTrack.value
-                    ?.playbackContext
-                    ?.radioCollectionId ?: collectionId
-            ).takeUnless { context.explicit }
+            manager.currentTrack.value
+                ?.playbackContext
+                ?.takeIf { it.preferCollectionRadio }
+                ?.radioCollectionId
+                ?.takeUnless { context.explicit }
         radioSeedPending = true
         manager.setRadioLoading(false)
         if (player.isPlaying) startPendingRadio()
@@ -1273,17 +1273,15 @@ class Media3MusicService : MediaLibraryService() {
         val id = player.currentMediaItem?.mediaId?.takeUnless(LocalMediaIds::isLocal) ?: return
         radioSeedPending = false
         radioSeedId = id
-        startRadio(id, radioCollectionId)
+        startRadio(id)
     }
 
     /**
-     * Seeds the station the way YouTube Music does: the collection's or the track's own mix, kept in
-     * the order YouTube built it. Only artists the user blocked or turned down are taken out.
+     * Seeds the station the way YouTube Music does, from the first of [MusicRadioPlanner.radioSeeds] that
+     * gives one, kept in the order YouTube built it. Only artists the user blocked or turned down are
+     * taken out.
      */
-    private fun startRadio(
-        seedId: String,
-        collectionId: String?,
-    ) {
+    private fun startRadio(currentId: String) {
         automixJob?.cancel()
         radioTopUpJob?.cancel()
         val manager = io.github.aedev.flow.player.EnhancedMusicPlayerManager
@@ -1291,34 +1289,58 @@ class Media3MusicService : MediaLibraryService() {
         manager.updateAutomixItems(emptyList())
         manager.setRadioLoading(true)
         val generation = radioGeneration
+        val seeds =
+            MusicRadioPlanner.radioSeeds(
+                mirrorPlaylistId = radioCollectionId,
+                queueIds =
+                    manager.queue.value
+                        .map { it.videoId }
+                        .filterNot(LocalMediaIds::isLocal),
+                currentId = currentId,
+            )
         automixJob =
             lifecycleScope.launch(Dispatchers.IO) {
                 try {
-                    val nativeCollection =
-                        manager.currentTrack.value
-                            ?.playbackContext
-                            ?.takeIf { it.preferCollectionRadio }
-                            ?.radioCollectionId
-                    var result =
-                        nativeCollection?.let { mix(EntityRef(EntityKind.PLAYLIST, it)) }
-                            ?: mix(EntityRef(EntityKind.TRACK, seedId), queuedDescriptor(seedId))
-                    if (result == null ||
-                        result.tracks.tracks
-                            .isEmpty()
-                    ) {
-                        result = collectionId?.let { mix(EntityRef(EntityKind.PLAYLIST, it)) }
-                    }
-                    val mapped = result?.toRadioTracks(seedId).orEmpty()
-                    val station = radioModeTuner.withoutHiddenArtists(mapped)
+                    val seeded =
+                        MusicRadioPlanner.firstStation(
+                            seeds,
+                            page = { candidate ->
+                                when (candidate) {
+                                    is MusicRadioPlanner.RadioSeed.Playlist -> {
+                                        mix(EntityRef(EntityKind.PLAYLIST, candidate.id))
+                                    }
+
+                                    is MusicRadioPlanner.RadioSeed.Track -> {
+                                        mix(
+                                            EntityRef(EntityKind.TRACK, candidate.id),
+                                            queuedDescriptor(candidate.id),
+                                        )
+                                    }
+                                }
+                            },
+                            station = { candidate, page ->
+                                val seedId = (candidate as? MusicRadioPlanner.RadioSeed.Track)?.id ?: currentId
+                                radioModeTuner.withoutHiddenArtists(page.toRadioTracks(seedId))
+                            },
+                        )
+                    val seed = seeded?.seed
+                    val result = seeded?.page
+                    val station = seeded?.tracks.orEmpty()
                     withContext(Dispatchers.Main) {
                         if (generation != radioGeneration) return@withContext
+                        // A top-up whose mix ran out reseeds from anything but this, so it names the track actually used.
+                        radioSeedId = (seed as? MusicRadioPlanner.RadioSeed.Track)?.id ?: currentId
                         radioContinuation = result?.tracks?.next
                         radioPage = result
                         radioTuning.station(result, generation)
                         Log.i(
                             TAG,
-                            "Radio seeded from $seedId via ${result?.pluginId}: ${station.size} tracks, " +
-                                "continuation=${radioContinuation != null}",
+                            "Radio seeded from $seed via ${result?.pluginId}: ${station.size} tracks, " +
+                                "presets=${result
+                                    ?.tracks
+                                    ?.filters
+                                    ?.options
+                                    ?.size ?: 0}, continuation=${radioContinuation != null}",
                         )
                         if (station.isNotEmpty()) {
                             manager.updateAutomixItems(station)

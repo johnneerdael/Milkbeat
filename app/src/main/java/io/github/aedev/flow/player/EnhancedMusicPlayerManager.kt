@@ -16,6 +16,7 @@ import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.ListenableFuture
 import com.google.common.util.concurrent.MoreExecutors
 import io.github.aedev.flow.data.local.AudioSettingsPersistence
+import io.github.aedev.flow.data.local.NowPlayingView
 import io.github.aedev.flow.data.local.QueuePersistence
 import io.github.aedev.flow.data.local.VisualizerPreferences
 import io.github.aedev.flow.data.localmedia.LocalMediaIds
@@ -34,6 +35,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import org.schabi.newpipe.extractor.stream.AudioStream
@@ -62,8 +64,8 @@ object EnhancedMusicPlayerManager {
     var pendingRadioSeedId: String? = null
 
     /**
-     * The collection a new queue was played from, whose own YouTube mix follows it. Travels with
-     * the queue change like [pendingRadioSeedId] and is consumed by the service with it.
+     * The collection a new queue was played from, which always opens a new radio session. Travels
+     * with the queue change like [pendingRadioSeedId] and is consumed by the service with it.
      */
     @Volatile
     var pendingRadioPlaylistId: String? = null
@@ -146,8 +148,8 @@ object EnhancedMusicPlayerManager {
     internal val shuffleEnabledState = MutableStateFlow(false)
     val shuffleEnabled: StateFlow<Boolean> = shuffleEnabledState.asStateFlow()
 
-    // Whether a music video shows its picture: the setting decides, and the player's Video button
-    // overrides it for the session, so each video track starts the way the last one was left.
+    // Whether a music video shows its picture: while the remembered now-playing view is the video, so
+    // each video track starts the way the player's view button last left it.
     @Volatile
     internal var showVideo = false
 
@@ -214,7 +216,11 @@ object EnhancedMusicPlayerManager {
                 if (controller != null) {
                     setupPlayerListener(controller)
                     scope.launch {
-                        VisualizerPreferences(context).showMusicVideos.distinctUntilChanged().collect(::setVideoMode)
+                        VisualizerPreferences(context)
+                            .nowPlayingView
+                            .map { it == NowPlayingView.VIDEO }
+                            .distinctUntilChanged()
+                            .collect(::setVideoMode)
                     }
 
                     scope.launch {
@@ -336,8 +342,6 @@ object EnhancedMusicPlayerManager {
             ?: MusicVideoItems.uri(track, withPicture = carriesPicture(track))
 
     internal fun carriesPicture(track: MusicTrack): Boolean = showVideo && track.isVideoSong && track.videoId !in videoUnavailableIds
-
-    fun toggleVideoMode() = setVideoMode(!showVideo)
 
     /**
      * Shows or hides music videos' pictures. Hiding turns the playing track's picture off while its sound

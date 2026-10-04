@@ -9,6 +9,7 @@ import io.github.aedev.flow.plugin.registry.PluginRegistry
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
+import java.security.MessageDigest
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -35,6 +36,7 @@ open class PluginInstallException(
 class BrowserVerification internal constructor(
     val page: String,
     internal val source: PluginDownloadSource,
+    internal val update: PluginUpdate? = null,
 )
 
 class BrowserVerificationRequiredException(
@@ -53,36 +55,45 @@ class PluginInstaller
         private val registry: PluginRegistry,
         private val codes: PluginDownloadCodes,
     ) {
-        suspend fun fetch(url: String): PendingInstall {
+        /** Fetches the plugin [url] names; for an [update], only the exact release it offered is accepted. */
+        suspend fun fetch(
+            url: String,
+            update: PluginUpdate? = null,
+        ): PendingInstall {
             val source = codes.resolve(url)
             val bytes =
                 try {
                     downloadPlugin(client, source.url)
                 } catch (e: BuzzheavierChallengeException) {
-                    throw BrowserVerificationRequiredException(BrowserVerification(e.page, source))
+                    throw BrowserVerificationRequiredException(BrowserVerification(e.page, source, update))
                 }
-            return verify(bytes, source)
+            return verify(bytes, source, update)
         }
 
         /** Continues [verification] with the file link the browser was handed once it passed. */
         suspend fun fetch(
             verification: BrowserVerification,
             fileUrl: String,
-        ): PendingInstall = verify(downloadBuzzheavierFile(client, verification.page, fileUrl), verification.source)
+        ): PendingInstall = verify(downloadBuzzheavierFile(client, verification.page, fileUrl), verification.source, verification.update)
 
         private suspend fun verify(
             bytes: ByteArray,
             source: PluginDownloadSource,
+            update: PluginUpdate?,
         ): PendingInstall {
             val pack =
                 withContext(Dispatchers.IO) {
+                    if (update != null && !sha256(bytes).equals(update.sha256, ignoreCase = true)) {
+                        throw PluginInstallException(messageResource = R.string.tv_plugins_update_mismatch)
+                    }
                     try {
                         PluginPackageReader.read(bytes.inputStream())
                     } catch (e: PluginPackageException) {
                         throw PluginInstallException(e.message ?: "Not a valid plugin", e)
                     }
                 }
-            if (source.pluginId != null && pack.manifest.id != source.pluginId) {
+            val expected = update?.pluginId ?: source.pluginId
+            if (expected != null && pack.manifest.id != expected) {
                 throw PluginInstallException(messageResource = R.string.tv_plugins_code_package_mismatch)
             }
             return check(pack, source.url)
@@ -115,3 +126,5 @@ class PluginInstaller
                 grantedBrowser = pending.pack.manifest.permissions.browser,
             )
     }
+
+private fun sha256(bytes: ByteArray): String = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }

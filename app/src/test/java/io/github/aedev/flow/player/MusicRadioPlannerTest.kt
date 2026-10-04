@@ -2,6 +2,7 @@ package io.github.aedev.flow.player
 
 import com.google.common.truth.Truth.assertThat
 import io.github.aedev.flow.data.music.model.MusicTrack
+import kotlinx.coroutines.test.runTest
 import org.junit.Test
 
 /**
@@ -223,4 +224,66 @@ class MusicRadioPlannerTest {
 
         assertThat(pool.map { it.videoId }).containsExactly("a1", "a2", "b1", "a3").inOrder()
     }
+
+    @Test
+    fun `a mirrored playlist seeds from its YouTube copy, then its first track, then the playing one`() {
+        assertThat(MusicRadioPlanner.radioSeeds("PLmirror", listOf("first", "second"), currentId = "second"))
+            .containsExactly(
+                MusicRadioPlanner.RadioSeed.Playlist("PLmirror"),
+                MusicRadioPlanner.RadioSeed.Track("first"),
+                MusicRadioPlanner.RadioSeed.Track("second"),
+            ).inOrder()
+    }
+
+    @Test
+    fun `anything not mirrored seeds from the first track of its queue, not the one it started on`() {
+        assertThat(MusicRadioPlanner.radioSeeds(null, listOf("first", "fifth"), currentId = "fifth"))
+            .containsExactly(MusicRadioPlanner.RadioSeed.Track("first"), MusicRadioPlanner.RadioSeed.Track("fifth"))
+            .inOrder()
+    }
+
+    @Test
+    fun `a single song or an all-local queue still gets a radio from the playing track`() {
+        assertThat(MusicRadioPlanner.radioSeeds(null, listOf("only"), currentId = "only"))
+            .containsExactly(MusicRadioPlanner.RadioSeed.Track("only"))
+        assertThat(MusicRadioPlanner.radioSeeds(null, emptyList(), currentId = "playing"))
+            .containsExactly(MusicRadioPlanner.RadioSeed.Track("playing"))
+    }
+
+    @Test
+    fun `a seed whose page holds only songs already queued falls through to the next one`() =
+        runTest {
+            val mirror = MusicRadioPlanner.RadioSeed.Playlist("PLmirror")
+            val first = MusicRadioPlanner.RadioSeed.Track("first")
+            val pages = mapOf(mirror to listOf("first", "second"), first to listOf("second", "new"))
+            val fetched = mutableListOf<MusicRadioPlanner.RadioSeed>()
+
+            val seeded =
+                MusicRadioPlanner.firstStation(
+                    listOf(mirror, first, MusicRadioPlanner.RadioSeed.Track("second")),
+                    page = { seed -> pages[seed].also { fetched += seed } },
+                    station = { _, page -> page.filterNot { it in setOf("first", "second") } },
+                )
+
+            assertThat(seeded?.seed).isEqualTo(first)
+            assertThat(seeded?.tracks).containsExactly("new")
+            assertThat(fetched).containsExactly(mirror, first).inOrder()
+        }
+
+    @Test
+    fun `when no seed leaves a song to add, the first page that came back is kept`() =
+        runTest {
+            val mirror = MusicRadioPlanner.RadioSeed.Playlist("PLmirror")
+            val playing = MusicRadioPlanner.RadioSeed.Track("playing")
+
+            val seeded =
+                MusicRadioPlanner.firstStation(
+                    listOf(MusicRadioPlanner.RadioSeed.Track("unavailable"), mirror, playing),
+                    page = { seed -> if (seed == mirror || seed == playing) listOf("queued") else null },
+                    station = { _, _ -> emptyList<String>() },
+                )
+
+            assertThat(seeded?.seed).isEqualTo(mirror)
+            assertThat(seeded?.tracks).isEmpty()
+        }
 }

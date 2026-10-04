@@ -34,6 +34,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.aedev.flow.R
 import io.github.aedev.flow.plugin.install.PendingInstall
+import io.github.aedev.flow.plugin.install.PluginUpdate
 import io.github.aedev.flow.plugin.registry.InstalledPlugin
 import io.github.aedev.flow.plugin.registry.ProviderSelection
 import io.github.aedev.flow.ui.tv.components.TvButton
@@ -172,6 +173,8 @@ fun TvPluginsSettingsPane(
                         onFetch = { viewModel.fetch(url) },
                         onChoose = { choosing = it },
                         onOpen = { openPlugin = it },
+                        onCheckUpdates = viewModel::checkForUpdates,
+                        onUpdate = viewModel::update,
                     )
                 }
             }
@@ -201,6 +204,8 @@ private fun LazyListScope.overviewItems(
     onFetch: () -> Unit,
     onChoose: (ProviderRole) -> Unit,
     onOpen: (String) -> Unit,
+    onCheckUpdates: () -> Unit,
+    onUpdate: (PluginUpdate) -> Unit,
 ) {
     item(key = "providers-header") { TvSectionHeader(stringResource(R.string.tv_plugins_providers)) }
     ProviderRole.entries.forEach { role ->
@@ -233,6 +238,7 @@ private fun LazyListScope.overviewItems(
             onClick = { onOpen(plugin.id) },
         )
     }
+    if (state.plugins.isNotEmpty()) pluginUpdateItems(state.updates, onCheck = onCheckUpdates, onUpdate = onUpdate)
     item(key = "add-header") { TvSectionHeader(stringResource(R.string.tv_plugins_add), modifier = Modifier.padding(top = 12.dp)) }
     item(key = "add-url") {
         TvSearchField(

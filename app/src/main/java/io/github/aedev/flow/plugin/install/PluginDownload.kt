@@ -100,6 +100,15 @@ private fun downloadSession(
         .apply { if (cookies) cookieJar(DownloadCookies()) }
         .build()
 
+/** A small file the plugin publisher keeps current, by the same bounded download path as plugins. */
+internal suspend fun downloadPublished(
+    client: OkHttpClient,
+    url: HttpUrl,
+): ByteArray =
+    withContext(Dispatchers.IO) {
+        followDownload(downloadSession(client, cookies = false), url, MAX_PAGE_BYTES, secureBuzzheavier = false).bytes
+    }
+
 private suspend fun resolveBuzzheavier(
     client: OkHttpClient,
     source: HttpUrl,

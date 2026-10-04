@@ -3,10 +3,10 @@ package io.github.aedev.flow.ui.tv.music
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.MaterialTheme
@@ -15,12 +15,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -32,6 +34,7 @@ import io.github.aedev.flow.ui.tv.components.TvFilterChip
 import io.github.aedev.flow.ui.tv.components.TvMusicTrackRow
 import io.github.aedev.flow.ui.tv.components.TvSidePanel
 import io.github.aedev.flow.ui.tv.focus.tvAcceleratedDpad
+import kotlinx.coroutines.launch
 
 private const val QUEUE_PANEL_ALPHA = 0.5f
 
@@ -141,8 +144,20 @@ private fun TvRadioFilterControls(
 ) {
     if (state.choices.isEmpty()) return
     val entryIndex = state.choices.indexOfFirst { it.id == state.selectedId }.coerceAtLeast(0)
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        state.choices.forEachIndexed { index, option ->
+    val rowState = rememberLazyListState(initialFirstVisibleItemIndex = entryIndex)
+    val scope = rememberCoroutineScope()
+    // Right always enters the selected preset, so it is scrolled back into the row whenever focus
+    // leaves it: a chip scrolled out of the row is not composed and cannot take focus.
+    LaunchedEffect(entryIndex) { rowState.scrollToItem(entryIndex) }
+    LazyRow(
+        state = rowState,
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .onFocusChanged { if (!it.hasFocus) scope.launch { rowState.scrollToItem(entryIndex) } },
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        itemsIndexed(state.choices, key = { _, option -> option.id }) { index, option ->
             TvFilterChip(
                 option.label,
                 option.id == state.selectedId,

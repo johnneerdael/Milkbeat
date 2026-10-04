@@ -30,7 +30,7 @@ services and play music videos. Everything is built for the TV remote.
 - **Ordered audio providers:** try one provider first, then fall back to the next.
 - **Playback preparation:** index provider playlists in advance and resolve upcoming queue tracks
   one at a time across the remaining queue.
-- **Radio discovery:** switch between All, Familiar, Popular and Discover when the provider offers them.
+- **Radio discovery:** every queue continues as a radio, steered by every preset YouTube Music offers for it (All, Popular, Discover, Deep cuts, moods and decades).
 - **Optional private playlists:** prepare Spotify playlists in a signed-in YouTube Music account for
   native collection playback and autoplay. This is off by default.
 - **MilkDrop visuals:** projectM reacts to the audio from Milkbeat's player.
@@ -215,7 +215,7 @@ before transitions, but network availability and the provider still affect playb
 The queue panel shows what is coming and lets you jump to a track. Hold **Up** or **Down** to move
 through a long queue; scrolling accelerates while the button remains held.
 
-## Now playing: visuals or the music video
+## Now playing: visuals, the music video or the artwork
 
 The player fills the screen with projectM: 9,606 presets from Jason Fletcher's *Cream of the
 Crop* collection, blending from one to the next. The visuals take their sound straight from
@@ -227,7 +227,7 @@ the visualizer leaves the screen or the app goes into the background.
 
 - **Left and Right** step through presets while the controls are hidden.
 - **OK** shows the controls: seek bar, shuffle, previous, play/pause, next, repeat, like, the
-  Video/Visualizer switch and the queue.
+  view button and the queue.
 - **Visualizer timing** in Settings > Visualizations moves the visuals earlier or later against the
   sound, from -100 ms to +200 ms (on an Ugoos AM6, +75 ms is about right).
 - **Diagnostics**: an optional status line with frame rate, render size, blend state, audio level
@@ -244,19 +244,20 @@ the visualizer leaves the screen or the app goes into the background.
   </tr>
 </table>
 
-**Music videos:** a track that YouTube Music lists as a video can play its video instead of the
-visuals. The Video button in the controls switches between the two while the sound keeps
-playing. It is dimmed on tracks without a video.
+**The view button** steps through what fills the screen: the visualizer (the default), the
+music video, and the track's artwork. The sound keeps playing, and Milkbeat remembers the view
+you leave it on for every track after.
 
-- The picture is picked for your TV: at most 1080p, in a codec the TV decodes in hardware.
+- A track without a video skips straight from the visualizer to the artwork; with the video view
+  chosen, such a track shows the visualizer instead.
+- Music videos come from tracks that YouTube Music lists as videos. The picture is picked for your
+  TV: at most 1080p, in a codec the TV decodes in hardware.
 - If a video can't be played, the track carries on as audio with the visuals.
-- **Show music videos** in Settings > Visualizations makes video tracks start in video. It is off
-  by default, so the visuals come first.
 
 <table>
   <tr>
     <td><img src="docs/screenshots/music-video.jpg" alt="A live performance playing as full-screen video"></td>
-    <td><img src="docs/user-guide/images/settings-visualizations-enabled.png" alt="Settings > Visualizations with the music video and projectM preset options"></td>
+    <td><img src="docs/user-guide/images/settings-visualizations-enabled.png" alt="Settings > Visualizations with the projectM preset options"></td>
   </tr>
 </table>
 

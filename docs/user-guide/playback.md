@@ -4,7 +4,7 @@
 
 ## Player controls
 
-Press OK in the full music player to show seeking, shuffle, previous, play/pause, next, repeat, like, the video/visualizer switch and the queue. Back closes the current panel or player surface.
+Press OK in the full music player to show seeking, shuffle, previous, play/pause, next, repeat, like, the view button and the queue. Back closes the current panel or player surface.
 
 ![Player controls over projectM visuals](images/player-controls.png)
 
@@ -18,11 +18,11 @@ Confirmed unmatched tracks can be removed from the future queue. Temporary failu
 
 ## Mixes
 
-Streaming queues seed a mix from the first song that actually starts playing. When the metadata provider has no radio, Milkbeat tries compatible audio providers in priority order.
+Once a streaming queue starts playing, Milkbeat seeds a mix from the queue's first song. When the metadata provider has no radio, Milkbeat tries compatible audio providers in priority order.
 
 For normal Spotify playback through YouTube, that first song's matched YouTube ID seeds the radio. [Private playlist preparation](providers.md#why-prepare-a-youtube-playlist) instead gives YouTube the whole matched playlist as its native autoplay context. Milkbeat can then exclude the playlist's matched songs from later suggestions, helping avoid repeats as the radio continuation begins.
 
-When the provider offers them, **All**, **Familiar**, **Popular** and **Discover** controls appear above the queue. Changing the mode replaces upcoming radio-added songs while keeping the playing song, the original playlist and tracks you added yourself. Continuations stay in the selected mode, and the controls remain visible as more suggestions load. The controls stay pinned above the scrolling rows; press Back to close the queue. Radio suggestions are not saved into a [prepared private playlist](providers.md#prepare-private-playlists).
+Every queue continues as a radio: a [prepared private playlist](providers.md#prepare-private-playlists) from its YouTube copy, anything else from its first song. All the presets YouTube Music offers for that radio (**All**, **Popular**, **Discover**, **Deep cuts**, moods and decades) appear in one scrolling line above the queue; press Right on a queue track to reach them and Down to return to it. Changing the mode replaces upcoming radio-added songs while keeping the playing song, the original playlist and tracks you added yourself. Continuations stay in the selected mode, and the controls remain visible as more suggestions load. The controls stay pinned above the scrolling rows; press Back to close the queue. Radio suggestions are not saved into a [prepared private playlist](providers.md#prepare-private-playlists).
 
 Press Right on a queue track to focus the pinned radio presets. Move Left or Right between presets, then press Down to return to the track you left, with the queue's scroll position retained. If that track was removed while you changed the mix, focus falls back to an available row.
 
@@ -40,7 +40,7 @@ Rendering and audio monitoring stop when the visualizer leaves the screen or the
 
 ## Timing and diagnostics
 
-Settings → Visualizations contains the visualizer switch, music-video default, the projectM settings, diagnostics and the timing offset. Raise the timing value if the visuals arrive after the beat; lower it if they arrive before. Adjust by listening and watching on your own audio setup.
+Settings → Visualizations contains the visualizer switch, the projectM settings, diagnostics and the timing offset. Raise the timing value if the visuals arrive after the beat; lower it if they arrive before. Adjust by listening and watching on your own audio setup.
 
 Diagnostics show measured fps, target fps, render dimensions and whether the size is automatic or fixed, transition state, audio level and preset. Use these values when investigating slow visuals instead of judging performance from a still screenshot.
 
@@ -62,8 +62,16 @@ With **Change presets automatically** off, a preset stays until you press Left o
 
 ![A preset reached by a cut on a loud beat](images/visualizer-effect-beat-cuts.png)
 
-## Music videos
+## Visualizer, music video or artwork
 
-Supported music-video tracks can switch from visuals to their picture while audio continues. Unsupported or unavailable video can fall back to audio and visuals. **Show music videos** changes the starting preference; the player switch changes it for the current session.
+The view button in the player steps through three views while audio continues: the visualizer (the default), the music video, and the track's cover filling the screen. Milkbeat remembers the view you leave it on for later tracks and later sessions.
+
+A track without a video skips from the visualizer straight to the artwork, and with the video view chosen it shows the visualizer instead. With visualizations turned off, the button moves between the video and the artwork. Unsupported or unavailable video falls back to audio and visuals.
+
+![The view button on the visualizer](images/now-playing-view-visualizer.png)
+
+![The music video view](images/now-playing-view-video.png)
+
+![The artwork view: the cover filling the screen](images/now-playing-view-artwork.png)
 
 ![Full-screen music-video example from the existing README](images/music-video.jpg)

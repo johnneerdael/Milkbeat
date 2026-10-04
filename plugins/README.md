@@ -7,6 +7,6 @@ npm ci
 npm run check
 ```
 
-Compiled third-party packages and their publication metadata are retained as verification data for the app CI; they are not included in the APK or attached to app releases. Publication updates supply that data and the encrypted download catalog.
+Compiled third-party packages are not kept in git; they download only from Buzzheavier. The publisher verifies each package against its Buzzheavier account listing before registering it, and supplies the publication metadata (`published.json`) and the encrypted download catalog, which the app CI checks against each other.
 
 Third-party plugin packages are distributed separately from Milkbeat. Milkbeat releases contain the app APKs and checksums; the app's README lists optional third-party downloader codes.
