@@ -2,6 +2,7 @@ package io.github.aedev.flow.ui.screens.music
 
 import com.google.common.truth.Truth.assertThat
 import io.github.aedev.flow.data.catalog.CatalogPlayback
+import io.github.aedev.flow.data.library.catalog.LocalLibraryEmptyException
 import io.github.aedev.flow.plugin.catalog.NoMetadataPluginException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -239,6 +240,26 @@ class MusicHomeFeedViewModelTest {
 
             assertThat(vm.state.value.needsPlugin).isFalse()
             assertThat(vm.titles).containsExactly("Home")
+        }
+
+    @Test
+    fun `an empty local library asks for a scan and fills in when the index changes`() =
+        runTest(dispatcher) {
+            var indexed = false
+            provider.pages =
+                { if (indexed) Result.success(page("Recently added")) else Result.failure(LocalLibraryEmptyException("Indexing")) }
+            val vm = viewModel()
+            vm.load()
+            advanceUntilIdle()
+            assertThat(vm.state.value.libraryEmpty).isTrue()
+            assertThat(vm.state.value.needsPlugin).isFalse()
+
+            indexed = true
+            provider.current = ProviderAccount.SignedIn("local:revision-2")
+            advanceUntilIdle()
+
+            assertThat(vm.state.value.libraryEmpty).isFalse()
+            assertThat(vm.titles).containsExactly("Recently added")
         }
 
     @Test

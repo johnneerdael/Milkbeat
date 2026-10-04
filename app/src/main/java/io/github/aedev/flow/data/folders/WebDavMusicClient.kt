@@ -68,6 +68,7 @@ class WebDavMusicClient
             source: MusicFolder,
             secrets: MusicFolderSecrets,
             path: String,
+            includePlaylists: Boolean,
         ): List<MusicFolderEntry> {
             require(source.kind == MusicFolderKind.WEBDAV && source.isValid())
             val parent = source.folderPath(path)
@@ -81,7 +82,7 @@ class WebDavMusicClient
                     if (segments.size != parentSegments.size + 1 || segments.subList(0, parentSegments.size) != parentSegments) continue
                     val name = segments.last()
                     if (name.isEmpty() || name.any { it in "/\\\u0000" } || name == "." || name == "..") continue
-                    if (!resource.isCollection && !isMusicFile(name, resource.contentType)) continue
+                    if (!resource.isCollection && !isListedFile(name, resource.contentType, includePlaylists)) continue
                     add(
                         MusicFolderEntry(
                             name = name,

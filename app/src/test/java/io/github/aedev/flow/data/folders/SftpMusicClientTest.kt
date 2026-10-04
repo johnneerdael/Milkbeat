@@ -71,6 +71,8 @@ class SftpMusicClientTest {
         val track = sftpEntry("a.flac", "Albums/a.flac", attributes(0x8000))!!
         assertThat(track).isEqualTo(MusicFolderEntry("a.flac", "Albums/a.flac", false, 1234, 1_700_000_000_000))
         assertThat(sftpEntry("notes.txt", "notes.txt", attributes(0x8000))).isNull()
+        assertThat(sftpEntry("Mix.m3u", "Mix.m3u", attributes(0x8000))).isNull()
+        assertThat(sftpEntry("Mix.m3u", "Mix.m3u", attributes(0x8000), includePlaylists = true)?.location).isEqualTo("Mix.m3u")
         assertThat(sftpEntry("a.mp3", "a.mp3", attributes(0x1000))).isNull()
         assertThat(sftpEntry("a.mp3", "a.mp3", attributes(0xA000))).isNull()
     }

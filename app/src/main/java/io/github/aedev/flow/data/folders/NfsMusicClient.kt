@@ -29,12 +29,13 @@ class NfsMusicClient
             source: MusicFolder,
             secrets: MusicFolderSecrets,
             path: String,
+            includePlaylists: Boolean,
         ): List<MusicFolderEntry> =
             connect(source, path).use { (session, directory) ->
                 requireDirectory(directory)
                 buildList {
                     session.list(directory) { entry ->
-                        nfsMusicEntry(path, entry)?.let(::add)
+                        nfsMusicEntry(path, entry, includePlaylists)?.let(::add)
                         true
                     }
                 }

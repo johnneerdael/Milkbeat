@@ -265,6 +265,7 @@ jobs:
     if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'repository_dispatch') && github.ref == 'refs/heads/main'
     permissions:
       contents: write
+      pull-requests: read
 
     steps:
       # Tags are needed to find the previous build for the changelog range.
@@ -290,42 +291,19 @@ jobs:
           cp dist/milkbeat-universal.apk dist/musicviz-universal.apk
           cd dist && sha256sum milkbeat*.apk > checksums.txt && cat checksums.txt
 
-      - name: Write release notes
+      # Each merged PR contributes its "## Release notes" section (validated by release-notes.yml);
+      # the script appends the engine, install, plugin and changelog sections.
+      - name: Write release notes from merged PRs
         env:
-          REPO: ${{ github.repository }}
-          TAG: v${{ needs.build.outputs.version }}
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.build.outputs.version }}
           CORE: ${{ needs.build.outputs.core_version }}
         run: |
           set -euo pipefail
           prev=$(git tag --list 'v*' --sort=-v:refname | head -n 1)
-          [ -n "$prev" ] || prev=$(git tag --list 'build-*' --sort=-v:refname | head -n 1)
-          if [ -n "$prev" ]; then range="$prev..$GITHUB_SHA"; else range="$GITHUB_SHA"; fi
-          latest="https://github.com/$REPO/releases/latest/download"
-          {
-            echo "## What's new"
-            echo
-            git log --no-merges --format='- %s (%h)' -n 50 "$range"
-            echo "- Visualizer engine: [ProjectM-TV core $CORE](https://github.com/johnneerdael/ProjectM-TV/releases/tag/v$CORE)"
-            echo
-            echo "## Install on Android TV"
-            echo
-            echo "- **Downloader app:** enter code \`7170062\`"
-            echo "- **Direct link (always the latest):** $latest/milkbeat-universal.apk"
-            echo
-            echo "Per-ABI APKs (\`milkbeat-arm64-v8a.apk\`, \`milkbeat-armeabi-v7a.apk\`) and \`checksums.txt\` are attached below."
-            echo
-            echo "## Plugins"
-            echo
-            echo "Local and SMB music works without plugins. Optional third-party streaming plugins can be added in Settings > Plugins:"
-            echo
-            echo "- **YouTube Music and YouTube:** downloader code \`494\`"
-            echo "- **Beatport** (full-length streaming needs a Beatport streaming subscription): downloader code \`393\`"
-            echo "- **Spotify** (metadata; select YouTube Music for audio): downloader code \`981\`"
-            if [ -n "$prev" ]; then
-              echo
-              echo "**Full changelog:** https://github.com/$REPO/compare/$prev...$TAG"
-            fi
-          } > notes.md
+          python3 .github/scripts/release_notes.py generate \
+            --checkout . --repo "$GITHUB_REPOSITORY" --sha "$GITHUB_SHA" \
+            --version "$VERSION" --previous-tag "$prev" --core-version "$CORE" --output notes.md
           cat notes.md
 
       - name: Create Release

@@ -9,8 +9,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -30,16 +28,17 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.aedev.flow.R
 import io.github.aedev.flow.data.music.model.MusicTrack
+import io.github.aedev.flow.ui.screens.folders.LibraryScanViewModel
 import io.github.aedev.flow.ui.screens.music.MusicHomeFeedViewModel
 import io.github.aedev.flow.ui.tv.catalog.TvCatalogActions
+import io.github.aedev.flow.ui.tv.catalog.TvCatalogFilterChips
 import io.github.aedev.flow.ui.tv.catalog.catalogBlocks
 import io.github.aedev.flow.ui.tv.components.TvButton
-import io.github.aedev.flow.ui.tv.components.TvFilterChip
+import io.github.aedev.flow.ui.tv.components.TvLibraryScanStatus
 import io.github.aedev.flow.ui.tv.components.TvMessageState
 import io.github.aedev.flow.ui.tv.components.TvScreenScaffold
 import io.github.aedev.flow.ui.tv.components.TvShimmerRow
 import io.github.aedev.flow.ui.tv.focus.ProvideTvColumnPivot
-import io.github.aedev.flow.ui.tv.focus.tvRowFocus
 import io.github.aedev.flow.ui.tv.theme.LocalTvDimens
 import nl.neerdael.milkbeat.catalog.EntityRef
 
@@ -75,11 +74,14 @@ fun TvMusicScreen(
                 onOpen = { open(it) },
             )
         }
-    LaunchedEffect(hasShelves, state.needsPlugin) {
-        if ((hasShelves || state.needsPlugin) && !openedOnContent) {
+    // An empty library's scan button takes focus once; its shelves take it again when the first songs are indexed.
+    var openedOnScan by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(hasShelves, state.needsPlugin, state.libraryEmpty) {
+        val scanOnly = state.libraryEmpty && !hasShelves
+        if ((hasShelves || state.needsPlugin || scanOnly) && !openedOnContent && !(scanOnly && openedOnScan)) {
             withFrameNanos { }
             runCatching { firstShelfFocus.requestFocus() }
-            openedOnContent = true
+            if (scanOnly) openedOnScan = true else openedOnContent = true
         }
     }
 
@@ -92,19 +94,7 @@ fun TvMusicScreen(
         // shelf into place pushed them off the top.
         Column(Modifier.fillMaxSize()) {
             if (state.filters.isNotEmpty()) {
-                LazyRow(
-                    modifier = Modifier.fillMaxWidth().tvRowFocus(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    contentPadding = PaddingValues(horizontal = dimens.overscanHorizontal, vertical = 8.dp),
-                ) {
-                    items(state.filters, key = { it.id }) { filter ->
-                        TvFilterChip(
-                            label = filter.label,
-                            selected = filter.id == state.selectedFilterId,
-                            onClick = { viewModel.selectFilter(filter) },
-                        )
-                    }
-                }
+                TvCatalogFilterChips(state.filters, state.selectedFilterId, viewModel::selectFilter)
             }
             ProvideTvColumnPivot {
                 LazyColumn(
@@ -133,6 +123,20 @@ fun TvMusicScreen(
                                         modifier = Modifier.focusRequester(firstShelfFocus),
                                     )
                                 }
+                            }
+                        }
+
+                        state.libraryEmpty && blocks.isEmpty() -> {
+                            item(key = "music-library-empty") {
+                                val scanViewModel: LibraryScanViewModel = hiltViewModel()
+                                val scan by scanViewModel.state.collectAsStateWithLifecycle()
+                                TvLibraryScanStatus(
+                                    scan = scan,
+                                    onRescan = scanViewModel::rescan,
+                                    modifier = Modifier.padding(horizontal = dimens.overscanHorizontal),
+                                    actionModifier = Modifier.focusRequester(firstShelfFocus),
+                                    idleTitle = R.string.local_library_empty,
+                                )
                             }
                         }
 

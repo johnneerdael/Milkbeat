@@ -61,3 +61,6 @@ plugins/dist/
 
 # Plugin packages download only from Buzzheavier, never from git.
 plugins/packages/
+
+# Python bytecode from the CI scripts
+__pycache__/

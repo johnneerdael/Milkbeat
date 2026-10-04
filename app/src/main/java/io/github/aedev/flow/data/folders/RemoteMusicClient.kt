@@ -28,10 +28,12 @@ interface RemoteMusicClient {
         secrets: MusicFolderSecrets,
     ): MusicFolder
 
+    /** Directories and songs below [path]; also `.m3u` playlists when [includePlaylists] (the library index asks). */
     fun list(
         source: MusicFolder,
         secrets: MusicFolderSecrets,
         path: String,
+        includePlaylists: Boolean = false,
     ): List<MusicFolderEntry>
 
     fun open(

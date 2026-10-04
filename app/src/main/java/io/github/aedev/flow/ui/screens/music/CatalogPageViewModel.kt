@@ -6,6 +6,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.aedev.flow.data.catalog.CatalogPlayback
+import io.github.aedev.flow.data.library.catalog.LocalCatalogProvider
+import io.github.aedev.flow.data.library.catalog.LocalRef
 import io.github.aedev.flow.data.local.ChannelSubscription
 import io.github.aedev.flow.data.local.SubscriptionRepository
 import io.github.aedev.flow.data.music.model.MusicTrack
@@ -55,11 +57,13 @@ class CatalogPageViewModel
         private val subscriptions: SubscriptionRepository,
         pluginCatalog: PluginMetadataProvider? = null,
         private val mirrors: io.github.aedev.flow.plugin.mirror.PlaylistMirrorCoordinator? = null,
+        localCatalog: LocalCatalogProvider? = null,
     ) : ViewModel() {
         val sourcePluginId: String? = savedStateHandle.get<String>(PROVIDER_ARG)
-        private val scoped = sourcePluginId?.let { checkNotNull(pluginCatalog).scoped(it) }
-        private val provider: MetadataProvider = scoped ?: defaultProvider
-        private val playback: CatalogPlayback = scoped ?: defaultPlayback
+        private val local = localCatalog?.takeIf { sourcePluginId == LocalCatalogProvider.ID }
+        private val scoped = sourcePluginId?.takeIf { local == null }?.let { checkNotNull(pluginCatalog).scoped(it) }
+        private val provider: MetadataProvider = local ?: scoped ?: defaultProvider
+        private val playback: CatalogPlayback = local ?: scoped ?: defaultPlayback
 
         fun radioSeed(id: String?): String? {
             val value = id ?: return null
@@ -116,7 +120,7 @@ class CatalogPageViewModel
             _mirror.value =
                 io.github.aedev.flow.plugin.mirror
                     .PlaylistMirrorState()
-            val coordinator = mirrors ?: return
+            val coordinator = mirrors?.takeIf { LocalRef.parse(entity) == null } ?: return
             val identity = _state.value.sourceKey
             mirrorJob =
                 viewModelScope.launch {
@@ -136,9 +140,12 @@ class CatalogPageViewModel
                 }
         }
 
+        /** A provider's artist can be followed; an artist of the local library is only its tags. */
+        val canFollow: Boolean get() = entity.kind == EntityKind.ARTIST && LocalRef.parse(entity) == null
+
         /** Whether this artist is followed in the app's library; nothing else can be followed. */
         val following: StateFlow<Boolean> =
-            if (entity.kind == EntityKind.ARTIST) {
+            if (canFollow) {
                 subscriptions
                     .isSubscribed(entity.providerId)
                     .stateIn(viewModelScope, SharingStarted.WhileSubscribed(SUBSCRIPTION_TIMEOUT_MS), false)
@@ -158,7 +165,7 @@ class CatalogPageViewModel
         }
 
         fun toggleFollow(header: EntityHeader) {
-            if (header.entity.kind != EntityKind.ARTIST) return
+            if (!canFollow) return
             viewModelScope.launch {
                 if (following.value) {
                     subscriptions.unsubscribe(header.entity.providerId)

@@ -98,7 +98,7 @@ fun TvCatalogPageScreen(
                     playCollection(track, queue, source, viewModel.radioSeed(radioPlaylistId))
                 },
                 onOpen = { open(it) },
-                follow = TvCatalogFollow(isFollowing = { following }, toggle = viewModel::toggleFollow),
+                follow = TvCatalogFollow(isFollowing = { following }, toggle = viewModel::toggleFollow).takeIf { viewModel.canFollow },
             )
         }
     val playingTrack by EnhancedMusicPlayerManager.currentTrack.collectAsStateWithLifecycle()

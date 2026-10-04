@@ -648,6 +648,36 @@
         <item quantity="one">Imported %1$s, %2$d song</item>
         <item quantity="other">Imported %1$s, %2$d songs</item>
     </plurals>
+    <!-- Local library built from the music folders' tags -->
+    <string name="local_library_title">Local library</string>
+    <string name="local_library_recently_added">Recently added</string>
+    <string name="local_library_artists">Artists</string>
+    <string name="local_library_releases">Releases</string>
+    <string name="local_library_playlists">Playlists</string>
+    <string name="local_library_labels">Labels</string>
+    <string name="local_library_years">Years</string>
+    <string name="local_library_tracks">Tracks</string>
+    <string name="local_library_various_artists">Various Artists</string>
+    <string name="local_library_more_from">More from %1$s</string>
+    <string name="local_library_bpm">%1$d BPM</string>
+    <string name="local_library_unknown_year">Year unknown</string>
+    <string name="local_library_year_range">%1$d–%2$d</string>
+    <plurals name="local_library_track_count">
+        <item quantity="one">%d track</item>
+        <item quantity="other">%d tracks</item>
+    </plurals>
+    <plurals name="local_library_release_count">
+        <item quantity="one">%d release</item>
+        <item quantity="other">%d releases</item>
+    </plurals>
+    <string name="local_library_indexing">Indexing your music library</string>
+    <string name="local_library_indexing_progress">Reading tags: %1$d of %2$d files</string>
+    <string name="local_library_empty">No songs found in your music folders yet</string>
+    <string name="local_library_rescan">Rescan library</string>
+    <string name="local_library_scan_idle">The library is built from your folders\' tags and updates when they change.</string>
+    <string name="library_scan_channel">Library scan</string>
+    <string name="library_scan_notification_title">Scanning music folders</string>
+    <string name="library_scan_progress">%1$d of %2$d files read</string>
     <string name="music_folders_title">Music folders</string>
     <string name="music_folders_library">Folders</string>
     <string name="music_folders_description">Choose local music folders or add a network folder over SMB 2/3, WebDAV, SFTP or NFS. Open Folders in Library to browse and play music.</string>

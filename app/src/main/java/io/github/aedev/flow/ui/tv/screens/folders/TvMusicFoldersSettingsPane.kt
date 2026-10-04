@@ -23,10 +23,12 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.aedev.flow.R
 import io.github.aedev.flow.data.folders.MusicFolderKind
+import io.github.aedev.flow.ui.screens.folders.LibraryScanViewModel
 import io.github.aedev.flow.ui.screens.folders.MusicFoldersViewModel
 import io.github.aedev.flow.ui.screens.folders.addLabelRes
 import io.github.aedev.flow.ui.screens.folders.labelRes
 import io.github.aedev.flow.ui.tv.components.TvButton
+import io.github.aedev.flow.ui.tv.components.TvLibraryScanStatus
 import io.github.aedev.flow.ui.tv.components.TvNavRow
 import io.github.aedev.flow.ui.tv.components.TvSectionHeader
 import io.github.aedev.flow.ui.tv.focus.ProvideTvColumnPivot
@@ -70,6 +72,13 @@ internal fun TvMusicFoldersSettingsPane(viewModel: MusicFoldersViewModel = hiltV
                     }
                     items(NETWORK_KINDS, key = { it.name }) { kind ->
                         TvButton(stringResource(kind.addLabelRes()), { viewModel.create(kind) })
+                    }
+                    if (folders.isNotEmpty()) {
+                        item(key = "library-scan") {
+                            val scanViewModel: LibraryScanViewModel = hiltViewModel()
+                            val scan by scanViewModel.state.collectAsStateWithLifecycle()
+                            TvLibraryScanStatus(scan = scan, onRescan = scanViewModel::rescan)
+                        }
                     }
                     message?.let { res -> item(key = "message") { Text(stringResource(res), style = MaterialTheme.typography.bodyMedium) } }
                     items(folders, key = { it.id }) { source ->

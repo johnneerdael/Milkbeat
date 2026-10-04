@@ -94,6 +94,7 @@ class SmbMusicClient
             source: MusicFolder,
             secrets: MusicFolderSecrets,
             path: String,
+            includePlaylists: Boolean,
         ): List<MusicFolderEntry> =
             connect(source, secrets).use { connection ->
                 connection.share
@@ -111,7 +112,7 @@ class SmbMusicClient
                                 val name = entry.fileName
                                 if (name == "." || name == "..") continue
                                 val folder = entry.fileAttributes and FileAttributes.FILE_ATTRIBUTE_DIRECTORY.value != 0L
-                                if (!folder && !isMusicFile(name)) continue
+                                if (!folder && !isListedFile(name, null, includePlaylists)) continue
                                 val location = listOf(safeFolderPath(path), name).filter(String::isNotEmpty).joinToString("/")
                                 safeFolderPath(location)
                                 add(MusicFolderEntry(name, location, folder, entry.endOfFile, entry.lastWriteTime.toEpochMillis()))

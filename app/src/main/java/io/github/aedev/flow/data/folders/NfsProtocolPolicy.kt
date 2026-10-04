@@ -73,6 +73,7 @@ internal fun nfs4Components(
 internal fun nfsMusicEntry(
     parent: String,
     entry: NfsDirEntry,
+    includePlaylists: Boolean = false,
 ): MusicFolderEntry? {
     val name = entry.name
     if (name == "." || name == ".." || name.isEmpty() || name.any { it in "/\\\u0000" }) return null
@@ -82,7 +83,7 @@ internal fun nfsMusicEntry(
             NfsFileType.REGULAR -> false
             NfsFileType.OTHER -> return null
         }
-    if (!folder && !isMusicFile(name)) return null
+    if (!folder && !isListedFile(name, null, includePlaylists)) return null
     return MusicFolderEntry(
         name,
         childLocation(parent, name, MusicFolderKind.NFS.allowsColon),

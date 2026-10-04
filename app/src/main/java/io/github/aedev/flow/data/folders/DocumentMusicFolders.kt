@@ -32,6 +32,7 @@ class DocumentMusicFolders
         fun list(
             source: MusicFolder,
             location: String,
+            includePlaylists: Boolean = false,
         ): List<MusicFolderEntry> {
             val tree = Uri.parse(source.treeUri)
             val folder = Uri.parse(location.ifEmpty { root(source) })
@@ -58,7 +59,7 @@ class DocumentMusicFolders
                         val name = it.getString(1).orEmpty()
                         val mime = it.getString(2)
                         val directory = mime == DocumentsContract.Document.MIME_TYPE_DIR
-                        if (!directory && !isMusicFile(name, mime)) continue
+                        if (!directory && !isListedFile(name, mime, includePlaylists)) continue
                         val uri = DocumentsContract.buildDocumentUriUsingTree(tree, it.getString(0))
                         add(
                             MusicFolderEntry(

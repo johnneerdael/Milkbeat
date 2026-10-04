@@ -129,6 +129,9 @@ data class MusicFolder(
             ?.let { if (it.encodedPath.endsWith("/")) it else it.newBuilder().addPathSegment("").build() }
 }
 
+/** The URI the player reads the file at [location] in this folder through. */
+fun MusicFolder.fileUri(location: String): Uri = if (kind == MusicFolderKind.LOCAL) Uri.parse(location) else remoteUri(location)
+
 internal fun safeFolderPath(
     path: String,
     allowColon: Boolean = false,
@@ -158,7 +161,7 @@ data class MusicFolderEntry(
 ) {
     fun track(source: MusicFolder): MusicTrack {
         require(!isDirectory)
-        val uri = if (source.kind == MusicFolderKind.LOCAL) Uri.parse(location) else source.remoteUri(location)
+        val uri = source.fileUri(location)
         return MusicTrack(
             videoId = LocalMediaIds.of(uri),
             title = name.substringBeforeLast('.', name),
@@ -176,3 +179,12 @@ internal fun isMusicFile(
 ): Boolean =
     mime?.startsWith("audio/") == true || name.substringAfterLast('.', "").lowercase() in
         setOf("mp3", "flac", "m4a", "aac", "ogg", "opus", "wav", "aiff", "aif", "alac", "wma", "amr")
+
+internal fun isPlaylistFile(name: String): Boolean = name.substringAfterLast('.', "").lowercase() in setOf("m3u", "m3u8")
+
+/** Whether a listing keeps [name]: always its songs, and its playlists when the library index asks. */
+internal fun isListedFile(
+    name: String,
+    mime: String?,
+    includePlaylists: Boolean,
+): Boolean = if (isPlaylistFile(name)) includePlaylists else isMusicFile(name, mime)

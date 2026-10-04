@@ -158,4 +158,13 @@ class MusicFolderTest {
             assertThrows(IllegalArgumentException::class.java) { source.childLocation("", "../x") }
         }
     }
+
+    @Test fun libraryFileUrisRouteEveryNetworkKindThroughItsFolderScheme() {
+        val local = MusicFolder(name = "Local", kind = MusicFolderKind.LOCAL, treeUri = "content://documents/tree/root")
+        assertThat(local.fileUri("content://documents/tree/root/document/a.mp3").scheme).isEqualTo("content")
+        for (kind in MusicFolderKind.entries - MusicFolderKind.LOCAL) {
+            val source = MusicFolder(name = "Remote", kind = kind)
+            assertThat(source.fileUri("Album/a.flac")).isEqualTo(source.remoteUri("Album/a.flac"))
+        }
+    }
 }

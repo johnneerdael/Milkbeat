@@ -81,6 +81,7 @@ class SftpMusicClient
             source: MusicFolder,
             secrets: MusicFolderSecrets,
             path: String,
+            includePlaylists: Boolean,
         ): List<MusicFolderEntry> {
             require(source.kind == MusicFolderKind.SFTP && source.isValid() && source.hostKey.isNotBlank())
             return connect(source, secrets, SftpHostKeyVerifier(source.hostKey)).use { connection ->
@@ -100,7 +101,7 @@ class SftpMusicClient
                             } else {
                                 info.attributes
                             }
-                        sftpEntry(name, location, attributes)?.let(::add)
+                        sftpEntry(name, location, attributes, includePlaylists)?.let(::add)
                     }
                 }
             }
@@ -190,10 +191,11 @@ internal fun sftpEntry(
     name: String,
     location: String,
     attributes: FileAttributes,
+    includePlaylists: Boolean = false,
 ): MusicFolderEntry? {
     val directory = attributes.type == FileMode.Type.DIRECTORY
     val file = attributes.type == FileMode.Type.REGULAR || attributes.type == FileMode.Type.UNKNOWN
-    if (!directory && !(file && isMusicFile(name))) return null
+    if (!directory && !(file && isListedFile(name, null, includePlaylists))) return null
     return MusicFolderEntry(name, location, directory, if (directory) 0 else attributes.size, attributes.mtime * 1000)
 }
 

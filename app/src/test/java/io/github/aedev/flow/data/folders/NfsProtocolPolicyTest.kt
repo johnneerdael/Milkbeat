@@ -61,6 +61,8 @@ class NfsProtocolPolicyTest {
         assertThat(nfsMusicEntry("", NfsDirEntry("Été.flac", file)))
             .isEqualTo(MusicFolderEntry("Été.flac", "Été.flac", false, 1234, 1_700_000_000_123))
         assertThat(nfsMusicEntry("", NfsDirEntry("notes.txt", file))).isNull()
+        assertThat(nfsMusicEntry("", NfsDirEntry("Mix.m3u8", file))).isNull()
+        assertThat(nfsMusicEntry("", NfsDirEntry("Mix.m3u8", file), includePlaylists = true)?.location).isEqualTo("Mix.m3u8")
         assertThat(nfsMusicEntry("", NfsDirEntry("link.mp3", link))).isNull()
         assertThat(nfsMusicEntry("", NfsDirEntry(".", dir))).isNull()
         assertThat(nfsMusicEntry("", NfsDirEntry("..", dir))).isNull()
