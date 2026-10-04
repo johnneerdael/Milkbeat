@@ -55,4 +55,15 @@ data class PrivatePlaylistImportResult(
     val ref: EntityRef? = null,
     val next: String? = null,
     val retryAfterMs: Long? = null,
+    val progress: PrivatePlaylistImportProgress? = null,
+)
+
+@Serializable
+enum class PrivatePlaylistImportPhase { PREPARING, WRITING, VERIFYING }
+
+@Serializable
+data class PrivatePlaylistImportProgress(
+    val phase: PrivatePlaylistImportPhase,
+    val completed: Int,
+    val total: Int,
 )

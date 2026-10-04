@@ -3,6 +3,8 @@ package nl.neerdael.milkbeat.plugin
 import kotlinx.serialization.Serializable
 import nl.neerdael.milkbeat.catalog.Artwork
 import nl.neerdael.milkbeat.catalog.EntityRef
+import nl.neerdael.milkbeat.catalog.PrivatePlaylistImportRequest
+import nl.neerdael.milkbeat.catalog.PrivatePlaylistImportResult
 import nl.neerdael.milkbeat.catalog.TrackDescriptor
 
 /**
@@ -26,6 +28,25 @@ data class ResolveAudioRequest(
 @Serializable
 data class MatchAudioRequest(
     val track: TrackDescriptor,
+    val strategy: AudioMatchStrategy = AudioMatchStrategy.SONGS,
+)
+
+@Serializable
+enum class AudioMatchStrategy { SONGS, ALTERNATE_SONGS, VIDEOS }
+
+@Serializable
+data class MatchAudioBatchRequest(
+    val tracks: List<TrackDescriptor>,
+    val strategy: AudioMatchStrategy = AudioMatchStrategy.SONGS,
+    val playlist: PrivatePlaylistImportRequest? = null,
+)
+
+/** Result slots correspond to request tracks, including misses and transient failures. */
+@Serializable
+data class AudioMatchesBatch(
+    val matches: List<AudioMatches>,
+    val playlist: PrivatePlaylistImportResult? = null,
+    val playlistError: PluginError? = null,
 )
 
 /**
@@ -36,6 +57,7 @@ data class MatchAudioRequest(
 @Serializable
 data class AudioMatches(
     val candidates: List<TrackDescriptor> = emptyList(),
+    val error: PluginError? = null,
 )
 
 /** What went wrong with a stream: the URL the host fetched and the HTTP status it got, if any. */

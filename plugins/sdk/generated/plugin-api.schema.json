@@ -198,6 +198,22 @@
                     ],
                     "additionalProperties": false
                 },
+                "audio.matchBatch": {
+                    "type": "object",
+                    "properties": {
+                        "request": {
+                            "$ref": "#/$defs/nl.neerdael.milkbeat.plugin.MatchAudioBatchRequest"
+                        },
+                        "response": {
+                            "$ref": "#/$defs/nl.neerdael.milkbeat.plugin.AudioMatchesBatch"
+                        }
+                    },
+                    "required": [
+                        "request",
+                        "response"
+                    ],
+                    "additionalProperties": false
+                },
                 "audio.radio": {
                     "type": "object",
                     "properties": {
@@ -434,6 +450,7 @@
                 "metadata.radio",
                 "audio.resolve",
                 "audio.match",
+                "audio.matchBatch",
                 "audio.radio",
                 "audio.reportPlayback",
                 "video.search",
@@ -1637,6 +1654,38 @@
             ],
             "title": "PrivatePlaylistImportMode"
         },
+        "nl.neerdael.milkbeat.catalog.PrivatePlaylistImportPhase": {
+            "enum": [
+                "PREPARING",
+                "WRITING",
+                "VERIFYING"
+            ],
+            "title": "PrivatePlaylistImportPhase"
+        },
+        "nl.neerdael.milkbeat.catalog.PrivatePlaylistImportProgress": {
+            "type": "object",
+            "required": [
+                "phase",
+                "completed",
+                "total"
+            ],
+            "properties": {
+                "phase": {
+                    "$ref": "#/$defs/nl.neerdael.milkbeat.catalog.PrivatePlaylistImportPhase"
+                },
+                "completed": {
+                    "type": "integer",
+                    "minimum": -2147483648,
+                    "maximum": 2147483647
+                },
+                "total": {
+                    "type": "integer",
+                    "minimum": -2147483648,
+                    "maximum": 2147483647
+                }
+            },
+            "title": "PrivatePlaylistImportProgress"
+        },
         "nl.neerdael.milkbeat.catalog.PrivatePlaylistImportRequest": {
             "type": "object",
             "required": [
@@ -1730,6 +1779,16 @@
                     ],
                     "minimum": -9223372036854775808,
                     "maximum": 9223372036854775807
+                },
+                "progress": {
+                    "oneOf": [
+                        {
+                            "type": "null"
+                        },
+                        {
+                            "$ref": "#/$defs/nl.neerdael.milkbeat.catalog.PrivatePlaylistImportProgress"
+                        }
+                    ]
                 }
             },
             "title": "PrivatePlaylistImportResult"
@@ -2037,6 +2096,14 @@
             ],
             "title": "AudioDelivery"
         },
+        "nl.neerdael.milkbeat.plugin.AudioMatchStrategy": {
+            "enum": [
+                "SONGS",
+                "ALTERNATE_SONGS",
+                "VIDEOS"
+            ],
+            "title": "AudioMatchStrategy"
+        },
         "nl.neerdael.milkbeat.plugin.AudioMatches": {
             "type": "object",
             "required": [],
@@ -2046,9 +2113,54 @@
                     "items": {
                         "$ref": "#/$defs/nl.neerdael.milkbeat.catalog.TrackDescriptor"
                     }
+                },
+                "error": {
+                    "oneOf": [
+                        {
+                            "type": "null"
+                        },
+                        {
+                            "$ref": "#/$defs/nl.neerdael.milkbeat.plugin.PluginError"
+                        }
+                    ]
                 }
             },
             "title": "AudioMatches"
+        },
+        "nl.neerdael.milkbeat.plugin.AudioMatchesBatch": {
+            "type": "object",
+            "required": [
+                "matches"
+            ],
+            "properties": {
+                "matches": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/$defs/nl.neerdael.milkbeat.plugin.AudioMatches"
+                    }
+                },
+                "playlist": {
+                    "oneOf": [
+                        {
+                            "type": "null"
+                        },
+                        {
+                            "$ref": "#/$defs/nl.neerdael.milkbeat.catalog.PrivatePlaylistImportResult"
+                        }
+                    ]
+                },
+                "playlistError": {
+                    "oneOf": [
+                        {
+                            "type": "null"
+                        },
+                        {
+                            "$ref": "#/$defs/nl.neerdael.milkbeat.plugin.PluginError"
+                        }
+                    ]
+                }
+            },
+            "title": "AudioMatchesBatch"
         },
         "nl.neerdael.milkbeat.plugin.AudioQuality": {
             "enum": [
@@ -2086,6 +2198,9 @@
                 },
                 "delivery": {
                     "$ref": "#/$defs/nl.neerdael.milkbeat.plugin.AudioDelivery"
+                },
+                "batchMatching": {
+                    "type": "boolean"
                 }
             },
             "title": "AudioRole"
@@ -2592,6 +2707,34 @@
             },
             "title": "LogRequest"
         },
+        "nl.neerdael.milkbeat.plugin.MatchAudioBatchRequest": {
+            "type": "object",
+            "required": [
+                "tracks"
+            ],
+            "properties": {
+                "tracks": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/$defs/nl.neerdael.milkbeat.catalog.TrackDescriptor"
+                    }
+                },
+                "strategy": {
+                    "$ref": "#/$defs/nl.neerdael.milkbeat.plugin.AudioMatchStrategy"
+                },
+                "playlist": {
+                    "oneOf": [
+                        {
+                            "type": "null"
+                        },
+                        {
+                            "$ref": "#/$defs/nl.neerdael.milkbeat.catalog.PrivatePlaylistImportRequest"
+                        }
+                    ]
+                }
+            },
+            "title": "MatchAudioBatchRequest"
+        },
         "nl.neerdael.milkbeat.plugin.MatchAudioRequest": {
             "type": "object",
             "required": [
@@ -2600,6 +2743,9 @@
             "properties": {
                 "track": {
                     "$ref": "#/$defs/nl.neerdael.milkbeat.catalog.TrackDescriptor"
+                },
+                "strategy": {
+                    "$ref": "#/$defs/nl.neerdael.milkbeat.plugin.AudioMatchStrategy"
                 }
             },
             "title": "MatchAudioRequest"
