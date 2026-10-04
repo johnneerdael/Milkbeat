@@ -241,6 +241,10 @@ project-operated proxy or relay in between.
 - `discord.com`: rich presence, `github` flavor only, and only after the user links an account.
 - Local network addresses: DLNA renderers on the LAN, the peer device during Device Sync, and the
   user's phone during TV sign-in.
+- Music folder servers the user adds (SMB, WebDAV, SFTP or NFS), only the host and port entered in
+  Settings → Music folders, and only while browsing, indexing or playing that folder. Their
+  passwords and SFTP private keys are sealed with the Android Keystore on the device and are sent only
+  to that server; WebDAV over `http://` sends them unencrypted, which the editor warns about.
 
 ## What Milkbeat does not do
 
