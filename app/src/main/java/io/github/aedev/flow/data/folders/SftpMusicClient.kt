@@ -3,11 +3,13 @@ package io.github.aedev.flow.data.folders
 import net.schmizz.keepalive.KeepAliveProvider
 import net.schmizz.sshj.DefaultConfig
 import net.schmizz.sshj.SSHClient
+import net.schmizz.sshj.common.DisconnectReason
 import net.schmizz.sshj.sftp.FileAttributes
 import net.schmizz.sshj.sftp.FileMode
 import net.schmizz.sshj.sftp.RemoteFile
 import net.schmizz.sshj.sftp.SFTPClient
 import net.schmizz.sshj.sftp.SFTPException
+import net.schmizz.sshj.transport.TransportException
 import net.schmizz.sshj.userauth.method.AuthKeyboardInteractive
 import net.schmizz.sshj.userauth.method.AuthMethod
 import net.schmizz.sshj.userauth.method.AuthPassword
@@ -40,7 +42,14 @@ class SftpMusicClient
                 ssh.connectTimeout = TIMEOUT_MS
                 ssh.connection.keepAlive.keepAliveInterval = KEEP_ALIVE_SECONDS
                 ssh.addHostKeyVerifier(verifier)
-                ssh.connect(source.host.removeSurrounding("[", "]"), source.port)
+                try {
+                    ssh.connect(source.host.removeSurrounding("[", "]"), source.port)
+                } catch (error: TransportException) {
+                    if (verifier.pinned != null && error.disconnectReason == DisconnectReason.HOST_KEY_NOT_VERIFIABLE) {
+                        throw SftpHostKeyMismatchException(error)
+                    }
+                    throw error
+                }
                 ssh.auth(source.username, authMethods(ssh, source, secrets))
                 val sftp = ssh.newSFTPClient()
                 sftp.sftpEngine.timeoutMs = TIMEOUT_MS
@@ -80,7 +89,7 @@ class SftpMusicClient
                         if (Thread.currentThread().isInterrupted) throw InterruptedException()
                         val name = info.name
                         if (name == "." || name == "..") continue
-                        val location = runCatching { childLocation(path, name) }.getOrNull() ?: continue
+                        val location = runCatching { source.childLocation(path, name) }.getOrNull() ?: continue
                         val attributes =
                             if (info.attributes.type == FileMode.Type.SYMLINK) {
                                 try {
@@ -103,7 +112,7 @@ class SftpMusicClient
             path: String,
         ): RemoteMusicFile {
             require(source.kind == MusicFolderKind.SFTP && source.isValid() && source.hostKey.isNotBlank())
-            require(safeFolderPath(path).isNotEmpty())
+            require(source.folderPath(path).isNotEmpty())
             val connection = connect(source, secrets, SftpHostKeyVerifier(source.hostKey))
             try {
                 val file = connection.sftp.open(serverPath(source, path))
@@ -149,18 +158,28 @@ class SftpMusicClient
                         val stream = readAhead ?: file.ReadAheadRemoteFileInputStream(READ_AHEAD_REQUESTS, position).also { readAhead = it }
                         stream.read(buffer, offset, length)
                     } else {
-                        readAhead = null
+                        closeReadAhead()
                         file.read(position, buffer, offset, length)
                     }
                 if (count > 0) nextPosition = position + count
                 return if (count > 0) count else -1
             }
 
+            private fun closeReadAhead() {
+                val stream = readAhead
+                readAhead = null
+                stream?.close()
+            }
+
             override fun close() {
                 try {
-                    file.close()
+                    closeReadAhead()
                 } finally {
-                    connection.close()
+                    try {
+                        file.close()
+                    } finally {
+                        connection.close()
+                    }
                 }
             }
         }

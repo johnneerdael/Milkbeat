@@ -21,6 +21,9 @@ enum class MusicFolderKind(
     NFS("nfsmusic", 2049),
     ;
 
+    /** SMB reserves `:` for NTFS alternate data streams; the POSIX-backed protocols allow it in names. */
+    val allowsColon: Boolean get() = this == WEBDAV || this == SFTP || this == NFS
+
     companion object {
         val remoteSchemes: Set<String> = entries.filter { it != LOCAL }.map { it.scheme }.toSet()
 
@@ -89,10 +92,18 @@ data class MusicFolder(
             .Builder()
             .scheme(kind.scheme)
             .authority(id)
-            .path("/" + safeFolderPath(relativePath))
+            .path("/" + folderPath(relativePath))
             .appendQueryParameter("revision", revision)
             .build()
     }
+
+    /** [relativePath] validated with this kind's name rules. */
+    fun folderPath(relativePath: String): String = safeFolderPath(relativePath, kind.allowsColon)
+
+    fun childLocation(
+        parent: String,
+        name: String,
+    ): String = childLocation(parent, name, kind.allowsColon)
 
     fun smbPath(relativePath: String): String =
         listOf(safeFolderPath(root), safeFolderPath(relativePath)).filter(String::isNotEmpty).joinToString("\\").replace('/', '\\')
@@ -102,12 +113,12 @@ data class MusicFolder(
      * login directory; NFS paths are always relative to [nfsExport].
      */
     fun remotePath(relativePath: String): String {
-        val joined = listOf(safeFolderPath(root), safeFolderPath(relativePath)).filter(String::isNotEmpty).joinToString("/")
+        val joined = listOf(folderPath(root), folderPath(relativePath)).filter(String::isNotEmpty).joinToString("/")
         return if (kind == MusicFolderKind.SFTP && root.trim().startsWith("/")) "/$joined" else joined
     }
 
     /** Absolute NFS export path, for example `/volume1/music`, or `/` for an NFSv4 pseudo-root. */
-    fun nfsExport(): String = "/" + safeFolderPath(share.trim().ifEmpty { "/" })
+    fun nfsExport(): String = "/" + folderPath(share.trim().ifEmpty { "/" })
 
     /** The WebDAV collection URL, always ending in a slash, or null when [url] is not a plain http(s) URL. */
     fun webDavUrl(): HttpUrl? =
@@ -118,9 +129,12 @@ data class MusicFolder(
             ?.let { if (it.encodedPath.endsWith("/")) it else it.newBuilder().addPathSegment("").build() }
 }
 
-internal fun safeFolderPath(path: String): String {
+internal fun safeFolderPath(
+    path: String,
+    allowColon: Boolean = false,
+): String {
     val normalized = path.replace('\\', '/')
-    require(!normalized.startsWith("//") && ':' !in normalized && '\u0000' !in normalized)
+    require(!normalized.startsWith("//") && (allowColon || ':' !in normalized) && '\u0000' !in normalized)
     val relative = normalized.removePrefix("/").removeSuffix("/")
     require(relative.isEmpty() || relative.split('/').all { it.isNotEmpty() && it != "." && it != ".." })
     return relative
@@ -129,9 +143,10 @@ internal fun safeFolderPath(path: String): String {
 internal fun childLocation(
     parent: String,
     name: String,
+    allowColon: Boolean = false,
 ): String {
     require(name.isNotEmpty() && name != "." && name != ".." && '/' !in name && '\\' !in name)
-    return safeFolderPath(listOf(safeFolderPath(parent), name).filter(String::isNotEmpty).joinToString("/"))
+    return safeFolderPath(listOf(safeFolderPath(parent, allowColon), name).filter(String::isNotEmpty).joinToString("/"), allowColon)
 }
 
 data class MusicFolderEntry(

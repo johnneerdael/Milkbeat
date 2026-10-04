@@ -709,6 +709,8 @@
     <string name="music_folders_host_key">Server key: %1$s</string>
     <string name="music_folders_host_key_unknown">The server key is trusted on first connection. Test access to see it before saving.</string>
     <string name="music_folders_host_key_forget">Forget server key</string>
+    <string name="music_folders_host_key_changed">The server key has changed since it was trusted. If you replaced or reinstalled the server, choose Forget server key and test again; otherwise someone may be intercepting the connection.</string>
+    <string name="music_folders_nfs_insecure_required">The server only accepts connections from privileged ports, which apps cannot use. Enable the \'insecure\' export option, or \'Allow connections from non-privileged ports\' on Synology and QNAP.</string>
     <string name="music_folders_nfs_export">Export path (for example /volume1/music)</string>
     <string name="music_folders_nfs_path">Folder within export (optional)</string>
     <string name="music_folders_nfs_version">NFS version</string>

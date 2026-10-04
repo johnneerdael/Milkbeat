@@ -3,6 +3,8 @@ package io.github.aedev.flow.ui.screens.folders
 import androidx.annotation.StringRes
 import io.github.aedev.flow.R
 import io.github.aedev.flow.data.folders.MusicFolderKind
+import io.github.aedev.flow.data.folders.NfsInsecurePortRequiredException
+import io.github.aedev.flow.data.folders.SftpHostKeyMismatchException
 
 @StringRes
 internal fun MusicFolderKind.labelRes(): Int =
@@ -33,4 +35,9 @@ internal fun invalidMessage(kind: MusicFolderKind): Int =
     }
 
 @StringRes
-internal fun folderAccessMessage(error: Throwable): Int? = null
+internal fun folderAccessMessage(error: Throwable): Int? =
+    when (error) {
+        is NfsInsecurePortRequiredException -> R.string.music_folders_nfs_insecure_required
+        is SftpHostKeyMismatchException -> R.string.music_folders_host_key_changed
+        else -> null
+    }

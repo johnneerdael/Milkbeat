@@ -69,16 +69,13 @@ internal fun nfs4Components(
     path: String,
 ): List<String> = source.nfsExport().split('/').filter(String::isNotEmpty) + nfsComponents(source, path)
 
-/**
- * Symlinks and special files are skipped: resolving a link target could leave the configured root. Names the
- * folder path model cannot represent (it rejects `:`) are skipped rather than failing the whole listing.
- */
+/** Symlinks and special files are skipped: resolving a link target could leave the configured root. */
 internal fun nfsMusicEntry(
     parent: String,
     entry: NfsDirEntry,
 ): MusicFolderEntry? {
     val name = entry.name
-    if (name == "." || name == ".." || name.isEmpty() || name.any { it in "/\\:\u0000" }) return null
+    if (name == "." || name == ".." || name.isEmpty() || name.any { it in "/\\\u0000" }) return null
     val folder =
         when (entry.attributes.type) {
             NfsFileType.DIRECTORY -> true
@@ -86,7 +83,13 @@ internal fun nfsMusicEntry(
             NfsFileType.OTHER -> return null
         }
     if (!folder && !isMusicFile(name)) return null
-    return MusicFolderEntry(name, childLocation(parent, name), folder, entry.attributes.size, entry.attributes.modified)
+    return MusicFolderEntry(
+        name,
+        childLocation(parent, name, MusicFolderKind.NFS.allowsColon),
+        folder,
+        entry.attributes.size,
+        entry.attributes.modified,
+    )
 }
 
 internal fun nfsTimeMillis(

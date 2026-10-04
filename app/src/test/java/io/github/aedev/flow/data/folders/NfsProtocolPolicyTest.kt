@@ -65,7 +65,8 @@ class NfsProtocolPolicyTest {
         assertThat(nfsMusicEntry("", NfsDirEntry(".", dir))).isNull()
         assertThat(nfsMusicEntry("", NfsDirEntry("..", dir))).isNull()
         assertThat(nfsMusicEntry("", NfsDirEntry("a\\b.mp3", file))).isNull()
-        assertThat(nfsMusicEntry("", NfsDirEntry("Act I: Overture.flac", file))).isNull()
+        assertThat(nfsMusicEntry("Live", NfsDirEntry("Act I: Overture.flac", file)))
+            .isEqualTo(MusicFolderEntry("Act I: Overture.flac", "Live/Act I: Overture.flac", false, 1234, 1_700_000_000_123))
     }
 
     @Test fun nfsTimesBecomeEpochMillis() {

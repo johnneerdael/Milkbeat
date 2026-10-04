@@ -141,4 +141,21 @@ class MusicFolderTest {
         assertThat(MusicFolder(name = "Box", kind = MusicFolderKind.SFTP).port).isEqualTo(22)
         assertThat(MusicFolder(name = "Export", kind = MusicFolderKind.NFS).port).isEqualTo(2049)
     }
+
+    @Test fun colonsAreLegalInPosixProtocolNamesButNotInSmbStreams() {
+        val smb = MusicFolder(name = "NAS", kind = MusicFolderKind.SMB, host = "nas", share = "Music")
+        assertThrows(IllegalArgumentException::class.java) { smb.remoteUri("song.flac:stream") }
+        assertThrows(IllegalArgumentException::class.java) { smb.childLocation("", "song.flac:stream") }
+        for (source in listOf(
+            MusicFolder(name = "Cloud", kind = MusicFolderKind.WEBDAV, url = "https://cloud.test/dav"),
+            MusicFolder(name = "Box", kind = MusicFolderKind.SFTP, host = "box", root = "/srv/Live: 2024"),
+            MusicFolder(name = "Export", kind = MusicFolderKind.NFS, host = "nas", share = "/music"),
+        )) {
+            assertThat(source.isValid()).isTrue()
+            val location = source.childLocation("Live: 2024", "Act I: Overture.flac")
+            assertThat(location).isEqualTo("Live: 2024/Act I: Overture.flac")
+            assertThat(source.remoteUri(location).path).isEqualTo("/Live: 2024/Act I: Overture.flac")
+            assertThrows(IllegalArgumentException::class.java) { source.childLocation("", "../x") }
+        }
+    }
 }

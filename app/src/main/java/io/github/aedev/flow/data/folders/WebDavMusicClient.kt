@@ -61,7 +61,7 @@ class WebDavMusicClient
             path: String,
         ): List<MusicFolderEntry> {
             require(source.kind == MusicFolderKind.WEBDAV && source.isValid())
-            val parent = safeFolderPath(path)
+            val parent = source.folderPath(path)
             val url = collectionUrl(source, parent)
             val parentSegments = url.pathSegments.dropLastWhile(String::isEmpty)
             return buildList {
@@ -76,7 +76,7 @@ class WebDavMusicClient
                     add(
                         MusicFolderEntry(
                             name = name,
-                            location = childLocation(parent, name),
+                            location = source.childLocation(parent, name),
                             isDirectory = resource.isCollection,
                             size = if (resource.isCollection) 0 else resource.length ?: 0,
                             modified = resource.modified,
@@ -109,7 +109,7 @@ class WebDavMusicClient
             source: MusicFolder,
             path: String,
         ): HttpUrl {
-            require(safeFolderPath(path).isNotEmpty())
+            require(source.folderPath(path).isNotEmpty())
             return childUrl(source, path)
         }
 
@@ -118,7 +118,11 @@ class WebDavMusicClient
             path: String,
         ): HttpUrl {
             val builder = checkNotNull(source.webDavUrl()).newBuilder()
-            safeFolderPath(path).split('/').filter(String::isNotEmpty).forEach { builder.addPathSegment(it) }
+            source
+                .folderPath(path)
+                .split('/')
+                .filter(String::isNotEmpty)
+                .forEach { builder.addPathSegment(it) }
             return builder.build()
         }
 

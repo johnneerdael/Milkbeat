@@ -4,6 +4,7 @@ import net.schmizz.sshj.common.Buffer
 import net.schmizz.sshj.common.KeyType
 import net.schmizz.sshj.common.SecurityUtils
 import net.schmizz.sshj.transport.verification.HostKeyVerifier
+import java.io.IOException
 import java.security.PublicKey
 import java.util.Base64
 
@@ -22,9 +23,13 @@ internal fun sftpHostKeyAlgorithms(fingerprint: String): List<String> =
         else -> listOf(type)
     }
 
+class SftpHostKeyMismatchException(
+    cause: Throwable,
+) : IOException("The server key does not match the pinned key", cause)
+
 /** Verifies against [pinned] strictly, or accepts and records the presented key when [pinned] is null. */
 internal class SftpHostKeyVerifier(
-    private val pinned: String?,
+    val pinned: String?,
 ) : HostKeyVerifier {
     @Volatile
     var presented: String? = null
