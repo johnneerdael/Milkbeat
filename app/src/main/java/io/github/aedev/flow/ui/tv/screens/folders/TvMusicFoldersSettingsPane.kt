@@ -25,8 +25,6 @@ import io.github.aedev.flow.R
 import io.github.aedev.flow.data.folders.MusicFolderKind
 import io.github.aedev.flow.ui.screens.folders.LibraryScanViewModel
 import io.github.aedev.flow.ui.screens.folders.MusicFoldersViewModel
-import io.github.aedev.flow.ui.screens.folders.addLabelRes
-import io.github.aedev.flow.ui.screens.folders.labelRes
 import io.github.aedev.flow.ui.tv.components.TvButton
 import io.github.aedev.flow.ui.tv.components.TvLibraryScanStatus
 import io.github.aedev.flow.ui.tv.components.TvNavRow

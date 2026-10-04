@@ -19,7 +19,6 @@ import io.github.aedev.flow.data.folders.MusicFolderKind
 import io.github.aedev.flow.ui.screens.folders.FolderAccess
 import io.github.aedev.flow.ui.screens.folders.MusicFolderEditor
 import io.github.aedev.flow.ui.screens.folders.MusicFoldersViewModel
-import io.github.aedev.flow.ui.screens.folders.addLabelRes
 import io.github.aedev.flow.ui.tv.components.TvButton
 import io.github.aedev.flow.ui.tv.components.TvSectionHeader
 import io.github.aedev.flow.ui.tv.focus.tvInitialFocus

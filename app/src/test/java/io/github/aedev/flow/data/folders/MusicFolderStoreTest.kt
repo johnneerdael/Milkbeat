@@ -85,7 +85,8 @@ class MusicFolderStoreTest {
             val data = PreferenceDataStoreFactory.create(scope = scope) { temp.newFile("keys.preferences_pb") }
             val store = MusicFolderStore(data, { "sealed:" + it.reversed() }, { it?.removePrefix("sealed:")?.reversed().orEmpty() })
             try {
-                val source = MusicFolder(name = "Box", kind = MusicFolderKind.SFTP, host = "box", keyAuth = true, hostKey = "k")
+                val source =
+                    MusicFolder(name = "Box", kind = MusicFolderKind.SFTP, host = "box", username = "me", keyAuth = true, hostKey = "k")
                 store.save(source, "passphrase", "-----BEGIN OPENSSH PRIVATE KEY-----")
                 assertThat(
                     data.data

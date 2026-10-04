@@ -2,6 +2,7 @@ package io.github.aedev.flow.data.folders
 
 import org.dcache.nfs.ChimeraNFSException
 import org.dcache.nfs.nfsstat
+import org.dcache.nfs.v4.xdr.nfs_opnum4
 import org.dcache.oncrpc4j.rpc.OncRpcAcceptedException
 import org.dcache.oncrpc4j.rpc.OncRpcRejectedException
 import org.dcache.oncrpc4j.rpc.RpcAccepsStatus
@@ -182,3 +183,19 @@ internal inline fun retryWhileDelayed(
 }
 
 private const val NFS_DELAY_RETRY_MS = 1_000L
+
+/**
+ * Whether a failed PUTROOTFH/PUTFH + LOOKUP compound was refused while still reaching the export. [resops] are the
+ * reply's operations up to and including the failing one, the first LOOKUP resolves component [firstComponent], and
+ * the export spans the first [exportDepth] components. A refusal below the export is an ordinary permission error.
+ */
+internal fun nfs4RefusedBeforeExport(
+    resops: List<Int>,
+    firstComponent: Int,
+    exportDepth: Int,
+): Boolean =
+    when (resops.lastOrNull()) {
+        nfs_opnum4.OP_PUTROOTFH -> true
+        nfs_opnum4.OP_LOOKUP -> firstComponent + resops.count { it == nfs_opnum4.OP_LOOKUP } - 1 < exportDepth
+        else -> false
+    }

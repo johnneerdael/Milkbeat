@@ -120,9 +120,16 @@ class MusicFolderTest {
     }
 
     @Test fun networkConfigurationsRejectBadHostsPortsAndIds() {
-        val sftp = MusicFolder(name = "Box", kind = MusicFolderKind.SFTP, host = "box")
+        val sftp = MusicFolder(name = "Box", kind = MusicFolderKind.SFTP, host = "box", username = "me")
         val nfs = MusicFolder(name = "Export", kind = MusicFolderKind.NFS, host = "nas", share = "/music")
-        for (invalid in listOf(sftp.copy(host = "sftp://box"), sftp.copy(port = 0), sftp.copy(root = "../x"), sftp.copy(name = " "))) {
+        assertThat(sftp.isValid()).isTrue()
+        for (invalid in listOf(
+            sftp.copy(host = "sftp://box"),
+            sftp.copy(port = 0),
+            sftp.copy(root = "../x"),
+            sftp.copy(name = " "),
+            sftp.copy(username = " "),
+        )) {
             assertThat(invalid.isValid()).isFalse()
         }
         for (invalid in listOf(nfs.copy(uid = -1), nfs.copy(gid = -1), nfs.copy(share = "/a/../b"), nfs.copy(host = ""))) {
@@ -148,7 +155,7 @@ class MusicFolderTest {
         assertThrows(IllegalArgumentException::class.java) { smb.childLocation("", "song.flac:stream") }
         for (source in listOf(
             MusicFolder(name = "Cloud", kind = MusicFolderKind.WEBDAV, url = "https://cloud.test/dav"),
-            MusicFolder(name = "Box", kind = MusicFolderKind.SFTP, host = "box", root = "/srv/Live: 2024"),
+            MusicFolder(name = "Box", kind = MusicFolderKind.SFTP, host = "box", username = "me", root = "/srv/Live: 2024"),
             MusicFolder(name = "Export", kind = MusicFolderKind.NFS, host = "nas", share = "/music"),
         )) {
             assertThat(source.isValid()).isTrue()

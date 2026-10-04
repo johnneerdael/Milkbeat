@@ -139,4 +139,18 @@ class NfsProtocolPolicyTest {
         assertThat(isNfsReconnectable(NfsInsecurePortRequiredException("refused"))).isFalse()
         assertThat(isNfsReconnectable(IllegalStateException())).isFalse()
     }
+
+    @Test fun onlyRefusalsWhileReachingTheExportPointAtPrivilegedPorts() {
+        val putRoot = org.dcache.nfs.v4.xdr.nfs_opnum4.OP_PUTROOTFH
+        val putFh = org.dcache.nfs.v4.xdr.nfs_opnum4.OP_PUTFH
+        val lookup = org.dcache.nfs.v4.xdr.nfs_opnum4.OP_LOOKUP
+        val sequence = org.dcache.nfs.v4.xdr.nfs_opnum4.OP_SEQUENCE
+        assertThat(nfs4RefusedBeforeExport(listOf(sequence, putRoot), 0, 2)).isTrue()
+        assertThat(nfs4RefusedBeforeExport(listOf(putRoot, lookup, lookup), 0, 2)).isTrue()
+        assertThat(nfs4RefusedBeforeExport(listOf(putRoot, lookup, lookup, lookup), 0, 2)).isFalse()
+        assertThat(nfs4RefusedBeforeExport(listOf(putFh, lookup), 1, 2)).isTrue()
+        assertThat(nfs4RefusedBeforeExport(listOf(putFh, lookup), 2, 2)).isFalse()
+        assertThat(nfs4RefusedBeforeExport(listOf(putRoot, lookup), 0, 0)).isFalse()
+        assertThat(nfs4RefusedBeforeExport(listOf(sequence), 0, 2)).isFalse()
+    }
 }

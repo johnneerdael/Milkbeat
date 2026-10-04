@@ -74,7 +74,7 @@ data class MusicFolder(
                 }
 
                 MusicFolderKind.SFTP -> {
-                    validHost() && runCatching { remotePath("") }.isSuccess
+                    validHost() && username.isNotBlank() && runCatching { remotePath("") }.isSuccess
                 }
 
                 MusicFolderKind.NFS -> {

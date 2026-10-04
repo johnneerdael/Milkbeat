@@ -754,7 +754,7 @@
     <string name="music_folders_nfs_gid">Group ID (GID)</string>
     <string name="music_folders_nfs_hint">The export must allow connections from non-privileged ports: the \'insecure\' export option, or \'Allow connections from non-privileged ports\' on Synology and QNAP.</string>
     <string name="music_folders_invalid_webdav">Enter a name and an http:// or https:// server URL without a username, password or query.</string>
-    <string name="music_folders_invalid_remote">Enter a name, server, valid port and IDs. Folder paths cannot contain . or .. segments.</string>
+    <string name="music_folders_invalid_remote">Enter a name, server and valid port, plus a username for SFTP or user and group IDs for NFS. Folder paths cannot contain . or .. segments.</string>
     <string name="playlist_mirror_starting">Starting playlist preparation…</string>
     <string name="playlist_mirror_playback_waiting">Playlist syncing. Playback will start when it is ready.</string>
     <string name="playlist_mirror_title">Private playlist preparation</string>
