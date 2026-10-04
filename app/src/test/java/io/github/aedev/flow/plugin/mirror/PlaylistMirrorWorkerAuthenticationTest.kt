@@ -16,7 +16,9 @@ import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
 import nl.neerdael.milkbeat.catalog.ProviderAccount
 import nl.neerdael.milkbeat.plugin.PluginError
@@ -89,7 +91,7 @@ class PlaylistMirrorWorkerAuthenticationTest {
 
     private class Fixture {
         val host = mockk<PluginHost>()
-        val accounts = PluginAccounts(host)
+        val accounts = PluginAccounts(host, CoroutineScope(StandardTestDispatcher()), { 0L })
         val coordinator = mockk<PlaylistMirrorCoordinator>()
         val worker: PlaylistMirrorWorker
 

@@ -14,8 +14,10 @@ import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import nl.neerdael.milkbeat.catalog.EntityKind
@@ -44,7 +46,7 @@ class PluginAudioRoutingTest {
     private val host = mockk<PluginHost>()
     private val registry = mockk<PluginRegistry>()
     private val matcher = PluginTrackMatcher(host, MemoryTrackMatches())
-    private val accounts = PluginAccounts(host)
+    private val accounts = PluginAccounts(host, CoroutineScope(StandardTestDispatcher()), { 0L })
     private val audio = PluginAudio(host, registry, matcher, accounts)
     private val radio = PluginRadio(host, registry, audio)
     private val stream = AudioStream("https://example.invalid/audio", "song", "audio", "audio/mp4", trackingToken = "listen")

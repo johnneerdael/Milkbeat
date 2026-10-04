@@ -70,6 +70,6 @@ Enter the plugin's current download link again in Settings → Plugins and revie
 
 ## Private playlist preparation fails
 
-Check that both Spotify and YouTube Music are enabled, signed in and updated to versions that support playlist preparation. If a sign-in expired, reopen that plugin's details and sign in through the phone viewer, then select **Retry preparation** on the playlist page.
+Check that both Spotify and YouTube Music are enabled, signed in and updated to versions that support playlist preparation. Milkbeat re-checks an expired sign-in in the background and resumes preparation when the account still works; YouTube Music 0.2.4 or later is needed so that one refused request does not sign the account out. If the provider confirms the sign-in expired, reopen that plugin's details and sign in through the phone viewer, then select **Retry preparation** on the playlist page.
 
 Interrupted preparation resumes from saved progress. Confirmed unavailable songs are omitted; temporary connection errors can be retried. Your own playlists and Liked Songs can prepare in the background, while other playlists prepare when opened. Albums use normal playback and are not mirrored. See [Prepare private playlists](providers.md#prepare-private-playlists).
