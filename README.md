@@ -88,11 +88,13 @@ scan of the whole library. Sources can be edited, refreshed or removed in Settin
 
 Add optional **third-party plugins** in **Settings > Plugins** using their downloader codes:
 
+<!-- plugin-codes:readme -->
 | Third-party plugin | Downloader code | Original code, still supported |
 | --- | --- | --- |
 | Beatport | **393** | 102 |
 | Spotify | **981** | 772 |
 | YouTube Music | **494** | 416 |
+<!-- /plugin-codes -->
 
 You can also enter a plugin download URL, including a supported Buzzheavier file page; a bare
 address defaults to HTTPS. Review its requested permissions before installing. Plugin packages

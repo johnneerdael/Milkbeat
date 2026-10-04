@@ -1,0 +1,22 @@
+name: PR release notes
+
+# Every merged PR's "## Release notes" section becomes its entry in the next release.
+on:
+  pull_request:
+    branches: [ main ]
+    types: [ opened, synchronize, reopened, edited, ready_for_review ]
+
+permissions:
+  contents: read
+
+jobs:
+  release-notes:
+    name: Validate release notes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - name: Test the release notes script
+        run: python3 -m unittest discover -s .github/scripts -p 'test_release_notes.py' -v
+      - name: Validate public changelog text
+        run: python3 .github/scripts/release_notes.py validate --event-file "$GITHUB_EVENT_PATH"

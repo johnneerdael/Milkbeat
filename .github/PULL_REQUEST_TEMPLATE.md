@@ -2,6 +2,30 @@
 
 <!-- Explain what changed and why. Focus on observable behavior and important implementation decisions. -->
 
+## Release notes
+
+<!--
+Required: the "PR release notes" check fails without this section. It is published as this PR's
+entry in the next release, so write factual, public, user-facing changes, one bullet each, e.g.
+- Plugins update automatically in the background; updates that ask for new permissions wait for review.
+Sub-headings such as ### Fixed or ### New are kept. If nothing changes for viewers, write
+Internal: followed by what actually changed (e.g. Internal: Pin the Gradle wrapper to 9.1).
+Leave out test results, screenshots, install links and plugin codes: the release workflow appends the
+visualizer engine, install instructions, plugin downloader codes and the full changelog link itself.
+-->
+
+-
+
+## Docs
+
+<!--
+The "Check docs updated" check fails when app sources change but neither README.md nor
+docs/user-guide/ does. Update them to describe the new behaviour (the user guide is published to
+Pages on merge), or say here why no docs change is needed, e.g.
+Not needed: internal refactor, nothing visible changes.
+The plugin downloader-code tables inside plugin-codes markers are generated: do not edit them.
+-->
+
 ## Related issue
 
 <!-- Use "Closes #123" when this PR should close an issue. -->
@@ -38,3 +62,4 @@
 - [ ] Dependency and lockfile changes are intentional and limited to this PR.
 - [ ] Room schema changes include the required version bump and migration, or this PR does not change the Room schema.
 - [ ] Breaking changes and upgrade steps are clearly documented.
+- [ ] The `Release notes` section matches the final change and contains no placeholders or test logs.
