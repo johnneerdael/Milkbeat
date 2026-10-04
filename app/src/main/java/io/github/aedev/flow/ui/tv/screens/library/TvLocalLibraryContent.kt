@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -37,7 +36,6 @@ internal fun TvLocalLibraryContent(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val dimens = LocalTvDimens.current
-    LaunchedEffect(viewModel) { viewModel.open() }
     val playMix by rememberUpdatedState(onPlayMix)
     val playCollection by rememberUpdatedState(onPlayCollection)
     val open by rememberUpdatedState(onOpen)

@@ -119,6 +119,10 @@ fun TvLibraryScreen(
     val accountIdentity by accountLibrary.accountIdentity.collectAsStateWithLifecycle(initialValue = "")
     val accountTabs by accountLibrary.tabs.collectAsStateWithLifecycle()
     val localAvailable by localLibrary.available.collectAsStateWithLifecycle()
+    // The section goes when its last folder or the metadata plugin does; never leave its pane blank.
+    LaunchedEffect(localAvailable) {
+        if (localAvailable == false && selectedSection == TvLibrarySection.LOCAL) selectedSection = TvLibrarySection.HISTORY
+    }
     LaunchedEffect(accountViewModel) { accountViewModel.refresh() }
     LaunchedEffect(signedIn, accountIdentity) {
         if (accountIdentity.isNotEmpty()) accountLibrary.accountChanged(accountIdentity)
@@ -163,7 +167,10 @@ fun TvLibraryScreen(
                     }
                 }
                 val sections =
-                    TvLibrarySection.entries.filterNot { it == TvLibrarySection.LIKES || (it == TvLibrarySection.LOCAL && !localAvailable) }
+                    TvLibrarySection.entries.filterNot {
+                        it == TvLibrarySection.LIKES ||
+                            (it == TvLibrarySection.LOCAL && localAvailable != true)
+                    }
                 items(sections, key = TvLibrarySection::name) { section ->
                     TvFilterChip(
                         label = stringResource(section.titleRes),
@@ -202,7 +209,7 @@ fun TvLibraryScreen(
             } else {
                 when (selectedSection) {
                     TvLibrarySection.LOCAL -> {
-                        if (localAvailable) {
+                        if (localAvailable == true) {
                             TvLocalLibraryContent(
                                 viewModel = localLibrary,
                                 onPlayMix = onPlayMix,

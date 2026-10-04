@@ -144,6 +144,24 @@ class LibraryIndexerTest {
             assertThat(order).containsExactly("bp:a", "bp:b", "bp:c").inOrder()
         }
 
+    @Test fun aCoverRemovedFromEveryFileOfItsReleaseIsDropped() =
+        runBlocking {
+            sources.file("a.mp3", tags(title = "A", releaseId = "1"), art = byteArrayOf(1))
+            sources.file("b.mp3", tags(title = "B", releaseId = "1"), art = byteArrayOf(1))
+            indexer.scan()
+            val cover = File(dao.artwork("bp:1")!!.path)
+
+            sources.file("a.mp3", tags(title = "A", releaseId = "1"), modified = 2)
+            indexer.scan()
+            assertThat(dao.artwork("bp:1")).isNotNull()
+
+            sources.file("b.mp3", tags(title = "B", releaseId = "1"), modified = 2)
+            sources.file("a.mp3", tags(title = "A", releaseId = "1"), modified = 3)
+            indexer.scan()
+            assertThat(dao.artwork("bp:1")).isNull()
+            assertThat(cover.exists()).isFalse()
+        }
+
     @Test fun coversOfReleasesNoLongerIndexedAreDeleted() =
         runBlocking {
             sources.file("a.mp3", tags(title = "A", releaseId = "1"), art = byteArrayOf(1))

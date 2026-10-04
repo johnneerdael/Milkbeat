@@ -114,5 +114,7 @@ class LibraryTagsTest {
         assertThat(releaseKey(LibraryTags(album = "Remixes", label = "X"), "t1"))
             .isEqualTo(releaseKey(LibraryTags(album = "REMIXES", label = "x"), "t2"))
         assertThat(releaseKey(LibraryTags(), "folder|a.mp3")).isEqualTo("track:folder|a.mp3")
+        assertThat(releaseKey(LibraryTags(album = "Greatest Hits", artists = listOf("A")), "t1"))
+            .isNotEqualTo(releaseKey(LibraryTags(album = "Greatest Hits", artists = listOf("B")), "t2"))
     }
 }

@@ -108,6 +108,8 @@ internal class LibraryIndexer
             onProgress(LibraryScanProgress(read, total))
             val artworkKeys = dao.artworkKeys().toHashSet()
             val coveredThisScan = HashSet<String>()
+            val readThisScan = HashSet<String>()
+            val retaggedWithoutCover = HashSet<String>()
             var announced = !wasEmpty
             for (plan in plans) {
                 for (batch in plan.toRead.chunked(WRITE_BATCH)) {
@@ -136,6 +138,11 @@ internal class LibraryIndexer
                             file.artists.mapIndexed { position, name -> LibraryTrackArtistEntity(id, position, name) }
                         },
                     )
+                    for (file in files) {
+                        val track = checkNotNull(file.track)
+                        readThisScan += track.id
+                        if (file.updated && file.tags?.artwork == null) retaggedWithoutCover += track.releaseKey
+                    }
                     changed = true
                     read += files.size
                     onProgress(LibraryScanProgress(read, total))
@@ -148,6 +155,14 @@ internal class LibraryIndexer
                 if (indexPlaylists(plan)) changed = true
             }
 
+            // A cover is dropped only when every file of its release was read again and none carries one any more.
+            for (key in retaggedWithoutCover - coveredThisScan) {
+                val cover = dao.artwork(key) ?: continue
+                if (dao.releaseTrackIds(key).all { it in readThisScan }) {
+                    dao.deleteArtworkOf(key)
+                    artwork.delete(cover.path)
+                }
+            }
             val orphans = dao.orphanArtwork()
             if (orphans.isNotEmpty()) {
                 dao.deleteOrphanArtwork()
@@ -302,7 +317,8 @@ internal class LibraryIndexer
 
 /**
  * The release a file belongs to. Beatport's release id is exact; without it the album is told apart
- * from another of the same name by its album artist and label. A file with no album is its own single.
+ * from another of the same name by its album artist (else its artists) and label. A file with no
+ * album is its own single.
  */
 internal fun releaseKey(
     tags: LibraryTags,
@@ -315,7 +331,8 @@ internal fun releaseKey(
 
         tags.album.isNotBlank() -> {
             "album:" +
-                listOf(tags.album, tags.albumArtists.joinToString(","), tags.label).joinToString("|") { it.trim().lowercase() }
+                listOf(tags.album, tags.albumArtists.ifEmpty { tags.artists }.joinToString(","), tags.label)
+                    .joinToString("|") { it.trim().lowercase() }
         }
 
         else -> {

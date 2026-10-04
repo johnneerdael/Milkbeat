@@ -8,17 +8,15 @@ import io.github.aedev.flow.data.library.catalog.LocalCatalogProvider
 import io.github.aedev.flow.data.music.model.MusicTrack
 import io.github.aedev.flow.plugin.catalog.listenerMessage
 import io.github.aedev.flow.plugin.registry.PluginRegistry
-import kotlinx.coroutines.Job
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
 import nl.neerdael.milkbeat.catalog.FilterOption
 import nl.neerdael.milkbeat.catalog.HomeRequest
 import nl.neerdael.milkbeat.catalog.MetadataItem
@@ -35,7 +33,8 @@ data class TvLocalLibraryState(
 
 /**
  * The local library's home inside Library, offered while a metadata plugin owns the app's home and
- * the library has songs. It reloads when a scan changes the index.
+ * the library has songs. It loads only while the section is shown, and again when a scan changes the
+ * index or another genre is picked.
  */
 @HiltViewModel
 class TvLocalLibraryViewModel
@@ -44,47 +43,34 @@ class TvLocalLibraryViewModel
         private val local: LocalCatalogProvider,
         registry: PluginRegistry,
     ) : ViewModel() {
-        val available: StateFlow<Boolean> =
+        /** Null until known, so a restored selection of this section is not dropped before the library answers. */
+        val available: StateFlow<Boolean?> =
             combine(registry.state.map { it.selection.metadata != null }, local.hasTracks) { pluginHome, hasTracks ->
-                pluginHome &&
-                    hasTracks
-            }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(SUBSCRIPTION_TIMEOUT_MS), false)
+                pluginHome && hasTracks
+            }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(SUBSCRIPTION_TIMEOUT_MS), null)
 
-        private val _state = MutableStateFlow(TvLocalLibraryState())
-        val state: StateFlow<TvLocalLibraryState> = _state.asStateFlow()
-        private var job: Job? = null
-        private var loaded = false
+        private val selectedFilter = MutableStateFlow<String?>(null)
 
-        init {
-            viewModelScope.launch {
-                local.account.drop(1).collect { if (loaded) load(_state.value.selectedFilterId) }
-            }
-        }
+        @OptIn(ExperimentalCoroutinesApi::class)
+        val state: StateFlow<TvLocalLibraryState> =
+            combine(local.account, selectedFilter) { _, filterId -> filterId }
+                .mapLatest(::load)
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(SUBSCRIPTION_TIMEOUT_MS), TvLocalLibraryState(isLoading = true))
 
-        fun open() {
-            if (!loaded) load(null)
-        }
-
-        fun selectFilter(option: FilterOption) = load(option.id.takeUnless { it == _state.value.selectedFilterId })
+        fun selectFilter(option: FilterOption) = selectedFilter.update { current -> option.id.takeUnless { it == current } }
 
         fun track(item: MetadataItem): MusicTrack? = local.track(item)
 
-        private fun load(filterId: String?) {
-            loaded = true
-            job?.cancel()
-            job =
-                viewModelScope.launch {
-                    _state.update { it.copy(selectedFilterId = filterId, isLoading = it.blocks.isEmpty(), error = null) }
-                    local
-                        .home(HomeRequest(filterId = filterId))
-                        .onSuccess { page ->
-                            _state.update { it.copy(filters = page.filters?.options.orEmpty(), blocks = page.blocks, isLoading = false) }
-                        }.onFailure { error ->
-                            Log.w(TAG, "local home failed", error)
-                            _state.update { it.copy(blocks = emptyList(), isLoading = false, error = error.listenerMessage) }
-                        }
-                }
-        }
+        private suspend fun load(filterId: String?): TvLocalLibraryState =
+            local.home(HomeRequest(filterId = filterId)).fold(
+                onSuccess = { page ->
+                    TvLocalLibraryState(filters = page.filters?.options.orEmpty(), selectedFilterId = filterId, blocks = page.blocks)
+                },
+                onFailure = { error ->
+                    Log.w(TAG, "local home failed", error)
+                    TvLocalLibraryState(selectedFilterId = filterId, error = error.listenerMessage)
+                },
+            )
 
         private companion object {
             const val TAG = "TvLocalLibrary"

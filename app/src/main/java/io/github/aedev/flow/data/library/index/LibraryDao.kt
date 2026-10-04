@@ -97,6 +97,12 @@ internal interface LibraryDao {
     @Query("SELECT * FROM release_artwork WHERE releaseKey NOT IN (SELECT releaseKey FROM tracks)")
     suspend fun orphanArtwork(): List<LibraryArtworkEntity>
 
+    @Query("SELECT id FROM tracks WHERE releaseKey = :releaseKey")
+    suspend fun releaseTrackIds(releaseKey: String): List<String>
+
+    @Query("DELETE FROM release_artwork WHERE releaseKey = :releaseKey")
+    suspend fun deleteArtworkOf(releaseKey: String)
+
     @Query("DELETE FROM release_artwork WHERE releaseKey NOT IN (SELECT releaseKey FROM tracks)")
     suspend fun deleteOrphanArtwork()
 
