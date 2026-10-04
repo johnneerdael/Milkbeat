@@ -95,7 +95,7 @@ class MusicFolderMetadataDeviceTest {
                                 androidx.media3.common.MediaItem
                                     .Builder()
                                     .setMediaId(track.videoId)
-                                    .setUri(source.smbUri("tagged.m4a"))
+                                    .setUri(source.remoteUri("tagged.m4a"))
                                     .build(),
                             )
                             prepare()

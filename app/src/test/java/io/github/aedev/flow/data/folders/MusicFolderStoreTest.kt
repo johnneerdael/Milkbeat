@@ -73,7 +73,7 @@ class MusicFolderStoreTest {
                 val changed = store.folders.first().single()
                 val access = store.access(changed.id, changed.revision)
                 assertThat(access.source.host).isEqualTo("new-nas")
-                assertThat(access.password).isEqualTo("new-password")
+                assertThat(access.secrets.password).isEqualTo("new-password")
             } finally {
                 scope.cancel()
             }

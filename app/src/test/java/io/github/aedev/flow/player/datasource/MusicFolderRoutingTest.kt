@@ -17,15 +17,15 @@ import org.robolectric.annotation.Config
 class MusicFolderRoutingTest {
     @Test fun smbBypassesPluginAndCacheWhileAllOtherSchemesDelegate() {
         var delegated = 0
-        var openedSmb = 0
+        var openedRemote = 0
         val source =
             MusicFolderRoutingDataSource(
                 DataSource.Factory {
                     delegated++
                     ByteArrayDataSource(byteArrayOf(1))
                 },
-                smb = {
-                    openedSmb++
+                remote = {
+                    openedRemote++
                     ByteArrayDataSource(byteArrayOf(2))
                 },
             )
@@ -42,14 +42,14 @@ class MusicFolderRoutingTest {
             assertThat(bytes.single().toInt()).isEqualTo(expected)
             source.close()
         }
-        assertThat(openedSmb).isEqualTo(1)
+        assertThat(openedRemote).isEqualTo(1)
         assertThat(delegated).isEqualTo(4)
     }
 
     @Test fun transferEventsAreBalancedAndOpenFailureDoesNotSignalStart() {
         val events = mutableListOf<String>()
         val source =
-            SmbMusicDataSource {
+            RemoteMusicDataSource {
                 object : RemoteMusicFile {
                     override val length = 1L
 

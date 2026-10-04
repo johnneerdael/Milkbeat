@@ -38,6 +38,8 @@ class MusicFolderStore internal constructor(
 
     private fun passwordKey(id: String) = stringPreferencesKey("password_$id")
 
+    private fun privateKeyKey(id: String) = stringPreferencesKey("private_key_$id")
+
     private fun decode(prefs: Preferences): List<MusicFolder> =
         prefs[sourcesKey]
             ?.let {
@@ -55,7 +57,7 @@ class MusicFolderStore internal constructor(
             val source =
                 decode(snapshot).firstOrNull { it.id == id && it.revision == revision }
                     ?: throw FileNotFoundException("Music folder configuration changed or was removed")
-            MusicFolderAccess(source, open(snapshot[passwordKey(id)]))
+            MusicFolderAccess(source, MusicFolderSecrets(open(snapshot[passwordKey(id)]), open(snapshot[privateKeyKey(id)])))
         }
 
     suspend fun password(id: String): String = withContext(PerformanceDispatcher.diskIO) { open(data.data.first()[passwordKey(id)]) }
@@ -63,14 +65,17 @@ class MusicFolderStore internal constructor(
     suspend fun save(
         source: MusicFolder,
         password: String? = null,
+        privateKey: String? = null,
     ) = withContext(PerformanceDispatcher.diskIO) {
         require(source.isValid())
         val sealed = password?.let(seal)
+        val sealedKey = privateKey?.let(seal)
         data.edit { prefs ->
             val current = decode(prefs)
             val saved = if (current.any { it.id == source.id }) source.copy(revision = UUID.randomUUID().toString()) else source
             prefs[sourcesKey] = json.encodeToString(current.filterNot { it.id == saved.id } + saved)
             if (sealed != null) prefs[passwordKey(saved.id)] = sealed
+            if (sealedKey != null) prefs[privateKeyKey(saved.id)] = sealedKey
         }
     }
 
@@ -78,11 +83,12 @@ class MusicFolderStore internal constructor(
         data.edit { prefs ->
             prefs[sourcesKey] = json.encodeToString(decode(prefs).filterNot { it.id == id })
             prefs.remove(passwordKey(id))
+            prefs.remove(privateKeyKey(id))
         }
     }
 }
 
 internal class MusicFolderAccess(
     val source: MusicFolder,
-    val password: String,
+    val secrets: MusicFolderSecrets,
 )

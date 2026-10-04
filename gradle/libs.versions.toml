@@ -44,11 +44,15 @@ quickjsKt = "1.0.15"
 schemaKenerator = "2.7.2"
 rhino = "1.8.1"
 smbj = "0.15.0"
+sshj = "0.41.1"
+nfs4j = "0.28.5"
 jsoup = "1.23.2"
 
 [libraries]
 jsoup = { group = "org.jsoup", name = "jsoup", version.ref = "jsoup" }
 smbj = { group = "com.hierynomus", name = "smbj", version.ref = "smbj" }
+sshj = { group = "com.hierynomus", name = "sshj", version.ref = "sshj" }
+nfs4j-core = { group = "org.dcache", name = "nfs4j-core", version.ref = "nfs4j" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 androidx-core-splashscreen = { group = "androidx.core", name = "core-splashscreen", version.ref = "core-splashscreen" }
 androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }

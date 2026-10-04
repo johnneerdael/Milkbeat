@@ -225,6 +225,9 @@ dependencies {
     implementation(project(":plugin-api"))
     implementation(libs.quickjs.kt)
     implementation(libs.smbj)
+    implementation(libs.sshj)
+    // Berkeley DB backs only nfs4j's server-side state store; the client never loads it.
+    implementation(libs.nfs4j.core) { exclude(group = "com.sleepycat") }
     // --- Core Android ---
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.core.splashscreen)

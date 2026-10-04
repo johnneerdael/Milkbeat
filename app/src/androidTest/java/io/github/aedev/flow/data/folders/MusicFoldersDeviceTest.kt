@@ -149,7 +149,7 @@ class MusicFoldersDeviceTest {
             val factory = MusicFolderDataSourceFactory(context, store, smb).wrap(DefaultDataSource.Factory(context))
             val items =
                 files.map {
-                    val uri = source.smbUri(it.location)
+                    val uri = source.remoteUri(it.location)
                     val id = LocalMediaIds.of(uri)
                     assertEquals(uri, LocalMediaIds.audioUri(id))
                     MediaItem

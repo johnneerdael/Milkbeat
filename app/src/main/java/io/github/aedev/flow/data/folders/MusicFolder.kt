@@ -5,10 +5,31 @@ import android.provider.DocumentsContract
 import io.github.aedev.flow.data.localmedia.LocalMediaIds
 import io.github.aedev.flow.data.music.model.MusicTrack
 import kotlinx.serialization.Serializable
+import okhttp3.HttpUrl
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import java.util.UUID
 
 @Serializable
-enum class MusicFolderKind { LOCAL, SMB }
+enum class MusicFolderKind(
+    val scheme: String,
+    val defaultPort: Int,
+) {
+    LOCAL("content", 0),
+    SMB("smbmusic", 445),
+    WEBDAV("davmusic", 443),
+    SFTP("sftpmusic", 22),
+    NFS("nfsmusic", 2049),
+    ;
+
+    companion object {
+        val remoteSchemes: Set<String> = entries.filter { it != LOCAL }.map { it.scheme }.toSet()
+
+        fun forScheme(scheme: String?): MusicFolderKind? = entries.firstOrNull { it != LOCAL && it.scheme == scheme }
+    }
+}
+
+@Serializable
+enum class NfsVersion { AUTO, V3, V4, V4_1 }
 
 @Serializable
 data class MusicFolder(
@@ -18,12 +39,18 @@ data class MusicFolder(
     val kind: MusicFolderKind,
     val treeUri: String = "",
     val host: String = "",
-    val port: Int = 445,
+    val port: Int = kind.defaultPort,
     val share: String = "",
     val root: String = "",
     val username: String = "",
     val domain: String = "",
     val guest: Boolean = false,
+    val url: String = "",
+    val hostKey: String = "",
+    val keyAuth: Boolean = false,
+    val nfsVersion: NfsVersion = NfsVersion.AUTO,
+    val uid: Int = 0,
+    val gid: Int = 0,
 ) {
     fun isValid(): Boolean =
         name.isNotBlank() && id.isNotBlank() && revision.isNotBlank() &&
@@ -36,27 +63,59 @@ data class MusicFolder(
                 }
 
                 MusicFolderKind.SMB -> {
-                    host.isNotBlank() && host.all { it.isLetterOrDigit() || it in ".-:[]" } && !host.contains("://") &&
-                        port in 1..65535 && share.isNotBlank() && share.none { it in "/\\\u0000" } &&
-                        runCatching { smbPath("") }.isSuccess
+                    validHost() && share.isNotBlank() && share.none { it in "/\\\u0000" } && runCatching { smbPath("") }.isSuccess
+                }
+
+                MusicFolderKind.WEBDAV -> {
+                    webDavUrl() != null
+                }
+
+                MusicFolderKind.SFTP -> {
+                    validHost() && runCatching { remotePath("") }.isSuccess
+                }
+
+                MusicFolderKind.NFS -> {
+                    validHost() && uid >= 0 && gid >= 0 && runCatching { nfsExport() }.isSuccess &&
+                        runCatching { remotePath("") }.isSuccess
                 }
             }
 
-    fun smbUri(relativePath: String): Uri =
-        Uri
+    private fun validHost(): Boolean =
+        host.isNotBlank() && host.all { it.isLetterOrDigit() || it in ".-:[]" } && !host.contains("://") && port in 1..65535
+
+    fun remoteUri(relativePath: String): Uri {
+        require(kind != MusicFolderKind.LOCAL)
+        return Uri
             .Builder()
-            .scheme(SMB_SCHEME)
+            .scheme(kind.scheme)
             .authority(id)
             .path("/" + safeFolderPath(relativePath))
             .appendQueryParameter("revision", revision)
             .build()
+    }
 
     fun smbPath(relativePath: String): String =
         listOf(safeFolderPath(root), safeFolderPath(relativePath)).filter(String::isNotEmpty).joinToString("\\").replace('/', '\\')
 
-    companion object {
-        const val SMB_SCHEME = "smbmusic"
+    /**
+     * Slash-separated server path for SFTP and NFS. An SFTP root without a leading slash is relative to the
+     * login directory; NFS paths are always relative to [nfsExport].
+     */
+    fun remotePath(relativePath: String): String {
+        val joined = listOf(safeFolderPath(root), safeFolderPath(relativePath)).filter(String::isNotEmpty).joinToString("/")
+        return if (kind == MusicFolderKind.SFTP && root.trim().startsWith("/")) "/$joined" else joined
     }
+
+    /** Absolute NFS export path, for example `/volume1/music`, or `/` for an NFSv4 pseudo-root. */
+    fun nfsExport(): String = "/" + safeFolderPath(share.trim().ifEmpty { "/" })
+
+    /** The WebDAV collection URL, always ending in a slash, or null when [url] is not a plain http(s) URL. */
+    fun webDavUrl(): HttpUrl? =
+        url
+            .trim()
+            .toHttpUrlOrNull()
+            ?.takeIf { it.username.isEmpty() && it.password.isEmpty() && it.query == null && it.fragment == null }
+            ?.let { if (it.encodedPath.endsWith("/")) it else it.newBuilder().addPathSegment("").build() }
 }
 
 internal fun safeFolderPath(path: String): String {
@@ -65,6 +124,14 @@ internal fun safeFolderPath(path: String): String {
     val relative = normalized.removePrefix("/").removeSuffix("/")
     require(relative.isEmpty() || relative.split('/').all { it.isNotEmpty() && it != "." && it != ".." })
     return relative
+}
+
+internal fun childLocation(
+    parent: String,
+    name: String,
+): String {
+    require(name.isNotEmpty() && name != "." && name != ".." && '/' !in name && '\\' !in name)
+    return safeFolderPath(listOf(safeFolderPath(parent), name).filter(String::isNotEmpty).joinToString("/"))
 }
 
 data class MusicFolderEntry(
@@ -76,7 +143,7 @@ data class MusicFolderEntry(
 ) {
     fun track(source: MusicFolder): MusicTrack {
         require(!isDirectory)
-        val uri = if (source.kind == MusicFolderKind.SMB) source.smbUri(location) else Uri.parse(location)
+        val uri = if (source.kind == MusicFolderKind.LOCAL) Uri.parse(location) else source.remoteUri(location)
         return MusicTrack(
             videoId = LocalMediaIds.of(uri),
             title = name.substringBeforeLast('.', name),

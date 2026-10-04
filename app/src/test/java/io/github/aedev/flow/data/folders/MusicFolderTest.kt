@@ -42,7 +42,7 @@ class MusicFolderTest {
                 share = "Music",
                 root = "Albums",
             )
-        val uri = source.smbUri("Été/A #1.flac")
+        val uri = source.remoteUri("Été/A #1.flac")
         assertThat(uri.host).isEqualTo("source")
         assertThat(uri.getQueryParameter("revision")).isEqualTo("revision")
         assertThat(uri.path).isEqualTo("/Été/A #1.flac")

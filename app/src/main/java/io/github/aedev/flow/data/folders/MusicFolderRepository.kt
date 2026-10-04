@@ -15,7 +15,7 @@ class MusicFolderRepository
     constructor(
         private val store: MusicFolderStore,
         private val documents: DocumentMusicFolders,
-        private val smb: SmbMusicClient,
+        private val clients: RemoteMusicClients,
     ) {
         val folders = store.folders
 
@@ -35,7 +35,18 @@ class MusicFolderRepository
         suspend fun save(
             source: MusicFolder,
             password: String?,
-        ) = store.save(source, password)
+            privateKey: String? = null,
+        ) {
+            val trusted =
+                if (source.kind == MusicFolderKind.SFTP &&
+                    source.hostKey.isBlank()
+                ) {
+                    test(source, password, privateKey)
+                } else {
+                    source
+                }
+            store.save(trusted, password, privateKey)
+        }
 
         suspend fun remove(source: MusicFolder) {
             store.remove(source.id)
@@ -47,9 +58,18 @@ class MusicFolderRepository
         suspend fun test(
             source: MusicFolder,
             password: String?,
-        ) {
-            val secret = password ?: store.access(source.id, source.revision).password
-            runInterruptible(PerformanceDispatcher.networkIO) { smb.test(source, secret) }
+            privateKey: String? = null,
+        ): MusicFolder {
+            val stored =
+                if (password == null ||
+                    privateKey == null
+                ) {
+                    store.access(source.id, source.revision).secrets
+                } else {
+                    MusicFolderSecrets()
+                }
+            val secrets = MusicFolderSecrets(password ?: stored.password, privateKey ?: stored.privateKey)
+            return runInterruptible(PerformanceDispatcher.networkIO) { clients[source.kind].test(source, secrets) }
         }
 
         suspend fun list(
@@ -61,7 +81,9 @@ class MusicFolderRepository
                     runInterruptible(PerformanceDispatcher.diskIO) { documents.list(source, location) }
                 } else {
                     val access = store.access(source.id, source.revision)
-                    runInterruptible(PerformanceDispatcher.networkIO) { smb.list(access.source, access.password, location) }
+                    runInterruptible(
+                        PerformanceDispatcher.networkIO,
+                    ) { clients[access.source.kind].list(access.source, access.secrets, location) }
                 }
             return withContext(PerformanceDispatcher.diskIO) {
                 entries.sortedWith(
