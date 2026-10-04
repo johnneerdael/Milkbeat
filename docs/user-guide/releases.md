@@ -30,7 +30,7 @@ Update your existing Milkbeat installation to retain sign-ins and settings. Loca
 | Spotify metadata | **981** |
 | Beatport | **393** |
 
-Plugin capabilities depend on the installed version, account and subscription. YouTube sign-in is optional for normal playback and supports personalized Home with free accounts. Spotify supplies metadata and requires a separate audio provider. Beatport requires sign-in and a streaming subscription for full streams.
+Plugin capabilities depend on the installed version, account and subscription. After an app update, Milkbeat reads each installed plugin's capabilities again, so features a plugin already declared, such as parallel playlist matching, become available without reinstalling it. YouTube sign-in is optional for normal playback and supports personalized Home with free accounts. Spotify supplies metadata and requires a separate audio provider. Beatport requires sign-in and a streaming subscription for full streams.
 
 - [Install Milkbeat](getting-started.md)
 - [Prepare private playlists](providers.md#prepare-private-playlists)
