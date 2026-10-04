@@ -89,9 +89,10 @@ private fun TvYouTubeCopyStatus(
     text: String,
     targetName: String,
 ) {
+    // Top-aligned with room to wrap: the cover pane is narrow and the counts vary, so the line may take two rows.
     Row(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
+        verticalAlignment = Alignment.Top,
     ) {
         Icon(
             painter = painterResource(R.drawable.ic_youtube_mono),
@@ -99,6 +100,11 @@ private fun TvYouTubeCopyStatus(
             tint = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.size(LocalTvDimens.current.sourceBadgeSize),
         )
-        Text(text = text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f, fill = false),
+        )
     }
 }
