@@ -7,12 +7,11 @@ import io.github.aedev.flow.updater.AppUpdateInstaller
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.filter
-import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.take
+import kotlinx.coroutines.flow.flowOf
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
@@ -38,8 +37,8 @@ internal object AutoUpdateSchedule {
 
 /**
  * Keeps a release build current while it is open: looks for a newer release at launch and every six
- * hours, downloads it in the background, and says once when it is ready. Installing waits until the
- * user chooses Install.
+ * hours, downloads it in the background, and says when it is ready. Installing waits until the user
+ * chooses Install.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 @Singleton
@@ -58,19 +57,18 @@ class AutoUpdater
         /** Elapsed-realtime of this process's last check; null until the launch check has run. */
         private var lastCheckMs: Long? = null
 
-        /** A newer release whose download is ready to install, until [markAnnounced] records that it was shown. */
-        val readyToAnnounce: Flow<AppRelease> =
+        /** The newer release whose download is ready to install, or null while there is none or it was skipped. */
+        val ready: Flow<AppRelease?> =
             updates.latest
-                .filterNotNull()
                 .flatMapLatest { release ->
-                    installer
-                        .state(release.version)
-                        .filter { it == UpdateDownload.Ready }
-                        .take(1)
-                        .map { release }
-                }.filter { isAvailable && it.version != dataManager.promptedUpdateVersion.first() }
-
-        suspend fun markAnnounced(version: String) = dataManager.setPromptedUpdateVersion(version)
+                    if (release == null || !isAvailable) {
+                        flowOf(null)
+                    } else {
+                        combine(installer.state(release.version), dataManager.skippedUpdateVersion) { download, skipped ->
+                            release.takeIf { download == UpdateDownload.Ready && it.version != skipped }
+                        }
+                    }
+                }.distinctUntilChanged()
 
         suspend fun setEnabled(enabled: Boolean) {
             dataManager.setAutomaticUpdates(enabled)

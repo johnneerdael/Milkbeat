@@ -47,6 +47,11 @@ data class PluginRegistryState(
     fun plugin(id: String?): InstalledPlugin? = plugins.firstOrNull { it.id == id && it.enabled }
 }
 
+/** An install refused because [installed], a newer version of the same plugin, went in after it was offered. */
+class NewerPluginInstalledException(
+    val installed: InstalledPlugin,
+) : IllegalStateException("${installed.manifest.name} ${installed.manifest.version} is already installed")
+
 /**
  * The installed plugins, kept as one JSON file next to their unpacked versions under the app's
  * private files. Each version lives in its own directory, so an update that fails to start leaves
@@ -75,6 +80,13 @@ class PluginRegistry
             grantedBrowser: List<String>,
         ): InstalledPlugin =
             mutex.withLock {
+                // Checked under the lock: an automatic update may have gone in while this install waited for consent.
+                val current = _state.value.plugins.firstOrNull { it.id == pack.manifest.id }
+                if (current != null &&
+                    current.manifest.versionCode > pack.manifest.versionCode
+                ) {
+                    throw NewerPluginInstalledException(current)
+                }
                 val installed =
                     InstalledPlugin(
                         manifest = pack.manifest,

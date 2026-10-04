@@ -434,15 +434,31 @@
     <string name="tv_plugins_download_page_large">The download page is too large.</string>
     <string name="tv_plugins_code_package_mismatch">The download does not match the plugin assigned to this code.</string>
     <string name="tv_plugins_fetching">Getting the plugin…</string>
-    <string name="tv_plugins_check_updates">Check for updates</string>
-    <string name="tv_plugins_checking_updates">Checking for updates…</string>
+    <string name="tv_plugins_update_all">Update all plugins</string>
+    <string name="tv_plugins_updating">Checking for updates and installing them…</string>
     <string name="tv_plugins_up_to_date">All plugins are up to date</string>
-    <plurals name="tv_plugins_updates_available">
-        <item quantity="one">%1$d update available</item>
-        <item quantity="other">%1$d updates available</item>
+    <plurals name="tv_plugins_updated">
+        <item quantity="one">Updated %1$d plugin</item>
+        <item quantity="other">Updated %1$d plugins</item>
+    </plurals>
+    <plurals name="tv_plugins_updates_need_review">
+        <item quantity="one">%1$d update needs your review</item>
+        <item quantity="other">%1$d updates need your review</item>
+    </plurals>
+    <string name="tv_plugins_update_automatic">Update plugins automatically</string>
+    <string name="tv_plugins_update_automatic_subtitle">Looks for new plugin versions when Milkbeat starts and every 6 hours and installs them. An update that asks for new permissions waits for you</string>
+    <string name="tv_plugins_notice_updated">Plugins updated: %1$s</string>
+    <plurals name="tv_plugins_notice_review">
+        <item quantity="one">%1$d plugin update needs your review: open Settings, Plugins</item>
+        <item quantity="other">%1$d plugin updates need your review: open Settings, Plugins</item>
     </plurals>
     <string name="tv_plugins_update_to">Update %1$s</string>
     <string name="tv_plugins_update_check_failed">Could not check for updates. Check the connection and try again.</string>
+    <string name="tv_plugins_newer_installed">A newer version of this plugin is already installed.</string>
+    <plurals name="tv_plugins_updates_failed">
+        <item quantity="one">Could not download %1$d update. Select to try again</item>
+        <item quantity="other">Could not download %1$d updates. Select to try again</item>
+    </plurals>
     <string name="tv_plugins_update_mismatch">The download is not the update that was offered. Check for updates again.</string>
     <string name="tv_plugins_installed">Installed</string>
     <string name="tv_plugins_none_installed">No plugins yet. Add one to browse and play music and videos.</string>

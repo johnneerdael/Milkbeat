@@ -10,24 +10,39 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import io.github.aedev.flow.R
 import io.github.aedev.flow.plugin.install.PluginUpdate
+import io.github.aedev.flow.plugin.install.PluginUpdatesState
 import io.github.aedev.flow.ui.tv.components.TvNavRow
+import io.github.aedev.flow.ui.tv.components.TvToggleRow
 
-/** Checking the plugin publisher for newer versions, and one row per update found to review and install it. */
+/**
+ * Keeping plugins current: whether they update by themselves, updating them all now, and one row per
+ * update left over (it asks for new permissions or a browser check, or its download failed) to install it by hand.
+ */
 internal fun LazyListScope.pluginUpdateItems(
     state: PluginUpdatesState,
-    onCheck: () -> Unit,
+    automatic: Boolean,
+    onAutomaticChange: (Boolean) -> Unit,
+    onUpdateAll: () -> Unit,
     onUpdate: (PluginUpdate) -> Unit,
 ) {
-    item(key = "updates-check") {
-        TvNavRow(
-            label = stringResource(R.string.tv_plugins_check_updates),
-            supportingText = updatesStatus(state),
-            leadingIcon = Icons.Outlined.Refresh,
-            onClick = onCheck,
+    item(key = "updates-automatic") {
+        TvToggleRow(
+            label = stringResource(R.string.tv_plugins_update_automatic),
+            supportingText = stringResource(R.string.tv_plugins_update_automatic_subtitle),
+            checked = automatic,
+            onCheckedChange = onAutomaticChange,
         )
     }
-    val found = (state as? PluginUpdatesState.Checked)?.updates.orEmpty()
-    items(found, key = { "update-${it.pluginId}" }) { update ->
+    item(key = "updates-all") {
+        TvNavRow(
+            label = stringResource(R.string.tv_plugins_update_all),
+            supportingText = updatesStatus(state),
+            leadingIcon = Icons.Outlined.Refresh,
+            onClick = { if (state != PluginUpdatesState.Checking) onUpdateAll() },
+        )
+    }
+    val left = (state as? PluginUpdatesState.Checked)?.let { it.updates + it.failed }.orEmpty()
+    items(left, key = { "update-${it.pluginId}" }) { update ->
         TvNavRow(
             label = stringResource(R.string.tv_plugins_update_to, update.name),
             value = update.version,
@@ -45,14 +60,26 @@ private fun updatesStatus(state: PluginUpdatesState): String? =
         }
 
         PluginUpdatesState.Checking -> {
-            stringResource(R.string.tv_plugins_checking_updates)
+            stringResource(R.string.tv_plugins_updating)
         }
 
         is PluginUpdatesState.Checked -> {
-            if (state.updates.isEmpty()) {
-                stringResource(R.string.tv_plugins_up_to_date)
-            } else {
-                pluralStringResource(R.plurals.tv_plugins_updates_available, state.updates.size, state.updates.size)
+            when {
+                state.updates.isNotEmpty() -> {
+                    pluralStringResource(R.plurals.tv_plugins_updates_need_review, state.updates.size, state.updates.size)
+                }
+
+                state.failed.isNotEmpty() -> {
+                    pluralStringResource(R.plurals.tv_plugins_updates_failed, state.failed.size, state.failed.size)
+                }
+
+                state.installed.isNotEmpty() -> {
+                    pluralStringResource(R.plurals.tv_plugins_updated, state.installed.size, state.installed.size)
+                }
+
+                else -> {
+                    stringResource(R.string.tv_plugins_up_to_date)
+                }
             }
         }
 

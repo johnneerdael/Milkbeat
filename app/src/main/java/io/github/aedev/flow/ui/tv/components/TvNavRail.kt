@@ -19,6 +19,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -48,7 +50,8 @@ import io.github.aedev.flow.ui.tv.theme.LocalTvDimens
 /**
  * Collapsible navigation rail: 72dp icon-only strip that expands with labels
  * while any rail item holds focus. It overlays the content (which is laid out
- * against the collapsed width) so expansion never reflows the screen.
+ * against the collapsed width) so expansion never reflows the screen. The
+ * [badged] destination carries a dot for something there that wants attention.
  */
 @Composable
 fun TvNavRail(
@@ -58,6 +61,7 @@ fun TvNavRail(
     modifier: Modifier = Modifier,
     selectedFocusRequester: FocusRequester? = null,
     acceptsEnteringFocus: Boolean = true,
+    badged: TvDestination? = null,
 ) {
     val dimens = LocalTvDimens.current
     var expanded by remember { mutableStateOf(false) }
@@ -140,6 +144,7 @@ fun TvNavRail(
                     destination = destination,
                     selected = destination == selected,
                     expanded = expanded,
+                    badged = destination == badged,
                     onClick = { onSelected(destination) },
                     modifier =
                         if (destination == selected && selectedFocusRequester != null) {
@@ -158,6 +163,7 @@ private fun TvRailItem(
     destination: TvDestination,
     selected: Boolean,
     expanded: Boolean,
+    badged: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -188,11 +194,13 @@ private fun TvRailItem(
             horizontalArrangement = Arrangement.spacedBy(14.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(
-                imageVector = destination.icon,
-                contentDescription = stringResource(destination.labelRes),
-                modifier = Modifier.size(26.dp),
-            )
+            BadgedBox(badge = { if (badged) Badge() }) {
+                Icon(
+                    imageVector = destination.icon,
+                    contentDescription = stringResource(destination.labelRes),
+                    modifier = Modifier.size(26.dp),
+                )
+            }
             AnimatedVisibility(
                 visible = expanded,
                 enter = fadeIn() + expandHorizontally(),

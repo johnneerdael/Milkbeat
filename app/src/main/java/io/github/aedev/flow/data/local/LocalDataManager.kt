@@ -45,6 +45,7 @@ class LocalDataManager
             private val UPDATE_PROMPTED_VERSION = stringPreferencesKey("update_prompted_version")
             private val UPDATE_NOTIFIED_VERSION = stringPreferencesKey("update_notified_version")
             private val UPDATE_AUTOMATIC = booleanPreferencesKey("update_automatic")
+            private val PLUGIN_UPDATE_AUTOMATIC = booleanPreferencesKey("plugin_update_automatic")
             private val BEDTIME_REMINDER =
                 androidx.datastore.preferences.core
                     .booleanPreferencesKey("bedtime_reminder")
@@ -122,6 +123,13 @@ class LocalDataManager
 
         suspend fun setAutomaticUpdates(enabled: Boolean) {
             context.dataStore.edit { it[UPDATE_AUTOMATIC] = enabled }
+        }
+
+        /** Whether plugin updates that ask for nothing new install by themselves; on unless switched off. */
+        val automaticPluginUpdates: Flow<Boolean> = context.dataStore.data.map { it[PLUGIN_UPDATE_AUTOMATIC] ?: true }
+
+        suspend fun setAutomaticPluginUpdates(enabled: Boolean) {
+            context.dataStore.edit { it[PLUGIN_UPDATE_AUTOMATIC] = enabled }
         }
 
         // Theme Settings

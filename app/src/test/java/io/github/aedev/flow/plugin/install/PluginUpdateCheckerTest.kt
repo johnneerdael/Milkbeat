@@ -2,8 +2,6 @@ package io.github.aedev.flow.plugin.install
 
 import com.google.common.truth.Truth.assertThat
 import io.github.aedev.flow.plugin.registry.InstalledPlugin
-import io.github.aedev.flow.ui.tv.screens.settings.PluginUpdatesState
-import io.github.aedev.flow.ui.tv.screens.settings.forInstalled
 import nl.neerdael.milkbeat.plugin.ApiRange
 import nl.neerdael.milkbeat.plugin.AudioRole
 import nl.neerdael.milkbeat.plugin.PluginManifest
