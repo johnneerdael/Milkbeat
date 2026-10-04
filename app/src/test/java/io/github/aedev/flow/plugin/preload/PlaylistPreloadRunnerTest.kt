@@ -240,6 +240,28 @@ class PlaylistPreloadRunnerTest {
         }
 
     @Test
+    fun `a refused second provider is retried without asking the exhausted first one again`() =
+        runTest {
+            coEvery { host.call("youtube", PluginOperations.matchAudio, any()) } throws
+                PluginCallException("youtube", PluginError(PluginErrorCode.UNAVAILABLE, "not here"))
+            var refused = false
+            coEvery { host.call("beatport", PluginOperations.matchAudio, any()) } coAnswers {
+                if (!refused) {
+                    refused = true
+                    throw PluginCallException("beatport", PluginError(PluginErrorCode.RATE_LIMITED, "paused"))
+                }
+                AudioMatches(listOf(b.copy(ref = EntityRef(EntityKind.TRACK, "bp-b"), ids = mapOf("beatport" to "bp-b"))))
+            }
+
+            val error = runCatching { runner.run("spotify", "listener", listOf("youtube", "beatport")) { } }.exceptionOrNull()
+
+            assertThat((error as PluginCallException).error.code).isEqualTo(PluginErrorCode.UNAVAILABLE)
+            coVerify(exactly = 1) { host.call("youtube", PluginOperations.matchAudio, any()) }
+            coVerify(exactly = 2) { host.call("beatport", PluginOperations.matchAudio, any()) }
+            assertThat(testScheduler.currentTime).isAtLeast(5_000L)
+        }
+
+    @Test
     fun `cancellation finishes the active match keeps its cache and starts no other query`() =
         runTest {
             val release = CompletableDeferred<Unit>()

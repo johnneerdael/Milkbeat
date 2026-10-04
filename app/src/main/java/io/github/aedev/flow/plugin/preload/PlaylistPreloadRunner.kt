@@ -122,7 +122,7 @@ class PlaylistPreloadRunner
                         for (track in page.tracks) {
                             validate()
                             if (!seenTracks.add(PluginTrackMatcher.fingerprint(track))) continue
-                            val matched = retryingTransient(beforeRetry = { validate() }) { index(track) { validate() } }
+                            val matched = index(track) { validate() }
                             progress =
                                 progress.copy(
                                     indexed = progress.indexed + 1,
@@ -166,7 +166,9 @@ class PlaylistPreloadRunner
                     try {
                         // Interrupting QuickJS can leave a rejected host promise for its next evaluation.
                         // Finish this bounded request; validation then stops a cancelled indexing job.
-                        withContext(NonCancellable) { matcher.matchForIndexing(track, attempt.plugin.id) }
+                        retryingTransient(beforeRetry = validate) {
+                            withContext(NonCancellable) { matcher.matchForIndexing(track, attempt.plugin.id) }
+                        }
                     } catch (e: PluginCallException) {
                         validate()
                         if (e.error.code !in
