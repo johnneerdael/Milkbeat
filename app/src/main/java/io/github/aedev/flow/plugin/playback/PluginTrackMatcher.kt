@@ -61,6 +61,7 @@ class PluginTrackMatcher
             track: TrackDescriptor,
             pluginId: String,
             excludedId: String?,
+            onNetworkLookup: (requests: Int) -> Unit = {},
         ): TrackDescriptor? {
             val fingerprint = fingerprint(track)
             validatedCache(track, fingerprint, pluginId)?.let {
@@ -74,10 +75,11 @@ class PluginTrackMatcher
                 } catch (e: CancellationException) {
                     currentCoroutineContext().ensureActive()
                     inFlight.remove(key, owner)
-                    return find(track, pluginId, excludedId)
+                    return find(track, pluginId, excludedId, onNetworkLookup)
                 }
             }
             try {
+                onNetworkLookup(1)
                 return lookup(track, fingerprint, pluginId, excludedId).also(mine::complete)
             } catch (e: Throwable) {
                 mine.completeExceptionally(e)
@@ -87,17 +89,36 @@ class PluginTrackMatcher
             }
         }
 
+        /** Like [match], but a failed search is thrown. [onNetworkLookup] hears of each search sent to the plugin. */
         suspend fun matchForIndexing(
             track: TrackDescriptor,
             pluginId: String,
             excludedId: String? = null,
-        ): TrackDescriptor? = find(track, pluginId, excludedId)
+            onNetworkLookup: (requests: Int) -> Unit = {},
+        ): TrackDescriptor? = find(track, pluginId, excludedId, onNetworkLookup)
 
+        /**
+         * Whether matching [tracks] would search [pluginId] rather than answer from the kept matches;
+         * [batched] asks with [matchBatchForIndexing]'s rules, which try once more after a single miss.
+         */
+        suspend fun needsLookup(
+            tracks: List<TrackDescriptor>,
+            pluginId: String,
+            batched: Boolean,
+        ): Boolean =
+            tracks.any { track ->
+                val fingerprint = fingerprint(track)
+                val hit = validatedCache(track, fingerprint, pluginId)
+                hit == null || batched && hit.candidate == null && cached(batchMissFingerprint(fingerprint), pluginId) == null
+            }
+
+        /** [onNetworkLookup] hears of each batch sent to the plugin, with the number of tracks it searches. */
         suspend fun matchBatchForIndexing(
             tracks: List<TrackDescriptor>,
             pluginId: String,
             playlist: PrivatePlaylistImportRequest? = null,
             ensureCallerActive: () -> Unit = {},
+            onNetworkLookup: (requests: Int) -> Unit = {},
         ): AudioBatchIndexingResult {
             require(tracks.size <= 16) { "An indexing batch may contain at most 16 tracks" }
             val distinct = tracks.associateBy(::fingerprint)
@@ -147,6 +168,7 @@ class PluginTrackMatcher
                     if (pending.isEmpty() && ensure == null) continue
                     ensureCallerActive()
                     currentCoroutineContext().ensureActive()
+                    onNetworkLookup(pending.size)
                     val response =
                         host.call(
                             pluginId,
@@ -202,6 +224,7 @@ class PluginTrackMatcher
                                     listOf(distinct.getValue(fingerprint)),
                                     pluginId,
                                     ensureCallerActive = ensureCallerActive,
+                                    onNetworkLookup = onNetworkLookup,
                                 )
                             resolved[fingerprint] = retry.matches.single()
                             retry.errors.singleOrNull()?.let { errors[fingerprint] = it }
@@ -210,7 +233,12 @@ class PluginTrackMatcher
                         currentCoroutineContext().ensureActive()
                         inFlight.remove(flightKey(fingerprint), owner)
                         val retry =
-                            matchBatchForIndexing(listOf(distinct.getValue(fingerprint)), pluginId, ensureCallerActive = ensureCallerActive)
+                            matchBatchForIndexing(
+                                listOf(distinct.getValue(fingerprint)),
+                                pluginId,
+                                ensureCallerActive = ensureCallerActive,
+                                onNetworkLookup = onNetworkLookup,
+                            )
                         resolved[fingerprint] = retry.matches.single()
                         retry.errors.singleOrNull()?.let { errors[fingerprint] = it }
                     } catch (error: PluginCallException) {

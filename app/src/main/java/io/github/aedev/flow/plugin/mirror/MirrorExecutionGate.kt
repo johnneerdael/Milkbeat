@@ -26,6 +26,9 @@ class MirrorExecutionGate
             }
         }
 
+        /** Whether a foreground caller is waiting on [key], so its work no longer counts as background. */
+        fun isForeground(key: String): Boolean = key in foreground.value
+
         suspend fun <T> match(
             key: String,
             background: Boolean,

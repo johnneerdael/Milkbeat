@@ -1,6 +1,8 @@
 package io.github.aedev.flow.plugin.mirror
 
 import android.util.Log
+import io.github.aedev.flow.plugin.background.BackgroundPausedException
+import io.github.aedev.flow.plugin.background.PausedProvider
 import io.github.aedev.flow.plugin.catalog.PluginAccounts
 import io.github.aedev.flow.plugin.registry.PluginRegistry
 import io.github.aedev.flow.plugin.registry.PluginRegistryState
@@ -204,6 +206,10 @@ class PlaylistMirrorCoordinator
                                                     }
                                                 }
                                             }
+                                    } catch (e: BackgroundPausedException) {
+                                        val name = registry.state.value.plugin(e.pause.pluginId)?.manifest?.name ?: e.pause.pluginId
+                                        flow.value = latest.copy(isPreparing = false, paused = PausedProvider(name, e.pause.untilMs))
+                                        throw e
                                     } catch (e: Exception) {
                                         if (e is PluginCallException && e.error.code == PluginErrorCode.SIGN_IN_EXPIRED) {
                                             accounts.expired(e.pluginId)

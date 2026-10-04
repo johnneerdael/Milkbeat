@@ -1,5 +1,6 @@
 package io.github.aedev.flow.plugin.mirror
 
+import io.github.aedev.flow.plugin.background.PausedProvider
 import kotlinx.serialization.Serializable
 import nl.neerdael.milkbeat.catalog.EntityRef
 import nl.neerdael.milkbeat.catalog.TrackDescriptor
@@ -53,6 +54,7 @@ data class PlaylistMirrorState(
     val phase: MirrorPhase = MirrorPhase.SOURCE_LOADING,
     val phaseCompleted: Int = 0,
     val phaseTotal: Int = 0,
+    val paused: PausedProvider? = null,
 ) {
     val percentage: Int get() = mirrorPercentage(this)
 }

@@ -1,10 +1,13 @@
 package io.github.aedev.flow.plugin.preload
 
 import io.github.aedev.flow.plugin.PluginHost
+import io.github.aedev.flow.plugin.background.BackgroundMatchPacer
+import io.github.aedev.flow.plugin.background.BackgroundProviderBackoff
 import io.github.aedev.flow.plugin.catalog.PluginAccounts
 import io.github.aedev.flow.plugin.playback.PluginTrackMatcher
 import io.github.aedev.flow.plugin.playback.audioProviderAttempts
 import io.github.aedev.flow.plugin.registry.PluginRegistry
+import io.github.aedev.flow.plugin.runtime.BackgroundTransientPluginErrors
 import io.github.aedev.flow.plugin.runtime.PluginCallException
 import io.github.aedev.flow.plugin.runtime.retryingTransient
 import kotlinx.coroutines.NonCancellable
@@ -23,6 +26,11 @@ import nl.neerdael.milkbeat.plugin.PluginErrorCode
 import nl.neerdael.milkbeat.plugin.PluginOperations
 import javax.inject.Inject
 
+/**
+ * Indexes every playlist track of a metadata provider's library with the audio providers, in the
+ * background. A provider that refuses a request pauses the run ([BackgroundProviderBackoff]) rather
+ * than being asked again, and searches that reach a provider are paced ([BackgroundMatchPacer]).
+ */
 class PlaylistPreloadRunner
     @Inject
     constructor(
@@ -30,6 +38,8 @@ class PlaylistPreloadRunner
         private val registry: PluginRegistry,
         private val accounts: PluginAccounts,
         private val matcher: PluginTrackMatcher,
+        private val backoff: BackgroundProviderBackoff,
+        private val pacer: BackgroundMatchPacer,
     ) {
         suspend fun run(
             metadataId: String,
@@ -88,8 +98,9 @@ class PlaylistPreloadRunner
             try {
                 do {
                     validate()
+                    backoff.ensureNotPaused(metadataId)
                     val page =
-                        retryingTransient(beforeRetry = { validate() }) {
+                        retryingTransient(retryable = BackgroundTransientPluginErrors, beforeRetry = { validate() }) {
                             withContext(NonCancellable) {
                                 host.call(metadataId, PluginOperations.library, LibraryRequest(cursor = libraryCursor))
                             }
@@ -112,8 +123,9 @@ class PlaylistPreloadRunner
                     var trackCursor: String? = null
                     do {
                         validate()
+                        backoff.ensureNotPaused(metadataId)
                         val page =
-                            retryingTransient(beforeRetry = { validate() }) {
+                            retryingTransient(retryable = BackgroundTransientPluginErrors, beforeRetry = { validate() }) {
                                 withContext(NonCancellable) {
                                     host.call(metadataId, PluginOperations.tracks, TracksRequest(collection, trackCursor))
                                 }
@@ -147,10 +159,12 @@ class PlaylistPreloadRunner
                     }
                     accounts.expired(metadataId)
                 }
+                backoff.throwIfRefused(e)
                 throw e
             }
             progress = progress.copy(finished = true)
             emit()
+            backoff.succeeded(versions.keys)
             return progress
         }
 
@@ -162,15 +176,22 @@ class PlaylistPreloadRunner
             for (attempt in audioProviderAttempts(registry.state.value, track)) {
                 validate()
                 if (attempt.direct != null) return true
+                val pluginId = attempt.plugin.id
+                if (matcher.needsLookup(listOf(track), pluginId, batched = false)) pacer.awaitTurn(pluginId)
+                validate()
+                backoff.ensureNotPaused(pluginId)
                 val candidate =
                     try {
                         // Interrupting QuickJS can leave a rejected host promise for its next evaluation.
                         // Finish this bounded request; validation then stops a cancelled indexing job.
-                        retryingTransient(beforeRetry = validate) {
-                            withContext(NonCancellable) { matcher.matchForIndexing(track, attempt.plugin.id) }
+                        retryingTransient(retryable = BackgroundTransientPluginErrors, beforeRetry = validate) {
+                            withContext(NonCancellable) {
+                                matcher.matchForIndexing(track, pluginId) { requests -> pacer.spend(pluginId, requests) }
+                            }
                         }
                     } catch (e: PluginCallException) {
                         validate()
+                        backoff.throwIfRefused(e)
                         if (e.error.code !in
                             setOf(
                                 PluginErrorCode.UNAVAILABLE,

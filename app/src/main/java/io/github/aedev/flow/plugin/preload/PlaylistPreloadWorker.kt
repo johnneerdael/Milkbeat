@@ -11,14 +11,20 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.work.CoroutineWorker
 import androidx.work.Data
+import androidx.work.ExistingWorkPolicy
 import androidx.work.ForegroundInfo
+import androidx.work.WorkManager
 import androidx.work.WorkerParameters
+import androidx.work.await
 import androidx.work.workDataOf
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.components.SingletonComponent
 import io.github.aedev.flow.R
+import io.github.aedev.flow.plugin.background.BackgroundPausedException
+import io.github.aedev.flow.plugin.background.BackgroundProviderBackoff
+import io.github.aedev.flow.plugin.background.ProviderPause
 import io.github.aedev.flow.plugin.runtime.PluginCallException
 import nl.neerdael.milkbeat.plugin.PluginErrorCode
 
@@ -26,6 +32,7 @@ internal const val PRELOAD_PLUGIN = "plugin"
 internal const val PRELOAD_ACCOUNT = "account"
 internal const val PRELOAD_AUDIO = "audio"
 internal const val PRELOAD_ERROR = "error"
+internal const val PRELOAD_PAUSED_UNTIL = "pausedUntil"
 private const val CHANNEL_ID = "playlist_preload"
 
 internal fun preloadWorkName(pluginId: String): String = "playlist-preload:$pluginId"
@@ -34,6 +41,8 @@ internal fun preloadWorkName(pluginId: String): String = "playlist-preload:$plug
 @InstallIn(SingletonComponent::class)
 interface PlaylistPreloadEntryPoint {
     fun playlistPreloadRunner(): PlaylistPreloadRunner
+
+    fun playlistPreloadBackoff(): BackgroundProviderBackoff
 }
 
 class PlaylistPreloadWorker(
@@ -46,6 +55,9 @@ class PlaylistPreloadWorker(
         val plugin = inputData.getString(PRELOAD_PLUGIN) ?: return Result.failure()
         val account = inputData.getString(PRELOAD_ACCOUNT) ?: return Result.failure()
         val audio = inputData.getStringArray(PRELOAD_AUDIO)?.toList() ?: return Result.failure()
+        val entry = EntryPointAccessors.fromApplication(applicationContext, PlaylistPreloadEntryPoint::class.java)
+        val backoff = entry.playlistPreloadBackoff()
+        backoff.activePause(audio + plugin)?.let { return resumeAfter(plugin, it, backoff.now()) }
         val manager = applicationContext.getSystemService(NotificationManager::class.java)
         manager.createNotificationChannel(
             NotificationChannel(
@@ -55,7 +67,7 @@ class PlaylistPreloadWorker(
             ),
         )
         setForeground(foreground(PlaylistPreloadProgress()))
-        val runner = EntryPointAccessors.fromApplication(applicationContext, PlaylistPreloadEntryPoint::class.java).playlistPreloadRunner()
+        val runner = entry.playlistPreloadRunner()
         var lastProgressAt = 0L
         return try {
             val result =
@@ -68,11 +80,13 @@ class PlaylistPreloadWorker(
                     }
                 }
             Result.success(result.data())
+        } catch (e: BackgroundPausedException) {
+            resumeAfter(plugin, e.pause, backoff.now())
         } catch (e: PlaylistPreloadException) {
             Result.failure(workDataOf(PRELOAD_ERROR to e.reason.name))
         } catch (e: PluginCallException) {
             Log.w("PlaylistPreloadWorker", "Indexing failed via ${e.pluginId} (${e.error.code}): ${e.error.message}")
-            if (e.error.code in setOf(PluginErrorCode.NETWORK, PluginErrorCode.RATE_LIMITED, PluginErrorCode.TIMEOUT) &&
+            if (e.error.code in setOf(PluginErrorCode.NETWORK, PluginErrorCode.TIMEOUT) &&
                 runAttemptCount < 3
             ) {
                 Result.retry()
@@ -80,6 +94,23 @@ class PlaylistPreloadWorker(
                 Result.failure(workDataOf(PRELOAD_ERROR to e.error.code.name))
             }
         }
+    }
+
+    /**
+     * Ends this run without waiting on the pause: the same job is chained after it, to start once
+     * [pause] ends, and cached matches let it continue where this run stopped.
+     */
+    private suspend fun resumeAfter(
+        plugin: String,
+        pause: ProviderPause,
+        now: Long,
+    ): Result {
+        Log.i("PlaylistPreloadWorker", "Indexing paused by ${pause.pluginId}; resuming in ${(pause.untilMs - now) / 1000}s")
+        WorkManager
+            .getInstance(applicationContext)
+            .enqueueUniqueWork(preloadWorkName(plugin), ExistingWorkPolicy.APPEND_OR_REPLACE, preloadRequest(inputData, pause.untilMs - now))
+            .await()
+        return Result.success(workDataOf(PRELOAD_PAUSED_UNTIL to pause.untilMs))
     }
 
     private fun foreground(progress: PlaylistPreloadProgress): ForegroundInfo =

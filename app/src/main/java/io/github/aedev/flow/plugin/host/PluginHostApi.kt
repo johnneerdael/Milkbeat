@@ -61,8 +61,9 @@ internal class PluginHostApi(
     client: OkHttpClient,
     private val appLocale: () -> Locale,
     private val webLogin: WebLoginRefresher? = null,
+    onRefusal: suspend (retryAfterMs: Long?) -> Unit = {},
 ) {
-    private val http = PluginHttp(client, plugin.grantedNetwork)
+    private val http = PluginHttp(client, plugin.grantedNetwork, onRefusal)
     private val storage = PluginStore(File(dataDirectory, "storage.json"), plugin.manifest.permissions.storage)
     private val secrets =
         PluginStore(File(dataDirectory, "secrets.json"), SECRETS_QUOTA, seal = KeystoreSecretBox::seal, open = KeystoreSecretBox::open)

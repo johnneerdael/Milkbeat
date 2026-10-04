@@ -1,12 +1,16 @@
 package io.github.aedev.flow.plugin.mirror
 
 import io.github.aedev.flow.plugin.PluginHost
+import io.github.aedev.flow.plugin.background.BackgroundMatchPacer
+import io.github.aedev.flow.plugin.background.BackgroundProviderBackoff
 import io.github.aedev.flow.plugin.catalog.PluginAccounts
 import io.github.aedev.flow.plugin.playback.AudioBatchIndexingResult
 import io.github.aedev.flow.plugin.playback.PluginTrackMatcher
 import io.github.aedev.flow.plugin.registry.InstalledPlugin
 import io.github.aedev.flow.plugin.registry.PluginRegistry
+import io.github.aedev.flow.plugin.runtime.BackgroundTransientPluginErrors
 import io.github.aedev.flow.plugin.runtime.PluginCallException
+import io.github.aedev.flow.plugin.runtime.TransientPluginErrors
 import io.github.aedev.flow.plugin.runtime.retryingTransient
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.currentCoroutineContext
@@ -35,9 +39,17 @@ class PlaylistMirrorRunner
         private val accounts: PluginAccounts,
         private val matcher: PluginTrackMatcher,
         private val store: MirrorStorage,
+        private val backoff: BackgroundProviderBackoff,
+        private val pacer: BackgroundMatchPacer,
         private val gate: MirrorExecutionGate = MirrorExecutionGate(),
         private val artworkLoader: MirrorArtwork? = null,
     ) {
+        /**
+         * Prepares [key]'s private copy. While no foreground caller waits on it, a [background] run
+         * paces its searches, and a provider refusal pauses that provider and ends the run with
+         * `BackgroundPausedException` instead of retrying in place; the checkpoint lets the next run
+         * continue.
+         */
         suspend fun prepare(
             key: MirrorKey,
             title: String,
@@ -45,6 +57,29 @@ class PlaylistMirrorRunner
             background: Boolean = false,
             artwork: Artwork? = null,
         ): MirrorRecord {
+            val pausable = { background && !gate.isForeground(key.id) }
+            return try {
+                prepareRecord(key, title, onProgress, background, pausable, artwork)
+            } catch (e: PluginCallException) {
+                if (pausable()) backoff.throwIfRefused(e)
+                throw e
+            }
+        }
+
+        private suspend fun prepareRecord(
+            key: MirrorKey,
+            title: String,
+            onProgress: suspend (PlaylistMirrorState) -> Unit,
+            background: Boolean,
+            pausable: () -> Boolean,
+            artwork: Artwork?,
+        ): MirrorRecord {
+            fun retryable() = if (pausable()) BackgroundTransientPluginErrors else TransientPluginErrors
+
+            suspend fun ensureNotPaused(pluginId: String) {
+                if (pausable()) backoff.ensureNotPaused(pluginId)
+            }
+
             val source = registry.state.value.plugin(key.sourcePlugin)
             val target = registry.state.value.plugin(key.targetPlugin)
             if (source
@@ -86,8 +121,9 @@ class PlaylistMirrorRunner
                 var revision: String? = null
                 do {
                     active()
+                    ensureNotPaused(key.sourcePlugin)
                     val page =
-                        retryingTransient(beforeRetry = { active() }) {
+                        retryingTransient(retryable = retryable(), beforeRetry = { active() }) {
                             withContext(NonCancellable) {
                                 host.call(key.sourcePlugin, PluginOperations.tracks, TracksRequest(key.source, cursor))
                             }
@@ -174,8 +210,9 @@ class PlaylistMirrorRunner
                 if (cursor != null) initial?.retryAfterMs?.let { delay(it.coerceIn(100L, 5000L)) }
                 do {
                     active()
+                    ensureNotPaused(key.targetPlugin)
                     val result =
-                        retryingTransient(beforeRetry = { active() }) {
+                        retryingTransient(retryable = retryable(), beforeRetry = { active() }) {
                             withContext(NonCancellable) {
                                 host.call(
                                     key.targetPlugin,
@@ -192,7 +229,7 @@ class PlaylistMirrorRunner
                 checkNotNull(record.destination) { "The provider did not return the private playlist" }
             }
             if (record.ready) {
-                val image = retryingTransient(beforeRetry = { active() }) { artworkLoader?.fetch(source, sourceArtwork) }
+                val image = retryingTransient(retryable = retryable(), beforeRetry = { active() }) { artworkLoader?.fetch(source, sourceArtwork) }
                 import(
                     PrivatePlaylistImportRequest(
                         key.sourceKey,
@@ -207,7 +244,7 @@ class PlaylistMirrorRunner
                 return record
             }
             checkpoint()
-            val image = retryingTransient(beforeRetry = { active() }) { artworkLoader?.fetch(source, sourceArtwork) }
+            val image = retryingTransient(retryable = retryable(), beforeRetry = { active() }) { artworkLoader?.fetch(source, sourceArtwork) }
             active()
             val ensureRequest =
                 PrivatePlaylistImportRequest(
@@ -228,6 +265,14 @@ class PlaylistMirrorRunner
                 active()
                 val start = record.nextIndex
                 val batch = tracks.subList(start, minOf(start + if (batched) MATCH_BATCH_SIZE else 1, tracks.size))
+                val paced = pausable()
+                if (paced) {
+                    // Waits here, before the gate, so a foreground match is never held up by background spacing.
+                    if (matcher.needsLookup(batch, key.targetPlugin, batched)) pacer.awaitTurn(key.targetPlugin)
+                    active()
+                    ensureNotPaused(key.targetPlugin)
+                }
+                val spend = { requests: Int -> if (paced) pacer.spend(key.targetPlugin, requests) }
                 val outcome =
                     gate.match(key.id, background) {
                         active()
@@ -242,10 +287,11 @@ class PlaylistMirrorRunner
                                         callerContext.ensureActive()
                                         validate()
                                     },
+                                    onNetworkLookup = spend,
                                 )
                             } else {
                                 AudioBatchIndexingResult(
-                                    listOf(matcher.matchForIndexing(batch.single(), key.targetPlugin)),
+                                    listOf(matcher.matchForIndexing(batch.single(), key.targetPlugin, onNetworkLookup = spend)),
                                 )
                             }
                         }
@@ -272,7 +318,7 @@ class PlaylistMirrorRunner
                 }
             }
             while (record.nextIndex < tracks.size) {
-                retryingTransient(beforeRetry = { active() }) { matchNext() }
+                retryingTransient(retryable = retryable(), beforeRetry = { active() }) { matchNext() }
                 yield()
             }
             if (ensured?.next != null) import(ensureRequest, ensured)

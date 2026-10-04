@@ -1,7 +1,9 @@
 package io.github.aedev.flow.plugin
 
 import android.content.Context
+import android.util.Log
 import dagger.hilt.android.qualifiers.ApplicationContext
+import io.github.aedev.flow.plugin.background.BackgroundProviderBackoff
 import io.github.aedev.flow.plugin.host.PluginBrowser
 import io.github.aedev.flow.plugin.host.PluginHostApi
 import io.github.aedev.flow.plugin.host.WebLoginRefresher
@@ -23,6 +25,7 @@ import nl.neerdael.milkbeat.plugin.PluginErrorCode
 import nl.neerdael.milkbeat.plugin.PluginOperation
 import okhttp3.OkHttpClient
 import java.io.File
+import java.io.IOException
 import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -40,6 +43,7 @@ class PluginHost
         private val registry: PluginRegistry,
         private val client: OkHttpClient,
         private val webLogin: WebLoginRefresher,
+        private val backoff: BackgroundProviderBackoff,
     ) {
         private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         private val lock = Mutex()
@@ -97,6 +101,14 @@ class PluginHost
                     client = client,
                     appLocale = Locale::getDefault,
                     webLogin = webLogin,
+                    onRefusal = { retryAfterMs ->
+                        // Losing the pause record must not fail the request that observed it.
+                        try {
+                            backoff.refused(plugin.id, retryAfterMs)
+                        } catch (e: IOException) {
+                            Log.w("PluginHost", "Could not record ${plugin.id}'s refusal", e)
+                        }
+                    },
                 )
             return PluginRuntime(
                 plugin = plugin,

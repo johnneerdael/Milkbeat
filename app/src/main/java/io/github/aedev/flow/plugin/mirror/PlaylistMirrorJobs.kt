@@ -3,9 +3,11 @@ package io.github.aedev.flow.plugin.mirror
 import android.content.Context
 import androidx.work.BackoffPolicy
 import androidx.work.Constraints
+import androidx.work.Data
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequest
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
@@ -70,22 +72,10 @@ class PlaylistMirrorJobs
                                 "target" to key.targetPlugin,
                                 "targetAccount" to key.targetAccount,
                             )
-                        val constraints =
-                            Constraints
-                                .Builder()
-                                .setRequiredNetworkType(
-                                    NetworkType.CONNECTED,
-                                ).setRequiresBatteryNotLow(true)
-                                .build()
                         work.enqueueUniqueWork(
-                            "mirror-now:$id",
+                            mirrorNowWorkName(id),
                             if (key in previous) ExistingWorkPolicy.REPLACE else ExistingWorkPolicy.KEEP,
-                            OneTimeWorkRequestBuilder<PlaylistMirrorWorker>()
-                                .setInputData(input)
-                                .setConstraints(constraints)
-                                .addTag("mirror:$id")
-                                .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
-                                .build(),
+                            mirrorNowRequest(input, id),
                         )
                         work.enqueueUniquePeriodicWork(
                             "mirror-refresh:$id",
@@ -93,7 +83,7 @@ class PlaylistMirrorJobs
                             PeriodicWorkRequestBuilder<PlaylistMirrorWorker>(6, TimeUnit.HOURS)
                                 .setInitialDelay(6, TimeUnit.HOURS)
                                 .setInputData(input)
-                                .setConstraints(constraints)
+                                .setConstraints(mirrorConstraints())
                                 .addTag("mirror:$id")
                                 .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
                                 .build(),
@@ -123,3 +113,25 @@ class PlaylistMirrorJobs
             }
         }
     }
+
+internal fun mirrorNowWorkName(id: String): String = "mirror-now:$id"
+
+private fun mirrorConstraints(): Constraints =
+    Constraints
+        .Builder()
+        .setRequiredNetworkType(NetworkType.CONNECTED)
+        .setRequiresBatteryNotLow(true)
+        .build()
+
+internal fun mirrorNowRequest(
+    input: Data,
+    id: String,
+    delayMs: Long = 0L,
+): OneTimeWorkRequest =
+    OneTimeWorkRequestBuilder<PlaylistMirrorWorker>()
+        .setInputData(input)
+        .setInitialDelay(delayMs.coerceAtLeast(0L), TimeUnit.MILLISECONDS)
+        .setConstraints(mirrorConstraints())
+        .addTag("mirror:$id")
+        .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
+        .build()

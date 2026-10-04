@@ -487,6 +487,7 @@
     <string name="playlist_preload_invalid_pagination">The provider could not continue its playlist pages. Update the plugin and try again.</string>
     <string name="playlist_preload_channel">Playlist indexing</string>
     <string name="playlist_preload_notification_title">Indexing playlists</string>
+    <string name="background_provider_paused">Paused: %1$s is limiting requests. Resumes at %2$s.</string>
     <string name="tv_plugins_move_earlier">Move earlier</string>
     <string name="tv_plugins_move_later">Move later</string>
     <string name="tv_plugins_audio_use">Use %1$s for audio</string>

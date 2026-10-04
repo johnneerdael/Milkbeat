@@ -12,6 +12,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -20,6 +21,7 @@ import io.github.aedev.flow.plugin.mirror.MirrorPhase
 import io.github.aedev.flow.plugin.mirror.PlaylistMirrorState
 import io.github.aedev.flow.ui.tv.components.TvButton
 import io.github.aedev.flow.ui.tv.theme.LocalTvDimens
+import io.github.aedev.flow.utils.formatClockTime
 import nl.neerdael.milkbeat.plugin.PluginManifest
 
 @Composable
@@ -28,12 +30,20 @@ internal fun TvPlaylistMirrorStatus(
     target: PluginManifest?,
     retry: () -> Unit,
 ) {
-    if (!state.isPreparing && !state.ready && state.error == null) return
+    if (!state.isPreparing && !state.ready && state.error == null && state.paused == null) return
     Column {
         val text =
             when {
                 state.error != null -> {
                     stringResource(R.string.playlist_mirror_failed)
+                }
+
+                state.paused != null -> {
+                    stringResource(
+                        R.string.background_provider_paused,
+                        state.paused.providerName,
+                        formatClockTime(LocalContext.current, state.paused.untilMs),
+                    )
                 }
 
                 state.ready -> {

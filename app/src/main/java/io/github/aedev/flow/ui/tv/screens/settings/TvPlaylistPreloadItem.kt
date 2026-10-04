@@ -7,6 +7,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -19,6 +20,7 @@ import io.github.aedev.flow.plugin.preload.preloadProgress
 import io.github.aedev.flow.plugin.registry.InstalledPlugin
 import io.github.aedev.flow.ui.tv.components.TvButton
 import io.github.aedev.flow.ui.tv.components.TvSectionHeader
+import io.github.aedev.flow.utils.formatClockTime
 
 @Composable
 internal fun TvPlaylistPreloadItem(
@@ -27,6 +29,8 @@ internal fun TvPlaylistPreloadItem(
 ) {
     val updates = remember(jobs, plugin.id) { jobs.observe(plugin.id) }
     val work by updates.collectAsStateWithLifecycle(initialValue = null)
+    val pauses = remember(jobs, plugin.id) { jobs.observePause(plugin.id) }
+    val pause by pauses.collectAsStateWithLifecycle(initialValue = null)
     val info = work
     val progress = (if (info?.state == WorkInfo.State.SUCCEEDED) info.outputData else info?.progress)?.preloadProgress()
     val active = info?.state in setOf(WorkInfo.State.ENQUEUED, WorkInfo.State.RUNNING, WorkInfo.State.BLOCKED)
@@ -57,7 +61,8 @@ internal fun TvPlaylistPreloadItem(
                 }
 
                 WorkInfo.State.ENQUEUED, WorkInfo.State.BLOCKED -> {
-                    stringResource(R.string.playlist_preload_queued)
+                    pause?.let { stringResource(R.string.background_provider_paused, it.providerName, formatClockTime(LocalContext.current, it.untilMs)) }
+                        ?: stringResource(R.string.playlist_preload_queued)
                 }
 
                 WorkInfo.State.CANCELLED -> {

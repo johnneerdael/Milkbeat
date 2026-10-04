@@ -9,6 +9,7 @@ import nl.neerdael.milkbeat.plugin.HttpBodyEncoding
 import nl.neerdael.milkbeat.plugin.HttpRequest
 import nl.neerdael.milkbeat.plugin.HttpResponse
 import nl.neerdael.milkbeat.plugin.PluginJson
+import okhttp3.HttpUrl
 import okhttp3.Interceptor
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.OkHttpClient
@@ -22,6 +23,8 @@ private const val DEFAULT_TIMEOUT_MS = 20_000L
 private const val MAX_TIMEOUT_MS = 60_000L
 private const val MAX_RESPONSE_BYTES = 16L * 1024 * 1024
 private val BODYLESS_METHODS = setOf("GET", "HEAD")
+private const val HTTP_FORBIDDEN = 403
+private const val HTTP_TOO_MANY_REQUESTS = 429
 
 class PluginHttpException(
     message: String,
@@ -30,11 +33,14 @@ class PluginHttpException(
 /**
  * `mb.http.fetch` for one plugin: the app's HTTP client, restricted to the hosts the listener granted.
  * The check runs on every hop, so a redirect cannot lead a plugin anywhere it was not allowed to go.
- * Plugins handle their own cookies through headers; nothing is shared between plugins.
+ * Plugins handle their own cookies through headers; nothing is shared between plugins. A response
+ * that refuses the client for sending too many requests is reported to [onRefusal], whatever the
+ * plugin then makes of it, with the server's retry-after when it gave one.
  */
 internal class PluginHttp(
     base: OkHttpClient,
     private val allowedHosts: List<String>,
+    private val onRefusal: suspend (retryAfterMs: Long?) -> Unit = {},
 ) {
     private val client =
         base
@@ -85,6 +91,9 @@ internal class PluginHttp(
                 val source = response.body.source()
                 if (source.request(MAX_RESPONSE_BYTES + 1)) throw PluginHttpException("Response is too large")
                 val bytes = source.buffer.readByteArray()
+                if (isProviderRefusal(response.code, response.request.url, bytes)) {
+                    onRefusal(response.header("Retry-After")?.trim()?.toLongOrNull()?.let { TimeUnit.SECONDS.toMillis(it) })
+                }
                 val responseText =
                     if (request.responseEncoding == HttpBodyEncoding.BASE64) {
                         Base64.getEncoder().encodeToString(bytes)
@@ -129,3 +138,19 @@ internal class PluginHttp(
         return request
     }
 }
+
+/**
+ * Whether a response refuses the client for its request rate: a 429, or a 403 that is Google's
+ * "unusual traffic" page (the body says the network "may be sending automated queries", or the
+ * request ended on /sorry/). Any other 403 is an ordinary refusal of one item and is not counted.
+ */
+internal fun isProviderRefusal(
+    status: Int,
+    url: HttpUrl,
+    body: ByteArray,
+): Boolean =
+    when (status) {
+        HTTP_TOO_MANY_REQUESTS -> true
+        HTTP_FORBIDDEN -> url.encodedPath.startsWith("/sorry/") || body.toString(Charsets.UTF_8).contains("automated queries", ignoreCase = true)
+        else -> false
+    }
