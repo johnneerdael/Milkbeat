@@ -39,7 +39,7 @@ class CatalogRouterTest {
             coEvery { home(any()) } returns Result.success(MetadataPage("local", emptyList()))
             coEvery { page(any(), any()) } returns Result.success(MetadataPage("local-page", emptyList()))
         }
-    private val router = CatalogRouter(plugins, local, registry)
+    private val router = CatalogRouter(plugins, { local }, registry)
 
     @Test fun withoutAMetadataPluginTheLocalLibraryIsHome() =
         runBlocking {

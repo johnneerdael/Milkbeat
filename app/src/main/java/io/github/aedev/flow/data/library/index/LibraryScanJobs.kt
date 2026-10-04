@@ -34,7 +34,7 @@ class LibraryScanJobs
     internal constructor(
         @param:ApplicationContext private val context: Context,
         private val folders: MusicFolderRepository,
-        private val dao: LibraryDao,
+        private val dao: dagger.Lazy<LibraryDao>,
     ) {
         private val work: WorkManager get() = WorkManager.getInstance(context)
 
@@ -58,9 +58,9 @@ class LibraryScanJobs
         suspend fun scanIfStale(now: Long = System.currentTimeMillis()) {
             val current = folders.folders.first()
             val fingerprint = LibraryIndexer.foldersFingerprint(current)
-            val scannedFolders = dao.meta(LibraryIndexer.META_SCANNED_FOLDERS)
+            val scannedFolders = dao.get().meta(LibraryIndexer.META_SCANNED_FOLDERS)
             if (current.isEmpty() && scannedFolders.isNullOrEmpty()) return
-            val scannedAt = dao.meta(LibraryIndexer.META_SCANNED_AT)?.toLongOrNull() ?: 0L
+            val scannedAt = dao.get().meta(LibraryIndexer.META_SCANNED_AT)?.toLongOrNull() ?: 0L
             val pending = work.getWorkInfosForUniqueWorkFlow(WORK_NAME).first().filterNot { it.state.isFinished }
             when {
                 // A long first scan records its folders only when it ends; it is already the scan these folders need.

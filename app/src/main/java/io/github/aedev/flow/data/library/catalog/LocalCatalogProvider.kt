@@ -22,9 +22,15 @@ import io.github.aedev.flow.data.music.model.MusicArtist
 import io.github.aedev.flow.data.music.model.MusicTrack
 import io.github.aedev.flow.plugin.catalog.NoMetadataPluginException
 import io.github.aedev.flow.utils.PerformanceDispatcher
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import nl.neerdael.milkbeat.catalog.EntityRef
@@ -56,24 +62,36 @@ class LocalCatalogProvider
     @Inject
     internal constructor(
         @param:ApplicationContext private val context: Context,
-        private val dao: LibraryDao,
+        private val lazyDao: dagger.Lazy<LibraryDao>,
         private val folders: MusicFolderRepository,
         private val scans: LibraryScanJobs,
     ) : MetadataProvider,
         CatalogPlayback {
         override val id: String = ID
 
+        // The index is opened on first use, off the main thread, so building the home costs startup nothing.
+        private val dao: LibraryDao get() = lazyDao.get()
+
         /**
          * The index revision stands in for an account: a scan that changes the index swaps it, so pages
          * built from the old index reload as a sign-in would make them.
          */
+        @OptIn(ExperimentalCoroutinesApi::class)
         override val account: Flow<ProviderAccount> =
-            dao
-                .observeMeta(LibraryIndexer.META_REVISION)
-                .map { ProviderAccount.SignedIn(key = "$ID:${it.orEmpty()}") }
+            folders.folders
+                .map { it.isEmpty() }
                 .distinctUntilChanged()
+                .flatMapLatest { noFolders ->
+                    if (noFolders) flowOf<String?>(null) else flow<String?> { emitAll(dao.observeMeta(LibraryIndexer.META_REVISION)) }
+                }.map { ProviderAccount.SignedIn(key = "$ID:${it.orEmpty()}") }
+                .distinctUntilChanged()
+                .flowOn(PerformanceDispatcher.diskIO)
 
-        val hasTracks: Flow<Boolean> = dao.observeTrackCount().map { it > 0 }.distinctUntilChanged()
+        val hasTracks: Flow<Boolean> =
+            flow { emitAll(dao.observeTrackCount()) }
+                .map { it > 0 }
+                .distinctUntilChanged()
+                .flowOn(PerformanceDispatcher.diskIO)
 
         override suspend fun home(request: HomeRequest): Result<MetadataPage> =
             runCatching {
