@@ -220,11 +220,18 @@ Before writing any component, effect, animation, formatter, parser, scheduler, o
 | Dates and times | `java.time` — **core library desugaring is enabled, minSdk 26**, so all of it is available | `SimpleDateFormat`, `Calendar`, or manual millisecond arithmetic |
 | Images | Coil 3.5.0 | Custom loaders, caches, or decoders |
 | Widgets | Glance 1.1.1 + `glance-material3` | Hand-built `RemoteViews` |
+| Network music folders | `RemoteMusicClient` in `data/folders/`: SMB via smbj 0.15.0, SFTP via sshj 0.41.1, NFS v3/v4.x via nfs4j-core 0.28.5 (oncrpc4j), WebDAV on OkHttp with playback through Media3 `OkHttpDataSource` | New protocol stacks, SSH/XDR/RPC encoding, or per-protocol player wiring — implement `RemoteMusicClient` and reuse `RemoteMusicDataSource` |
 
 Known debt in this table, to fix opportunistically when already in a file: 13 files still use
 `SimpleDateFormat` and 8 use `Calendar.getInstance()` against only 4 on `java.time`.
 `re2j` is declared in `app/build.gradle.kts` but referenced from no first-party source — verify
 whether it is a transitive requirement before either using or removing it.
+
+smbj resolves `bcprov-jdk18on` to a newer line than sshj's `bcpkix`/`bcutil`; mixed BouncyCastle
+lines fail at provider init and in the duplicate-class check. `app/build.gradle.kts` pins
+`bcpkix`/`bcutil` to bcprov's line through a `constraints` block — keep them aligned when bumping
+smbj, sshj or BouncyCastle. sshj uses the bundled BouncyCastle under a private provider name
+(`SftpSecurity`) because Android's own stripped "BC" provider lacks X25519/Ed25519.
 
 ### When hand-rolling is legitimate
 
@@ -621,6 +628,23 @@ revision must pass the configured ktlint rules.
 
 2. If the build fails, fix the reported errors and rebuild before proceeding.
 3. For UI changes, actually run the app (emulator or device) and exercise the golden path plus edge cases — passing a build does not mean the feature works correctly.
+
+## Documentation and publishing
+
+- The root `README.md` and the user guide in `docs/user-guide/` are the user-facing documentation.
+  `mkdocs.yml` (`docs_dir: docs/user-guide`) builds the guide; `.github/workflows/docs.yml` runs
+  `mkdocs build --strict` on PRs that touch the guide and deploys it to GitHub Pages at
+  <https://johnneerdael.github.io/Milkbeat/> on pushes to `main`.
+- Validate guide changes locally with
+  `python3 -m pip install -r docs/site-requirements.txt && mkdocs build --strict` (use a virtualenv;
+  output goes to the git-ignored `debug/user-guide-site`).
+- PR checks enforce the template in `.github/PULL_REQUEST_TEMPLATE.md`: **Check docs updated**
+  (`pr-docs.yml`) fails when app sources change without a `README.md`/`docs/user-guide/` change or a
+  `## Docs` reason, and **Validate release notes** (`release-notes.yml`) requires a factual
+  `## Release notes` section. Both scripts live in `.github/scripts/` and can be run locally against
+  a PR body before opening the PR.
+- Guide screenshots live in `docs/user-guide/images/`; all but one are 1920×1080, so downscale 4K
+  emulator captures to match (for example `sips -Z 1920 shot.png`).
 
 ## Baseline profile — when to regenerate
 
