@@ -192,7 +192,7 @@ class PlaylistMirrorRunner
                 checkNotNull(record.destination) { "The provider did not return the private playlist" }
             }
             if (record.ready) {
-                val image = artworkLoader?.fetch(source, sourceArtwork)
+                val image = retryingTransient(beforeRetry = { active() }) { artworkLoader?.fetch(source, sourceArtwork) }
                 import(
                     PrivatePlaylistImportRequest(
                         key.sourceKey,
@@ -207,7 +207,7 @@ class PlaylistMirrorRunner
                 return record
             }
             checkpoint()
-            val image = artworkLoader?.fetch(source, sourceArtwork)
+            val image = retryingTransient(beforeRetry = { active() }) { artworkLoader?.fetch(source, sourceArtwork) }
             active()
             val ensureRequest =
                 PrivatePlaylistImportRequest(
