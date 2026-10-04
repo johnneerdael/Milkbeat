@@ -31,16 +31,25 @@ import io.github.aedev.flow.ui.tv.components.TvSectionHeader
 private const val BUZZHEAVIER_HOST = "buzzheavier.com"
 
 // The page's own download button asks for its file link with htmx; asking the same way from inside the
-// page keeps the request in the browser Cloudflare let through.
+// page keeps the request in the browser Cloudflare let through. Links are matched as the app's native
+// resolver matches them: same origin, this file's /download path, and a token.
 private const val REQUEST_FILE_SCRIPT = """
 (() => {
   if (window.__milkbeatRequested) return;
+  const id = location.pathname.split('/').filter(Boolean)[0];
   const link = [...document.querySelectorAll('[hx-get]')]
-    .map((element) => element.getAttribute('hx-get'))
-    .find((path) => /^\/[A-Za-z0-9]{8,16}\/download\?t=[^&]+$/.test(path));
+    .map((element) => {
+      try {
+        return new URL(element.getAttribute('hx-get'), location.href);
+      } catch (error) {
+        return null;
+      }
+    })
+    .find((url) => url && url.origin === location.origin && url.pathname === '/' + id + '/download' &&
+      !url.username && !url.password && (url.searchParams.get('t') || '').trim() !== '');
   if (!link) return;
   window.__milkbeatRequested = true;
-  fetch(link, { headers: { 'HX-Request': 'true', 'HX-Current-URL': location.href }, credentials: 'same-origin' })
+  fetch(link.href, { headers: { 'HX-Request': 'true', 'HX-Current-URL': location.href }, credentials: 'same-origin' })
     .then((response) => response.headers.get('HX-Redirect'))
     .then((target) => {
       if (target) location.href = target;
