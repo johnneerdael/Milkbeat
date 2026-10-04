@@ -1,15 +1,16 @@
 package io.github.aedev.flow.data.folders
 
-import net.schmizz.keepalive.KeepAliveProvider
 import net.schmizz.sshj.DefaultConfig
 import net.schmizz.sshj.SSHClient
 import net.schmizz.sshj.common.DisconnectReason
 import net.schmizz.sshj.sftp.FileAttributes
 import net.schmizz.sshj.sftp.FileMode
 import net.schmizz.sshj.sftp.RemoteFile
+import net.schmizz.sshj.sftp.Response
 import net.schmizz.sshj.sftp.SFTPClient
 import net.schmizz.sshj.sftp.SFTPException
 import net.schmizz.sshj.transport.TransportException
+import net.schmizz.sshj.userauth.UserAuthException
 import net.schmizz.sshj.userauth.method.AuthKeyboardInteractive
 import net.schmizz.sshj.userauth.method.AuthMethod
 import net.schmizz.sshj.userauth.method.AuthPassword
@@ -32,15 +33,10 @@ class SftpMusicClient
         ): SftpConnection {
             SftpSecurity.install()
             val config =
-                DefaultConfig().apply {
-                    timeoutMs = TIMEOUT_MS
-                    // Idle paused playback must neither hit a read timeout nor be dropped by the server or a NAT.
-                    keepAliveProvider = KeepAliveProvider.KEEP_ALIVE
-                }
+                DefaultConfig().apply { timeoutMs = TIMEOUT_MS }
             val ssh = SSHClient(config)
             try {
                 ssh.connectTimeout = TIMEOUT_MS
-                ssh.connection.keepAlive.keepAliveInterval = KEEP_ALIVE_SECONDS
                 ssh.addHostKeyVerifier(verifier)
                 try {
                     ssh.connect(source.host.removeSurrounding("[", "]"), source.port)
@@ -114,13 +110,15 @@ class SftpMusicClient
         ): RemoteMusicFile {
             require(source.kind == MusicFolderKind.SFTP && source.isValid() && source.hostKey.isNotBlank())
             require(source.folderPath(path).isNotEmpty())
-            val connection = connect(source, secrets, SftpHostKeyVerifier(source.hostKey))
-            try {
-                val file = connection.sftp.open(serverPath(source, path))
-                return SftpRemoteFile(connection, file)
-            } catch (error: Exception) {
-                connection.close()
-                throw error
+            val remotePath = serverPath(source, path)
+            return SftpRemoteFile {
+                val connection = connect(source, secrets, SftpHostKeyVerifier(source.hostKey))
+                try {
+                    connection to connection.sftp.open(remotePath)
+                } catch (error: Exception) {
+                    connection.close()
+                    throw error
+                }
             }
         }
 
@@ -137,10 +135,20 @@ class SftpMusicClient
             }
         }
 
+        /**
+         * Holds no heartbeat while playback is paused; a connection the server or a NAT dropped in the meantime
+         * is reopened on the next read instead.
+         */
         private class SftpRemoteFile(
-            private val connection: SftpConnection,
-            private val file: RemoteFile,
+            private val reopen: () -> Pair<SftpConnection, RemoteFile>,
         ) : RemoteMusicFile {
+            private lateinit var connection: SftpConnection
+            private lateinit var file: RemoteFile
+
+            init {
+                attach()
+            }
+
             override val length: Long = file.length()
             private var nextPosition = -1L
             private var readAhead: InputStream? = null
@@ -153,17 +161,45 @@ class SftpMusicClient
             ): Int {
                 if (length == 0) return 0
                 if (position >= this.length) return -1
-                // A contiguous follow-up read means sequential playback, so pipeline requests instead of paying a round trip per chunk.
+                if (!connection.ssh.isConnected) reattach()
                 val count =
-                    if (position == nextPosition) {
-                        val stream = readAhead ?: file.ReadAheadRemoteFileInputStream(READ_AHEAD_REQUESTS, position).also { readAhead = it }
-                        stream.read(buffer, offset, length)
-                    } else {
-                        readAhead = null
-                        file.read(position, buffer, offset, length)
+                    try {
+                        readAt(buffer, position, offset, length)
+                    } catch (error: IOException) {
+                        if (Thread.currentThread().isInterrupted || !isSftpReconnectable(error)) throw error
+                        reattach()
+                        readAt(buffer, position, offset, length)
                     }
                 if (count > 0) nextPosition = position + count
                 return if (count > 0) count else -1
+            }
+
+            private fun readAt(
+                buffer: ByteArray,
+                position: Long,
+                offset: Int,
+                length: Int,
+            ): Int =
+                // A contiguous follow-up read means sequential playback, so pipeline requests instead of paying a round trip per chunk.
+                if (position == nextPosition) {
+                    val stream = readAhead ?: file.ReadAheadRemoteFileInputStream(READ_AHEAD_REQUESTS, position).also { readAhead = it }
+                    stream.read(buffer, offset, length)
+                } else {
+                    readAhead = null
+                    file.read(position, buffer, offset, length)
+                }
+
+            private fun attach() {
+                val (opened, remote) = reopen()
+                connection = opened
+                file = remote
+            }
+
+            private fun reattach() {
+                readAhead = null
+                nextPosition = -1
+                runCatching { close() }
+                attach()
             }
 
             override fun close() {
@@ -177,7 +213,6 @@ class SftpMusicClient
 
         companion object {
             private const val TIMEOUT_MS = 15_000
-            private const val KEEP_ALIVE_SECONDS = 15
             private const val READ_AHEAD_REQUESTS = 4
         }
     }
@@ -218,3 +253,11 @@ internal fun authMethods(
         listOf(AuthPassword(passwordFinder), AuthKeyboardInteractive(PasswordResponseProvider(passwordFinder)))
     }
 }
+
+/** Whether a failed read may succeed on a fresh connection: not when the server answered with an SFTP status. */
+internal fun isSftpReconnectable(error: IOException): Boolean =
+    when (error) {
+        is SftpHostKeyMismatchException, is UserAuthException -> false
+        is SFTPException -> error.statusCode == Response.StatusCode.UNKNOWN
+        else -> true
+    }

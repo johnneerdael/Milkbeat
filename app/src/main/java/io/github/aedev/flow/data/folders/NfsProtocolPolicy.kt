@@ -18,6 +18,14 @@ class NfsInsecurePortRequiredException(
     message: String,
 ) : IOException(message)
 
+/**
+ * The server rejected the AUTH_SYS credentials at the RPC layer. oncrpc4j does not expose which auth error it
+ * was, so this cannot tell a Kerberos-only export from one that also demands privileged ports.
+ */
+class NfsAuthenticationRejectedException(
+    message: String,
+) : IOException(message)
+
 /** The server does not speak the attempted NFS version or minor version. */
 internal class NfsVersionUnsupportedException(
     message: String,
@@ -105,9 +113,14 @@ internal fun nfsTimeMillis(
  */
 internal fun isNfsReconnectable(error: Throwable): Boolean =
     when (error) {
-        is SocketTimeoutException, is NfsInsecurePortRequiredException, is NfsVersionUnsupportedException -> false
+        is SocketTimeoutException, is NfsInsecurePortRequiredException, is NfsAuthenticationRejectedException,
+        is NfsVersionUnsupportedException,
+        -> false
+
         is ChimeraNFSException -> error.status in RECONNECTABLE_STATUSES
+
         is IOException -> true
+
         else -> false
     }
 
@@ -145,13 +158,12 @@ internal fun nfsStatusException(
 
 /**
  * Maps an RPC-level rejection. oncrpc4j exposes the reject and accept status only through the exception
- * message, so it is compared against the library's own status names. An AUTH_ERROR for AUTH_SYS means
- * AUTH_TOOWEAK in practice: the export wants a privileged port (or Kerberos, which this client cannot offer).
+ * message, so it is compared against the library's own status names.
  */
 internal fun rpcFailure(error: IOException): IOException =
     when {
         error is OncRpcRejectedException && error.message == RpcRejectStatus.toString(RpcRejectStatus.AUTH_ERROR) -> {
-            NfsInsecurePortRequiredException("NFS server rejected the AUTH_SYS credentials")
+            NfsAuthenticationRejectedException("NFS server rejected the AUTH_SYS credentials")
         }
 
         error is OncRpcAcceptedException &&

@@ -102,4 +102,33 @@ class SftpMusicClientTest {
             authMethods(SSHClient(), sftpFolder(keyAuth = true), MusicFolderSecrets(password = "pw"))
         }
     }
+
+    @Test fun onlyTransportFailuresReopenTheConnection() {
+        assertThat(isSftpReconnectable(java.io.EOFException("Connection closed"))).isTrue()
+        assertThat(
+            isSftpReconnectable(
+                net.schmizz.sshj.connection
+                    .ConnectionException("Disconnected"),
+            ),
+        ).isTrue()
+        assertThat(
+            isSftpReconnectable(
+                net.schmizz.sshj.sftp
+                    .SFTPException("Timeout expired"),
+            ),
+        ).isTrue()
+        assertThat(
+            isSftpReconnectable(
+                net.schmizz.sshj.sftp
+                    .SFTPException(net.schmizz.sshj.sftp.Response.StatusCode.NO_SUCH_FILE, "gone"),
+            ),
+        ).isFalse()
+        assertThat(
+            isSftpReconnectable(
+                net.schmizz.sshj.userauth
+                    .UserAuthException("denied"),
+            ),
+        ).isFalse()
+        assertThat(isSftpReconnectable(SftpHostKeyMismatchException(java.io.IOException()))).isFalse()
+    }
 }

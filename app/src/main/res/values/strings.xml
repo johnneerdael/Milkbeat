@@ -743,6 +743,7 @@
     <string name="music_folders_host_key_forget">Forget server key</string>
     <string name="music_folders_host_key_changed">The server key has changed since it was trusted. If you replaced or reinstalled the server, choose Forget server key and test again; otherwise someone may be intercepting the connection.</string>
     <string name="music_folders_nfs_insecure_required">The server only accepts connections from privileged ports, which apps cannot use. Enable the \'insecure\' export option, or \'Allow connections from non-privileged ports\' on Synology and QNAP.</string>
+    <string name="music_folders_nfs_auth_rejected">The server rejected Milkbeat\'s sign-in, which uses your user and group IDs (AUTH_SYS). The export may require Kerberos, which Milkbeat does not support, or connections from privileged ports only. Check the export\'s security and port options.</string>
     <string name="music_folders_nfs_export">Export path (for example /volume1/music)</string>
     <string name="music_folders_nfs_path">Folder within export (optional)</string>
     <string name="music_folders_nfs_version">NFS version</string>

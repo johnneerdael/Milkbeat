@@ -86,10 +86,10 @@ class NfsProtocolPolicyTest {
             .isInstanceOf(NfsVersionUnsupportedException::class.java)
     }
 
-    @Test fun rpcRejectionsMapToPortHintOrVersionFallback() {
+    @Test fun rpcRejectionsMapToAuthenticationFailureOrVersionFallback() {
         assertThat(
             rpcFailure(OncRpcRejectedException(RpcRejectStatus.AUTH_ERROR)),
-        ).isInstanceOf(NfsInsecurePortRequiredException::class.java)
+        ).isInstanceOf(NfsAuthenticationRejectedException::class.java)
         assertThat(
             rpcFailure(OncRpcAcceptedException(RpcAccepsStatus.PROG_MISMATCH)),
         ).isInstanceOf(NfsVersionUnsupportedException::class.java)
@@ -131,6 +131,7 @@ class NfsProtocolPolicyTest {
 
     @Test fun onlyConnectionAndHandleFailuresAreRetriedOnAFreshConnection() {
         assertThat(isNfsReconnectable(EOFException("Disconnected"))).isTrue()
+        assertThat(isNfsReconnectable(NfsAuthenticationRejectedException("AUTH_ERROR"))).isFalse()
         assertThat(isNfsReconnectable(IOException("Broken pipe"))).isTrue()
         assertThat(isNfsReconnectable(StaleException())).isTrue()
         assertThat(isNfsReconnectable(BadSessionException())).isTrue()
