@@ -75,17 +75,25 @@ fun TvPluginsSettingsPane(
         }
     }
 
+    val verifying = state.adding as? AddPluginState.Verifying
+    // Remembered across the browser check, so the list takes focus back when it returns.
+    val listFocus = Modifier.tvInitialFocus(choosing, openPlugin, consent?.pending, verifying, onFirstComposition = false)
+    if (verifying != null) {
+        TvPluginVerificationPane(
+            page = verifying.verification.page,
+            onFile = viewModel::verified,
+            onCancel = viewModel::cancelAdd,
+            modifier = modifier,
+        )
+        return
+    }
     ProvideTvColumnPivot {
         LazyColumn(
             modifier =
                 modifier
                     .fillMaxSize()
-                    .tvInitialFocus(
-                        choosing,
-                        openPlugin,
-                        consent?.pending,
-                        onFirstComposition = false,
-                    ).focusGroup(),
+                    .then(listFocus)
+                    .focusGroup(),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             val plugin = state.plugins.firstOrNull { it.id == openPlugin }

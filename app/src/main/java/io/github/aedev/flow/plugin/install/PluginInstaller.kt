@@ -25,11 +25,21 @@ class PendingInstall(
     val newBrowser: List<String> get() = pack.manifest.permissions.browser - installed?.grantedBrowser.orEmpty().toSet()
 }
 
-class PluginInstallException(
+open class PluginInstallException(
     message: String? = null,
     cause: Throwable? = null,
     val messageResource: Int? = null,
 ) : Exception(message, cause)
+
+/** The plugin's download page wants a browser check; the listener passes it on [page], then [PluginInstaller.fetch] continues. */
+class BrowserVerification internal constructor(
+    val page: String,
+    internal val source: PluginDownloadSource,
+)
+
+class BrowserVerificationRequiredException(
+    val verification: BrowserVerification,
+) : PluginInstallException(messageResource = R.string.tv_plugins_download_verification)
 
 /**
  * Fetches and verifies plugins, then installs them once the listener agrees. An update must come from
@@ -45,7 +55,25 @@ class PluginInstaller
     ) {
         suspend fun fetch(url: String): PendingInstall {
             val source = codes.resolve(url)
-            val bytes = downloadPlugin(client, source.url)
+            val bytes =
+                try {
+                    downloadPlugin(client, source.url)
+                } catch (e: BuzzheavierChallengeException) {
+                    throw BrowserVerificationRequiredException(BrowserVerification(e.page, source))
+                }
+            return verify(bytes, source)
+        }
+
+        /** Continues [verification] with the file link the browser was handed once it passed. */
+        suspend fun fetch(
+            verification: BrowserVerification,
+            fileUrl: String,
+        ): PendingInstall = verify(downloadBuzzheavierFile(client, verification.page, fileUrl), verification.source)
+
+        private suspend fun verify(
+            bytes: ByteArray,
+            source: PluginDownloadSource,
+        ): PendingInstall {
             val pack =
                 withContext(Dispatchers.IO) {
                     try {

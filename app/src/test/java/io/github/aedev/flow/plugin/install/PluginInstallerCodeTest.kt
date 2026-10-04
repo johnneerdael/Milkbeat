@@ -60,4 +60,65 @@ class PluginInstallerCodeTest {
             client.dispatcher.executorService.shutdown()
         }
     }
+
+    @Test
+    fun `a package fetched after a browser check is still held to its code's plugin`() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val fixture = checkNotNull(javaClass.getResourceAsStream("/plugins/fixture-signed.mbplugin")).use { it.readBytes() }
+        val client =
+            OkHttpClient
+                .Builder()
+                .addInterceptor { chain ->
+                    Response
+                        .Builder()
+                        .request(chain.request())
+                        .protocol(Protocol.HTTP_1_1)
+                        .code(200)
+                        .message("OK")
+                        .body(fixture.toResponseBody("application/octet-stream".toMediaType()))
+                        .build()
+                }.build()
+        try {
+            val installer = PluginInstaller(client, PluginRegistry(context), PluginDownloadCodes(context))
+            val verification =
+                BrowserVerification(
+                    "https://buzzheavier.com/abcdef123456",
+                    PluginDownloadSource("https://buzzheavier.com/abcdef123456", "another.plugin"),
+                )
+            val failure =
+                assertThrows(PluginInstallException::class.java) {
+                    runBlocking { installer.fetch(verification, "https://ts.buzzheavier.com/d/abcdef123456?v=signed") }
+                }
+            assertThat(failure.messageResource).isEqualTo(R.string.tv_plugins_code_package_mismatch)
+        } finally {
+            client.dispatcher.executorService.shutdown()
+        }
+    }
+
+    @Test
+    fun `a code whose page keeps a browser challenge asks for a browser and keeps the code's plugin`() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val client =
+            OkHttpClient
+                .Builder()
+                .addInterceptor { chain ->
+                    Response
+                        .Builder()
+                        .request(chain.request())
+                        .protocol(Protocol.HTTP_1_1)
+                        .code(403)
+                        .message("Forbidden")
+                        .header("cf-mitigated", "challenge")
+                        .body("<title>Just a moment...</title>".toResponseBody("text/html".toMediaType()))
+                        .build()
+                }.build()
+        try {
+            val installer = PluginInstaller(client, PluginRegistry(context), PluginDownloadCodes(context))
+            val failure = assertThrows(BrowserVerificationRequiredException::class.java) { runBlocking { installer.fetch("102") } }
+            assertThat(failure.verification.page).startsWith("https://buzzheavier.com/")
+            assertThat(failure.verification.source.pluginId).isNotNull()
+        } finally {
+            client.dispatcher.executorService.shutdown()
+        }
+    }
 }

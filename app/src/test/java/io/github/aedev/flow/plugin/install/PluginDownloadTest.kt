@@ -18,6 +18,7 @@ import okio.Buffer
 import org.junit.Test
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import kotlin.time.Duration
 
 class PluginDownloadTest {
     private val page = "https://buzzheavier.com/abcdef123456"
@@ -43,6 +44,119 @@ class PluginDownloadTest {
             assertThat(requests[1].header("HX-Request")).isEqualTo("true")
             assertThat(requests[1].header("Referer")).isEqualTo(page)
             assertThat(requests[1].header("HX-Current-URL")).isEqualTo(page)
+        }
+
+    @Test
+    fun `a challenge that clears on a later try still downloads natively`() =
+        runBlocking {
+            var landings = 0
+            val client =
+                client { request ->
+                    when (request.url.toString()) {
+                        page -> {
+                            if (++landings == 1) {
+                                response(
+                                    request,
+                                    "<title>Just a moment...</title>",
+                                    "cf-mitigated" to "challenge",
+                                ).newBuilder().code(403).build()
+                            } else {
+                                response(request, "<a hx-get='/abcdef123456/download?t=token'>Download</a>")
+                            }
+                        }
+
+                        "$page/download?t=token" -> {
+                            response(request, "", "HX-Redirect" to "https://ts.buzzheavier.com/d/file")
+                        }
+
+                        else -> {
+                            response(request, bytes)
+                        }
+                    }
+                }
+
+            assertThat(downloadPlugin(client, page, Duration.ZERO)).isEqualTo(bytes)
+            assertThat(landings).isEqualTo(2)
+        }
+
+    @Test
+    fun `a challenge that never clears hands the file page to a browser`() =
+        runBlocking {
+            var landings = 0
+            val client =
+                client { request ->
+                    landings++
+                    response(request, "<html><head><title>Just a moment...</title></head></html>")
+                }
+
+            val failure = runCatching { downloadPlugin(client, "https://bzzhr.to/abcdef123456?ref=x", Duration.ZERO) }.exceptionOrNull()
+            assertThat((failure as BuzzheavierChallengeException).page).isEqualTo(page)
+            assertThat(failure.messageResource).isEqualTo(R.string.tv_plugins_download_verification)
+            assertThat(landings).isEqualTo(3)
+        }
+
+    @Test
+    fun `a file link from the browser downloads only from Buzzheavier over HTTPS`() =
+        runBlocking {
+            val client = client { request -> response(request, bytes) }
+            assertThat(downloadBuzzheavierFile(client, page, "https://ts.buzzheavier.com/d/abcdef123456?v=signed")).isEqualTo(bytes)
+            listOf(
+                "https://evil.example/d/abcdef123456",
+                "http://ts.buzzheavier.com/d/abcdef123456",
+                "https://ts.buzzheavier.com:8443/d/abcdef123456",
+                "https://ts.buzzheavier.com.evil.example/d/abcdef123456",
+                "https://ts.buzzheavier.com/d/otherfile99",
+            ).forEach { target ->
+                assertThat(runCatching { downloadBuzzheavierFile(client, page, target) }.exceptionOrNull())
+                    .isInstanceOf(PluginInstallException::class.java)
+            }
+        }
+
+    @Test
+    fun `only Buzzheavier's own download links count as the file`() {
+        assertThat(isBuzzheavierFileUrl("https://ts.buzzheavier.com/d/abcdef123456?v=signed", page)).isTrue()
+        listOf(
+            page,
+            "https://buzzheavier.com/d/abcdef123456",
+            "http://ts.buzzheavier.com/d/abcdef123456",
+            "https://ts.buzzheavier.com/abcdef123456",
+            "https://ts.buzzheavier.com.evil.example/d/abcdef123456",
+            "https://user@ts.buzzheavier.com/d/abcdef123456",
+            "https://ts.buzzheavier.com/d/otherfile99",
+        ).forEach { assertThat(isBuzzheavierFileUrl(it, page)).isFalse() }
+    }
+
+    @Test
+    fun `a challenge on the download request also hands the page to a browser`() =
+        runBlocking {
+            val client =
+                client { request ->
+                    if (request.url.toString() == page) {
+                        response(request, "<a hx-get='/abcdef123456/download?t=token'>Download</a>")
+                    } else {
+                        response(request, "", "cf-mitigated" to "challenge").newBuilder().code(403).build()
+                    }
+                }
+
+            val failure = runCatching { downloadPlugin(client, page, Duration.ZERO) }.exceptionOrNull()
+            assertThat((failure as BuzzheavierChallengeException).page).isEqualTo(page)
+        }
+
+    @Test
+    fun `a removed or forbidden file fails at once instead of asking for a browser`() =
+        runBlocking {
+            listOf(403, 404).forEach { status ->
+                var landings = 0
+                val client =
+                    client { request ->
+                        landings++
+                        response(request, "<html>Gone</html>").newBuilder().code(status).build()
+                    }
+                val failure = runCatching { downloadPlugin(client, page, Duration.ZERO) }.exceptionOrNull()
+                assertThat((failure as PluginInstallException).messageResource).isEqualTo(R.string.tv_plugins_download_failed)
+                assertThat(failure).isNotInstanceOf(BuzzheavierChallengeException::class.java)
+                assertThat(landings).isEqualTo(1)
+            }
         }
 
     @Test
@@ -74,7 +188,7 @@ class PluginDownloadTest {
                     override fun source() = buffer
                 }
             val client = client { request -> response(request, bytes).newBuilder().body(body).build() }
-            val failure = runCatching { downloadPlugin(client, page) }.exceptionOrNull()
+            val failure = runCatching { downloadPlugin(client, page, Duration.ZERO) }.exceptionOrNull()
             assertThat((failure as PluginInstallException).messageResource).isEqualTo(R.string.tv_plugins_download_page_large)
         }
 
@@ -82,7 +196,9 @@ class PluginDownloadTest {
     fun `Buzzheavier never sends a request to an unrelated token host`() =
         runBlocking {
             val client = client { request -> response(request, "<a hx-get='https://evil.example/abcdef123456/download?t=x'>Download</a>") }
-            assertThat(runCatching { downloadPlugin(client, page) }.exceptionOrNull()).isInstanceOf(PluginInstallException::class.java)
+            assertThat(
+                runCatching { downloadPlugin(client, page, Duration.ZERO) }.exceptionOrNull(),
+            ).isInstanceOf(PluginInstallException::class.java)
         }
 
     @Test
@@ -101,7 +217,7 @@ class PluginDownloadTest {
                             }
                         }
                     assertThat(
-                        runCatching { downloadPlugin(client, page) }.exceptionOrNull(),
+                        runCatching { downloadPlugin(client, page, Duration.ZERO) }.exceptionOrNull(),
                     ).isInstanceOf(PluginInstallException::class.java)
                     assertThat(requests).isEqualTo(2)
                 }
@@ -112,7 +228,9 @@ class PluginDownloadTest {
         runBlocking {
             listOf(200, 403, 404).forEach { status ->
                 val client = client { request -> response(request, "<html>Unavailable</html>").newBuilder().code(status).build() }
-                assertThat(runCatching { downloadPlugin(client, page) }.exceptionOrNull()).isInstanceOf(PluginInstallException::class.java)
+                assertThat(
+                    runCatching { downloadPlugin(client, page, Duration.ZERO) }.exceptionOrNull(),
+                ).isInstanceOf(PluginInstallException::class.java)
             }
         }
 

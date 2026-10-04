@@ -427,6 +427,8 @@
     <string name="tv_plugins_input_invalid">Enter a registered 3-digit code or a valid web address.</string>
     <string name="tv_plugins_download_failed">The plugin download failed. Check the link and try again.</string>
     <string name="tv_plugins_download_verification">Buzzheavier requires browser verification. Try again or use a direct plugin download URL.</string>
+    <string name="tv_plugins_verify_title">Verify with Buzzheavier</string>
+    <string name="tv_plugins_verify_message">Buzzheavier wants to check that a browser is downloading this plugin. Milkbeat continues as soon as the page lets it through; if it shows a checkbox, select it.</string>
     <string name="tv_plugins_download_missing">The Buzzheavier file has no usable download link. It may have been removed.</string>
     <string name="tv_plugins_download_redirect">The download returned an unsupported redirect.</string>
     <string name="tv_plugins_download_large">The plugin download is too large.</string>
