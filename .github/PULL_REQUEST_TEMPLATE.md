@@ -16,6 +16,16 @@ visualizer engine, install instructions, plugin downloader codes and the full ch
 
 -
 
+## Docs
+
+<!--
+The "Check docs updated" check fails when app sources change but neither README.md nor
+docs/user-guide/ does. Update them to describe the new behaviour (the user guide is published to
+Pages on merge), or say here why no docs change is needed, e.g.
+Not needed: internal refactor, nothing visible changes.
+The plugin downloader-code tables inside plugin-codes markers are generated: do not edit them.
+-->
+
 ## Related issue
 
 <!-- Use "Closes #123" when this PR should close an issue. -->

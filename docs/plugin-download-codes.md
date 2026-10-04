@@ -3,6 +3,7 @@
 The app accepts registered three-digit codes in Settings → Plugins and in an
 add-plugin deep link's `url` parameter. Full download URLs remain supported.
 
+<!-- plugin-codes:maintainer -->
 | Code | Package |
 | --- | --- |
 | 102 | Beatport |
@@ -11,6 +12,7 @@ add-plugin deep link's `url` parameter. Full download URLs remain supported.
 | 393 | Beatport, private publisher |
 | 981 | Spotify, private publisher |
 | 494 | YouTube Music, private publisher |
+<!-- /plugin-codes -->
 
 ## Register another URL
 
