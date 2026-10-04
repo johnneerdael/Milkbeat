@@ -44,7 +44,7 @@ class NfsMusicClientServerTest {
         val nested = client.list(source, secrets, "Albums/Café del Mar")
         assertThat(nested.single().location).isEqualTo("Albums/Café del Mar/Ünïcødé – Track.ogg")
         assertThat(client.list(source, secrets, "Many")).hasSize(300)
-        assertThat(client.list(source, secrets, "Singles").map { it.name }).containsExactly("Track one.m4a")
+        assertThat(client.list(source, secrets, "Singles").map { it.name }).containsExactly("Track one.m4a", "Act I: Overture.m4a")
         val deep = (1..14).joinToString("/", prefix = "Deep/")
         assertThat(client.list(source, secrets, deep).map { it.location }).containsExactly("$deep/deep.mp3")
         client.open(source, secrets, "$deep/deep.mp3").use { assertThat(it.length).isEqualTo(File(fixture, "$deep/deep.mp3").length()) }

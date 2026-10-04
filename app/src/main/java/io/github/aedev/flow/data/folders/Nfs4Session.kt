@@ -37,7 +37,7 @@ internal class Nfs4Session private constructor(
 ) : NfsSession {
     private var clientId: clientid4? = null
     private var sessionId: sessionid4? = null
-    private var sequence = FIRST_SLOT_SEQUENCE
+    private var lastSequence = 0
     private var answered = false
     private var replyLimit = MAX_READ_BYTES + COMPOUND_OVERHEAD_BYTES
     private var maxOperations = MAX_OPERATIONS
@@ -169,7 +169,7 @@ internal class Nfs4Session private constructor(
         if (replyLimit <= COMPOUND_OVERHEAD_BYTES || maxOperations <= LOOKUP_FIXED_OPERATIONS) {
             throw IOException("NFS server session limits are too small")
         }
-        sequence = FIRST_SLOT_SEQUENCE
+        lastSequence = 0
         val reclaim = sequenced(CompoundBuilder().withReclaimComplete())
         if (reclaim.status != nfsstat.NFS_OK && reclaim.status != nfsstat.NFSERR_COMPLETE_ALREADY) {
             throw nfsStatusException(reclaim.status, reachingExport = false)
@@ -190,20 +190,14 @@ internal class Nfs4Session private constructor(
 
     /** Sends [builder] behind SEQUENCE; the slot's sequence id only advances when SEQUENCE itself succeeded. */
     private fun sequenced(builder: CompoundBuilder): COMPOUND4res {
-        val args =
-            CompoundBuilder()
-                .withMinorversion(minorVersion)
-                .withSequence(false, checkNotNull(sessionId), sequence, 0, 0)
-                .build()
-        val body = builder.withMinorversion(minorVersion).build()
-        args.argarray += body.argarray
+        val args = sequencedCompound(checkNotNull(sessionId), lastSequence, minorVersion, builder)
         val result = rpc(args, NFS_TIMEOUT_MS)
         if (result.resarray
                 .firstOrNull()
                 ?.opsequence
                 ?.sr_status == nfsstat.NFS_OK
         ) {
-            sequence++
+            lastSequence++
         }
         return result
     }
@@ -249,8 +243,6 @@ internal class Nfs4Session private constructor(
     }
 
     companion object {
-        // RFC 8881 2.10.6.1: a slot's first request carries sequence id 1; strict servers treat 0 as a replay.
-        private const val FIRST_SLOT_SEQUENCE = 1
         private const val IMPLEMENTATION_DOMAIN = "neerdael.nl"
         private const val IMPLEMENTATION_NAME = "Milkbeat"
         private const val MAX_READ_BYTES = 64 * 1024
@@ -323,4 +315,16 @@ internal class Nfs4Session private constructor(
             return NfsAttributes(type, size, modified)
         }
     }
+}
+
+// CompoundBuilder.withSequence sends ++sequence, so a fresh slot starts at 0 to put sequence id 1 on the wire (RFC 8881 2.10.6.1).
+internal fun sequencedCompound(
+    sessionId: sessionid4,
+    lastSequence: Int,
+    minorVersion: Int,
+    body: CompoundBuilder,
+): COMPOUND4args {
+    val args = CompoundBuilder().withMinorversion(minorVersion).withSequence(false, sessionId, lastSequence, 0, 0).build()
+    args.argarray += body.withMinorversion(minorVersion).build().argarray
+    return args
 }
