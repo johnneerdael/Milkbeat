@@ -184,10 +184,12 @@ class WebDavMusicClientTest {
 
     @Test fun testRequiresACollectionAndReturnsSourceUnchanged() {
         val folder = davFolder(root())
-        dav.propfindBodies["/dav/Music/"] = multistatus(davResponse("/dav/Music/", true))
+        dav.propfindBodies["/dav/Music/"] = multistatus(davResponse("/dav/Music/", true), davResponse("/dav/Music/a.flac", false, 4))
         assertThat(davClient().test(folder, MusicFolderSecrets())).isSameInstanceAs(folder)
-        assertThat(dav.requests.single().headers["Depth"]).isEqualTo("0")
+        assertThat(dav.requests.single().headers["Depth"]).isEqualTo("1")
         dav.propfindBodies["/dav/Music/"] = multistatus(davResponse("/dav/Music/", false, 4))
+        assertThrows(IOException::class.java) { davClient().test(folder, MusicFolderSecrets()) }
+        dav.propfindBodies["/dav/Music/"] = multistatus(davResponse("/dav/Music/a.flac", false, 4))
         assertThrows(IOException::class.java) { davClient().test(folder, MusicFolderSecrets()) }
     }
 

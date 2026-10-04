@@ -57,10 +57,14 @@ class WebDavMusicClient
             secrets: MusicFolderSecrets,
         ): MusicFolder {
             require(source.kind == MusicFolderKind.WEBDAV && source.isValid())
-            val resource =
-                propfind(source, secrets, collectionUrl(source, ""), depth = 0).firstOrNull()
-                    ?: throw IOException("Empty multistatus response")
-            if (!resource.isCollection) throw IOException("Not a collection")
+            // Browsing needs Depth: 1, which some servers disable while still answering Depth: 0.
+            val url = collectionUrl(source, "")
+            val segments = url.pathSegments.dropLastWhile(String::isEmpty)
+            val root =
+                propfind(source, secrets, url, depth = 1).firstOrNull {
+                    url.resolve(it.href)?.pathSegments?.dropLastWhile(String::isEmpty) == segments
+                } ?: throw IOException("The folder is missing from its own listing")
+            if (!root.isCollection) throw IOException("Not a collection")
             return source
         }
 
