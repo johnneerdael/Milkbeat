@@ -44,6 +44,9 @@ class FlowApplication :
     @Inject
     lateinit var mirrorJobs: dagger.Lazy<io.github.aedev.flow.plugin.mirror.PlaylistMirrorJobs>
 
+    @Inject
+    lateinit var libraryScans: dagger.Lazy<io.github.aedev.flow.data.library.index.LibraryScanJobs>
+
     override fun newImageLoader(context: PlatformContext): ImageLoader = imageLoader
 
     /**
@@ -90,6 +93,9 @@ class FlowApplication :
         appContext = applicationContext
 
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch { mirrorJobs.get().start(this) }
+        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+            runCatching { libraryScans.get().scanIfStale() }.onFailure { Log.w(TAG, "Library scan check failed", it) }
+        }
         val playerPreferences = PlayerPreferences(this)
 
         // Injects modern TLS/SSL certificates so OkHttp and Ktor don't crash

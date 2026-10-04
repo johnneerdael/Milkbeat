@@ -10,6 +10,7 @@ import io.github.aedev.flow.data.folders.MusicFolderEntry
 import io.github.aedev.flow.data.folders.MusicFolderKind
 import io.github.aedev.flow.data.folders.MusicFolderMetadata
 import io.github.aedev.flow.data.folders.MusicFolderRepository
+import io.github.aedev.flow.data.library.index.LibraryScanJobs
 import io.github.aedev.flow.data.music.model.MusicTrack
 import io.github.aedev.flow.utils.PerformanceDispatcher
 import kotlinx.coroutines.CancellationException
@@ -65,6 +66,7 @@ internal class MusicFoldersViewModel
     constructor(
         private val repository: MusicFolderRepository,
         private val metadata: MusicFolderMetadata,
+        private val scans: LibraryScanJobs? = null,
     ) : ViewModel() {
         val folders = repository.folders.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
         private val mutableEditor = MutableStateFlow<MusicFolderEditor?>(null)
@@ -137,6 +139,7 @@ internal class MusicFoldersViewModel
                         repository.save(source, if (source.guest) "" else draft.password)
                         mutableEditor.value = null
                         mutableMessage.value = R.string.music_folders_saved
+                        scans?.scanIfStale()
                     } catch (
                         cancelled: CancellationException,
                     ) {
@@ -155,6 +158,7 @@ internal class MusicFoldersViewModel
                         repository.remove(source)
                         mutableEditor.value = null
                         mutableMessage.value = R.string.music_folders_removed
+                        scans?.scanIfStale()
                     } catch (
                         cancelled: CancellationException,
                     ) {
@@ -172,6 +176,7 @@ internal class MusicFoldersViewModel
                     try {
                         repository.addLocal(uri)
                         mutableMessage.value = R.string.music_folders_saved
+                        scans?.scanIfStale()
                     } catch (cancelled: CancellationException) {
                         throw cancelled
                     } catch (_: Exception) {

@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.aedev.flow.R
+import io.github.aedev.flow.data.library.catalog.LocalCatalogProvider
 import io.github.aedev.flow.data.local.LikedVideoInfo
 import io.github.aedev.flow.data.local.LikedVideosRepository
 import io.github.aedev.flow.data.local.PlaylistRepository
@@ -54,6 +55,8 @@ import io.github.aedev.flow.ui.tv.screens.account.TvPluginAccountViewModel
 import io.github.aedev.flow.ui.tv.screens.account.libraryNavigationTabs
 import io.github.aedev.flow.ui.tv.screens.folders.TvMusicFoldersContent
 import io.github.aedev.flow.ui.tv.screens.library.TvLibraryMixedContent
+import io.github.aedev.flow.ui.tv.screens.library.TvLocalLibraryContent
+import io.github.aedev.flow.ui.tv.screens.library.TvLocalLibraryViewModel
 import io.github.aedev.flow.ui.tv.screens.library.TvMergedPlaylistsPane
 import io.github.aedev.flow.ui.tv.screens.library.selectLibraryAccountSection
 import io.github.aedev.flow.ui.tv.theme.LocalTvDimens
@@ -65,6 +68,7 @@ import nl.neerdael.milkbeat.catalog.EntityRef
 private enum class TvLibrarySection(
     @StringRes val titleRes: Int,
 ) {
+    LOCAL(R.string.local_library_title),
     FOLDERS(R.string.music_folders_library),
     HISTORY(R.string.tv_library_history),
     LIKES(R.string.library_liked_songs),
@@ -92,6 +96,7 @@ fun TvLibraryScreen(
     onOpenProviderCatalog: (String, EntityRef) -> Unit = { _, _ -> },
     accountViewModel: TvPluginAccountViewModel = hiltViewModel(),
     accountLibrary: TvAccountLibraryViewModel = hiltViewModel(),
+    localLibrary: TvLocalLibraryViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
     val historyRepository = remember { ViewHistory.getInstance(context.applicationContext) }
@@ -113,6 +118,7 @@ fun TvLibraryScreen(
     }
     val accountIdentity by accountLibrary.accountIdentity.collectAsStateWithLifecycle(initialValue = "")
     val accountTabs by accountLibrary.tabs.collectAsStateWithLifecycle()
+    val localAvailable by localLibrary.available.collectAsStateWithLifecycle()
     LaunchedEffect(accountViewModel) { accountViewModel.refresh() }
     LaunchedEffect(signedIn, accountIdentity) {
         if (accountIdentity.isNotEmpty()) accountLibrary.accountChanged(accountIdentity)
@@ -156,7 +162,9 @@ fun TvLibraryScreen(
                         )
                     }
                 }
-                items(TvLibrarySection.entries.filterNot { it == TvLibrarySection.LIKES }, key = TvLibrarySection::name) { section ->
+                val sections =
+                    TvLibrarySection.entries.filterNot { it == TvLibrarySection.LIKES || (it == TvLibrarySection.LOCAL && !localAvailable) }
+                items(sections, key = TvLibrarySection::name) { section ->
                     TvFilterChip(
                         label = stringResource(section.titleRes),
                         selected =
@@ -193,6 +201,17 @@ fun TvLibraryScreen(
                 )
             } else {
                 when (selectedSection) {
+                    TvLibrarySection.LOCAL -> {
+                        if (localAvailable) {
+                            TvLocalLibraryContent(
+                                viewModel = localLibrary,
+                                onPlayMix = onPlayMix,
+                                onPlayCollection = onPlayCollection,
+                                onOpen = { onOpenProviderCatalog(LocalCatalogProvider.ID, it) },
+                            )
+                        }
+                    }
+
                     TvLibrarySection.FOLDERS -> {
                         TvMusicFoldersContent(onPlayTrack = onPlayTrack, onConfigure = onConfigureFolders)
                     }
