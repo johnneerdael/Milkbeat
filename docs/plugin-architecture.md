@@ -365,7 +365,9 @@ A plugin throws `mb.error(code, message)`. The host reacts by code:
 | `unavailable` (region, removed) | Try the next audio provider or candidate |
 | `signInRequired` / `signInExpired` | Mark the account expired and offer sign-in |
 | `rateLimited` (+ `retryAfter`) | Back off; do not retry before `retryAfter` |
-| `network` | Retry once, then surface |
+| `network` / `timeout` | Interactive calls: retry once, then surface |
+
+Background runs (playlist preparation and library indexing) treat `network`, `timeout` and `rateLimited` as transient. They pause and retry the same step up to three times, waiting 5, 15 and 45 s or the plugin's longer `retryAfter`, continue from saved progress, and only then surface the failure to the worker's own backoff. `unavailable` is never retried this way: it means "try another provider", not "try again later".
 | `unsupported` | Hide the feature for this plugin |
 | `internal` | Count toward the failure limit (4.2) |
 
