@@ -168,7 +168,6 @@ android {
             excludes +=
                 listOf(
                     "/META-INF/{AL2.0,LGPL2.1}",
-                    "/META-INF/LICENSE.md",
                     "/META-INF/INDEX.LIST",
                     "/META-INF/DEPENDENCIES",
                     "/META-INF/*.version",
@@ -228,10 +227,7 @@ dependencies {
     implementation(libs.quickjs.kt)
     implementation(libs.smbj)
     implementation(libs.sshj)
-    // sshj pins bcpkix/bcutil 1.84 while smbj brings bcprov 1.85.2; bcpkix/bcutil must match bcprov (1.85 line).
     implementation(libs.bouncycastle.bcprov)
-    implementation(libs.bouncycastle.bcpkix)
-    implementation(libs.bouncycastle.bcutil)
     // Berkeley DB backs only nfs4j's server-side state store; the client never loads it.
     implementation(libs.nfs4j.core) { exclude(group = "com.sleepycat") }
     constraints {
