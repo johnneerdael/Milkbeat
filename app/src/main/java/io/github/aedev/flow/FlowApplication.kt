@@ -18,6 +18,7 @@ import io.github.aedev.flow.utils.PerformanceDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
@@ -43,6 +44,9 @@ class FlowApplication :
 
     @Inject
     lateinit var mirrorJobs: dagger.Lazy<io.github.aedev.flow.plugin.mirror.PlaylistMirrorJobs>
+
+    @Inject
+    lateinit var libraryScans: dagger.Lazy<io.github.aedev.flow.data.library.index.LibraryScanJobs>
 
     override fun newImageLoader(context: PlatformContext): ImageLoader = imageLoader
 
@@ -76,6 +80,7 @@ class FlowApplication :
         private const val SUBSCRIPTION_CHECK_WORK = "subscription_check_work_v2"
         private const val LEGACY_SUBSCRIPTION_CHECK_WORK = "subscription_check_work"
         private const val RESTORED_TRACK_WAIT_MS = 20_000L
+        private const val LIBRARY_SCAN_CHECK_DELAY_MS = 15_000L
         lateinit var appContext: Context
             private set
     }
@@ -90,6 +95,11 @@ class FlowApplication :
         appContext = applicationContext
 
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch { mirrorJobs.get().start(this) }
+        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+            // After the first screens are up, so opening the index never competes with cold start.
+            delay(LIBRARY_SCAN_CHECK_DELAY_MS)
+            runCatching { libraryScans.get().scanIfStale() }.onFailure { Log.w(TAG, "Library scan check failed", it) }
+        }
         val playerPreferences = PlayerPreferences(this)
 
         // Injects modern TLS/SSL certificates so OkHttp and Ktor don't crash

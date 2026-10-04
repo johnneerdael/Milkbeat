@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.aedev.flow.data.catalog.CatalogPlayback
+import io.github.aedev.flow.data.library.catalog.LocalLibraryEmptyException
 import io.github.aedev.flow.data.music.model.MusicTrack
 import io.github.aedev.flow.plugin.catalog.NoMetadataPluginException
 import io.github.aedev.flow.plugin.catalog.listenerMessage
@@ -38,6 +39,8 @@ data class MusicHomeFeedState(
     val error: String? = null,
     /** No music plugin is chosen: the page offers to add one instead of an error. */
     val needsPlugin: Boolean = false,
+    /** The local library is the home but has no songs yet: its first scan is running, or found none. */
+    val libraryEmpty: Boolean = false,
 )
 
 /**
@@ -101,6 +104,7 @@ class MusicHomeFeedViewModel
                             isLoadingMore = false,
                             error = null,
                             needsPlugin = false,
+                            libraryEmpty = false,
                         )
                     }
                     val first =
@@ -108,7 +112,12 @@ class MusicHomeFeedViewModel
                             Log.w(TAG, "home failed", error)
                             loadedAtMs = 0L
                             _state.update {
-                                it.copy(isLoading = false, error = error.listenerMessage, needsPlugin = error is NoMetadataPluginException)
+                                it.copy(
+                                    isLoading = false,
+                                    error = error.listenerMessage,
+                                    needsPlugin = error is NoMetadataPluginException,
+                                    libraryEmpty = error is LocalLibraryEmptyException,
+                                )
                             }
                             return@launch
                         }
