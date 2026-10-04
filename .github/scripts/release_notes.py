@@ -51,7 +51,7 @@ def markdown_lines(text: str) -> list[tuple[str, int, str]]:
 def release_section(body: str) -> str | None:
     lines = markdown_lines(body)
     start = next((index for index, (_, depth, title) in enumerate(lines)
-                  if depth and re.fullmatch(r"release[ -]+notes\s*:?", title, re.IGNORECASE)), None)
+                  if depth == 2 and re.fullmatch(r"release[ -]+notes\s*:?", title, re.IGNORECASE)), None)
     if start is None:
         return None
     level = lines[start][1]

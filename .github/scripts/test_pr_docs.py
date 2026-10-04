@@ -42,6 +42,8 @@ class DocsTests(unittest.TestCase):
             "## Docs\nNo docs changes needed.",
             "## Docs\nTODO",
             "```\n## Docs\nNot needed: refactor.\n```",
+            "# Docs\nNot needed: refactor.",
+            "### Docs\nNot needed: refactor.",
         ):
             with self.subTest(body=body):
                 with self.assertRaises(ValueError):

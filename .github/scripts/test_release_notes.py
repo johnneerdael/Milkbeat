@@ -60,6 +60,14 @@ Tests passed.
                 with self.assertRaises(ValueError):
                     notes.validate_release_notes(body)
 
+    def test_only_a_level_two_heading_starts_the_section(self):
+        for heading in ("#", "###"):
+            body = f"{heading} Release notes\n- Fix audio.\n## Validation\n- [x] Tests pass.\n## Risk and compatibility\nNone."
+            with self.subTest(heading=heading):
+                self.assertIsNone(notes.release_section(body))
+                with self.assertRaisesRegex(ValueError, "## Release notes"):
+                    notes.validate_release_notes(body)
+
     def test_accepts_concrete_internal_changes_without_word_count(self):
         body = "## Release notes\nNo user-visible changes.\n### Internal\n- Pin Gradle."
         self.assertIn("Pin Gradle.", notes.validate_release_notes(body))
