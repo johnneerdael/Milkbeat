@@ -88,7 +88,12 @@ fun TvMusicNowPlayingScreen(
     val showsVideo by manager.videoShown.collectAsStateWithLifecycle()
     val shownView = shownNowPlayingView(view, showsVideo, visualizerAvailable = visualizer != null)
     val nextView =
-        nextNowPlayingView(shownView, videoAvailable = track?.isVideoSong == true, visualizerAvailable = visualizer != null)
+        nextNowPlayingView(
+            chosen = view,
+            shown = shownView,
+            videoAvailable = track?.isVideoSong == true,
+            visualizerAvailable = visualizer != null,
+        )
     val dimens = LocalTvDimens.current
 
     val artworkUrl = track?.highResThumbnailUrl
