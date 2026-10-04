@@ -18,7 +18,7 @@ Confirmed unmatched tracks can be removed from the future queue. Temporary failu
 
 ## Mixes
 
-Streaming queues seed a mix from the first song that actually starts playing. When the metadata provider has no radio, Milkbeat tries compatible audio providers in priority order.
+Once a streaming queue starts playing, Milkbeat seeds a mix from the queue's first song. When the metadata provider has no radio, Milkbeat tries compatible audio providers in priority order.
 
 For normal Spotify playback through YouTube, that first song's matched YouTube ID seeds the radio. [Private playlist preparation](providers.md#why-prepare-a-youtube-playlist) instead gives YouTube the whole matched playlist as its native autoplay context. Milkbeat can then exclude the playlist's matched songs from later suggestions, helping avoid repeats as the radio continuation begins.
 

@@ -1301,30 +1301,35 @@ class Media3MusicService : MediaLibraryService() {
         automixJob =
             lifecycleScope.launch(Dispatchers.IO) {
                 try {
-                    var seed: MusicRadioPlanner.RadioSeed? = null
-                    var result: RadioPage? = null
-                    for (candidate in seeds) {
-                        result =
-                            when (candidate) {
-                                is MusicRadioPlanner.RadioSeed.Playlist -> {
-                                    mix(EntityRef(EntityKind.PLAYLIST, candidate.id))
-                                }
+                    val seeded =
+                        MusicRadioPlanner.firstStation(
+                            seeds,
+                            page = { candidate ->
+                                when (candidate) {
+                                    is MusicRadioPlanner.RadioSeed.Playlist -> {
+                                        mix(EntityRef(EntityKind.PLAYLIST, candidate.id))
+                                    }
 
-                                is MusicRadioPlanner.RadioSeed.Track -> {
-                                    mix(
-                                        EntityRef(EntityKind.TRACK, candidate.id),
-                                        queuedDescriptor(candidate.id),
-                                    )
+                                    is MusicRadioPlanner.RadioSeed.Track -> {
+                                        mix(
+                                            EntityRef(EntityKind.TRACK, candidate.id),
+                                            queuedDescriptor(candidate.id),
+                                        )
+                                    }
                                 }
-                            }
-                        seed = candidate
-                        if (result != null && result.tracks.tracks.isNotEmpty()) break
-                    }
-                    val seedId = (seed as? MusicRadioPlanner.RadioSeed.Track)?.id ?: currentId
-                    val mapped = result?.toRadioTracks(seedId).orEmpty()
-                    val station = radioModeTuner.withoutHiddenArtists(mapped)
+                            },
+                            station = { candidate, page ->
+                                val seedId = (candidate as? MusicRadioPlanner.RadioSeed.Track)?.id ?: currentId
+                                radioModeTuner.withoutHiddenArtists(page.toRadioTracks(seedId))
+                            },
+                        )
+                    val seed = seeded?.seed
+                    val result = seeded?.page
+                    val station = seeded?.tracks.orEmpty()
                     withContext(Dispatchers.Main) {
                         if (generation != radioGeneration) return@withContext
+                        // A top-up whose mix ran out reseeds from anything but this, so it names the track actually used.
+                        radioSeedId = (seed as? MusicRadioPlanner.RadioSeed.Track)?.id ?: currentId
                         radioContinuation = result?.tracks?.next
                         radioPage = result
                         radioTuning.station(result, generation)
