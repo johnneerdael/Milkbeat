@@ -16,7 +16,6 @@ import io.github.aedev.flow.data.folders.MusicFolderAccess
 import io.github.aedev.flow.data.folders.MusicFolderKind
 import io.github.aedev.flow.data.folders.MusicFolderStore
 import io.github.aedev.flow.data.folders.RemoteMusicClients
-import io.github.aedev.flow.data.folders.WebDavMusicClient
 import io.github.aedev.flow.utils.PerformanceDispatcher
 import kotlinx.coroutines.runBlocking
 import java.io.FileNotFoundException
@@ -29,7 +28,6 @@ class MusicFolderDataSourceFactory
         @ApplicationContext private val context: Context,
         private val store: MusicFolderStore,
         private val clients: RemoteMusicClients,
-        private val webDav: WebDavMusicClient,
     ) {
         private fun access(uri: Uri): MusicFolderAccess {
             val access =
@@ -45,9 +43,9 @@ class MusicFolderDataSourceFactory
 
         fun wrap(delegate: DataSource.Factory): DataSource.Factory {
             val webDavStreams =
-                ResolvingDataSource.Factory(OkHttpDataSource.Factory(webDav.httpClient)) { dataSpec ->
+                ResolvingDataSource.Factory(OkHttpDataSource.Factory(clients.webDav.httpClient)) { dataSpec ->
                     val access = access(dataSpec.uri)
-                    val stream = webDav.stream(access.source, access.secrets, dataSpec.uri.path.orEmpty())
+                    val stream = clients.webDav.stream(access.source, access.secrets, dataSpec.uri.path.orEmpty())
                     dataSpec.withUri(Uri.parse(stream.url)).withAdditionalHeaders(stream.headers)
                 }
             return DataSource.Factory {

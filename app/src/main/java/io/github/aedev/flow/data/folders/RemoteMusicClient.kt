@@ -46,7 +46,7 @@ class RemoteMusicClients
     @Inject
     constructor(
         private val smb: SmbMusicClient,
-        private val webDav: WebDavMusicClient,
+        val webDav: WebDavMusicClient,
         private val sftp: SftpMusicClient,
         private val nfs: NfsMusicClient,
     ) {

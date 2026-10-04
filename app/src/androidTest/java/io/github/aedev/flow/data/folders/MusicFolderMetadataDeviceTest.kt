@@ -27,7 +27,7 @@ class MusicFolderMetadataDeviceTest {
             val retriever = MediaMetadataRetriever()
             try {
                 retriever.setDataSource(context, FileProvider.getUriForFile(context, context.packageName + ".files", file))
-                assertMetadata(MusicFolderMetadataReader(context, MusicFolderStore(context), SmbMusicClient()).readTags(retriever))
+                assertMetadata(MusicFolderMetadataReader(context, MusicFolderStore(context), testFolderClients()).readTags(retriever))
             } finally {
                 retriever.release()
                 file.delete()
@@ -44,7 +44,7 @@ class MusicFolderMetadataDeviceTest {
             val source = MusicFolder(name = "Tags", kind = MusicFolderKind.SMB, host = host!!, share = "Music", port = 1447, guest = true)
             store.save(source, "")
             try {
-                val reader = MusicFolderMetadataReader(context, store, SmbMusicClient())
+                val reader = MusicFolderMetadataReader(context, store, testFolderClients())
                 for (format in listOf(
                     "m4a",
                     "mp3",
@@ -75,7 +75,7 @@ class MusicFolderMetadataDeviceTest {
                     .MusicFolderDataSourceFactory(
                         context,
                         store,
-                        SmbMusicClient(),
+                        testFolderClients(),
                     ).wrap(
                         androidx.media3.datasource.DefaultDataSource
                             .Factory(context),
@@ -151,7 +151,7 @@ class MusicFolderMetadataDeviceTest {
                         )
                         player.currentPosition
                     }
-                val metadata = MusicFolderMetadata(MusicFolderMetadataReader(context, store, SmbMusicClient()))
+                val metadata = MusicFolderMetadata(MusicFolderMetadataReader(context, store, testFolderClients()))
                 io.github.aedev.flow.player
                     .MusicFolderPlaybackMetadata(metadata)
                     .enrichCurrent(track)
@@ -232,7 +232,7 @@ class MusicFolderMetadataDeviceTest {
             val source = MusicFolder(name = "Art", kind = MusicFolderKind.SMB, host = host!!, share = "Music", port = 1447, guest = true)
             store.save(source, "")
             val original = coil3.SingletonImageLoader.get(context)
-            val metadata = MusicFolderMetadata(MusicFolderMetadataReader(context, store, SmbMusicClient()))
+            val metadata = MusicFolderMetadata(MusicFolderMetadataReader(context, store, testFolderClients()))
             val loader =
                 coil3.ImageLoader
                     .Builder(context)
