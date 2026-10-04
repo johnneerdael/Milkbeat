@@ -156,6 +156,10 @@ internal class MusicFoldersViewModel
                 mutableEditor.value = draft.copy(error = R.string.music_folders_private_key_required)
                 return
             }
+            if (source.kind == MusicFolderKind.SFTP && source.hostKey.isBlank()) {
+                testAccess()
+                return
+            }
             accessJob?.cancel()
             settingsJob =
                 viewModelScope.launch {

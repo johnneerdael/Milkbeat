@@ -80,7 +80,7 @@ class WebDavMusicClient
                     val segments = resolved.pathSegments.dropLastWhile(String::isEmpty)
                     if (segments.size != parentSegments.size + 1 || segments.subList(0, parentSegments.size) != parentSegments) continue
                     val name = segments.last()
-                    if (name.isEmpty() || '/' in name || '\\' in name || name == "." || name == "..") continue
+                    if (name.isEmpty() || name.any { it in "/\\\u0000" } || name == "." || name == "..") continue
                     if (!resource.isCollection && !isMusicFile(name, resource.contentType)) continue
                     add(
                         MusicFolderEntry(
@@ -244,7 +244,7 @@ class WebDavMusicClient
                         }
 
                         200 -> {
-                            skipFully(body, position)
+                            opened.body.source().skip(position)
                             windowEnd = -1
                         }
 
@@ -287,23 +287,6 @@ class WebDavMusicClient
                     """<d:getlastmodified/><d:getcontenttype/><d:displayname/></d:prop></d:propfind>"""
         }
     }
-
-private fun skipFully(
-    input: InputStream,
-    count: Long,
-) {
-    var remaining = count
-    while (remaining > 0) {
-        val skipped = input.skip(remaining)
-        if (skipped > 0) {
-            remaining -= skipped
-        } else if (input.read() < 0) {
-            throw IOException("Response ended before the requested position")
-        } else {
-            remaining--
-        }
-    }
-}
 
 private fun statusError(response: Response): IOException =
     when (response.code) {

@@ -167,4 +167,27 @@ class MusicFoldersViewModelTest {
             advanceUntilIdle()
             assertThat(vm.editor.value?.access).isEqualTo(FolderAccess.SUCCESS)
         }
+
+    @Test fun savingAnSftpFolderShowsTheServerKeyBeforeTrustingIt() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            val repository = mockk<MusicFolderRepository>(relaxed = true)
+            coEvery { repository.folders } returns flowOf(emptyList())
+            coEvery { repository.test(any(), any(), any()) } answers { firstArg<MusicFolder>().copy(hostKey = "ssh-ed25519 SHA256:abc") }
+            val vm = MusicFoldersViewModel(repository, mockk(relaxed = true))
+            vm.create(MusicFolderKind.SFTP)
+            vm.updateDraft { copy(source = source.copy(name = "Box", host = "box", username = "me"), password = "pw") }
+            vm.save()
+            advanceUntilIdle()
+            io.mockk.coVerify(exactly = 0) { repository.save(any(), any(), any()) }
+            assertThat(
+                vm.editor.value
+                    ?.source
+                    ?.hostKey,
+            ).isEqualTo("ssh-ed25519 SHA256:abc")
+            vm.save()
+            advanceUntilIdle()
+            io.mockk.coVerify(exactly = 1) { repository.save(match { it.hostKey == "ssh-ed25519 SHA256:abc" }, "pw", "") }
+            assertThat(vm.editor.value).isNull()
+        }
 }

@@ -99,9 +99,7 @@
 
 ## SFTP: sshj reaches BouncyCastle only through the JCA provider, which instantiates every algorithm
 ## (X25519, Ed25519, ECDH, AES-GCM, bcrypt key derivation...) from class names held in strings.
--keep class org.bouncycastle.jce.provider.BouncyCastleProvider { *; }
--keep class org.bouncycastle.jcajce.provider.** { *; }
--dontwarn org.bouncycastle.**
+-keep class org.bouncycastle.jcajce.provider.** { public <init>(); }
 
 ## nfs4j / oncrpc4j (NFS music folders): plain XDR classes constructed directly, so no keep rules are needed.
 # RpcAuthTypeUnix builds a JAAS Subject from these JDK-only principals; the app sends AUTH_SYS through

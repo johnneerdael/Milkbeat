@@ -709,7 +709,7 @@
     <string name="music_folders_passphrase">Key passphrase (optional)</string>
     <string name="music_folders_passphrase_keep">Key passphrase (leave unchanged to keep the saved one)</string>
     <string name="music_folders_host_key">Server key: %1$s</string>
-    <string name="music_folders_host_key_unknown">The server key is trusted on first connection. Test access to see it before saving.</string>
+    <string name="music_folders_host_key_unknown">The server key is not trusted yet. Test access or Save shows it first; check it, then select Save to trust it.</string>
     <string name="music_folders_host_key_forget">Forget server key</string>
     <string name="music_folders_host_key_changed">The server key has changed since it was trusted. If you replaced or reinstalled the server, choose Forget server key and test again; otherwise someone may be intercepting the connection.</string>
     <string name="music_folders_nfs_insecure_required">The server only accepts connections from privileged ports, which apps cannot use. Enable the \'insecure\' export option, or \'Allow connections from non-privileged ports\' on Synology and QNAP.</string>

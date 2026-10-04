@@ -158,28 +158,18 @@ class SftpMusicClient
                         val stream = readAhead ?: file.ReadAheadRemoteFileInputStream(READ_AHEAD_REQUESTS, position).also { readAhead = it }
                         stream.read(buffer, offset, length)
                     } else {
-                        closeReadAhead()
+                        readAhead = null
                         file.read(position, buffer, offset, length)
                     }
                 if (count > 0) nextPosition = position + count
                 return if (count > 0) count else -1
             }
 
-            private fun closeReadAhead() {
-                val stream = readAhead
-                readAhead = null
-                stream?.close()
-            }
-
             override fun close() {
                 try {
-                    closeReadAhead()
+                    file.close()
                 } finally {
-                    try {
-                        file.close()
-                    } finally {
-                        connection.close()
-                    }
+                    connection.close()
                 }
             }
         }
