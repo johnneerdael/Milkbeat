@@ -5,6 +5,7 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Truth.assertThat
 import io.github.aedev.flow.R
+import io.github.aedev.flow.plugin.pkg.PluginPackage
 import io.github.aedev.flow.plugin.pkg.PluginPackageReader
 import io.github.aedev.flow.plugin.registry.PluginRegistry
 import kotlinx.coroutines.runBlocking
@@ -94,6 +95,19 @@ class PluginInstallerCodeTest {
                 }
             assertThat(failure.messageResource).isEqualTo(R.string.tv_plugins_update_mismatch)
             assertThat(runBlocking { installer.fetch(offered.url, offered) }.pack.manifest.id).isEqualTo(id)
+        }
+
+    @Test
+    fun `a consent kept open for an older version cannot replace a newer one installed meanwhile`() =
+        withInstaller { installer ->
+            val pack = PluginPackageReader.read(fixture.inputStream())
+            val older = PluginPackage(pack.manifest.copy(versionCode = pack.manifest.versionCode - 1), pack.files, pack.signerFingerprint)
+            val stale = installer.check(older, "https://buzzheavier.com/older1234567")
+            runBlocking { installer.install(installer.check(pack, "https://buzzheavier.com/fixture12345")) }
+
+            val failure = assertThrows(PluginInstallException::class.java) { runBlocking { installer.install(stale) } }
+
+            assertThat(failure.messageResource).isEqualTo(R.string.tv_plugins_newer_installed)
         }
 
     @Test

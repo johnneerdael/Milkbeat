@@ -454,6 +454,11 @@
     </plurals>
     <string name="tv_plugins_update_to">Update %1$s</string>
     <string name="tv_plugins_update_check_failed">Could not check for updates. Check the connection and try again.</string>
+    <string name="tv_plugins_newer_installed">A newer version of this plugin is already installed.</string>
+    <plurals name="tv_plugins_updates_failed">
+        <item quantity="one">Could not download %1$d update. Select to try again</item>
+        <item quantity="other">Could not download %1$d updates. Select to try again</item>
+    </plurals>
     <string name="tv_plugins_update_mismatch">The download is not the update that was offered. Check for updates again.</string>
     <string name="tv_plugins_installed">Installed</string>
     <string name="tv_plugins_none_installed">No plugins yet. Add one to browse and play music and videos.</string>

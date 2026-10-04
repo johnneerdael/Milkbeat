@@ -86,6 +86,9 @@ class TvUpdatesViewModelTest {
 
                 pluginState.value = PluginUpdatesState.Checked(emptyList(), setOf("yt"), installed = listOf(waiting))
                 assertThat(awaitItem()).isFalse()
+
+                pluginState.value = PluginUpdatesState.Checked(emptyList(), setOf("yt"), failed = listOf(waiting))
+                expectNoEvents()
             }
         }
 }

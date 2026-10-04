@@ -5,6 +5,7 @@ import io.github.aedev.flow.plugin.pkg.PluginPackage
 import io.github.aedev.flow.plugin.pkg.PluginPackageException
 import io.github.aedev.flow.plugin.pkg.PluginPackageReader
 import io.github.aedev.flow.plugin.registry.InstalledPlugin
+import io.github.aedev.flow.plugin.registry.NewerPluginInstalledException
 import io.github.aedev.flow.plugin.registry.PluginRegistry
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -122,12 +123,16 @@ class PluginInstaller
 
         /** Installs with the permissions the manifest asks for; call only after the listener agreed to [PendingInstall.needsConsent]. */
         suspend fun install(pending: PendingInstall): InstalledPlugin =
-            registry.install(
-                pack = pending.pack,
-                sourceUrl = pending.sourceUrl,
-                grantedNetwork = pending.pack.manifest.permissions.network,
-                grantedBrowser = pending.pack.manifest.permissions.browser,
-            )
+            try {
+                registry.install(
+                    pack = pending.pack,
+                    sourceUrl = pending.sourceUrl,
+                    grantedNetwork = pending.pack.manifest.permissions.network,
+                    grantedBrowser = pending.pack.manifest.permissions.browser,
+                )
+            } catch (e: NewerPluginInstalledException) {
+                throw PluginInstallException(cause = e, messageResource = R.string.tv_plugins_newer_installed)
+            }
     }
 
 private fun sha256(bytes: ByteArray): String = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }

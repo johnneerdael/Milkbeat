@@ -157,6 +157,8 @@ class TvPluginsViewModel
                         val installed = installer.install(consent.pending)
                         if (installed.manifest.signIn.isNotEmpty()) runCatching { accounts.refresh(installed.id) }
                         AddPluginState.Idle
+                    } catch (e: PluginInstallException) {
+                        AddPluginState.Failed(e.message.orEmpty(), e.messageResource)
                     } catch (e: IllegalStateException) {
                         AddPluginState.Failed(e.message ?: "Could not install the plugin")
                     }

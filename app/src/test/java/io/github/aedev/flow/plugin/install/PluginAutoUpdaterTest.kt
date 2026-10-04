@@ -119,7 +119,7 @@ class PluginAutoUpdaterTest {
         }
 
     @Test
-    fun `a browser check or a failed download leaves that update offered and the others still install`() =
+    fun `a browser check waits for review, a failed download is retried, and the others still install`() =
         runTest {
             coEvery { checker.check(any()) } returns listOf(update("yt", 5), update("spotify", 3))
             coEvery { installer.fetch(any(), update("yt", 5)) } throws
@@ -138,7 +138,81 @@ class PluginAutoUpdaterTest {
 
             val offline = updater().updateAll() as PluginUpdatesState.Checked
 
-            assertThat(offline.updates).containsExactly(update("yt", 5))
+            assertThat(offline.updates).isEmpty()
+            assertThat(offline.failed).containsExactly(update("yt", 5))
+        }
+
+    @Test
+    fun `a failed download is tried again next run and is never reported as needing review`() =
+        runTest {
+            coEvery { checker.check(any()) } returns listOf(update("yt", 5))
+            coEvery { installer.fetch(any(), update("yt", 5)) } throws IOException("offline")
+            val updater = updater()
+            backgroundScope.launch { updater.checkWhileForeground() }
+
+            advanceTimeBy(AUTO_UPDATE_FIRST_CHECK_MS + 1)
+            assertThat(updater.report.value).isNull()
+
+            advanceTimeBy(AUTO_UPDATE_INTERVAL_MS)
+            coVerify(exactly = 2) { installer.fetch(any(), update("yt", 5)) }
+        }
+
+    @Test
+    fun `an update the listener already saw waiting in Settings is not announced by the background check`() =
+        runTest {
+            coEvery { checker.check(any()) } returns listOf(update("yt", 5))
+            coEvery { installer.fetch(any(), update("yt", 5)) } returns pending(yt, 5, network = listOf("new.example"))
+            val updater = updater()
+            updater.updateAll()
+
+            backgroundScope.launch { updater.checkWhileForeground() }
+            advanceTimeBy(AUTO_UPDATE_FIRST_CHECK_MS + 1)
+
+            assertThat(updater.report.value).isNull()
+        }
+
+    @Test
+    fun `a background check that joins a run the listener started reports nothing`() =
+        runTest {
+            val release = CompletableDeferred<Unit>()
+            coEvery { checker.check(any()) } coAnswers {
+                release.await()
+                listOf(update("spotify", 3))
+            }
+            val spotifyPending = pending(spotify, 3)
+            coEvery { installer.fetch(any(), update("spotify", 3)) } returns spotifyPending
+            coEvery { installer.install(spotifyPending) } returns installed("spotify", 3)
+            val updater = updater()
+
+            val manual = async { updater.updateAll() }
+            backgroundScope.launch { updater.checkWhileForeground() }
+            advanceTimeBy(AUTO_UPDATE_FIRST_CHECK_MS + 1)
+            release.complete(Unit)
+            manual.await()
+            runCurrent()
+
+            assertThat(updater.report.value).isNull()
+            coVerify(exactly = 1) { checker.check(any()) }
+        }
+
+    @Test
+    fun `marking a report shown keeps what a later run added to it`() =
+        runTest {
+            coEvery { checker.check(any()) } returns listOf(update("spotify", 3))
+            val spotifyPending = pending(spotify, 3)
+            coEvery { installer.fetch(any(), update("spotify", 3)) } returns spotifyPending
+            coEvery { installer.install(spotifyPending) } returns installed("spotify", 3)
+            val updater = updater()
+            backgroundScope.launch { updater.checkWhileForeground() }
+            advanceTimeBy(AUTO_UPDATE_FIRST_CHECK_MS + 1)
+            val shown = updater.report.value!!
+
+            coEvery { checker.check(any()) } returns listOf(update("yt", 5))
+            coEvery { installer.fetch(any(), update("yt", 5)) } returns pending(yt, 5, network = listOf("new.example"))
+            advanceTimeBy(AUTO_UPDATE_INTERVAL_MS)
+            updater.markReported(shown)
+
+            assertThat(updater.report.value).isEqualTo(PluginUpdateReport(installed = emptyList(), needsReview = listOf(update("yt", 5))))
         }
 
     @Test

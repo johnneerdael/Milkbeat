@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.withContext
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -26,11 +27,15 @@ sealed interface PluginUpdatesState {
 
     data object Checking : PluginUpdatesState
 
-    /** [updates] are still to install, each needing the listener's review; [installed] went in by themselves. */
+    /**
+     * [updates] wait for the listener's review (new permissions or a browser check); [failed] could not
+     * be downloaded or installed and are tried again next run; [installed] went in by themselves.
+     */
     data class Checked(
         val updates: List<PluginUpdate>,
         val checked: Set<String>,
         val installed: List<PluginUpdate> = emptyList(),
+        val failed: List<PluginUpdate> = emptyList(),
     ) : PluginUpdatesState
 
     data class Failed(
@@ -43,6 +48,8 @@ data class PluginUpdateReport(
     val installed: List<PluginUpdate>,
     val needsReview: List<PluginUpdate>,
 )
+
+private enum class UpdateOutcome { INSTALLED, NEEDS_REVIEW, FAILED }
 
 /**
  * Keeps the installed plugins current: finds newer versions and installs each one that verifies and
@@ -63,11 +70,11 @@ class PluginAutoUpdater
         private val runState = MutableStateFlow<PluginUpdatesState>(PluginUpdatesState.Idle)
         private val unreported = MutableStateFlow<PluginUpdateReport?>(null)
 
-        /** Updates already reported as needing review, so each is reported once while the app process lives. */
-        private val reportedReviews = HashSet<String>()
+        /** Updates the listener has seen waiting for review, so each is announced once while the app process lives. */
+        private val seenReviews = ConcurrentHashMap.newKeySet<String>()
 
         /** Updates that need the listener's review; their download is not fetched again while the app process lives. */
-        private val heldForReview = HashSet<String>()
+        private val heldForReview = ConcurrentHashMap.newKeySet<String>()
 
         /** Elapsed-realtime of this process's last background run; null until the launch run. */
         private var lastCheckMs: Long? = null
@@ -80,24 +87,13 @@ class PluginAutoUpdater
 
         suspend fun setEnabled(enabled: Boolean) = dataManager.setAutomaticPluginUpdates(enabled)
 
-        fun markReported(report: PluginUpdateReport) {
-            unreported.compareAndSet(report, null)
+        /** Takes what [shown] told the listener out of the report; anything a later run added stays. */
+        fun markReported(shown: PluginUpdateReport) {
+            unreported.update { current -> current?.without(shown) }
         }
 
         /** Checks every installed plugin and installs what it can; a request during a run gets that run's result. */
-        suspend fun updateAll(): PluginUpdatesState {
-            val previous = runState.value
-            if (previous == PluginUpdatesState.Checking || !runState.compareAndSet(previous, PluginUpdatesState.Checking)) {
-                return runState.first { it != PluginUpdatesState.Checking }
-            }
-            var result: PluginUpdatesState = PluginUpdatesState.Idle
-            try {
-                result = run()
-            } finally {
-                runState.value = result
-            }
-            return result
-        }
+        suspend fun updateAll(): PluginUpdatesState = update(background = false)
 
         /** Runs for as long as the caller keeps it running, i.e. while the app is in the foreground. */
         suspend fun checkWhileForeground() {
@@ -108,9 +104,34 @@ class PluginAutoUpdater
                     registry.state.value.plugins
                         .isNotEmpty()
                 ) {
-                    report(updateAll())
+                    update(background = true)
                 }
             }
+        }
+
+        /** Only a run that actually ran in the background is reported; one the listener started shows in Settings. */
+        private suspend fun update(background: Boolean): PluginUpdatesState {
+            val previous = runState.value
+            if (previous == PluginUpdatesState.Checking || !runState.compareAndSet(previous, PluginUpdatesState.Checking)) {
+                return runState.first { it != PluginUpdatesState.Checking }
+            }
+            var result: PluginUpdatesState = PluginUpdatesState.Idle
+            try {
+                result = run()
+            } finally {
+                runState.value = result
+            }
+            val checked = result as? PluginUpdatesState.Checked ?: return result
+            val newReviews = checked.updates.filter { seenReviews.add(it.key()) }
+            if (background && (checked.installed.isNotEmpty() || newReviews.isNotEmpty())) {
+                unreported.update { earlier ->
+                    PluginUpdateReport(
+                        installed = earlier?.installed.orEmpty() + checked.installed,
+                        needsReview = earlier?.needsReview.orEmpty() + newReviews,
+                    )
+                }
+            }
+            return result
         }
 
         private suspend fun run(): PluginUpdatesState {
@@ -121,49 +142,48 @@ class PluginAutoUpdater
                 } catch (e: PluginInstallException) {
                     return PluginUpdatesState.Failed(e.messageResource)
                 }
-            val (installed, left) = updates.partition { install(it) }
-            return PluginUpdatesState.Checked(left, plugins.mapTo(HashSet()) { it.id }, installed)
+            val outcomes = updates.associateWith { install(it) }
+
+            fun withOutcome(outcome: UpdateOutcome) = outcomes.filterValues { it == outcome }.keys.toList()
+            return PluginUpdatesState.Checked(
+                updates = withOutcome(UpdateOutcome.NEEDS_REVIEW),
+                checked = plugins.mapTo(HashSet()) { it.id },
+                installed = withOutcome(UpdateOutcome.INSTALLED),
+                failed = withOutcome(UpdateOutcome.FAILED),
+            )
         }
 
-        /** False leaves [update] offered: it needs consent, a browser check, or its download failed and is tried again next run. */
-        private suspend fun install(update: PluginUpdate): Boolean {
+        private suspend fun install(update: PluginUpdate): UpdateOutcome {
             val key = update.key()
-            if (key in heldForReview) return false
+            if (key in heldForReview) return UpdateOutcome.NEEDS_REVIEW
             return try {
                 val pending = installer.fetch(update.url, update)
                 if (pending.needsConsent) {
                     heldForReview += key
-                    false
+                    UpdateOutcome.NEEDS_REVIEW
                 } else {
                     // The registry writes its file before its state, so a run cancelled by leaving the app must not stop between them.
                     val installed = withContext(NonCancellable) { installer.install(pending) }
                     if (installed.manifest.signIn.isNotEmpty()) runCatching { accounts.refresh(installed.id) }
-                    true
+                    UpdateOutcome.INSTALLED
                 }
             } catch (_: BrowserVerificationRequiredException) {
                 heldForReview += key
-                false
+                UpdateOutcome.NEEDS_REVIEW
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
-                false
-            }
-        }
-
-        private fun report(result: PluginUpdatesState) {
-            val checked = result as? PluginUpdatesState.Checked ?: return
-            val newReviews = checked.updates.filter { reportedReviews.add(it.key()) }
-            if (checked.installed.isEmpty() && newReviews.isEmpty()) return
-            unreported.update { earlier ->
-                PluginUpdateReport(
-                    installed = earlier?.installed.orEmpty() + checked.installed,
-                    needsReview = earlier?.needsReview.orEmpty() + newReviews,
-                )
+                UpdateOutcome.FAILED
             }
         }
     }
 
 private fun PluginUpdate.key(): String = "$pluginId:$versionCode"
+
+private fun PluginUpdateReport.without(shown: PluginUpdateReport): PluginUpdateReport? {
+    val rest = PluginUpdateReport(installed - shown.installed.toSet(), needsReview - shown.needsReview.toSet())
+    return rest.takeIf { it.installed.isNotEmpty() || it.needsReview.isNotEmpty() }
+}
 
 /**
  * The run's findings for the plugins [installed] now: a plugin added since was not checked, so the
@@ -181,6 +201,8 @@ internal fun PluginUpdatesState.forInstalled(installed: List<InstalledPlugin>): 
 
         else -> {
             val versions = installed.associate { it.id to it.manifest.versionCode }
-            copy(updates = updates.filter { update -> versions[update.pluginId]?.let { it < update.versionCode } == true })
+
+            fun stillNewer(update: PluginUpdate) = versions[update.pluginId]?.let { it < update.versionCode } == true
+            copy(updates = updates.filter(::stillNewer), failed = failed.filter(::stillNewer))
         }
     }

@@ -16,7 +16,7 @@ import io.github.aedev.flow.ui.tv.components.TvToggleRow
 
 /**
  * Keeping plugins current: whether they update by themselves, updating them all now, and one row per
- * update left for review (it asks for new permissions or a browser check) to review and install it.
+ * update left over (it asks for new permissions or a browser check, or its download failed) to install it by hand.
  */
 internal fun LazyListScope.pluginUpdateItems(
     state: PluginUpdatesState,
@@ -41,7 +41,7 @@ internal fun LazyListScope.pluginUpdateItems(
             onClick = { if (state != PluginUpdatesState.Checking) onUpdateAll() },
         )
     }
-    val left = (state as? PluginUpdatesState.Checked)?.updates.orEmpty()
+    val left = (state as? PluginUpdatesState.Checked)?.let { it.updates + it.failed }.orEmpty()
     items(left, key = { "update-${it.pluginId}" }) { update ->
         TvNavRow(
             label = stringResource(R.string.tv_plugins_update_to, update.name),
@@ -67,6 +67,10 @@ private fun updatesStatus(state: PluginUpdatesState): String? =
             when {
                 state.updates.isNotEmpty() -> {
                     pluralStringResource(R.plurals.tv_plugins_updates_need_review, state.updates.size, state.updates.size)
+                }
+
+                state.failed.isNotEmpty() -> {
+                    pluralStringResource(R.plurals.tv_plugins_updates_failed, state.failed.size, state.failed.size)
                 }
 
                 state.installed.isNotEmpty() -> {

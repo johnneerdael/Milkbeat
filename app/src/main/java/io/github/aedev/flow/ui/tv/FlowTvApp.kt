@@ -131,6 +131,7 @@ fun FlowTvApp(
                     if (report.installed.isNotEmpty()) {
                         val names = report.installed.joinToString { it.name }
                         snackbarHostState.showNotice(context.getString(R.string.tv_plugins_notice_updated, names), Icons.Outlined.Extension)
+                        updatesViewModel.markReported(report.copy(needsReview = emptyList()))
                     }
                     if (report.needsReview.isNotEmpty()) {
                         val count = report.needsReview.size
@@ -138,8 +139,8 @@ fun FlowTvApp(
                             context.resources.getQuantityString(R.plurals.tv_plugins_notice_review, count, count),
                             Icons.Outlined.Extension,
                         )
+                        updatesViewModel.markReported(report.copy(installed = emptyList()))
                     }
-                    updatesViewModel.markReported(report)
                 }
             }
             updatesViewModel.readyToInstall.collect { version ->
