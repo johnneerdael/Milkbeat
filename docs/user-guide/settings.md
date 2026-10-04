@@ -12,9 +12,9 @@ Install packages, select metadata/audio/video roles, set audio priority, manage 
 
 ## Music folders
 
-Choose local folders, add SMB shares, test access, and edit or remove sources. See [Folders](folders.md).
+Choose local folders, add SMB shares and WebDAV, SFTP or NFS servers, test access, and edit or remove sources. See [Folders](folders.md).
 
-![Music folders settings with local and SMB source actions](images/settings-folders.png)
+![Music folders settings with local folder, SMB, WebDAV, SFTP and NFS actions](images/settings-folders.png)
 
 ## Playback
 

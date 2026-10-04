@@ -15,7 +15,7 @@ The Downloader app accepts code **7170062** for the release download. Subsequent
 
 ## First playback
 
-For your own files, [add a local folder or SMB share](folders.md). No plugin is needed.
+For your own files, [add a local folder or an SMB, WebDAV, SFTP or NFS server](folders.md). No plugin is needed.
 
 For a streaming catalog, [install and select providers](providers.md). The Music tab can be empty until a metadata provider is selected; this does not prevent playback through Library → Folders.
 
