@@ -3,6 +3,7 @@ package io.github.aedev.flow.ui.tv.screens
 import android.app.Application
 import android.graphics.Bitmap
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.mutableStateOf
@@ -18,10 +19,22 @@ import androidx.compose.ui.test.onRoot
 import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Truth.assertThat
 import io.github.aedev.flow.R
+import io.github.aedev.flow.plugin.catalog.toMusicTrack
 import io.github.aedev.flow.plugin.mirror.MirrorPhase
 import io.github.aedev.flow.plugin.mirror.PlaylistMirrorState
+import io.github.aedev.flow.ui.tv.catalog.TvCatalogActions
 import io.github.aedev.flow.ui.tv.theme.TvDimens
 import io.github.aedev.flow.ui.tv.theme.TvTheme
+import nl.neerdael.milkbeat.catalog.Attribution
+import nl.neerdael.milkbeat.catalog.CollectionBlock
+import nl.neerdael.milkbeat.catalog.CollectionLayout
+import nl.neerdael.milkbeat.catalog.EntityHeader
+import nl.neerdael.milkbeat.catalog.EntityKind
+import nl.neerdael.milkbeat.catalog.EntityRef
+import nl.neerdael.milkbeat.catalog.HeaderStyle
+import nl.neerdael.milkbeat.catalog.ItemView
+import nl.neerdael.milkbeat.catalog.MetadataItem
+import nl.neerdael.milkbeat.catalog.TrackDescriptor
 import nl.neerdael.milkbeat.plugin.PluginJson
 import nl.neerdael.milkbeat.plugin.PluginManifest
 import org.junit.Rule
@@ -74,6 +87,46 @@ class TvPlaylistMirrorStatusTest {
         val line = compose.onNodeWithText(context.getString(R.string.playlist_mirror_ready, 11, 1)).getUnclippedBoundsInRoot()
         assertThat(line.right.value).isAtMost(paneWidth.value)
         assertThat(mark.top).isEqualTo(line.top)
+
+        compose.runOnIdle { state.value = state.value.copy(ready = false, error = "synthetic failure") }
+        compose.onNodeWithContentDescription(youtube).assertDoesNotExist()
+        compose.onNodeWithText(context.getString(R.string.playlist_mirror_failed)).assertIsDisplayed()
+    }
+
+    @Test
+    fun `the YouTube mark sits in the playlist page's cover pane`() {
+        val cover =
+            EntityHeader(
+                "cover",
+                HeaderStyle.COVER,
+                EntityRef(EntityKind.PLAYLIST, "spotify:playlist:fixture"),
+                "Late Night Drive",
+                attribution = Attribution("Spotify"),
+                details = listOf("12 songs"),
+            )
+        val items =
+            listOf("Glow", "Hear Me Now", "Portal", "Digital Dream", "Syren", "Ignite", "Dystopia", "Storm 2022", "The Pipe", "Echoes")
+                .mapIndexed { index, title ->
+                    val ref = EntityRef(EntityKind.TRACK, "spotify:track:$index")
+                    MetadataItem("row$index", ref, title, subtitle = "Rebūke", track = TrackDescriptor(ref, title))
+                }
+        val table = CollectionBlock("tracks", null, CollectionLayout.TRACK_TABLE, ItemView.TRACK_ROW, items)
+        val actions = TvCatalogActions({ it.track?.toMusicTrack("spotify") }, {}, { _, _, _, _ -> }, {})
+        val ready = PlaylistMirrorState(total = 12, matched = 11, missing = 1, ready = true)
+        compose.setContent {
+            TvTheme {
+                Surface(Modifier.fillMaxSize()) {
+                    CoverPage(cover, listOf(cover, table), actions, Modifier.fillMaxSize()) {
+                        TvPlaylistMirrorStatus(ready, target("YouTube Music", "ytm")) {}
+                    }
+                }
+            }
+        }
+        compose.mainClock.advanceTimeBy(1000)
+
+        val mark = compose.onNodeWithContentDescription(youtube).assertIsDisplayed().getUnclippedBoundsInRoot()
+        val dimens = TvDimens()
+        assertThat(mark.right.value).isAtMost((dimens.overscanHorizontal + dimens.coverPaneWidth).value)
         System.getProperty("milkbeat.screenshotDir")?.let { dir ->
             File(dir, "playlist-youtube-indicator.png").outputStream().use {
                 compose
@@ -83,10 +136,6 @@ class TvPlaylistMirrorStatusTest {
                     .compress(Bitmap.CompressFormat.PNG, 100, it)
             }
         }
-
-        compose.runOnIdle { state.value = state.value.copy(ready = false, error = "synthetic failure") }
-        compose.onNodeWithContentDescription(youtube).assertDoesNotExist()
-        compose.onNodeWithText(context.getString(R.string.playlist_mirror_failed)).assertIsDisplayed()
     }
 
     @Test
