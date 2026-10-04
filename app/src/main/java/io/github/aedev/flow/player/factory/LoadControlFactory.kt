@@ -93,9 +93,10 @@ object LoadControlFactory {
     }
 
     /**
-     * Music service: audio-only, so a long window costs little memory and a low playback threshold
-     * gets the first note out quickly. No back buffer, and no byte cap — the duration window is the
-     * only budget it needs.
+     * Music service: below [PlayerConfig.MUSIC_MIN_BUFFER_MS] it always loads, within Media3's heap
+     * headroom check; above it, loading runs on to [PlayerConfig.MUSIC_TARGET_BUFFER_BYTES], which holds a
+     * whole song, and stops there, so a music video's picture cannot grow the buffer past that budget.
+     * A low playback threshold still gets the first note out quickly. No back buffer.
      */
     fun forMusic(): DefaultLoadControl =
         build(
@@ -105,7 +106,7 @@ object LoadControlFactory {
             rebufferMs = PlayerConfig.MUSIC_BUFFER_FOR_REBUFFER_MS,
             backBufferMs = 0,
             retainBackBufferFromKeyframe = false,
-            targetBufferBytes = C.LENGTH_UNSET,
+            targetBufferBytes = PlayerConfig.MUSIC_TARGET_BUFFER_BYTES,
         )
 
     /**

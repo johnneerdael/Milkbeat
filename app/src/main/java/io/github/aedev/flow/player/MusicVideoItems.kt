@@ -59,6 +59,20 @@ object MusicVideoItems {
 
     fun preferredProvider(uri: Uri): String? = uri.getQueryParameter("provider")
 
+    /**
+     * The song half of the item at [uri], for a fresh resolve: the track's descriptor and provider stay,
+     * since without them a provider id would be taken for a YouTube video id.
+     */
+    fun songUri(
+        uri: Uri,
+        mediaId: String,
+    ): Uri =
+        uri
+            .buildUpon()
+            .scheme(SONG_SCHEME)
+            .authority(mediaId)
+            .build()
+
     fun videoKey(videoId: String): String = videoId + VIDEO_KEY_SUFFIX
 
     /** The video id a cache key names when it is the picture half of a music video, else null. */

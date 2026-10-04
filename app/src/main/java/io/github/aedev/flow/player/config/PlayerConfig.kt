@@ -45,11 +45,19 @@ object PlayerConfig {
     const val LOW_MEMORY_MAIN_TARGET_BUFFER_BYTES = 4 * 1024 * 1024
     const val MID_MEMORY_MAIN_TARGET_BUFFER_BYTES = 12 * 1024 * 1024
 
-    /** Music buffer window. Audio-only, so a long window is cheap and a low start threshold is safe. */
-    const val MUSIC_MIN_BUFFER_MS = 2_500
-    const val MUSIC_MAX_BUFFER_MS = 30_000
+    /**
+     * Music buffer window. Below the minimum the player always loads (so a music video's picture, which
+     * shares the byte budget below, still keeps this much ahead); above it, loading continues until the
+     * byte budget, which holds a whole song, so a stream url that stops answering later no longer
+     * interrupts a song already in memory.
+     */
+    const val MUSIC_MIN_BUFFER_MS = 30_000
+    const val MUSIC_MAX_BUFFER_MS = 30 * 60_000
     const val MUSIC_BUFFER_FOR_PLAYBACK_MS = 1_000
     const val MUSIC_BUFFER_FOR_REBUFFER_MS = 1_500
+
+    /** About 13 minutes of 160 kbps audio; also bounds a music video, which shares the music player. */
+    const val MUSIC_TARGET_BUFFER_BYTES = 16 * 1024 * 1024
 
     /** Preferred delay from the true live edge. Keeps YouTube live playback stable. */
     const val LIVE_EDGE_GAP_MS = 10_000L
