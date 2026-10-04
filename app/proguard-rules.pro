@@ -95,3 +95,10 @@
 -dontwarn javax.el.FunctionMapper
 -dontwarn javax.el.ValueExpression
 -dontwarn javax.el.VariableMapper
+
+
+## SFTP: sshj reaches BouncyCastle only through the JCA provider, which instantiates every algorithm
+## (X25519, Ed25519, ECDH, AES-GCM, bcrypt key derivation...) from class names held in strings.
+-keep class org.bouncycastle.jce.provider.BouncyCastleProvider { *; }
+-keep class org.bouncycastle.jcajce.provider.** { *; }
+-dontwarn org.bouncycastle.**

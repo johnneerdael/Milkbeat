@@ -227,6 +227,7 @@ dependencies {
     implementation(libs.quickjs.kt)
     implementation(libs.smbj)
     implementation(libs.sshj)
+    implementation(libs.bouncycastle.bcprov)
     // Berkeley DB backs only nfs4j's server-side state store; the client never loads it.
     implementation(libs.nfs4j.core) { exclude(group = "com.sleepycat") }
     constraints {
