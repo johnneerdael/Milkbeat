@@ -34,7 +34,6 @@ internal class Nfs4Session private constructor(
     private val connection: NfsRpcConnection,
     private val auth: NfsAuthSys,
     private val minorVersion: Int,
-    private val exportDepth: Int,
 ) : NfsSession {
     private var clientId: clientid4? = null
     private var sessionId: sessionid4? = null
@@ -47,18 +46,17 @@ internal class Nfs4Session private constructor(
     override fun lookup(components: List<String>): NfsNode {
         val chunks = components.chunked(maxOperations - LOOKUP_FIXED_OPERATIONS).ifEmpty { listOf(emptyList()) }
         var handle: nfs_fh4? = null
-        var offset = 0
         for ((index, chunk) in chunks.withIndex()) {
             val last = index == chunks.lastIndex
             val start = handle
-            val first = offset
+            // knfsd rejects an unprivileged port one op after crossing into the export (GETATTR or the next LOOKUP),
+            // while plain mode-bit and ACL denials answer NFS4ERR_ACCESS, so PERM anywhere in this chain is the port.
             val result =
-                compound({ nfs4RefusedBeforeExport(it.resarray.map(nfs_resop4::resop), first, exportDepth) }) {
+                compound(reachingExport = true) {
                     (if (start == null) withPutrootfh() else withPutfh(start)).withLookup(chunk.joinToString("/")).withGetfh().also {
                         if (last) it.withGetattr(*ATTRIBUTES)
                     }
                 }
-            offset += chunk.size
             handle =
                 result
                     .op(nfs_opnum4.OP_GETFH)
@@ -181,14 +179,14 @@ internal class Nfs4Session private constructor(
     }
 
     private fun compound(
-        reachingExport: (COMPOUND4res) -> Boolean = { false },
+        reachingExport: Boolean = false,
         ops: CompoundBuilder.() -> CompoundBuilder,
     ): COMPOUND4res {
         lateinit var result: COMPOUND4res
         retryWhileDelayed({ result.status }) {
             result = if (minorVersion == 0) send(CompoundBuilder().ops(), checked = false) else sequenced(CompoundBuilder().ops())
         }
-        if (result.status != nfsstat.NFS_OK) throw nfsStatusException(result.status, reachingExport(result))
+        if (result.status != nfsstat.NFS_OK) throw nfsStatusException(result.status, reachingExport)
         return result
     }
 
@@ -267,8 +265,7 @@ internal class Nfs4Session private constructor(
             minorVersion: Int,
         ): Nfs4Session {
             val auth = NfsAuthSys(source.uid, source.gid)
-            val exportDepth = source.nfsExport().split('/').count(String::isNotEmpty)
-            val session = Nfs4Session(NfsRpcConnection.connect(source.host, source.port), auth, minorVersion, exportDepth)
+            val session = Nfs4Session(NfsRpcConnection.connect(source.host, source.port), auth, minorVersion)
             try {
                 if (minorVersion > 0) session.establishSession()
                 return session
