@@ -28,7 +28,10 @@ internal enum class FolderAccess { IDLE, RUNNING, SUCCESS, FAILED }
 internal data class MusicFolderEditor(
     val source: MusicFolder,
     val port: String = source.port.toString(),
+    val uid: String = source.uid.toString(),
+    val gid: String = source.gid.toString(),
     val password: String? = null,
+    val privateKey: String? = null,
     val access: FolderAccess = FolderAccess.IDLE,
     val error: Int? = null,
     val busy: Boolean = false,
@@ -39,8 +42,10 @@ internal data class MusicFolderEditor(
             host = source.host.trim(),
             share = source.share.trim(),
             root = source.root.trim(),
-            port =
-                port.toIntOrNull() ?: 0,
+            url = source.url.trim(),
+            port = port.toIntOrNull() ?: 0,
+            uid = uid.toIntOrNull() ?: -1,
+            gid = gid.toIntOrNull() ?: -1,
         )
 }
 
@@ -78,10 +83,16 @@ internal class MusicFoldersViewModel
         private var browseJob: Job? = null
         private var metadataJob: Job? = null
 
-        fun edit(source: MusicFolder? = null) {
+        fun edit(source: MusicFolder) {
             accessJob?.cancel()
-            mutableEditor.value =
-                MusicFolderEditor(source ?: MusicFolder(name = "", kind = MusicFolderKind.SMB), password = if (source == null) "" else null)
+            mutableEditor.value = MusicFolderEditor(source)
+            mutableMessage.value = null
+        }
+
+        fun create(kind: MusicFolderKind) {
+            require(kind != MusicFolderKind.LOCAL)
+            accessJob?.cancel()
+            mutableEditor.value = MusicFolderEditor(MusicFolder(name = "", kind = kind), password = "", privateKey = "")
             mutableMessage.value = null
         }
 
@@ -102,21 +113,23 @@ internal class MusicFoldersViewModel
             if (draft.busy || draft.access == FolderAccess.RUNNING) return
             val source = draft.configured()
             if (!source.isValid()) {
-                mutableEditor.value = draft.copy(error = R.string.music_folders_invalid)
+                mutableEditor.value = draft.copy(error = invalidMessage(source.kind))
                 return
             }
             accessJob =
                 viewModelScope.launch {
                     mutableEditor.value = draft.copy(access = FolderAccess.RUNNING, error = null)
                     try {
-                        repository.test(source, draft.password)
-                        mutableEditor.update { it?.copy(access = FolderAccess.SUCCESS) }
+                        val tested = repository.test(source, draft.password, draft.privateKey)
+                        mutableEditor.update {
+                            it?.copy(source = it.source.copy(hostKey = tested.hostKey), access = FolderAccess.SUCCESS)
+                        }
                     } catch (
                         cancelled: CancellationException,
                     ) {
                         throw cancelled
-                    } catch (_: Exception) {
-                        mutableEditor.update { it?.copy(access = FolderAccess.FAILED) }
+                    } catch (error: Exception) {
+                        mutableEditor.update { it?.copy(access = FolderAccess.FAILED, error = folderAccessMessage(error)) }
                     }
                 }
         }
@@ -126,7 +139,7 @@ internal class MusicFoldersViewModel
             if (draft.busy) return
             val source = draft.configured()
             if (!source.isValid()) {
-                mutableEditor.value = draft.copy(error = R.string.music_folders_invalid)
+                mutableEditor.value = draft.copy(error = invalidMessage(source.kind))
                 return
             }
             accessJob?.cancel()
@@ -134,15 +147,15 @@ internal class MusicFoldersViewModel
                 viewModelScope.launch {
                     mutableEditor.value = draft.copy(busy = true, access = FolderAccess.IDLE, error = null)
                     try {
-                        repository.save(source, if (source.guest) "" else draft.password)
+                        repository.save(source, if (source.guest) "" else draft.password, draft.privateKey)
                         mutableEditor.value = null
                         mutableMessage.value = R.string.music_folders_saved
                     } catch (
                         cancelled: CancellationException,
                     ) {
                         throw cancelled
-                    } catch (_: Exception) {
-                        mutableEditor.value = draft.copy(error = R.string.music_folders_save_failed)
+                    } catch (error: Exception) {
+                        mutableEditor.value = draft.copy(error = folderAccessMessage(error) ?: R.string.music_folders_save_failed)
                     }
                 }
         }
@@ -178,6 +191,26 @@ internal class MusicFoldersViewModel
                         pickerFailed()
                     }
                 }
+        }
+
+        fun importPrivateKey(uri: Uri) {
+            if (mutableEditor.value?.busy != false) return
+            accessJob?.cancel()
+            accessJob =
+                viewModelScope.launch {
+                    try {
+                        val key = repository.readPrivateKey(uri)
+                        mutableEditor.update { it?.copy(privateKey = key, access = FolderAccess.IDLE, error = null) }
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (_: Exception) {
+                        mutableEditor.update { it?.copy(error = R.string.music_folders_private_key_failed) }
+                    }
+                }
+        }
+
+        fun privateKeyPickerFailed() {
+            mutableEditor.update { it?.copy(error = R.string.music_folders_private_key_failed) }
         }
 
         fun pickerFailed() {

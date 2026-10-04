@@ -48,6 +48,11 @@ class MusicFolderRepository
             store.save(trusted, password, privateKey)
         }
 
+        suspend fun readPrivateKey(uri: Uri): String =
+            runInterruptible(PerformanceDispatcher.diskIO) { documents.readText(uri, MAX_PRIVATE_KEY_BYTES) }.also {
+                require(it.isNotBlank())
+            }
+
         suspend fun remove(source: MusicFolder) {
             store.remove(source.id)
             if (source.kind == MusicFolderKind.LOCAL && folders.first().none { it.treeUri == source.treeUri }) {
@@ -92,5 +97,9 @@ class MusicFolderRepository
                         .thenBy { it.location },
                 )
             }
+        }
+
+        private companion object {
+            const val MAX_PRIVATE_KEY_BYTES = 64 * 1024
         }
     }

@@ -78,4 +78,37 @@ class MusicFolderStoreTest {
                 scope.cancel()
             }
         }
+
+    @Test fun privateKeysAreSealedKeptOnEditAndRemovedWithTheFolder() =
+        runBlocking<Unit> {
+            val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+            val data = PreferenceDataStoreFactory.create(scope = scope) { temp.newFile("keys.preferences_pb") }
+            val store = MusicFolderStore(data, { "sealed:" + it.reversed() }, { it?.removePrefix("sealed:")?.reversed().orEmpty() })
+            try {
+                val source = MusicFolder(name = "Box", kind = MusicFolderKind.SFTP, host = "box", keyAuth = true, hostKey = "k")
+                store.save(source, "passphrase", "-----BEGIN OPENSSH PRIVATE KEY-----")
+                assertThat(
+                    data.data
+                        .first()
+                        .asMap()
+                        .values
+                        .joinToString(),
+                ).doesNotContain("BEGIN OPENSSH")
+                store.save(source.copy(name = "Renamed"), null, null)
+                val saved = store.folders.first().single()
+                val access = store.access(saved.id, saved.revision)
+                assertThat(access.secrets.password).isEqualTo("passphrase")
+                assertThat(access.secrets.privateKey).isEqualTo("-----BEGIN OPENSSH PRIVATE KEY-----")
+                store.remove(source.id)
+                assertThat(
+                    data.data
+                        .first()
+                        .asMap()
+                        .keys
+                        .map { it.name },
+                ).containsExactly("sources")
+            } finally {
+                scope.cancel()
+            }
+        }
 }

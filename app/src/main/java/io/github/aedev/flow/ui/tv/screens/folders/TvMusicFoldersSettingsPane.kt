@@ -24,6 +24,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.aedev.flow.R
 import io.github.aedev.flow.data.folders.MusicFolderKind
 import io.github.aedev.flow.ui.screens.folders.MusicFoldersViewModel
+import io.github.aedev.flow.ui.screens.folders.addLabelRes
+import io.github.aedev.flow.ui.screens.folders.labelRes
 import io.github.aedev.flow.ui.tv.components.TvButton
 import io.github.aedev.flow.ui.tv.components.TvNavRow
 import io.github.aedev.flow.ui.tv.components.TvSectionHeader
@@ -66,21 +68,14 @@ internal fun TvMusicFoldersSettingsPane(viewModel: MusicFoldersViewModel = hiltV
                             }
                         })
                     }
-                    item(key = "smb") { TvButton(stringResource(R.string.music_folders_add_smb), { viewModel.edit() }) }
+                    items(NETWORK_KINDS, key = { it.name }) { kind ->
+                        TvButton(stringResource(kind.addLabelRes()), { viewModel.create(kind) })
+                    }
                     message?.let { res -> item(key = "message") { Text(stringResource(res), style = MaterialTheme.typography.bodyMedium) } }
                     items(folders, key = { it.id }) { source ->
                         TvNavRow(
                             label = source.name,
-                            value =
-                                stringResource(
-                                    if (source.kind ==
-                                        MusicFolderKind.LOCAL
-                                    ) {
-                                        R.string.music_folders_local
-                                    } else {
-                                        R.string.music_folders_smb
-                                    },
-                                ),
+                            value = stringResource(source.kind.labelRes()),
                             leadingIcon = Icons.Outlined.Folder,
                             onClick = { viewModel.edit(source) },
                         )
@@ -90,3 +85,5 @@ internal fun TvMusicFoldersSettingsPane(viewModel: MusicFoldersViewModel = hiltV
         }
     }
 }
+
+private val NETWORK_KINDS = MusicFolderKind.entries.filter { it != MusicFolderKind.LOCAL }
