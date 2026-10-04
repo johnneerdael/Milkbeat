@@ -1,56 +1,68 @@
 package io.github.aedev.flow.plugin.playback
 
 import nl.neerdael.milkbeat.catalog.TrackDescriptor
+import java.text.Normalizer
+import java.util.Locale
 import kotlin.math.abs
 
-/**
- * How well an audio plugin's track stands for a track another plugin describes, the way Meld matches
- * Spotify to YouTube Music: title (45%), first artist (35%) and duration (20%), each compared after
- * normalisation. A shared ISRC is certain. Live, karaoke, cover and similar uploads the described
- * title does not ask for rank lower, but keep their raw score.
- */
 internal object TrackMatchScore {
-    /** The least raw score a candidate needs to be played at all. */
     const val MIN_SCORE = 0.35
     private const val CERTAIN = 1.0
     private const val EARLY_EXIT = 0.95
+    private const val MIN_TITLE_SIMILARITY = 0.88
+    private const val MIN_ARTIST_SIMILARITY = 0.92
+    private const val MAX_DURATION_DELTA_MS = 10_000L
     private const val TITLE_WEIGHT = 0.45
     private const val ARTIST_WEIGHT = 0.35
     private const val DURATION_WEIGHT = 0.20
     private const val UNKNOWN_DURATION = 0.5
-    private const val PENALTY_PER_MARKER = 0.15
-    private const val MAX_PENALTY = 0.30
     private const val ISRC = "isrc"
 
-    private val featuring = Regex("\\(feat\\..*?\\)")
-    private val ft = Regex("\\(ft\\..*?\\)")
-    private val brackets = Regex("\\[.*?]")
-    private val remaster = Regex("\\(.*?remaster.*?\\)", RegexOption.IGNORE_CASE)
-    private val remix = Regex("\\(.*?remix.*?\\)", RegexOption.IGNORE_CASE)
-    private val nonAlphanumeric = Regex("[^\\p{L}\\p{N}\\s]")
+    private val bracketedFeature = Regex("[\\[(]\\s*(?:feat(?:uring)?|ft|with)\\b[^)\\]]*[)\\]]", RegexOption.IGNORE_CASE)
+    private val trailingFeature = Regex("\\s+(?:feat(?:uring)?|ft)\\.?\\s+.*?(?=\\s*[\\[(]|\\s+[-–—]\\s+|$)", RegexOption.IGNORE_CASE)
+    private val featurePrefix = Regex("^\\s*(?:\\(|\\[)?\\s*(?:feat(?:uring)?|ft|with)\\b\\.?\\s*", RegexOption.IGNORE_CASE)
+    private const val CATALOG_LABEL =
+        "(?:(?:\\d{4}\\s+)?re[- ]?master(?:ed)?(?:\\s+\\d{4})?(?:\\s+version)?|" +
+            "clean|explicit|bonus track)"
+    private const val VIDEO_LABEL = "(?:official (?:music )?(?:video|audio|visuali[sz]er)|(?:official )?lyrics?|lyric video|music video)"
+    private val bracketedDecoration = Regex("[\\[(]\\s*(?:$CATALOG_LABEL|$VIDEO_LABEL)\\s*[)\\]]", RegexOption.IGNORE_CASE)
+    private val trailingDecoration = Regex("\\s+[-–—]\\s*(?:$CATALOG_LABEL|$VIDEO_LABEL)\\s*$", RegexOption.IGNORE_CASE)
+    private val versionAbbreviation = Regex("\\bver\\b")
+    private val versionWord = Regex("\\bversion\\b")
+    private val latinAccents = Regex("(?<=\\p{sc=Latin})\\p{M}+")
+    private val apostrophes = Regex("['’]")
+    private val nonAlphanumeric = Regex("[^\\p{L}\\p{N}\\p{M}\\s]")
     private val spaces = Regex("\\s+")
+    private val topicSuffix = Regex("\\s+-\\s+topic$", RegexOption.IGNORE_CASE)
+    private val imitationMarkers = Regex("\\b(?:tribute|karaoke|cover|covers|rendition|renditions)\\b")
+    private val unavailableArtists = setOf("", "unknown artist", "various artists", "release", "release topic")
     private val variantMarkers =
         Regex(
-            "\\b(live|en vivo|en directo|ao vivo|karaoke|cover|instrumental|sped up|spedup|slowed|nightcore|8d|" +
-                "music video|official video|lyric video)\\b",
+            "\\b(?:live|en vivo|en directo|ao vivo|acoustic|unplugged|stripped|remix|rework|mashup|dub|mix|edit|vip|" +
+                "karaoke|cover|instrumental|piano|demo|session|sped up|spedup|slowed|nightcore|8d|mono|stereo|" +
+                "a cappella|acapella|orchestral|orchestra|symphonic|re recording|re recorded|reverb|binaural|solo|alternate|alternative)\\b",
+        )
+    private val versionAliases =
+        listOf(
+            Regex("\\b(?:ao vivo|en vivo|en directo)\\b") to "live",
+            Regex("\\b(?:akustik|ac[uú]stic[oa]|acoustique)\\b") to "acoustic",
         )
 
-    /** The candidate that best stands for [track], or null when none scores at least [MIN_SCORE]. */
     fun best(
         track: TrackDescriptor,
         candidates: List<TrackDescriptor>,
     ): Scored? {
+        candidates.firstOrNull { sharesIsrc(track, it) }?.let { return Scored(it, CERTAIN) }
         var best: Scored? = null
-        var bestRanked = Double.NEGATIVE_INFINITY
         for (candidate in candidates) {
-            val score = score(track, candidate)
+            val evidence = evidence(track, candidate)
+            if (evidence.title < MIN_TITLE_SIMILARITY || evidence.artist < MIN_ARTIST_SIMILARITY) continue
+            if (!versionsCompatible(track.title, candidate.title) || !durationsCompatible(track.durationMs, candidate.durationMs)) continue
+            if (!guestsCompatible(track, candidate)) continue
+            val score = evidence.score
             if (score < MIN_SCORE) continue
-            val ranked = score - variantPenalty(track.title, candidate.title)
-            if (ranked > bestRanked) {
-                best = Scored(candidate, score)
-                bestRanked = ranked
-            }
-            if (ranked >= EARLY_EXIT) break
+            if (best == null || score > best.score) best = Scored(candidate, score)
+            if (score >= EARLY_EXIT) break
         }
         return best
     }
@@ -59,38 +71,140 @@ internal object TrackMatchScore {
         track: TrackDescriptor,
         candidate: TrackDescriptor,
     ): Double {
-        val isrc = track.ids[ISRC]
-        if (!isrc.isNullOrBlank() && isrc.equals(candidate.ids[ISRC], ignoreCase = true)) return CERTAIN
-        val title = similarity(normalize(track.title), normalize(candidate.title))
-        val artist =
-            similarity(
-                normalize(
-                    track.artists
-                        .firstOrNull()
-                        ?.name
-                        .orEmpty(),
-                ),
-                normalize(
-                    candidate.artists
-                        .firstOrNull()
-                        ?.name
-                        .orEmpty(),
-                ),
-            )
-        return title * TITLE_WEIGHT + artist * ARTIST_WEIGHT + durationScore(track.durationMs, candidate.durationMs) * DURATION_WEIGHT
+        if (sharesIsrc(track, candidate)) return CERTAIN
+        return evidence(track, candidate).score
     }
 
-    internal fun normalize(text: String): String =
-        text
-            .lowercase()
-            .replace(featuring, "")
-            .replace(ft, "")
-            .replace(brackets, "")
-            .replace(remaster, "")
-            .replace(remix, "")
-            .replace(nonAlphanumeric, "")
-            .replace(spaces, " ")
-            .trim()
+    internal fun normalize(text: String): String {
+        val cleaned =
+            text
+                .replace(bracketedFeature, " ")
+                .replace(trailingFeature, " ")
+                .replace(bracketedDecoration, " ")
+                .replace(trailingDecoration, " ")
+        val normalized =
+            versionAliases.fold(normalizeText(cleaned).replace(versionAbbreviation, "version")) { name, (pattern, canonical) ->
+                name.replace(pattern, canonical)
+            }
+        return if (variantMarkers.containsMatchIn(normalized)) {
+            normalized.replace(versionWord, " ").replace(spaces, " ").trim()
+        } else {
+            normalized
+        }
+    }
+
+    private fun normalizeText(text: String): String {
+        val unicode = Normalizer.normalize(text, Normalizer.Form.NFKC).lowercase(Locale.ROOT)
+        val normalized =
+            unicode
+                .replace("&", " and ")
+                .replace(apostrophes, "")
+                .replace(nonAlphanumeric, " ")
+                .replace(spaces, " ")
+                .trim()
+        return normalized.ifEmpty { unicode.replace(spaces, " ").trim() }
+    }
+
+    private fun foldLatinAccents(text: String): String =
+        Normalizer.normalize(Normalizer.normalize(text, Normalizer.Form.NFD).replace(latinAccents, ""), Normalizer.Form.NFC)
+
+    private fun textSimilarity(
+        a: String,
+        b: String,
+    ): Double = maxOf(similarity(a, b), similarity(foldLatinAccents(a), foldLatinAccents(b)))
+
+    private fun evidence(
+        track: TrackDescriptor,
+        candidate: TrackDescriptor,
+    ): Evidence =
+        Evidence(
+            textSimilarity(normalize(track.title), normalize(candidate.title)),
+            artistSimilarity(
+                track.artists
+                    .firstOrNull()
+                    ?.name
+                    .orEmpty(),
+                candidate.artists
+                    .firstOrNull()
+                    ?.name
+                    .orEmpty(),
+            ),
+            durationScore(track.durationMs, candidate.durationMs),
+        )
+
+    private fun artistSimilarity(
+        artist: String,
+        candidate: String,
+    ): Double {
+        val a = normalizeText(artist.replace(trailingFeature, " ").replace(bracketedFeature, " ").replace(topicSuffix, ""))
+        val b = normalizeText(candidate.replace(trailingFeature, " ").replace(bracketedFeature, " ").replace(topicSuffix, ""))
+        if (a in unavailableArtists || b in unavailableArtists) return 0.0
+        if (!imitationCompatible(a, b)) return 0.0
+        return maxOf(textSimilarity(a, b), textSimilarity(a.replace(" ", ""), b.replace(" ", "")))
+    }
+
+    private fun imitationCompatible(
+        a: String,
+        b: String,
+    ): Boolean = imitationMarkers.findAll(a).map { it.value }.toSet() == imitationMarkers.findAll(b).map { it.value }.toSet()
+
+    private fun sharesIsrc(
+        track: TrackDescriptor,
+        candidate: TrackDescriptor,
+    ): Boolean {
+        val isrc = track.ids[ISRC]
+        return !isrc.isNullOrBlank() && isrc.equals(candidate.ids[ISRC], ignoreCase = true)
+    }
+
+    private fun guestCredits(track: TrackDescriptor): Set<String> {
+        val explicit =
+            (listOf(track.title) + track.artists.map { it.name }).flatMap { text ->
+                (bracketedFeature.findAll(text) + trailingFeature.findAll(text))
+                    .map { match ->
+                        match.value.replace(featurePrefix, "").trim(' ', ')', ']')
+                    }.toList()
+            }
+        return (track.artists.drop(1).map { it.name } + explicit).map(::normalizeText).filter { it !in unavailableArtists }.toSet()
+    }
+
+    private fun guestsCompatible(
+        track: TrackDescriptor,
+        candidate: TrackDescriptor,
+    ): Boolean {
+        val a = guestCredits(track)
+        val b = guestCredits(candidate)
+        if (a.isEmpty() || b.isEmpty()) return true
+
+        fun creditMatches(
+            credit: String,
+            other: String,
+        ): Boolean =
+            imitationCompatible(credit, other) &&
+                (
+                    textSimilarity(credit, other) >= MIN_ARTIST_SIMILARITY ||
+                        " $credit ".contains(" $other ") || " $other ".contains(" $credit ")
+                )
+        return a.all { credit -> b.any { creditMatches(credit, it) } } && b.all { credit -> a.any { creditMatches(credit, it) } }
+    }
+
+    private fun versionsCompatible(
+        title: String,
+        candidate: String,
+    ): Boolean {
+        val a = normalize(title)
+        val b = normalize(candidate)
+        val aMarkers = variantMarkers.findAll(a).map { it.value }.toSet() + versionWord.findAll(a).map { it.value }
+        val bMarkers = variantMarkers.findAll(b).map { it.value }.toSet() + versionWord.findAll(b).map { it.value }
+        if (aMarkers != bMarkers) return false
+        return aMarkers.isEmpty() || foldLatinAccents(a) == foldLatinAccents(b)
+    }
+
+    private fun durationsCompatible(
+        trackMs: Long?,
+        candidateMs: Long?,
+    ): Boolean =
+        trackMs == null || candidateMs == null || trackMs <= 0 || candidateMs <= 0 ||
+            abs(trackMs - candidateMs) <= MAX_DURATION_DELTA_MS
 
     /** The Dice coefficient of the two strings' character bigrams. */
     internal fun similarity(
@@ -111,7 +225,7 @@ internal object TrackMatchScore {
         trackMs: Long?,
         candidateMs: Long?,
     ): Double {
-        if (trackMs == null || candidateMs == null || trackMs <= 0) return UNKNOWN_DURATION
+        if (trackMs == null || candidateMs == null || trackMs <= 0 || candidateMs <= 0) return UNKNOWN_DURATION
         val seconds = abs(trackMs / 1000 - candidateMs / 1000)
         return when {
             seconds <= 2 -> 1.0
@@ -122,13 +236,12 @@ internal object TrackMatchScore {
         }
     }
 
-    private fun variantPenalty(
-        title: String,
-        candidateTitle: String,
-    ): Double {
-        val asked = variantMarkers.findAll(title.lowercase()).map { it.value }.toSet()
-        val extra = variantMarkers.findAll(candidateTitle.lowercase()).map { it.value }.toSet() - asked
-        return (extra.size * PENALTY_PER_MARKER).coerceAtMost(MAX_PENALTY)
+    private data class Evidence(
+        val title: Double,
+        val artist: Double,
+        val duration: Double,
+    ) {
+        val score: Double get() = title * TITLE_WEIGHT + artist * ARTIST_WEIGHT + duration * DURATION_WEIGHT
     }
 
     class Scored(
