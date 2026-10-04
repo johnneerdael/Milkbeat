@@ -29,6 +29,7 @@ import nl.neerdael.milkbeat.plugin.Roles
 internal class PlaylistMirrorRunnerFixture(
     count: Int,
     batchMatching: Boolean = false,
+    artwork: MirrorArtwork? = null,
 ) {
     val key = MirrorKey("source", "a", "target", "b", EntityRef(EntityKind.PLAYLIST, "playlist"))
     val host = mockk<PluginHost>()
@@ -75,7 +76,7 @@ internal class PlaylistMirrorRunnerFixture(
                 checkpoints += record
             }
         }
-    val runner = PlaylistMirrorRunner(host, registry, accountProvider, matcher, storage)
+    val runner = PlaylistMirrorRunner(host, registry, accountProvider, matcher, storage, artworkLoader = artwork)
 
     init {
         val plugins =

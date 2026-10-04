@@ -5,10 +5,12 @@ import io.github.aedev.flow.plugin.playback.AudioBatchIndexingResult
 import io.github.aedev.flow.plugin.runtime.PluginCallException
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.mockk
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.test.runTest
+import nl.neerdael.milkbeat.catalog.Artwork
 import nl.neerdael.milkbeat.catalog.EntityKind
 import nl.neerdael.milkbeat.catalog.EntityRef
 import nl.neerdael.milkbeat.catalog.PrivatePlaylistImportMode
@@ -94,7 +96,7 @@ class PlaylistMirrorBatchRunnerTest {
                 AudioBatchIndexingResult(
                     tracks.map(f.match),
                     playlist = request?.let { PrivatePlaylistImportResult(EntityRef(EntityKind.PLAYLIST, "copy")) },
-                    errors = listOf(null, null, PluginError(PluginErrorCode.NETWORK, "offline"), null),
+                    errors = tracks.map { PluginError(PluginErrorCode.NETWORK, "offline").takeIf { _ -> it == f.tracks[2] } },
                 )
             }
             val failure = runCatching { f.runner.prepare(f.key, "Playlist") }.exceptionOrNull()
@@ -121,6 +123,47 @@ class PlaylistMirrorBatchRunnerTest {
             assertThat(result.destination?.providerId).isEqualTo("replacement")
             assertThat(f.batchCalls.last()).containsExactlyElementsIn(f.tracks.drop(2)).inOrder()
             assertThat(result.matches.map { it.sourcePosition }).containsExactly(0, 1, 2, 3).inOrder()
+        }
+
+    @Test
+    fun `a refused match pauses and resumes the run instead of ending it`() =
+        runTest {
+            val f = PlaylistMirrorRunnerFixture(4, batchMatching = true)
+            var refused = false
+            f.batch = { tracks, request ->
+                val error = PluginError(PluginErrorCode.RATE_LIMITED, "paused", retryAfterMs = 20_000).takeUnless { refused }
+                refused = true
+                AudioBatchIndexingResult(
+                    tracks.map(f.match),
+                    playlist = request?.let { PrivatePlaylistImportResult(EntityRef(EntityKind.PLAYLIST, "copy")) },
+                    errors = listOf(null, null, error, null).take(tracks.size),
+                )
+            }
+
+            val result = f.runner.prepare(f.key, "Playlist")
+
+            assertThat(result.ready).isTrue()
+            assertThat(result.matches.map { it.sourcePosition }).containsExactly(0, 1, 2, 3).inOrder()
+            assertThat(f.batchCalls.last()).containsExactlyElementsIn(f.tracks.drop(2)).inOrder()
+            assertThat(testScheduler.currentTime).isAtLeast(20_000L)
+        }
+
+    @Test
+    fun `a failed artwork fetch pauses and resumes the run instead of ending it`() =
+        runTest {
+            val artwork = mockk<MirrorArtwork>()
+            var calls = 0
+            coEvery { artwork.fetch(any(), any()) } coAnswers {
+                if (++calls == 1) throw PluginCallException("source", PluginError(PluginErrorCode.NETWORK, "cover offline"))
+                null
+            }
+            val f = PlaylistMirrorRunnerFixture(2, batchMatching = true, artwork = artwork)
+
+            val result = f.runner.prepare(f.key, "Playlist", artwork = Artwork("https://i.scdn.co/image/cover"))
+
+            assertThat(result.ready).isTrue()
+            assertThat(calls).isEqualTo(2)
+            assertThat(testScheduler.currentTime).isAtLeast(5_000L)
         }
 
     @Test
