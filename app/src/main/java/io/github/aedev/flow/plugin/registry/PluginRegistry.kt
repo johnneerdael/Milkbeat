@@ -4,10 +4,13 @@ import android.content.Context
 import android.util.Log
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.aedev.flow.plugin.pkg.PluginPackage
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -70,6 +73,28 @@ class PluginRegistry
         private val _state = MutableStateFlow(load())
 
         val state: StateFlow<PluginRegistryState> = _state.asStateFlow()
+
+        init {
+            CoroutineScope(SupervisorJob() + Dispatchers.IO).launch { refreshInstalledManifests() }
+        }
+
+        /**
+         * Reads each manifest again from its installed package: the saved copy was written by whichever app
+         * version installed the plugin, and would hide anything that version's manifest model did not know,
+         * such as a role capability the plugin declares, after an app update.
+         */
+        internal suspend fun refreshInstalledManifests() =
+            mutex.withLock {
+                val current =
+                    withContext(Dispatchers.IO) {
+                        withInstalledManifests(
+                            _state.value,
+                        ) { plugin -> File(directory(plugin), MANIFEST).takeIf { it.isFile }?.readText() }
+                    }
+                if (current != _state.value) {
+                    runCatching { update { current } }.onFailure { Log.w(TAG, "Could not save refreshed plugin manifests", it) }
+                }
+            }
 
         /** Where [plugin]'s unpacked files are. */
         fun directory(plugin: InstalledPlugin): File = File(File(root, plugin.id), plugin.manifest.versionCode.toString())
@@ -180,19 +205,9 @@ class PluginRegistry
             check(temp.renameTo(file)) { "Could not save the plugin registry" }
         }
 
-        /**
-         * The saved registry with each manifest read again from its installed package: the saved copy was
-         * written by whichever app version installed the plugin, and would hide anything that version's
-         * manifest model did not know, such as a role capability the plugin declares, after an app update.
-         */
-        private fun load(): PluginRegistryState {
-            val saved =
-                runCatching { PluginJson.decodeFromString(PluginRegistryState.serializer(), file.readText()) }
-                    .getOrDefault(PluginRegistryState())
-            val current = withInstalledManifests(saved) { plugin -> File(directory(plugin), MANIFEST).takeIf { it.isFile }?.readText() }
-            if (current != saved) runCatching { save(current) }.onFailure { Log.w(TAG, "Could not save refreshed plugin manifests", it) }
-            return current
-        }
+        private fun load(): PluginRegistryState =
+            runCatching { PluginJson.decodeFromString(PluginRegistryState.serializer(), file.readText()) }
+                .getOrDefault(PluginRegistryState())
 
         private companion object {
             const val TAG = "PluginRegistry"

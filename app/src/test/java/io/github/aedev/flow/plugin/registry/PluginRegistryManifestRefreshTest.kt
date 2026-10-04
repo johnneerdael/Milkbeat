@@ -3,6 +3,7 @@ package io.github.aedev.flow.plugin.registry
 import android.app.Application
 import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Truth.assertThat
+import kotlinx.coroutines.runBlocking
 import nl.neerdael.milkbeat.plugin.PluginJson
 import org.junit.Before
 import org.junit.Test
@@ -42,11 +43,13 @@ class PluginRegistryManifestRefreshTest {
         File(root, "nl.neerdael.youtube-music/10").apply { mkdirs() }.resolve("manifest.json").writeText(text)
     }
 
+    private fun refreshed() = PluginRegistry(context).also { runBlocking { it.refreshInstalledManifests() } }
+
     @Test
     fun `an app update reads the capabilities the installed plugin declares`() {
         install(manifest())
 
-        val plugin = PluginRegistry(context).state.value.plugin("nl.neerdael.youtube-music")!!
+        val plugin = refreshed().state.value.plugin("nl.neerdael.youtube-music")!!
 
         assertThat(
             plugin.manifest.roles.audio
@@ -70,7 +73,7 @@ class PluginRegistryManifestRefreshTest {
             clean()
             installed?.let(::install)
 
-            val plugin = PluginRegistry(context).state.value.plugin("nl.neerdael.youtube-music")!!
+            val plugin = refreshed().state.value.plugin("nl.neerdael.youtube-music")!!
 
             assertThat(
                 plugin.manifest.roles.audio
