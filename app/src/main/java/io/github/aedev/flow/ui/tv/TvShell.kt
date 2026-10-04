@@ -36,6 +36,7 @@ import io.github.aedev.flow.ui.tv.navigation.TvBackModel
 import io.github.aedev.flow.ui.tv.navigation.TvDestination
 import io.github.aedev.flow.ui.tv.navigation.TvNavHost
 import io.github.aedev.flow.ui.tv.theme.LocalTvDimens
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
 
@@ -96,8 +97,14 @@ fun TvShell(
     }
 
     // The first screen has nothing focusable but the rail while it loads, so the window's initial
-    // focus would open the rail; it waits for the content to take focus instead.
-    var contentFocusedOnce by remember { mutableStateOf(false) }
+    // focus would open the rail; it waits for the content to take focus instead. A page that never
+    // offers anything to focus must not lock the remote out, so the wait is bounded.
+    var railAcceptsFocus by remember { mutableStateOf(false) }
+    LaunchedEffect(railAcceptsFocus) {
+        if (railAcceptsFocus) return@LaunchedEffect
+        delay(CONTENT_FOCUS_WAIT_MS)
+        railAcceptsFocus = true
+    }
 
     val tabHistory = remember { mutableStateListOf<TvDestination>() }
 
@@ -138,7 +145,7 @@ fun TvShell(
                             }
                         }
                     }.focusGroup()
-                    .onFocusChanged { if (it.hasFocus) contentFocusedOnce = true },
+                    .onFocusChanged { if (it.hasFocus) railAcceptsFocus = true },
         ) {
             Box(modifier = Modifier.weight(1f)) {
                 TvNavHost(
@@ -166,7 +173,7 @@ fun TvShell(
             onSelected = ::selectTab,
             onFocusChanged = { railHasFocus = it },
             selectedFocusRequester = railFocusRequester,
-            acceptsEnteringFocus = contentFocusedOnce,
+            acceptsEnteringFocus = railAcceptsFocus,
             badged = badged,
             modifier =
                 Modifier

@@ -83,4 +83,23 @@ class TransientRetryTest {
             assertThat(stopped).hasMessageThat().isEqualTo("account changed")
             assertThat(calls).isEqualTo(1)
         }
+
+    @Test
+    fun `the retry delay follows the schedule, honours a longer provider delay and ends with it`() {
+        TransientRetryBackoffMs.forEachIndexed { attempt, waitMs ->
+            assertThat(transientRetryDelayMs(failure(PluginErrorCode.NETWORK), attempt)).isEqualTo(waitMs)
+        }
+        assertThat(transientRetryDelayMs(failure(PluginErrorCode.NETWORK), TransientRetryBackoffMs.size)).isNull()
+        assertThat(transientRetryDelayMs(failure(PluginErrorCode.RATE_LIMITED, retryAfterMs = 60_000), 0)).isEqualTo(60_000)
+        assertThat(transientRetryDelayMs(failure(PluginErrorCode.TIMEOUT, retryAfterMs = 1_000), 0))
+            .isEqualTo(TransientRetryBackoffMs.first())
+    }
+
+    @Test
+    fun `no retry delay for a lasting failure or one that is not a plugin's`() {
+        for (code in PluginErrorCode.entries - TransientPluginErrors) {
+            assertThat(transientRetryDelayMs(failure(code), 0)).isNull()
+        }
+        assertThat(transientRetryDelayMs(IllegalStateException("offline"), 0)).isNull()
+    }
 }

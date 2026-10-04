@@ -352,7 +352,7 @@ hard constraints, not suggestions.
     what was measured or verified (frame counts, load times from logs, fetch counts, benchmark
     output) and what was not. Recommendation-engine changes require their offline benchmarks
     (`MusicBenchmarkTest` / `NeuroBenchmarkTest` regression floors) before and after; startup
-    changes require `StartupBenchmarks`, not baseline-profile size.
+    changes require `StartupBenchmark`, not baseline-profile size.
 15. Player-path changes (ExoPlayer/Media3 setup, buffering config, surface handling, track
     selection) must not introduce added latency, buffering stalls, or black-screen/flicker
     regressions. Follow the existing player architecture rather than re-inventing player wiring.
@@ -620,6 +620,22 @@ revision must pass the configured ktlint rules.
 
 ## Building and testing your changes
 
+### Modules, source paths and local setup
+
+- `:app` is the Android app. Kotlin sources live in `app/src/main/java/io/github/aedev/flow/`;
+  the TV shell and navigation are in `ui/tv/`, and route ViewModels are in `ui/screens/`.
+  Unit tests live in `app/src/test/`, with device tests in `app/src/androidTest/`.
+- `:plugin-api` defines the plain Kotlin catalog/plugin contract; `:spike-plugin-runtime` contains
+  runtime experiments. `:benchmark` is the Android baseline-profile and benchmark module
+  configured in `settings.gradle.kts` (there is no `:baselineprofile` module).
+- Use JDK 21, as CI does, with an Android SDK containing platform 37 (`compileSdk = 37`).
+  Supply the SDK through `ANDROID_HOME` or an untracked `local.properties` containing `sdk.dir`.
+  The app targets Android 36, supports API 26+, and compiles Java/Kotlin to JVM 17.
+- `MusicHomeFeedViewModel` owns Home catalog requests, separately from playback. Its state is
+  collected only by `TvMusicScreen` using `collectAsStateWithLifecycle` for the Music route.
+  Automatic first-page retries wait for a state subscriber after backoff; preserve that lifecycle
+  gate when adding consumers. Never tie playback or queue preparation to Home visibility.
+
 1. After making changes, build the relevant flavor to check for compilation errors, e.g.:
 
 ```bash
@@ -650,7 +666,7 @@ revision must pass the configured ktlint rules.
 
 The app ships a generated baseline profile at `app/src/githubRelease/generated/baselineProfiles/`
 (`baseline-prof.txt` drives ART's AOT compilation; `startup-prof.txt` drives dex layout). It is
-generated on a real device by `baselineprofile/`, and the generated files **are committed**.
+generated on a real device by `benchmark/`, and the generated files **are committed**.
 
 ```bash
 ./gradlew :app:generateGithubReleaseBaselineProfile
@@ -680,4 +696,5 @@ run that occupies a physical device, and the resulting diff is thousands of line
   `classes.dex`. Keep `startup-prof.txt` a genuinely small subset of `baseline-prof.txt`.
 - Profile size is **not** a measure of startup work: it records everything executed during the
   journey on any thread, so moving work to a background thread keeps it in the profile. Use
-  `StartupBenchmarks` (`:baselineprofile:connectedBenchmarkReleaseAndroidTest`) to measure.
+  `StartupBenchmark` (`:benchmark:connectedBenchmarkReleaseAndroidTest --no-configuration-cache`)
+  to measure.
