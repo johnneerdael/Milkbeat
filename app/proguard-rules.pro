@@ -95,3 +95,11 @@
 -dontwarn javax.el.FunctionMapper
 -dontwarn javax.el.ValueExpression
 -dontwarn javax.el.VariableMapper
+
+## nfs4j / oncrpc4j (NFS music folders): plain XDR classes constructed directly, so no keep rules are needed.
+# RpcAuthTypeUnix builds a JAAS Subject from these JDK-only principals; the app sends AUTH_SYS through
+# NfsAuthSys instead and never instantiates RpcAuthTypeUnix.
+-dontwarn com.sun.security.auth.UnixNumericGroupPrincipal
+-dontwarn com.sun.security.auth.UnixNumericUserPrincipal
+# RPCSEC_GSS (Kerberos) support in oncrpc4j; Android has no org.ietf.jgss and the app only uses AUTH_SYS.
+-dontwarn org.ietf.jgss.MessageProp
