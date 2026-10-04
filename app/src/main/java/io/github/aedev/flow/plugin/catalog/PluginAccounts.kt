@@ -89,7 +89,7 @@ class PluginAccounts internal constructor(
                 } catch (e: PluginCallException) {
                     val backoffMs = RETRY_BACKOFF_MS.getOrNull(attempt)
                     if (e.error.code !in TRANSIENT || backoffMs == null) return
-                    delay(backoffMs)
+                    delay(maxOf(backoffMs, e.error.retryAfterMs ?: 0))
                     continue
                 } catch (e: CancellationException) {
                     throw e

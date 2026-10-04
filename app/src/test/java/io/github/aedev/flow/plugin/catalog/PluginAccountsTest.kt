@@ -114,6 +114,27 @@ class PluginAccountsTest {
         }
 
     @Test
+    fun `a rate-limited check waits at least as long as the provider asks`() =
+        runTest {
+            var calls = 0
+            coEvery { host.call("youtube", PluginOperations.account, Unit) } answers {
+                if (++calls == 1) {
+                    throw PluginCallException("youtube", PluginError(PluginErrorCode.RATE_LIMITED, "slow down", retryAfterMs = 90_000))
+                }
+                ProviderAccount.SignedIn("listener")
+            }
+            val accounts = accounts()
+
+            accounts.expired("youtube")
+            runCurrent()
+            advanceTimeBy(89_000)
+            assertThat(calls).isEqualTo(1)
+            advanceTimeBy(1_001)
+            assertThat(calls).isEqualTo(2)
+            assertThat(accounts.accounts.value["youtube"]).isEqualTo(ProviderAccount.SignedIn("listener"))
+        }
+
+    @Test
     fun `a permanent or unexpected failure stops re-checking without crashing`() =
         runTest {
             for (error in listOf(failure(PluginErrorCode.SIGN_IN_REQUIRED), IllegalStateException("broken runtime"))) {
