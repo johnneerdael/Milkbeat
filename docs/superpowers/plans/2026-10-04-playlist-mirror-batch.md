@@ -77,11 +77,11 @@ Progress phases: source loading starts at 0; matching accounts for processed mat
 
 ## Task 5: Integration and PRs
 
-- [ ] Run public contract/schema/SDK checks, affected unit tests, ktlint/Spotless and flavor-prefixed Github/Foss compilation; build the relevant app flavor.
-- [ ] Run all private provider tests/checks and plugin package verification; retain build evidence and version metadata.
-- [ ] Exercise a typical 50–100-track playlist on Android, including percentage progress, cancel/resume, ready playback, and an error path; record measured scope and limitations.
-- [ ] Update graphify AST state in the app worktree, review each task and the whole diff, fix material findings, and avoid secrets/generated package binaries in commits.
-- [ ] Commit conventional messages, push feature branches, open linked app and private-plugin PRs with exact validation results and pending deployment requirements.
+- [x] Run public contract/schema/SDK checks, affected unit tests, ktlint/Spotless and flavor-prefixed Github/Foss compilation; build the relevant app flavor.
+- [x] Run all private provider tests/checks and plugin package verification; retain build evidence and version metadata.
+- [x] Exercise a typical 50–100-track playlist on Android, including percentage progress, cancel/resume, ready playback, and an error path; record measured scope and limitations.
+- [x] Update graphify AST state in the app worktree, review each task and the whole diff, fix material findings, and avoid secrets/generated package binaries in commits.
+- [x] Commit conventional messages, push feature branches, open linked app and private-plugin PRs with exact validation results and pending deployment requirements.
 
 ## Execution ledger
 
@@ -91,11 +91,14 @@ Progress phases: source loading starts at 0; matching accounts for processed mat
 - A separate key in the existing Room cache distinguishes batch-confirmed misses from primary-only misses. This preserves fallback eligibility without a schema migration.
 - Independent API/reliability and cross-area reviews identified cancellation, miss provenance and remastered-version edge cases. Regression tests reproduced them; fixes and focused re-review cleared the findings.
 - Spotify 0.2.3/code 7 and YouTube Music 0.2.3/code 8 were built, signed and verified with the original pinned author. Generated contracts in both repos are identical; package binaries stay ignored.
-- Full app unit suite passed: 1,225 tests, zero failures, one skip. Contract suite passed: 16 tests. Github/Foss Kotlin compilation, debug app/test APK builds, ktlint and public SDK checks passed.
+- Full app unit suite passed after rebasing onto latest main: 1,243 tests, zero failures, one skip. Contract suite passed: 16 tests. Github/Foss Kotlin compilation, debug app/test APK builds, ktlint and public SDK checks passed.
 - Private checks passed with 303 tests and 11 intentionally skipped live tests. No publication or live Spotify REST investigation occurred.
 - Seven Android 9/AM6 tests passed using real signed providers, QuickJS and Room with intercepted synthetic HTTP. They verify 16-search/ENSURE overlap, 100 ordered occurrences in one duplicate-preserving edit, conditional Unicode fallback, transient error caching/retry, cancellation/resume and readiness-gated handoff.
 - Android verification caught unsupported pre-Android-10 Unicode script syntax. The scorer now uses `sc=Latin`, supported by the Android Pattern API, and has a device regression test.
 - The Android harness uses an isolated registry and in-memory MirrorStorage. Production coordinator persistence and live ExoPlayer decoding are not claimed by this harness.
 - Lifted the status leaf to an internal sibling component to keep the screen within its size target and test the actual Compose labels, retry action and rendered progress. The actual Compose test passed on Android 9, covering loading/matching/writing/99%-verification/ready/error/retry. The 99% screenshot was inspected; the UI test wakes and restores the device screen state.
 - `graphify update .` completed AST-only: 903 files, 7,933 nodes, 12,351 edges. A final refresh follows the remaining edits.
-- Remaining: integrate latest main, final commit/push, update private host source pin, and open linked PRs.
+- Rebased onto latest main, reran all app checks and eight Android integration/Compose tests (12.580s total), inspected the progress screenshot, pushed clean feature branches and opened linked app/provider PRs.
+- App PR: https://github.com/johnneerdael/Milkbeat/pull/28
+- Provider PR: https://forgejo.thepi.es/jneerdael/Milkbeat-Plugins/pulls/4
+- Both PRs are open and mergeable. Hosted build/security checks were still running at the final local verification; provider packages were built and verified locally without publication.
