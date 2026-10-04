@@ -53,7 +53,7 @@ class PluginInstallerCodeTest {
                     }.build()
                 }.build()
         try {
-            val installer = PluginInstaller(client, PluginRegistry(context), PluginDownloadCodes(context))
+            val installer = PluginInstaller(client, PluginRegistry(context), PluginDownloadCodes(context, PluginPublication(client)))
             val failure = assertThrows(PluginInstallException::class.java) { runBlocking { installer.fetch("102") } }
             assertThat(failure.messageResource).isEqualTo(R.string.tv_plugins_code_package_mismatch)
         } finally {

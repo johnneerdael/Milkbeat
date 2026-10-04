@@ -7,6 +7,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import io.github.aedev.flow.plugin.host.WebLoginRefresher
 import io.github.aedev.flow.plugin.install.PluginDownloadCodes
 import io.github.aedev.flow.plugin.install.PluginInstaller
+import io.github.aedev.flow.plugin.install.PluginPublication
 import io.github.aedev.flow.plugin.pkg.PluginPackageReader
 import io.github.aedev.flow.plugin.registry.PluginRegistry
 import io.github.aedev.flow.plugin.runtime.PluginCallException
@@ -47,7 +48,10 @@ class PluginHostTest {
             listOf(File(context.filesDir, "plugins"), File(context.filesDir, "plugin-data"), File(context.cacheDir, "plugin-code"))
                 .forEach(File::deleteRecursively)
             val registry = PluginRegistry(context)
-            val installer = PluginInstaller(OkHttpClient(), registry, PluginDownloadCodes(context))
+            val installer =
+                OkHttpClient().let { client ->
+                    PluginInstaller(client, registry, PluginDownloadCodes(context, PluginPublication(client)))
+                }
             val pack = assets.open("fixture.mbplugin").use(PluginPackageReader::read)
             installer.install(installer.check(pack, "test://fixture"))
             host = PluginHost(context, registry, OkHttpClient(), WebLoginRefresher(context))

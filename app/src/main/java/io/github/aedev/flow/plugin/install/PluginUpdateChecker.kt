@@ -4,21 +4,8 @@ import io.github.aedev.flow.R
 import io.github.aedev.flow.plugin.registry.InstalledPlugin
 import io.github.aedev.flow.plugin.registry.PluginRegistry
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
-import okhttp3.HttpUrl.Companion.toHttpUrl
-import okhttp3.OkHttpClient
 import javax.inject.Inject
 import javax.inject.Singleton
-
-// The plugin publisher commits each release's list and download catalog to the app repository.
-private const val PUBLISHED_BASE = "https://raw.githubusercontent.com/johnneerdael/Milkbeat/main/"
-private val PublishedListUrl = "${PUBLISHED_BASE}plugins/published.json".toHttpUrl()
-private val PublishedCatalogUrl = "${PUBLISHED_BASE}app/src/main/assets/plugin-download-catalog.json".toHttpUrl()
-
-private val PublishedJson = Json { ignoreUnknownKeys = true }
 
 /** A newer published version of an installed plugin, and the download it installs from. */
 data class PluginUpdate(
@@ -27,20 +14,6 @@ data class PluginUpdate(
     val version: String,
     val versionCode: Int,
     val url: String,
-)
-
-@Serializable
-internal data class PublishedPlugins(
-    val plugins: List<PublishedPlugin> = emptyList(),
-)
-
-@Serializable
-internal data class PublishedPlugin(
-    val id: String,
-    val version: String,
-    val versionCode: Int,
-    val fingerprint: String,
-    val code: String,
 )
 
 /**
@@ -52,18 +25,13 @@ internal data class PublishedPlugin(
 class PluginUpdateChecker
     @Inject
     constructor(
-        private val client: OkHttpClient,
+        private val publication: PluginPublication,
         private val registry: PluginRegistry,
     ) {
         suspend fun check(): List<PluginUpdate> {
-            val (list, catalog) =
+            val current =
                 try {
-                    coroutineScope {
-                        val list = async { downloadPublished(client, PublishedListUrl) }
-                        val catalog = async { downloadPublished(client, PublishedCatalogUrl) }
-                        PublishedJson.decodeFromString<PublishedPlugins>(list.await().decodeToString()) to
-                            decodePluginDownloadCatalog(catalog.await().decodeToString())
-                    }
+                    publication.current()
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: PluginInstallException) {
@@ -71,7 +39,7 @@ class PluginUpdateChecker
                 } catch (e: Exception) {
                     throw PluginInstallException(cause = e, messageResource = R.string.tv_plugins_update_check_failed)
                 }
-            return availableUpdates(registry.state.value.plugins, list, catalog)
+            return availableUpdates(registry.state.value.plugins, current.plugins, current.catalog)
         }
     }
 

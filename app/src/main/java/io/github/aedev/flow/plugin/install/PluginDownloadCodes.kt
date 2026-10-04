@@ -4,6 +4,7 @@ import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.aedev.flow.R
 import io.github.aedev.flow.sync.crypto.SyncCrypto
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
@@ -20,6 +21,7 @@ class PluginDownloadCodes
     @Inject
     constructor(
         @ApplicationContext private val context: Context,
+        private val publication: PluginPublication,
     ) {
         private val catalog by lazy {
             context.assets
@@ -28,9 +30,26 @@ class PluginDownloadCodes
                 .use { decodePluginDownloadCatalog(it.readText()) }
         }
 
+        /**
+         * A code resolves against the publisher's current catalog when it can be read, so every code a
+         * plugin was ever given installs its current release and codes newer than this build work too;
+         * offline, the catalog bundled with the app answers.
+         */
         internal suspend fun resolve(input: String): PluginDownloadSource =
             withContext(Dispatchers.IO) {
-                pluginDownloadSource(input) {
+                val live =
+                    if (isPluginDownloadCode(input.trim())) {
+                        try {
+                            publication.current()
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (_: Exception) {
+                            null
+                        }
+                    } else {
+                        null
+                    }
+                pluginDownloadSource(input, live) {
                     try {
                         catalog
                     } catch (e: Exception) {
@@ -65,12 +84,15 @@ internal fun isPluginDownloadCode(value: String): Boolean = value.length == 3 &&
 
 internal fun pluginDownloadSource(
     value: String,
+    live: Publication? = null,
     catalog: () -> Map<String, PluginDownloadCode>,
 ): PluginDownloadSource {
     val input = value.trim()
     if (isPluginDownloadCode(input)) {
-        val entry = catalog()[input] ?: throw PluginInstallException(messageResource = R.string.tv_plugins_code_unknown)
-        return PluginDownloadSource(entry.url, entry.id)
+        val entry =
+            live?.catalog?.get(input) ?: catalog()[input]
+                ?: throw PluginInstallException(messageResource = R.string.tv_plugins_code_unknown)
+        return PluginDownloadSource(live?.currentUrl(entry.id) ?: entry.url, entry.id)
     }
     if (input.matches(Regex("[+-]?[0-9]+"))) throw PluginInstallException(messageResource = R.string.tv_plugins_input_invalid)
     val url = pluginUrl(input) ?: throw PluginInstallException(messageResource = R.string.tv_plugins_input_invalid)
