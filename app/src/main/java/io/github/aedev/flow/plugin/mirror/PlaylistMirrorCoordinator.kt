@@ -25,6 +25,7 @@ import nl.neerdael.milkbeat.catalog.EntityKind
 import nl.neerdael.milkbeat.catalog.EntityRef
 import nl.neerdael.milkbeat.catalog.ProviderAccount
 import nl.neerdael.milkbeat.plugin.PluginErrorCode
+import nl.neerdael.milkbeat.plugin.PluginManifest
 import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -55,6 +56,11 @@ class PlaylistMirrorCoordinator
         private val states = ConcurrentHashMap<String, MutableStateFlow<PlaylistMirrorState>>()
 
         fun state(key: MirrorKey): StateFlow<PlaylistMirrorState> = states.getOrPut(key.id) { MutableStateFlow(PlaylistMirrorState()) }
+
+        fun target(key: MirrorKey): PluginManifest? =
+            registry.state.value
+                .plugin(key.targetPlugin)
+                ?.manifest
 
         fun available(
             source: String,
