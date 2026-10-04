@@ -6,7 +6,6 @@ import android.util.Log
 import androidx.media3.common.C
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.DefaultLoadControl
-import androidx.media3.exoplayer.LoadControl
 import androidx.media3.exoplayer.upstream.DefaultAllocator
 import io.github.aedev.flow.data.local.BufferDurations
 import io.github.aedev.flow.player.config.PlayerConfig
@@ -94,25 +93,20 @@ object LoadControlFactory {
     }
 
     /**
-     * Music service: loads ahead until [PlayerConfig.MUSIC_TARGET_BUFFER_BYTES], which holds a whole song,
-     * topping it up as playback releases what it played, with a low playback threshold so the first note
-     * still comes out quickly. Size wins over time so a music video's picture cannot grow the buffer
-     * past that budget, and [MusicLoadControl]'s floor still keeps [PlayerConfig.MUSIC_FLOOR_BUFFER_MS]
-     * ahead when the picture fills the budget first. No back buffer.
+     * Music service: below [PlayerConfig.MUSIC_MIN_BUFFER_MS] it always loads, within Media3's heap
+     * headroom check; above it, loading runs on to [PlayerConfig.MUSIC_TARGET_BUFFER_BYTES], which holds a
+     * whole song, and stops there, so a music video's picture cannot grow the buffer past that budget.
+     * A low playback threshold still gets the first note out quickly. No back buffer.
      */
-    fun forMusic(): LoadControl =
-        MusicLoadControl(
-            build(
-                minMs = PlayerConfig.MUSIC_MIN_BUFFER_MS,
-                maxMs = PlayerConfig.MUSIC_MAX_BUFFER_MS,
-                playbackMs = PlayerConfig.MUSIC_BUFFER_FOR_PLAYBACK_MS,
-                rebufferMs = PlayerConfig.MUSIC_BUFFER_FOR_REBUFFER_MS,
-                backBufferMs = 0,
-                retainBackBufferFromKeyframe = false,
-                targetBufferBytes = PlayerConfig.MUSIC_TARGET_BUFFER_BYTES,
-                prioritizeTimeOverSizeThresholds = false,
-            ),
-            floorUs = PlayerConfig.MUSIC_FLOOR_BUFFER_MS * 1_000L,
+    fun forMusic(): DefaultLoadControl =
+        build(
+            minMs = PlayerConfig.MUSIC_MIN_BUFFER_MS,
+            maxMs = PlayerConfig.MUSIC_MAX_BUFFER_MS,
+            playbackMs = PlayerConfig.MUSIC_BUFFER_FOR_PLAYBACK_MS,
+            rebufferMs = PlayerConfig.MUSIC_BUFFER_FOR_REBUFFER_MS,
+            backBufferMs = 0,
+            retainBackBufferFromKeyframe = false,
+            targetBufferBytes = PlayerConfig.MUSIC_TARGET_BUFFER_BYTES,
         )
 
     /**
@@ -127,7 +121,6 @@ object LoadControlFactory {
         backBufferMs: Int,
         retainBackBufferFromKeyframe: Boolean,
         targetBufferBytes: Int,
-        prioritizeTimeOverSizeThresholds: Boolean = true,
     ): DefaultLoadControl {
         // Widen rather than throw: a profile that violates the contract should cost buffer, not a crash loop.
         val resolvedMin = maxOf(minMs, playbackMs, rebufferMs)
@@ -138,7 +131,7 @@ object LoadControlFactory {
             .setAllocator(DefaultAllocator(true, PlayerConfig.ALLOCATOR_BUFFER_SIZE))
             .setBufferDurationsMs(resolvedMin, resolvedMax, playbackMs, rebufferMs)
             .setBackBuffer(backBufferMs, retainBackBufferFromKeyframe)
-            .setPrioritizeTimeOverSizeThresholds(prioritizeTimeOverSizeThresholds)
+            .setPrioritizeTimeOverSizeThresholds(true)
             .setTargetBufferBytes(targetBufferBytes)
             .build()
     }

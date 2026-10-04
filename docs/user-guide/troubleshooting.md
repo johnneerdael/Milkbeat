@@ -51,7 +51,7 @@ Spotify is metadata-only. Enable at least one audio provider, check its account/
 
 ## Music stops in the middle of a song
 
-Milkbeat loads each streamed song in full and, when a stream link fails, requests a fresh one for the same recording and resumes at the same position. If playback still stops, the audio provider could not supply a new stream in time: retry later, or check whether YouTube is limiting your network. For tracks longer than the buffer budget, Milkbeat keeps up to that budget loaded ahead and tops it up as the track plays.
+Milkbeat loads each streamed song in full and, when a stream link fails, requests a fresh one for the same recording and resumes at the same position. If playback still stops, the audio provider could not supply a new stream in time: retry later, or check whether YouTube is limiting your network. A track longer than the buffer budget loads up to the budget and loads the rest before the last 30 seconds of loaded audio run out.
 
 ## Provider sign-in needs verification
 
