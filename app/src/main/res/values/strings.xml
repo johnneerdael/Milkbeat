@@ -687,7 +687,7 @@
     <string name="music_folders_up">Parent folder</string>
     <string name="music_folders_save">Save</string>
     <string name="music_folders_editor_back">Back</string>
-    <string name="playlist_mirror_starting">Starting playlist preparation…</string>
+    <string name="playlist_mirror_starting">Loading playlist: %1$d%%</string>
     <string name="playlist_mirror_playback_waiting">Playlist syncing. Playback will start when it is ready.</string>
     <string name="playlist_mirror_title">Private playlist preparation</string>
     <string name="playlist_mirror_background">Preparing your playlists for native playback and radio</string>
@@ -695,6 +695,9 @@
     <string name="playlist_mirror_description">Create private copies of your own playlists and Liked Songs, and refresh them from this provider. Other playlists prepare when opened. Initial playback may take longer.</string>
     <string name="playlist_mirror_sign_in">Sign in to both providers to enable preparation</string>
     <string name="playlist_mirror_progress">Preparing: %1$d of %2$d matched · %3$d unavailable</string>
+    <string name="playlist_mirror_progress_percent">Preparing: %1$d%% · %2$d of %3$d matched · %4$d unavailable</string>
+    <string name="playlist_mirror_writing">Writing playlist: %1$d%% · %2$d unavailable</string>
+    <string name="playlist_mirror_verifying">Verifying playlist: %1$d%% · %2$d unavailable</string>
     <string name="playlist_mirror_ready">Private playlist ready · %1$d matched · %2$d unavailable</string>
     <string name="playlist_mirror_failed">Playlist preparation failed. Select Retry to try again.</string>
     <string name="playlist_mirror_retry">Retry preparation</string>
