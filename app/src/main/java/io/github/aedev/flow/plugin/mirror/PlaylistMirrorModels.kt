@@ -50,7 +50,14 @@ data class PlaylistMirrorState(
     val ready: Boolean = false,
     val error: String? = null,
     val isPreparing: Boolean = false,
-)
+    val phase: MirrorPhase = MirrorPhase.SOURCE_LOADING,
+    val phaseCompleted: Int = 0,
+    val phaseTotal: Int = 0,
+) {
+    val percentage: Int get() = mirrorPercentage(this)
+}
+
+enum class MirrorPhase { SOURCE_LOADING, MATCHING, WRITING, VERIFYING }
 
 interface MirrorStorage {
     suspend fun get(id: String): MirrorRecord?

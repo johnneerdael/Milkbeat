@@ -13,13 +13,10 @@ export type ItemView = 'COVER_CARD' | 'LANDSCAPE_CARD' | 'ARTIST_PORTRAIT' | 'TR
 export type HeaderStyle = 'PORTRAIT' | 'COVER';
 export type PersonalCollectionKind = 'OWNED_PLAYLIST' | 'LIKED_SONGS';
 export type PrivatePlaylistImportMode = 'REPLACE' | 'ENSURE' | 'APPEND';
+export type PrivatePlaylistImportPhase = 'PREPARING' | 'WRITING' | 'VERIFYING';
 export type AudioQuality = 'AUTO' | 'HIGH' | 'MEDIUM' | 'LOW';
 export type FormatType = 'AUDIO' | 'VIDEO';
-export type VideoKind = 'VOD' | 'LIVE' | 'UPCOMING';
-export type ProviderAccount = ProviderAccountAnonymous | ProviderAccountExpired | ProviderAccountSignedIn;
-export type HttpBodyEncoding = 'UTF8' | 'BASE64';
-export type HashAlgorithm = 'SHA1' | 'SHA256';
-export type LogLevel = 'DEBUG' | 'INFO' | 'WARN' | 'ERROR';
+export type AudioMatchStrategy = 'SONGS' | 'ALTERNATE_SONGS' | 'VIDEOS';
 export type PluginErrorCode =
   | 'NOT_FOUND'
   | 'UNAVAILABLE'
@@ -30,6 +27,11 @@ export type PluginErrorCode =
   | 'TIMEOUT'
   | 'UNSUPPORTED'
   | 'INTERNAL';
+export type VideoKind = 'VOD' | 'LIVE' | 'UPCOMING';
+export type ProviderAccount = ProviderAccountAnonymous | ProviderAccountExpired | ProviderAccountSignedIn;
+export type HttpBodyEncoding = 'UTF8' | 'BASE64';
+export type HashAlgorithm = 'SHA1' | 'SHA256';
+export type LogLevel = 'DEBUG' | 'INFO' | 'WARN' | 'ERROR';
 
 /**
  * Plugin API v3, generated from the plugin-api module. Do not edit.
@@ -82,6 +84,10 @@ export interface MilkbeatPluginApi {
     'audio.match': {
       request: MatchAudioRequest;
       response: AudioMatches;
+    };
+    'audio.matchBatch': {
+      request: MatchAudioBatchRequest;
+      response: AudioMatchesBatch;
     };
     'audio.radio': {
       request: RadioRequest;
@@ -253,6 +259,7 @@ export interface AudioRole {
   musicVideo?: boolean;
   reportPlayback?: boolean;
   delivery?: AudioDelivery;
+  batchMatching?: boolean;
 }
 export interface VideoRole {
   idSpace: string;
@@ -454,6 +461,12 @@ export interface PrivatePlaylistImportResult {
   ref?: null | EntityRef;
   next?: string | null;
   retryAfterMs?: number | null;
+  progress?: null | PrivatePlaylistImportProgress;
+}
+export interface PrivatePlaylistImportProgress {
+  phase: PrivatePlaylistImportPhase;
+  completed: number;
+  total: number;
 }
 export interface RadioRequest {
   seed: EntityRef;
@@ -524,9 +537,28 @@ export interface AudioTrackInfo {
 }
 export interface MatchAudioRequest {
   track: TrackDescriptor;
+  strategy?: AudioMatchStrategy;
 }
 export interface AudioMatches {
   candidates?: TrackDescriptor[];
+  error?: null | PluginError;
+}
+export interface PluginError {
+  code: PluginErrorCode;
+  message: string;
+  userMessage?: string | null;
+  retryAfterMs?: number | null;
+  detail?: string | null;
+}
+export interface MatchAudioBatchRequest {
+  tracks: TrackDescriptor[];
+  strategy?: AudioMatchStrategy;
+  playlist?: null | PrivatePlaylistImportRequest;
+}
+export interface AudioMatchesBatch {
+  matches: AudioMatches[];
+  playlist?: null | PrivatePlaylistImportResult;
+  playlistError?: null | PluginError;
 }
 export interface ReportPlaybackRequest {
   entity: EntityRef;
@@ -740,13 +772,6 @@ export interface SleepRequest {
 export interface WebLoginRefreshRequest {
   method: string;
   cookies: string;
-}
-export interface PluginError {
-  code: PluginErrorCode;
-  message: string;
-  userMessage?: string | null;
-  retryAfterMs?: number | null;
-  detail?: string | null;
 }
 
 export const HOST_OPERATIONS = [

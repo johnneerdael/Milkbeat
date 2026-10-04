@@ -61,6 +61,7 @@ object PluginOperations {
 
     val resolveAudio = PluginOperation("audio.resolve", ResolveAudioRequest.serializer(), AudioStream.serializer())
     val matchAudio = PluginOperation("audio.match", MatchAudioRequest.serializer(), AudioMatches.serializer())
+    val matchAudioBatch = PluginOperation("audio.matchBatch", MatchAudioBatchRequest.serializer(), AudioMatchesBatch.serializer())
     val audioRadio = PluginOperation("audio.radio", RadioRequest.serializer(), TrackList.serializer())
     val reportListen = PluginOperation("audio.reportPlayback", ReportPlaybackRequest.serializer(), Unit.serializer())
 
@@ -96,6 +97,7 @@ object PluginOperations {
             radio,
             resolveAudio,
             matchAudio,
+            matchAudioBatch,
             audioRadio,
             reportListen,
             videoSearch,

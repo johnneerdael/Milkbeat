@@ -755,7 +755,7 @@
     <string name="music_folders_nfs_hint">The export must allow connections from non-privileged ports: the \'insecure\' export option, or \'Allow connections from non-privileged ports\' on Synology and QNAP.</string>
     <string name="music_folders_invalid_webdav">Enter a name and an http:// or https:// server URL without a username, password or query.</string>
     <string name="music_folders_invalid_remote">Enter a name, server and valid port, plus a username for SFTP or user and group IDs for NFS. Folder paths cannot contain . or .. segments.</string>
-    <string name="playlist_mirror_starting">Starting playlist preparation…</string>
+    <string name="playlist_mirror_starting">Loading playlist: %1$d%%</string>
     <string name="playlist_mirror_playback_waiting">Playlist syncing. Playback will start when it is ready.</string>
     <string name="playlist_mirror_title">Private playlist preparation</string>
     <string name="playlist_mirror_background">Preparing your playlists for native playback and radio</string>
@@ -763,6 +763,9 @@
     <string name="playlist_mirror_description">Create private copies of your own playlists and Liked Songs, and refresh them from this provider. Other playlists prepare when opened. Initial playback may take longer.</string>
     <string name="playlist_mirror_sign_in">Sign in to both providers to enable preparation</string>
     <string name="playlist_mirror_progress">Preparing: %1$d of %2$d matched · %3$d unavailable</string>
+    <string name="playlist_mirror_progress_percent">Preparing: %1$d%% · %2$d of %3$d matched · %4$d unavailable</string>
+    <string name="playlist_mirror_writing">Writing playlist: %1$d%% · %2$d unavailable</string>
+    <string name="playlist_mirror_verifying">Verifying playlist: %1$d%% · %2$d unavailable</string>
     <string name="playlist_mirror_ready">Private playlist ready · %1$d matched · %2$d unavailable</string>
     <string name="playlist_mirror_failed">Playlist preparation failed. Select Retry to try again.</string>
     <string name="playlist_mirror_retry">Retry preparation</string>
