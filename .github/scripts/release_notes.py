@@ -162,19 +162,40 @@ def nested_markdown(text: str) -> str:
 
 DOWNLOADER_CODE = "7170062"
 
-PLUGINS = (
-    ("YouTube Music and YouTube", "", "494"),
-    ("Beatport", "full-length streaming needs a Beatport streaming subscription", "393"),
-    ("Spotify", "metadata; select YouTube Music for audio", "981"),
-)
+# What each plugin provides; names, versions and downloader codes come from plugins/published.json,
+# which the plugin publisher updates on main whenever it publishes a release.
+PLUGIN_ROLES = {
+    "nl.neerdael.youtube-music": "music and YouTube videos",
+    "nl.neerdael.beatport": "full-length streaming needs a Beatport streaming subscription",
+    "nl.neerdael.spotify": "metadata; select YouTube Music for audio",
+}
 
 
-def standard_footer(repo: str, version: str, previous_tag: str | None, core_version: str) -> str:
+def published_plugins(checkout: Path) -> list[dict[str, str]]:
+    descriptor = json.loads((checkout / "plugins/published.json").read_text(encoding="utf-8"))
+    rows = descriptor.get("plugins") if descriptor.get("format") == 1 else None
+    if not isinstance(rows, list) or not rows:
+        raise ValueError("plugins/published.json must list the published plugins.")
+    plugins = []
+    for row in rows:
+        plugin = {key: str(row.get(key) or "") for key in ("id", "name", "version", "code")}
+        if not re.fullmatch(r"[0-9]{3}", plugin["code"]) or not plugin["name"] or not plugin["version"]:
+            raise ValueError(f"plugins/published.json has an incomplete entry: {plugin['id'] or '?'}")
+        plugins.append(plugin)
+    return plugins
+
+
+def plugin_line(plugin: dict[str, str]) -> str:
+    role = PLUGIN_ROLES.get(plugin["id"])
+    return f"- **{plugin['name']} {plugin['version']}**{f' ({role})' if role else ''}: downloader code `{plugin['code']}`"
+
+
+def standard_footer(repo: str, version: str, previous_tag: str | None, core_version: str,
+                    plugins: list[dict[str, str]]) -> str:
     base = f"https://github.com/{repo}"
     latest = f"{base}/releases/latest/download"
     changelog = f"{base}/compare/{previous_tag}...v{version}" if previous_tag else f"{base}/commits/v{version}"
-    plugins = "\n".join(f"- **{name}**{f' ({note})' if note else ''}: downloader code `{code}`"
-                         for name, note, code in PLUGINS)
+    plugin_lines = "\n".join(plugin_line(plugin) for plugin in plugins)
     return f"""## Visualizer engine
 
 [ProjectM-TV core {core_version}](https://github.com/johnneerdael/ProjectM-TV/releases/tag/v{core_version})
@@ -190,7 +211,7 @@ Per-ABI APKs (`milkbeat-arm64-v8a.apk`, `milkbeat-armeabi-v7a.apk`) and `checksu
 
 Local and SMB music works without plugins. Optional third-party streaming plugins can be added in Settings > Plugins:
 
-{plugins}
+{plugin_lines}
 
 **Full changelog:** {changelog}"""
 
@@ -201,7 +222,7 @@ def is_bot(pr: PullRequest) -> bool:
 
 
 def render_release_notes(repo: str, version: str, previous_tag: str | None, core_version: str,
-                         commits: list[Commit], pull_requests: PullLookup) -> str:
+                         plugins: list[dict[str, str]], commits: list[Commit], pull_requests: PullLookup) -> str:
     parts = ["## What's new"]
     seen = set()
     for commit in commits:
@@ -230,7 +251,7 @@ def render_release_notes(repo: str, version: str, previous_tag: str | None, core
                 parts.append(nested_markdown(body))
     if not commits:
         parts.append("No app changes; this build updates the visualizer engine below.")
-    parts.append(standard_footer(repo, version, previous_tag, core_version))
+    parts.append(standard_footer(repo, version, previous_tag, core_version, plugins))
     return "\n\n".join(parts) + "\n"
 
 
@@ -333,8 +354,9 @@ def main() -> int:
             releases = github_items(f"repos/{args.repo}/releases?per_page=100")
             previous_tag = previous_release_tag(args.checkout, args.sha, args.version, args.previous_tag, releases)
             commits = collect_commits(args.checkout, args.sha, previous_tag)
-            result = render_release_notes(args.repo, args.version, previous_tag, args.core_version, commits,
-                                          lambda sha: associated_pull_requests(args.repo, sha))
+            plugins = published_plugins(args.checkout)
+            result = render_release_notes(args.repo, args.version, previous_tag, args.core_version, plugins,
+                                          commits, lambda sha: associated_pull_requests(args.repo, sha))
             args.output.write_text(result, encoding="utf-8")
             print(f"Release notes written to {args.output}")
     except (ValueError, OSError, subprocess.CalledProcessError) as error:

@@ -16,6 +16,17 @@ spec.loader.exec_module(notes)
 
 
 CORE = "2.2.4"
+PUBLISHED = {"format": 1, "plugins": [
+    {"id": "nl.neerdael.beatport", "name": "Beatport", "version": "0.1.3", "versionCode": 4, "code": "393"},
+    {"id": "nl.neerdael.spotify", "name": "Spotify", "version": "0.2.2", "versionCode": 6, "code": "981"},
+    {"id": "nl.neerdael.youtube-music", "name": "YouTube Music", "version": "0.2.2", "versionCode": 7, "code": "494"},
+]}
+PLUGINS = [{key: str(row[key]) for key in ("id", "name", "version", "code")} for row in PUBLISHED["plugins"]]
+
+
+def write_published(checkout, published=PUBLISHED):
+    (checkout / "plugins").mkdir(exist_ok=True)
+    (checkout / "plugins/published.json").write_text(json.dumps(published))
 
 
 class ValidationTests(unittest.TestCase):
@@ -136,7 +147,7 @@ More unchanged details.
     def test_explicit_release_notes_keep_images_and_validation_markdown(self):
         body = "## Release notes\nFix the resume handler.\n\n![Screenshot](screenshot.png)\n\n### Validation\n- Report the new diagnostics field.\n<!-- Private template comment -->\n## Tests\nReview-only tests."
         pr = {"number": 23, "title": "Fix resume", "body": body, "merged_at": "2026-10-03T10:00:00Z"}
-        result = notes.render_release_notes("johnneerdael/Milkbeat", "2.1.5", None, CORE, [notes.Commit("a" * 40, "Merge", "")], lambda sha: [pr])
+        result = notes.render_release_notes("johnneerdael/Milkbeat", "2.1.5", None, CORE, PLUGINS, [notes.Commit("a" * 40, "Merge", "")], lambda sha: [pr])
         self.assertIn("![Screenshot](screenshot.png)", result)
         self.assertIn("#### Validation\n- Report the new diagnostics field.", result)
         self.assertNotIn("Private template comment", result)
@@ -146,7 +157,7 @@ More unchanged details.
         commits = [notes.Commit("a" * 40, "Merge audio fix", ""), notes.Commit("b" * 40, "Merge audio fix again", "")]
         pr = {"number": 17, "title": "Restore audio", "merged_at": "2026-10-03T10:00:00Z", "body": "## Release notes\n### Fixed\n- Retains **audio** after resume.\n  - Preserves the session.\n\nExample: `$(touch dangerous)` and `literal`.\n## Tests\nChecked on TV."}
         unmerged = dict(pr, number=18, merged_at=None)
-        result = notes.render_release_notes("johnneerdael/Milkbeat", "2.1.5", "v2.1.4", CORE, commits, lambda sha: [pr, unmerged])
+        result = notes.render_release_notes("johnneerdael/Milkbeat", "2.1.5", "v2.1.4", CORE, PLUGINS, commits, lambda sha: [pr, unmerged])
         self.assertEqual(result.count("### Restore audio"), 1)
         self.assertIn("[#17](https://github.com/johnneerdael/Milkbeat/pull/17)", result)
         self.assertIn("#### Fixed\n- Retains **audio** after resume.\n  - Preserves the session.", result)
@@ -169,7 +180,7 @@ Generated with [Claude Code](https://example.org)
 Co-Authored-By: Agent <agent@example.org>
 """
         pr = {"number": 19, "title": "Repair audio", "body": body, "merged_at": "2026-10-03T10:00:00Z"}
-        result = notes.render_release_notes("johnneerdael/Milkbeat", "2.1.5", None, CORE, [notes.Commit("a" * 40, "Merge", "")], lambda sha: [pr])
+        result = notes.render_release_notes("johnneerdael/Milkbeat", "2.1.5", None, CORE, PLUGINS, [notes.Commit("a" * 40, "Merge", "")], lambda sha: [pr])
         self.assertIn("Keep the renderer alive", result)
         self.assertIn("- Cache the last working session.", result)
         for unwanted in ("badge.svg", "Unit tests", "Ready to ship", "Generated with", "Co-Authored"):
@@ -177,12 +188,12 @@ Co-Authored-By: Agent <agent@example.org>
 
     def test_description_without_change_content_falls_back_to_actual_title(self):
         pr = {"number": 20, "title": "Pin the Android build tools", "body": "## Tests\nAll pass.", "merged_at": "2026-10-03T10:00:00Z"}
-        result = notes.render_release_notes("johnneerdael/Milkbeat", "2.1.5", None, CORE, [notes.Commit("a" * 40, "Merge", "")], lambda sha: [pr])
+        result = notes.render_release_notes("johnneerdael/Milkbeat", "2.1.5", None, CORE, PLUGINS, [notes.Commit("a" * 40, "Merge", "")], lambda sha: [pr])
         self.assertIn("Pin the Android build tools", result)
         self.assertNotIn("All pass", result)
 
     def test_direct_commit_keeps_actual_subject_body_and_source_link(self):
-        result = notes.render_release_notes("johnneerdael/Milkbeat", "2.1.5", None, CORE, [notes.Commit("c" * 40, "fix: cache audio", "Retain the last session.\n\nLiteral: `$(false)`\n\nCo-Authored-By: Agent <agent@example.org>")], lambda sha: [])
+        result = notes.render_release_notes("johnneerdael/Milkbeat", "2.1.5", None, CORE, PLUGINS, [notes.Commit("c" * 40, "fix: cache audio", "Retain the last session.\n\nLiteral: `$(false)`\n\nCo-Authored-By: Agent <agent@example.org>")], lambda sha: [])
         self.assertIn("fix: cache audio", result)
         self.assertIn("Retain the last session.", result)
         self.assertIn("`$(false)`", result)
@@ -191,16 +202,16 @@ Co-Authored-By: Agent <agent@example.org>
 
 
     def test_standard_footer_appends_engine_install_plugins_and_changelog(self):
-        result = notes.render_release_notes("johnneerdael/Milkbeat", "2.1.5", "v2.1.4", CORE, [], lambda sha: [])
+        result = notes.render_release_notes("johnneerdael/Milkbeat", "2.1.5", "v2.1.4", CORE, PLUGINS, [], lambda sha: [])
         for expected in (
             "No app changes; this build updates the visualizer engine below.",
             "[ProjectM-TV core 2.2.4](https://github.com/johnneerdael/ProjectM-TV/releases/tag/v2.2.4)",
             "enter code `7170062`",
             "https://github.com/johnneerdael/Milkbeat/releases/latest/download/milkbeat-universal.apk",
             "`checksums.txt`",
-            "**YouTube Music and YouTube**: downloader code `494`",
-            "**Beatport** (full-length streaming needs a Beatport streaming subscription): downloader code `393`",
-            "**Spotify** (metadata; select YouTube Music for audio): downloader code `981`",
+            "- **Beatport 0.1.3** (full-length streaming needs a Beatport streaming subscription): downloader code `393`",
+            "- **Spotify 0.2.2** (metadata; select YouTube Music for audio): downloader code `981`",
+            "- **YouTube Music 0.2.2** (music and YouTube videos): downloader code `494`",
             "**Full changelog:** https://github.com/johnneerdael/Milkbeat/compare/v2.1.4...v2.1.5",
         ):
             self.assertIn(expected, result)
@@ -208,9 +219,34 @@ Co-Authored-By: Agent <agent@example.org>
         self.assertLess(result.index("## Visualizer engine"), result.index("## Install on Android TV"))
         self.assertLess(result.index("## Install on Android TV"), result.index("## Plugins"))
 
+    def test_plugins_come_from_the_published_descriptor(self):
+        with tempfile.TemporaryDirectory() as directory:
+            checkout = Path(directory)
+            republished = json.loads(json.dumps(PUBLISHED))
+            republished["plugins"][0].update(version="0.1.4", code="512")
+            republished["plugins"].append({"id": "nl.neerdael.new", "name": "New", "version": "1.0.0", "code": "777"})
+            write_published(checkout, republished)
+            plugins = notes.published_plugins(checkout)
+            result = notes.render_release_notes("johnneerdael/Milkbeat", "2.1.5", None, CORE, plugins, [], lambda sha: [])
+            self.assertIn("- **Beatport 0.1.4** (full-length streaming needs a Beatport streaming subscription): downloader code `512`", result)
+            self.assertIn("- **New 1.0.0**: downloader code `777`", result)
+            self.assertNotIn("`393`", result)
+
+    def test_missing_or_incomplete_published_descriptor_fails(self):
+        with tempfile.TemporaryDirectory() as directory:
+            checkout = Path(directory)
+            with self.assertRaises(OSError):
+                notes.published_plugins(checkout)
+            for published in ({"format": 1, "plugins": []}, {"format": 2, "plugins": PUBLISHED["plugins"]},
+                              {"format": 1, "plugins": [{"id": "nl.neerdael.spotify", "name": "Spotify", "version": "0.2.2"}]}):
+                with self.subTest(published=published):
+                    write_published(checkout, published)
+                    with self.assertRaises(ValueError):
+                        notes.published_plugins(checkout)
+
     def test_bot_pr_without_notes_is_listed_by_title_only(self):
         pr = {"number": 30, "title": "build(deps): bump okhttp", "body": "Bumps okhttp from 5.3.0 to 5.4.0.\n\nRelease notes sourced from upstream.", "merged_at": "2026-10-03T10:00:00Z", "user": {"login": "dependabot[bot]", "type": "Bot"}}
-        result = notes.render_release_notes("johnneerdael/Milkbeat", "2.1.5", None, CORE, [notes.Commit("a" * 40, "Merge", "")], lambda sha: [pr])
+        result = notes.render_release_notes("johnneerdael/Milkbeat", "2.1.5", None, CORE, PLUGINS, [notes.Commit("a" * 40, "Merge", "")], lambda sha: [pr])
         self.assertIn("### build(deps): bump okhttp ([#30]", result)
         self.assertNotIn("Bumps okhttp", result)
 
@@ -260,6 +296,7 @@ class GitTests(unittest.TestCase):
             git("commit", "--allow-empty", "-m", "Fix missing audio after resume")
             git("tag", "v2.1.5")
             git("commit", "--allow-empty", "-m", "Fix preset loading freeze")
+            write_published(checkout)
             fake_bin = checkout / "bin"
             fake_bin.mkdir()
             releases = [{"tag_name": "v2.1.4", "draft": False, "prerelease": False, "published_at": "2026-10-01T10:00:00Z"}, {"tag_name": "v2.1.5", "draft": True, "prerelease": False, "published_at": None}]
@@ -288,6 +325,7 @@ class GitTests(unittest.TestCase):
             git("commit", "--allow-empty", "-m", "Merge PR")
             marker = checkout / "must-not-exist"
             pr = {"number": 21, "title": "Fix audio", "body": f"## Release notes\n- Preserve the literal `$(touch {marker})` in examples.", "merged_at": "2026-10-03T10:00:00Z"}
+            write_published(checkout)
             fake_bin = checkout / "bin"
             fake_bin.mkdir()
             # Only the external GitHub boundary is replaced; real CLI and Git run.
