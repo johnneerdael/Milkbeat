@@ -26,12 +26,12 @@
     {
       "id": "nl.neerdael.youtube-music",
       "name": "YouTube Music",
-      "version": "0.2.5",
-      "versionCode": 10,
-      "sha256": "3c70970d6ff03c3faf8f67f8980cbd3df6c0b7b20b55dd6479529ce09f729a9f",
-      "size": 125729,
+      "version": "0.2.6",
+      "versionCode": 11,
+      "sha256": "3607a51660cb7d0fa9e46540b9b69bdb988ae7f768edf913970edf2a5b07320c",
+      "size": 126541,
       "fingerprint": "39dca3d132c56262c0873ec96faf22cc8ed9ca30c7ed1f135049f8570b943adc",
-      "contentDigest": "3051fc1a4d8f856f57921b609386f2dad49c3d84bf7690c1a78e2335f85c203d",
+      "contentDigest": "238bba6ac800b037b7bb9097344cfbc92bd8e9c58d3594fc7bab4333546d172d",
       "code": "494"
     }
   ]
