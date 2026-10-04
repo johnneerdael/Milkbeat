@@ -24,7 +24,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import nl.neerdael.milkbeat.catalog.ProviderAccount
 import javax.inject.Inject
@@ -45,7 +44,7 @@ sealed interface AddPluginState {
     ) : AddPluginState
 }
 
-/** Where checking for plugin updates stands: not asked, checking, the updates found, or failed. */
+/** Where checking for plugin updates stands: not asked, checking, the updates found among [Checked.checked], or failed. */
 sealed interface PluginUpdatesState {
     data object Idle : PluginUpdatesState
 
@@ -53,6 +52,7 @@ sealed interface PluginUpdatesState {
 
     data class Checked(
         val updates: List<PluginUpdate>,
+        val checked: Set<String>,
     ) : PluginUpdatesState
 
     data class Failed(
@@ -97,7 +97,7 @@ class TvPluginsViewModel
                 mirrors.store.enabledPairs,
                 updates,
             ) { registryState, known, add, pairs, found ->
-                TvPluginsState(registryState.plugins, registryState.selection, known, add, pairs, found)
+                TvPluginsState(registryState.plugins, registryState.selection, known, add, pairs, found.forInstalled(registryState.plugins))
             }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), TvPluginsState())
 
         init {
@@ -115,11 +115,12 @@ class TvPluginsViewModel
         fun checkForUpdates() {
             updateCheckJob?.cancel()
             updates.value = PluginUpdatesState.Checking
+            val installed = registry.state.value.plugins
             updateCheckJob =
                 viewModelScope.launch {
                     updates.value =
                         try {
-                            PluginUpdatesState.Checked(updateChecker.check())
+                            PluginUpdatesState.Checked(updateChecker.check(installed), installed.mapTo(HashSet()) { it.id })
                         } catch (e: PluginInstallException) {
                             PluginUpdatesState.Failed(e.messageResource)
                         }
@@ -127,12 +128,12 @@ class TvPluginsViewModel
         }
 
         /** Downloads [update] for the same review and install as any plugin added by hand. */
-        fun update(update: PluginUpdate) = fetch(update.url, links = null, expectedId = update.pluginId)
+        fun update(update: PluginUpdate) = fetch(update.url, links = null, update = update)
 
         private fun fetch(
             url: String,
             links: PluginLinks?,
-            expectedId: String? = null,
+            update: PluginUpdate? = null,
         ) {
             links?.consume()
             val trimmed = url.trim()
@@ -143,7 +144,7 @@ class TvPluginsViewModel
                 viewModelScope.launch {
                     adding.value =
                         try {
-                            AddPluginState.Consent(installer.fetch(trimmed, expectedId))
+                            AddPluginState.Consent(installer.fetch(trimmed, update))
                         } catch (e: PluginInstallException) {
                             AddPluginState.Failed(e.message.orEmpty(), e.messageResource)
                         }
@@ -157,7 +158,6 @@ class TvPluginsViewModel
                     try {
                         val installed = installer.install(consent.pending)
                         if (installed.manifest.signIn.isNotEmpty()) runCatching { accounts.refresh(installed.id) }
-                        updates.update { it.without(installed) }
                         AddPluginState.Idle
                     } catch (e: IllegalStateException) {
                         AddPluginState.Failed(e.message ?: "Could not install the plugin")
@@ -218,10 +218,22 @@ class TvPluginsViewModel
         }
     }
 
-/** The check's findings once [installed] is in place: its update, if this install was it, is done. */
-internal fun PluginUpdatesState.without(installed: InstalledPlugin): PluginUpdatesState =
-    if (this is PluginUpdatesState.Checked) {
-        PluginUpdatesState.Checked(updates.filterNot { it.pluginId == installed.id && it.versionCode <= installed.manifest.versionCode })
-    } else {
-        this
+/**
+ * The check's findings for the plugins [installed] now: a plugin added since was not checked, so the
+ * findings no longer hold; an update stays offered only while its plugin is installed and older.
+ */
+internal fun PluginUpdatesState.forInstalled(installed: List<InstalledPlugin>): PluginUpdatesState =
+    when {
+        this !is PluginUpdatesState.Checked -> {
+            this
+        }
+
+        installed.any { it.id !in checked } -> {
+            PluginUpdatesState.Idle
+        }
+
+        else -> {
+            val versions = installed.associate { it.id to it.manifest.versionCode }
+            copy(updates = updates.filter { update -> versions[update.pluginId]?.let { it < update.versionCode } == true })
+        }
     }

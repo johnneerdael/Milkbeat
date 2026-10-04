@@ -9,6 +9,7 @@ import io.github.aedev.flow.plugin.registry.PluginRegistry
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
+import java.security.MessageDigest
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -43,22 +44,25 @@ class PluginInstaller
         private val registry: PluginRegistry,
         private val codes: PluginDownloadCodes,
     ) {
-        /** Fetches the plugin [url] names; [expectedId], when known, is the only plugin it may turn out to be. */
+        /** Fetches the plugin [url] names; for an [update], only the exact release it offered is accepted. */
         suspend fun fetch(
             url: String,
-            expectedId: String? = null,
+            update: PluginUpdate? = null,
         ): PendingInstall {
             val source = codes.resolve(url)
             val bytes = downloadPlugin(client, source.url)
             val pack =
                 withContext(Dispatchers.IO) {
+                    if (update != null && !sha256(bytes).equals(update.sha256, ignoreCase = true)) {
+                        throw PluginInstallException(messageResource = R.string.tv_plugins_update_mismatch)
+                    }
                     try {
                         PluginPackageReader.read(bytes.inputStream())
                     } catch (e: PluginPackageException) {
                         throw PluginInstallException(e.message ?: "Not a valid plugin", e)
                     }
                 }
-            val expected = expectedId ?: source.pluginId
+            val expected = update?.pluginId ?: source.pluginId
             if (expected != null && pack.manifest.id != expected) {
                 throw PluginInstallException(messageResource = R.string.tv_plugins_code_package_mismatch)
             }
@@ -92,3 +96,5 @@ class PluginInstaller
                 grantedBrowser = pending.pack.manifest.permissions.browser,
             )
     }
+
+private fun sha256(bytes: ByteArray): String = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }

@@ -3,7 +3,7 @@ package io.github.aedev.flow.plugin.install
 import com.google.common.truth.Truth.assertThat
 import io.github.aedev.flow.plugin.registry.InstalledPlugin
 import io.github.aedev.flow.ui.tv.screens.settings.PluginUpdatesState
-import io.github.aedev.flow.ui.tv.screens.settings.without
+import io.github.aedev.flow.ui.tv.screens.settings.forInstalled
 import nl.neerdael.milkbeat.plugin.ApiRange
 import nl.neerdael.milkbeat.plugin.AudioRole
 import nl.neerdael.milkbeat.plugin.PluginManifest
@@ -31,7 +31,14 @@ class PluginUpdateCheckerTest {
         versionCode: Int,
         code: String,
         fingerprint: String = signer,
-    ) = PublishedPlugin(id = id, version = "0.$versionCode", versionCode = versionCode, fingerprint = fingerprint, code = code)
+    ) = PublishedPlugin(
+        id = id,
+        version = "0.$versionCode",
+        versionCode = versionCode,
+        fingerprint = fingerprint,
+        code = code,
+        sha256 = "sha-$id",
+    )
 
     private val catalog =
         mapOf(
@@ -48,7 +55,7 @@ class PluginUpdateCheckerTest {
                 catalog = catalog,
             )
 
-        assertThat(updates).containsExactly(PluginUpdate("yt", "Plugin yt", "0.6", 6, "https://buzzheavier.com/zd643kjppfeu"))
+        assertThat(updates).containsExactly(PluginUpdate("yt", "Plugin yt", "0.6", 6, "https://buzzheavier.com/zd643kjppfeu", "sha-yt"))
     }
 
     @Test
@@ -90,19 +97,37 @@ class PluginUpdateCheckerTest {
         assertThat(updates).isEmpty()
     }
 
+    private val found =
+        PluginUpdatesState.Checked(
+            listOf(
+                PluginUpdate("yt", "YouTube Music", "0.6", 6, "https://buzzheavier.com/zd643kjppfeu", "sha-yt"),
+                PluginUpdate("spotify", "Spotify", "0.5", 5, "https://buzzheavier.com/dr3519gvljk0", "sha-spotify"),
+            ),
+            checked = setOf("yt", "spotify"),
+        )
+
     @Test
     fun `installing an update removes it from the findings`() {
-        val found =
-            PluginUpdatesState.Checked(
-                listOf(
-                    PluginUpdate("yt", "YouTube Music", "0.6", 6, "https://buzzheavier.com/zd643kjppfeu"),
-                    PluginUpdate("spotify", "Spotify", "0.5", 5, "https://buzzheavier.com/dr3519gvljk0"),
-                ),
-            )
+        val current = listOf(installed("spotify", versionCode = 4))
 
-        assertThat((found.without(installed("yt", versionCode = 6)) as PluginUpdatesState.Checked).updates.map { it.pluginId })
-            .containsExactly("spotify")
-        assertThat((found.without(installed("yt", versionCode = 5)) as PluginUpdatesState.Checked).updates).hasSize(2)
-        assertThat(PluginUpdatesState.Checking.without(installed("yt", 6))).isEqualTo(PluginUpdatesState.Checking)
+        assertThat(
+            (found.forInstalled(current + installed("yt", versionCode = 6)) as PluginUpdatesState.Checked).updates.map { it.pluginId },
+        ).containsExactly("spotify")
+        assertThat((found.forInstalled(current + installed("yt", versionCode = 5)) as PluginUpdatesState.Checked).updates).hasSize(2)
+        assertThat(PluginUpdatesState.Checking.forInstalled(current)).isEqualTo(PluginUpdatesState.Checking)
+    }
+
+    @Test
+    fun `removing a plugin withdraws its update`() {
+        val current = found.forInstalled(listOf(installed("spotify", versionCode = 4))) as PluginUpdatesState.Checked
+
+        assertThat(current.updates.map { it.pluginId }).containsExactly("spotify")
+    }
+
+    @Test
+    fun `a plugin added after the check voids its findings`() {
+        val installed = listOf(installed("yt", 4), installed("spotify", 4), installed("beatport", 1))
+
+        assertThat(found.forInstalled(installed)).isEqualTo(PluginUpdatesState.Idle)
     }
 }

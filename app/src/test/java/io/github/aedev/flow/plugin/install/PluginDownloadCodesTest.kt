@@ -29,7 +29,7 @@ class PluginDownloadCodesTest {
             )
         val live =
             Publication(
-                PublishedPlugins(listOf(PublishedPlugin("nl.neerdael.youtube-music", "0.2.2", 7, "f", "494"))),
+                PublishedPlugins(listOf(PublishedPlugin("nl.neerdael.youtube-music", "0.2.2", 7, "f", "494", "sha"))),
                 bundled +
                     (
                         "494" to

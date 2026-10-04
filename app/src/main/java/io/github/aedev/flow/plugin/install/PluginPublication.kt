@@ -28,6 +28,7 @@ internal data class PublishedPlugin(
     val versionCode: Int,
     val fingerprint: String,
     val code: String,
+    val sha256: String,
 )
 
 /** What the plugin publisher has out right now: each plugin's current release and every download code. */
