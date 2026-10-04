@@ -32,10 +32,16 @@ internal data class MusicFolderEditor(
     val gid: String = source.gid.toString(),
     val password: String? = null,
     val privateKey: String? = null,
+    val hasSavedPrivateKey: Boolean = false,
     val access: FolderAccess = FolderAccess.IDLE,
     val error: Int? = null,
     val busy: Boolean = false,
 ) {
+    val missingPrivateKey: Boolean
+        get() =
+            source.kind == MusicFolderKind.SFTP && source.keyAuth && privateKey.isNullOrEmpty() &&
+                !(privateKey == null && hasSavedPrivateKey)
+
     fun configured(): MusicFolder =
         source.copy(
             name = source.name.trim(),
@@ -85,7 +91,7 @@ internal class MusicFoldersViewModel
 
         fun edit(source: MusicFolder) {
             accessJob?.cancel()
-            mutableEditor.value = MusicFolderEditor(source)
+            mutableEditor.value = MusicFolderEditor(source, hasSavedPrivateKey = source.kind == MusicFolderKind.SFTP && source.keyAuth)
             mutableMessage.value = null
         }
 
@@ -116,6 +122,10 @@ internal class MusicFoldersViewModel
                 mutableEditor.value = draft.copy(error = invalidMessage(source.kind))
                 return
             }
+            if (draft.missingPrivateKey) {
+                mutableEditor.value = draft.copy(error = R.string.music_folders_private_key_required)
+                return
+            }
             accessJob =
                 viewModelScope.launch {
                     mutableEditor.value = draft.copy(access = FolderAccess.RUNNING, error = null)
@@ -140,6 +150,10 @@ internal class MusicFoldersViewModel
             val source = draft.configured()
             if (!source.isValid()) {
                 mutableEditor.value = draft.copy(error = invalidMessage(source.kind))
+                return
+            }
+            if (draft.missingPrivateKey) {
+                mutableEditor.value = draft.copy(error = R.string.music_folders_private_key_required)
                 return
             }
             accessJob?.cancel()

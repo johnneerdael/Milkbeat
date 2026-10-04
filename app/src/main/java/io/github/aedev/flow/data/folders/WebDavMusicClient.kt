@@ -10,6 +10,7 @@ import okhttp3.Response
 import java.io.FileNotFoundException
 import java.io.IOException
 import java.io.InputStream
+import java.net.Proxy
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
@@ -24,7 +25,15 @@ class WebDavMusicClient
     constructor(
         baseClient: OkHttpClient,
     ) : RemoteMusicClient {
-        val httpClient: OkHttpClient = baseClient.newBuilder().cache(null).build()
+        // Folders live on the user's own network: bypass the app proxy, and let a paused stream idle past the
+        // shared client's whole-call deadline (read timeouts still catch a dead server).
+        val httpClient: OkHttpClient =
+            baseClient
+                .newBuilder()
+                .cache(null)
+                .proxy(Proxy.NO_PROXY)
+                .callTimeout(0, TimeUnit.MILLISECONDS)
+                .build()
 
         private val requestClient: OkHttpClient =
             httpClient

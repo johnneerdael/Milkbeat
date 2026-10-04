@@ -49,6 +49,15 @@ internal fun LazyListScope.webDavFields(
     if (!draft.source.guest) {
         sourceField("username", draft.source.username, R.string.music_folders_username, viewModel) { copy(username = it) }
         passwordField(draft, existing, viewModel)
+        if (draft.source.webDavUrl()?.isHttps == false) {
+            item(key = "cleartext") {
+                Text(
+                    stringResource(R.string.music_folders_webdav_cleartext),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+        }
     }
 }
 
@@ -73,7 +82,7 @@ internal fun LazyListScope.sftpFields(
             val state =
                 when {
                     !draft.privateKey.isNullOrEmpty() -> R.string.music_folders_private_key_loaded
-                    existing && draft.privateKey == null -> R.string.music_folders_private_key_saved
+                    draft.privateKey == null && draft.hasSavedPrivateKey -> R.string.music_folders_private_key_saved
                     else -> R.string.music_folders_private_key_missing
                 }
             TvNavRow(

@@ -704,6 +704,8 @@
     <string name="music_folders_private_key_saved">Saved private key in use</string>
     <string name="music_folders_private_key_missing">No private key chosen</string>
     <string name="music_folders_private_key_failed">Could not read that private key file. Choose an OpenSSH, PEM or PuTTY key file.</string>
+    <string name="music_folders_private_key_required">Choose a private key file, or turn off private key sign-in.</string>
+    <string name="music_folders_webdav_cleartext">This address uses http://, so your username and password are sent unencrypted. Use https:// unless the server is on a network you trust.</string>
     <string name="music_folders_passphrase">Key passphrase (optional)</string>
     <string name="music_folders_passphrase_keep">Key passphrase (leave unchanged to keep the saved one)</string>
     <string name="music_folders_host_key">Server key: %1$s</string>

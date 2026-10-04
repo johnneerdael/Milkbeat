@@ -147,4 +147,24 @@ class MusicFoldersViewModelTest {
             advanceUntilIdle()
             assertThat(vm.editor.value?.error).isEqualTo(io.github.aedev.flow.R.string.music_folders_invalid_webdav)
         }
+
+    @Test fun privateKeySignInNeedsAKeyUnlessOneIsAlreadySaved() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            val repository = mockk<MusicFolderRepository>()
+            coEvery { repository.folders } returns flowOf(emptyList())
+            coEvery { repository.test(any(), any(), any()) } answers { firstArg() }
+            val vm = MusicFoldersViewModel(repository, mockk(relaxed = true))
+            val box =
+                MusicFolder(name = "Box", kind = MusicFolderKind.SFTP, host = "box", username = "me", hostKey = "ssh-ed25519 SHA256:abc")
+            vm.edit(box)
+            vm.updateDraft { copy(source = source.copy(keyAuth = true)) }
+            vm.testAccess()
+            advanceUntilIdle()
+            assertThat(vm.editor.value?.error).isEqualTo(io.github.aedev.flow.R.string.music_folders_private_key_required)
+            vm.edit(box.copy(keyAuth = true))
+            vm.testAccess()
+            advanceUntilIdle()
+            assertThat(vm.editor.value?.access).isEqualTo(FolderAccess.SUCCESS)
+        }
 }

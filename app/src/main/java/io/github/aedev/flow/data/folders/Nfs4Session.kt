@@ -37,7 +37,7 @@ internal class Nfs4Session private constructor(
 ) : NfsSession {
     private var clientId: clientid4? = null
     private var sessionId: sessionid4? = null
-    private var sequence = 0
+    private var sequence = FIRST_SLOT_SEQUENCE
     private var answered = false
     private var replyLimit = MAX_READ_BYTES + COMPOUND_OVERHEAD_BYTES
     private var maxOperations = MAX_OPERATIONS
@@ -169,7 +169,7 @@ internal class Nfs4Session private constructor(
         if (replyLimit <= COMPOUND_OVERHEAD_BYTES || maxOperations <= LOOKUP_FIXED_OPERATIONS) {
             throw IOException("NFS server session limits are too small")
         }
-        sequence = 0
+        sequence = FIRST_SLOT_SEQUENCE
         val reclaim = sequenced(CompoundBuilder().withReclaimComplete())
         if (reclaim.status != nfsstat.NFS_OK && reclaim.status != nfsstat.NFSERR_COMPLETE_ALREADY) {
             throw nfsStatusException(reclaim.status, reachingExport = false)
@@ -249,6 +249,8 @@ internal class Nfs4Session private constructor(
     }
 
     companion object {
+        // RFC 8881 2.10.6.1: a slot's first request carries sequence id 1; strict servers treat 0 as a replay.
+        private const val FIRST_SLOT_SEQUENCE = 1
         private const val IMPLEMENTATION_DOMAIN = "neerdael.nl"
         private const val IMPLEMENTATION_NAME = "Milkbeat"
         private const val MAX_READ_BYTES = 64 * 1024
