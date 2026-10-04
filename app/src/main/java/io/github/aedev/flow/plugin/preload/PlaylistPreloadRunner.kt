@@ -6,6 +6,7 @@ import io.github.aedev.flow.plugin.playback.PluginTrackMatcher
 import io.github.aedev.flow.plugin.playback.audioProviderAttempts
 import io.github.aedev.flow.plugin.registry.PluginRegistry
 import io.github.aedev.flow.plugin.runtime.PluginCallException
+import io.github.aedev.flow.plugin.runtime.retryingTransient
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -88,8 +89,10 @@ class PlaylistPreloadRunner
                 do {
                     validate()
                     val page =
-                        withContext(NonCancellable) {
-                            host.call(metadataId, PluginOperations.library, LibraryRequest(cursor = libraryCursor))
+                        retryingTransient(beforeRetry = { validate() }) {
+                            withContext(NonCancellable) {
+                                host.call(metadataId, PluginOperations.library, LibraryRequest(cursor = libraryCursor))
+                            }
                         }
                     validate()
                     page.blocks.filterIsInstance<CollectionBlock>().flatMap { it.items }.forEach { item ->
@@ -110,14 +113,16 @@ class PlaylistPreloadRunner
                     do {
                         validate()
                         val page =
-                            withContext(NonCancellable) {
-                                host.call(metadataId, PluginOperations.tracks, TracksRequest(collection, trackCursor))
+                            retryingTransient(beforeRetry = { validate() }) {
+                                withContext(NonCancellable) {
+                                    host.call(metadataId, PluginOperations.tracks, TracksRequest(collection, trackCursor))
+                                }
                             }
                         validate()
                         for (track in page.tracks) {
                             validate()
                             if (!seenTracks.add(PluginTrackMatcher.fingerprint(track))) continue
-                            val matched = index(track) { validate() }
+                            val matched = retryingTransient(beforeRetry = { validate() }) { index(track) { validate() } }
                             progress =
                                 progress.copy(
                                     indexed = progress.indexed + 1,

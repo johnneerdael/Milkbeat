@@ -7,6 +7,7 @@ import io.github.aedev.flow.plugin.playback.PluginTrackMatcher
 import io.github.aedev.flow.plugin.registry.InstalledPlugin
 import io.github.aedev.flow.plugin.registry.PluginRegistry
 import io.github.aedev.flow.plugin.runtime.PluginCallException
+import io.github.aedev.flow.plugin.runtime.retryingTransient
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
@@ -86,8 +87,10 @@ class PlaylistMirrorRunner
                 do {
                     active()
                     val page =
-                        withContext(NonCancellable) {
-                            host.call(key.sourcePlugin, PluginOperations.tracks, TracksRequest(key.source, cursor))
+                        retryingTransient(beforeRetry = { active() }) {
+                            withContext(NonCancellable) {
+                                host.call(key.sourcePlugin, PluginOperations.tracks, TracksRequest(key.source, cursor))
+                            }
                         }
                     active()
                     if (cursor == null) revision = page.revision
@@ -172,12 +175,14 @@ class PlaylistMirrorRunner
                 do {
                     active()
                     val result =
-                        withContext(NonCancellable) {
-                            host.call(
-                                key.targetPlugin,
-                                PluginOperations.importPrivatePlaylist,
-                                request.copy(target = record.destination, cursor = cursor),
-                            )
+                        retryingTransient(beforeRetry = { active() }) {
+                            withContext(NonCancellable) {
+                                host.call(
+                                    key.targetPlugin,
+                                    PluginOperations.importPrivatePlaylist,
+                                    request.copy(target = record.destination, cursor = cursor),
+                                )
+                            }
                         }
                     acceptImport(result, request.mode)
                     cursor = result.next
@@ -218,7 +223,8 @@ class PlaylistMirrorRunner
                     ?.batchMatching == true
             var ensured: PrivatePlaylistImportResult? = null
             if (!batched || record.nextIndex >= tracks.size) import(ensureRequest)
-            while (record.nextIndex < tracks.size) {
+
+            suspend fun matchNext() {
                 active()
                 val start = record.nextIndex
                 val batch = tracks.subList(start, minOf(start + if (batched) MATCH_BATCH_SIZE else 1, tracks.size))
@@ -264,6 +270,9 @@ class PlaylistMirrorRunner
                         }
                     checkpoint()
                 }
+            }
+            while (record.nextIndex < tracks.size) {
+                retryingTransient(beforeRetry = { active() }) { matchNext() }
                 yield()
             }
             if (ensured?.next != null) import(ensureRequest, ensured)

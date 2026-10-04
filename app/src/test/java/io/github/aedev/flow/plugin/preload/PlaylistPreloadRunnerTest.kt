@@ -209,6 +209,37 @@ class PlaylistPreloadRunnerTest {
         }
 
     @Test
+    fun `a refused match pauses and resumes indexing instead of ending it`() =
+        runTest {
+            var refused = false
+            coEvery { host.call("youtube", PluginOperations.matchAudio, any()) } coAnswers {
+                if (!refused) {
+                    refused = true
+                    throw PluginCallException("youtube", PluginError(PluginErrorCode.RATE_LIMITED, "paused"))
+                }
+                val original = thirdArg<nl.neerdael.milkbeat.plugin.MatchAudioRequest>().track
+                AudioMatches(
+                    if (original.ref.providerId == "b") {
+                        emptyList()
+                    } else {
+                        listOf(
+                            original.copy(
+                                ref = EntityRef(EntityKind.TRACK, "yt-${original.ref.providerId}"),
+                                ids =
+                                    mapOf("youtube" to "yt-${original.ref.providerId}"),
+                            ),
+                        )
+                    },
+                )
+            }
+
+            val result = runner.run("spotify", "listener", listOf("youtube", "beatport")) { }
+
+            assertThat(result).isEqualTo(PlaylistPreloadProgress(3, 3, 3, 3, 0, true))
+            assertThat(testScheduler.currentTime).isAtLeast(5_000L)
+        }
+
+    @Test
     fun `cancellation finishes the active match keeps its cache and starts no other query`() =
         runTest {
             val release = CompletableDeferred<Unit>()
