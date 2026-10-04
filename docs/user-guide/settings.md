@@ -38,7 +38,8 @@ The projectM settings from ProjectM TV, applied to Milkbeat's own visualizer. An
 | Setting | Purpose |
 | --- | --- |
 | Enable visualizations | Enable projectM on supported devices |
-| Show music videos | Start supported video tracks with their picture instead of visuals |
+
+Whether now playing shows the visualizer, the music video or the artwork is chosen in the player with its view button, not here. See [Playback and visuals](playback.md#visualizer-music-video-or-artwork).
 
 ### Presets
 

@@ -27,6 +27,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.media3.common.util.UnstableApi
 import androidx.navigation.compose.rememberNavController
 import io.github.aedev.flow.R
+import io.github.aedev.flow.data.local.NowPlayingView
 import io.github.aedev.flow.data.model.Video
 import io.github.aedev.flow.data.music.model.MusicTrack
 import io.github.aedev.flow.player.EnhancedMusicPlayerManager
@@ -57,6 +58,7 @@ fun FlowTvApp(
     val musicPlayerViewModel: MusicPlayerViewModel = hiltViewModel(activity)
     val visualizerViewModel: TvVisualizerViewModel = hiltViewModel(activity)
     val visualizerActive by visualizerViewModel.active.collectAsStateWithLifecycle()
+    val nowPlayingView by visualizerViewModel.nowPlayingView.collectAsStateWithLifecycle()
     val navController = rememberNavController()
     // A plugin link opens Settings, where Plugins picks it up and asks the listener.
     LaunchedEffect(pluginLinkPending) {
@@ -206,6 +208,9 @@ fun FlowTvApp(
                             focusMusicStrip = true
                         },
                         visualizer = rememberTvNowPlayingVisual(visualizerViewModel).takeIf { visualizerActive },
+                        // Until the stored view is read, the artwork rather than starting a visualizer to drop.
+                        view = nowPlayingView ?: NowPlayingView.STATIC,
+                        onViewChange = visualizerViewModel::setNowPlayingView,
                     )
                 } else if (video == null) {
                     TvShell(

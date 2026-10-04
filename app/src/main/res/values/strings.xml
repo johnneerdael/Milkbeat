@@ -318,8 +318,7 @@
     <string name="tv_library_watch_later">Watch later</string>
     <string name="tv_catalog_open">Open %1$s</string>
     <string name="tv_music_show_video">Show video</string>
-    <string name="visualizer_music_videos">Show music videos</string>
-    <string name="visualizer_music_videos_subtitle">Tracks that have a video play it instead of the visualizer. The Video button in the player switches for the rest of the session.</string>
+    <string name="tv_music_show_artwork">Show artwork</string>
     <string name="tv_music_show_visualizer">Show visualizer</string>
     <string name="tv_catalog_show_all">Show all</string>
     <string name="tv_catalog_mix">Mix</string>

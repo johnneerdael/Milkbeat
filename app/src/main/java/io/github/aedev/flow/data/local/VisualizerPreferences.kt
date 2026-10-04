@@ -61,13 +61,17 @@ class VisualizerPreferences
         }
 
         /**
-         * Whether a track that has a music video starts on its picture rather than the visualizer. Off by
-         * default: most tracks come with a video, and the visualizer is the app's own view.
+         * The view now-playing shows, as the player's view button last left it. The visualizer until
+         * then; the music-video switch this replaced still decides it for anyone who turned videos on.
          */
-        val showMusicVideos: Flow<Boolean> = appContext.visualizerDataStore.data.map { it[SHOW_MUSIC_VIDEOS] ?: false }
+        val nowPlayingView: Flow<NowPlayingView> =
+            appContext.visualizerDataStore.data.map { prefs ->
+                NowPlayingView.fromName(prefs[NOW_PLAYING_VIEW])
+                    ?: if (prefs[SHOW_MUSIC_VIDEOS] == true) NowPlayingView.VIDEO else NowPlayingView.VISUALIZER
+            }
 
-        suspend fun setShowMusicVideos(show: Boolean) {
-            appContext.visualizerDataStore.edit { it[SHOW_MUSIC_VIDEOS] = show }
+        suspend fun setNowPlayingView(view: NowPlayingView) {
+            appContext.visualizerDataStore.edit { it[NOW_PLAYING_VIEW] = view.name }
         }
 
         /** ProjectM-TV's engine and quality settings; a value never set takes its device default from [defaults]. */
@@ -137,5 +141,6 @@ class VisualizerPreferences
             val ENABLED = booleanPreferencesKey("enabled")
             val DIAGNOSTICS = booleanPreferencesKey("diagnostics")
             val SHOW_MUSIC_VIDEOS = booleanPreferencesKey("show_music_videos")
+            val NOW_PLAYING_VIEW = stringPreferencesKey("now_playing_view")
         }
     }
