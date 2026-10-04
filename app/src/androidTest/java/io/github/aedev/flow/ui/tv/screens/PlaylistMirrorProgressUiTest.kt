@@ -48,7 +48,7 @@ class PlaylistMirrorProgressUiTest {
         compose.setContent {
             TvTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
-                    TvPlaylistMirrorStatus(state.value) { retries++ }
+                    TvPlaylistMirrorStatus(state.value, null) { retries++ }
                 }
             }
         }

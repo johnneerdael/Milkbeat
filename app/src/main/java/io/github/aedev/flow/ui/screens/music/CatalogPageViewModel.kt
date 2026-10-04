@@ -102,6 +102,8 @@ class CatalogPageViewModel
                     .PlaylistMirrorState(),
             )
         val mirror: StateFlow<io.github.aedev.flow.plugin.mirror.PlaylistMirrorState> = _mirror
+        private val _mirrorTarget = MutableStateFlow<nl.neerdael.milkbeat.plugin.PluginManifest?>(null)
+        val mirrorTarget: StateFlow<nl.neerdael.milkbeat.plugin.PluginManifest?> = _mirrorTarget
         private var mirrorJob: Job? = null
 
         fun retryMirror() {
@@ -130,6 +132,7 @@ class CatalogPageViewModel
                         _mirror.value =
                             io.github.aedev.flow.plugin.mirror
                                 .PlaylistMirrorState()
+                        _mirrorTarget.value = key?.let(coordinator::target)
                         if (key == null) return@collectLatest
                         coordinator.open(provider.id, entity, title, artwork)
                         coordinator.state(key).collect { progress ->
