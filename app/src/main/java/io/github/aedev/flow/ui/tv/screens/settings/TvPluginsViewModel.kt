@@ -6,6 +6,8 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.aedev.flow.data.account.AccountPlayHistory
 import io.github.aedev.flow.plugin.catalog.PluginAccounts
+import io.github.aedev.flow.plugin.install.BrowserVerification
+import io.github.aedev.flow.plugin.install.BrowserVerificationRequiredException
 import io.github.aedev.flow.plugin.install.PendingInstall
 import io.github.aedev.flow.plugin.install.PluginInstallException
 import io.github.aedev.flow.plugin.install.PluginInstaller
@@ -28,11 +30,15 @@ import kotlinx.coroutines.launch
 import nl.neerdael.milkbeat.catalog.ProviderAccount
 import javax.inject.Inject
 
-/** Where adding a plugin stands: nothing, fetching it, waiting for consent, or failed. */
+/** Where adding a plugin stands: nothing, fetching it, waiting on a browser check or for consent, or failed. */
 sealed interface AddPluginState {
     data object Idle : AddPluginState
 
     data object Fetching : AddPluginState
+
+    data class Verifying(
+        val verification: BrowserVerification,
+    ) : AddPluginState
 
     data class Consent(
         val pending: PendingInstall,
@@ -138,13 +144,25 @@ class TvPluginsViewModel
             links?.consume()
             val trimmed = url.trim()
             if (trimmed.isEmpty()) return
+            load { installer.fetch(trimmed, update) }
+        }
+
+        /** The browser check passed and Buzzheavier handed [fileUrl] to the page. */
+        fun verified(fileUrl: String) {
+            val verifying = adding.value as? AddPluginState.Verifying ?: return
+            load { installer.fetch(verifying.verification, fileUrl) }
+        }
+
+        private fun load(fetch: suspend () -> PendingInstall) {
             fetchJob?.cancel()
             adding.value = AddPluginState.Fetching
             fetchJob =
                 viewModelScope.launch {
                     adding.value =
                         try {
-                            AddPluginState.Consent(installer.fetch(trimmed, update))
+                            AddPluginState.Consent(fetch())
+                        } catch (e: BrowserVerificationRequiredException) {
+                            AddPluginState.Verifying(e.verification)
                         } catch (e: PluginInstallException) {
                             AddPluginState.Failed(e.message.orEmpty(), e.messageResource)
                         }

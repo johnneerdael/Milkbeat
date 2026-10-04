@@ -2,6 +2,7 @@ package io.github.aedev.flow.plugin.install
 
 import io.github.aedev.flow.R
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import okhttp3.CacheControl
@@ -11,40 +12,93 @@ import okhttp3.Cookie
 import okhttp3.CookieJar
 import okhttp3.Headers
 import okhttp3.HttpUrl
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
 import org.jsoup.Jsoup
+import org.jsoup.nodes.Document
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 private const val MAX_PLUGIN_BYTES = 64L * 1024 * 1024
 private const val MAX_PAGE_BYTES = 1024L * 1024
 private const val MAX_REDIRECTS = 5
 private const val DOWNLOAD_TIMEOUT_SECONDS = 30L
 private const val BUZZHEAVIER_HOST = "buzzheavier.com"
+private const val BUZZHEAVIER_ATTEMPTS = 3
+private val BUZZHEAVIER_LINK_HOSTS = setOf(BUZZHEAVIER_HOST, "www.buzzheavier.com", "bzzhr.to")
 private const val USER_AGENT = "Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36"
+
+/** Buzzheavier kept answering [page] with a browser challenge; a real browser can pass it there. */
+internal class BuzzheavierChallengeException(
+    val page: String,
+) : PluginInstallException(messageResource = R.string.tv_plugins_download_verification)
 
 internal suspend fun downloadPlugin(
     client: OkHttpClient,
     value: String,
+    challengeBackoff: Duration = 1.seconds,
 ): ByteArray =
     withContext(Dispatchers.IO) {
         val url = pluginUrl(value) ?: throw PluginInstallException(messageResource = R.string.tv_plugins_input_invalid)
-        val buzzheavier = url.host in setOf(BUZZHEAVIER_HOST, "www.buzzheavier.com", "bzzhr.to")
-        val session =
-            client
-                .newBuilder()
-                .followRedirects(false)
-                .followSslRedirects(false)
-                .callTimeout(DOWNLOAD_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-                .apply { if (buzzheavier) cookieJar(DownloadCookies()) }
-                .build()
-        val downloadUrl = if (buzzheavier) resolveBuzzheavier(session, url) else url
+        val buzzheavier = url.host in BUZZHEAVIER_LINK_HOSTS
+        val session = downloadSession(client, cookies = buzzheavier)
+        val downloadUrl = if (buzzheavier) resolveBuzzheavier(session, url, challengeBackoff) else url
         followDownload(session, downloadUrl, MAX_PLUGIN_BYTES, buzzheavier).bytes
     }
+
+/** Downloads the link to [page]'s file that a browser was handed after passing Buzzheavier's challenge. */
+internal suspend fun downloadBuzzheavierFile(
+    client: OkHttpClient,
+    page: String,
+    fileUrl: String,
+): ByteArray =
+    withContext(Dispatchers.IO) {
+        if (!isBuzzheavierFileUrl(fileUrl, page)) throw PluginInstallException(messageResource = R.string.tv_plugins_download_redirect)
+        followDownload(downloadSession(client, cookies = false), fileUrl.toHttpUrl(), MAX_PLUGIN_BYTES, true).bytes
+    }
+
+/** The file page a Buzzheavier link points at, or null when [value] is no Buzzheavier file link. */
+internal fun buzzheavierPage(value: String): HttpUrl? {
+    val url = pluginUrl(value)?.takeIf { it.host in BUZZHEAVIER_LINK_HOSTS } ?: return null
+    val id = url.pathSegments.filter { it.isNotEmpty() }.singleOrNull()
+    if (id == null || !id.matches(Regex("[A-Za-z0-9]{8,16}"))) return null
+    return url
+        .newBuilder()
+        .scheme("https")
+        .host(BUZZHEAVIER_HOST)
+        .port(443)
+        .query(null)
+        .fragment(null)
+        .build()
+}
+
+/** Whether [url] is the download link Buzzheavier's file [page] hands a browser for that same file. */
+internal fun isBuzzheavierFileUrl(
+    url: String,
+    page: String,
+): Boolean {
+    val id = buzzheavierPage(page)?.pathSegments?.first() ?: return false
+    val file = runCatching { secureBuzzheavierUrl("https://$BUZZHEAVIER_HOST/".toHttpUrl(), url) }.getOrNull() ?: return false
+    return file.host != BUZZHEAVIER_HOST && file.pathSegments == listOf("d", id)
+}
+
+private fun downloadSession(
+    client: OkHttpClient,
+    cookies: Boolean,
+): OkHttpClient =
+    client
+        .newBuilder()
+        .followRedirects(false)
+        .followSslRedirects(false)
+        .callTimeout(DOWNLOAD_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        .apply { if (cookies) cookieJar(DownloadCookies()) }
+        .build()
 
 /** A small file the plugin publisher keeps current, by the same bounded download path as plugins. */
 internal suspend fun downloadPublished(
@@ -52,38 +106,17 @@ internal suspend fun downloadPublished(
     url: HttpUrl,
 ): ByteArray =
     withContext(Dispatchers.IO) {
-        val session =
-            client
-                .newBuilder()
-                .followRedirects(false)
-                .followSslRedirects(false)
-                .callTimeout(DOWNLOAD_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-                .build()
-        followDownload(session, url, MAX_PAGE_BYTES, secureBuzzheavier = false).bytes
+        followDownload(downloadSession(client, cookies = false), url, MAX_PAGE_BYTES, secureBuzzheavier = false).bytes
     }
 
 private suspend fun resolveBuzzheavier(
     client: OkHttpClient,
     source: HttpUrl,
+    challengeBackoff: Duration,
 ): HttpUrl {
-    val id = source.pathSegments.filter { it.isNotEmpty() }.singleOrNull()
-    if (id == null || !id.matches(Regex("[A-Za-z0-9]{8,16}"))) {
-        throw PluginInstallException(messageResource = R.string.tv_plugins_input_invalid)
-    }
-    val page =
-        source
-            .newBuilder()
-            .scheme("https")
-            .host(BUZZHEAVIER_HOST)
-            .port(443)
-            .query(null)
-            .fragment(null)
-            .build()
-    val landing = followDownload(client, page, MAX_PAGE_BYTES, secureBuzzheavier = true)
-    val document = Jsoup.parse(landing.bytes.toString(Charsets.UTF_8), page.toString())
-    if (document.title().contains("Just a moment", ignoreCase = true)) {
-        throw PluginInstallException(messageResource = R.string.tv_plugins_download_verification)
-    }
+    val page = buzzheavierPage(source.toString()) ?: throw PluginInstallException(messageResource = R.string.tv_plugins_input_invalid)
+    val id = page.pathSegments.first()
+    val document = landingPage(client, page, challengeBackoff)
     val trigger =
         document
             .select("[hx-get]")
@@ -103,9 +136,34 @@ private suspend fun resolveBuzzheavier(
                 .build(),
             MAX_PAGE_BYTES,
         )
+    if (response.isChallenge) throw BuzzheavierChallengeException(page.toString())
     checkStatus(response, allowRedirect = true, buzzheavier = true)
     val target = response.headers["HX-Redirect"] ?: response.headers["Location"]
     return secureBuzzheavierUrl(trigger, target)
+}
+
+// Cloudflare decides per request, so a challenge can clear on a later try; one that never does
+// leaves the page to a browser.
+private suspend fun landingPage(
+    client: OkHttpClient,
+    page: HttpUrl,
+    challengeBackoff: Duration,
+): Document {
+    repeat(BUZZHEAVIER_ATTEMPTS) { attempt ->
+        if (attempt > 0) delay(challengeBackoff * (1 shl (attempt - 1)))
+        val document =
+            try {
+                Jsoup.parse(
+                    followDownload(client, page, MAX_PAGE_BYTES, secureBuzzheavier = true).bytes.toString(Charsets.UTF_8),
+                    page.toString(),
+                )
+            } catch (e: PluginInstallException) {
+                if (e.messageResource != R.string.tv_plugins_download_verification) throw e
+                null
+            }
+        if (document != null && !document.title().contains("Just a moment", ignoreCase = true)) return document
+    }
+    throw BuzzheavierChallengeException(page.toString())
 }
 
 private suspend fun followDownload(
@@ -154,14 +212,16 @@ private data class DownloadResponse(
     val code: Int,
     val headers: Headers,
     val bytes: ByteArray,
-)
+) {
+    val isChallenge: Boolean get() = headers["cf-mitigated"] == "challenge"
+}
 
 private fun checkStatus(
     response: DownloadResponse,
     allowRedirect: Boolean,
     buzzheavier: Boolean,
 ) {
-    if (response.headers["cf-mitigated"] == "challenge" || (buzzheavier && response.code == 403)) {
+    if (buzzheavier && response.isChallenge) {
         throw PluginInstallException(messageResource = R.string.tv_plugins_download_verification)
     }
     if (response.code !in 200..299 && !(allowRedirect && response.code in 300..399)) {
