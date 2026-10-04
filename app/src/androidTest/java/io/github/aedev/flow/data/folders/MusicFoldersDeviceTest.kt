@@ -49,7 +49,7 @@ class MusicFoldersDeviceTest {
                 MusicFolderDataSourceFactory(
                     context,
                     MusicFolderStore(context),
-                    SmbMusicClient(),
+                    testFolderClients(),
                 ).wrap(DefaultDataSource.Factory(context))
             val player =
                 withContext(Dispatchers.Main) {
@@ -97,10 +97,10 @@ class MusicFoldersDeviceTest {
             store.save(source, password)
             try {
                 val access = store.access(source.id, source.revision)
-                withContext(Dispatchers.IO) { client.test(access.source, access.password) }
-                val entries = withContext(Dispatchers.IO) { client.list(access.source, access.password, "Album") }
+                withContext(Dispatchers.IO) { client.test(access.source, access.secrets) }
+                val entries = withContext(Dispatchers.IO) { client.list(access.source, access.secrets, "Album") }
                 withContext(Dispatchers.IO) {
-                    client.open(access.source, access.password, entries.first().location).use {
+                    client.open(access.source, access.secrets, entries.first().location).use {
                         val bytes = ByteArray(4)
                         assertEquals(4, it.read(bytes, 0, 0, 4))
                         delay(16_000)
@@ -110,9 +110,9 @@ class MusicFoldersDeviceTest {
                 }
                 store.save(source.copy(name = "Edited fixture"), null)
                 val changed = store.folders.first().first { it.id == source.id }
-                assertEquals(password, store.access(changed.id, changed.revision).password)
+                assertEquals(password, store.access(changed.id, changed.revision).secrets.password)
                 assertThrows(java.io.FileNotFoundException::class.java) { runBlocking { store.access(source.id, source.revision) } }
-                assertThrows(Exception::class.java) { client.test(source, "incorrect-password") }
+                assertThrows(Exception::class.java) { client.test(source, MusicFolderSecrets("incorrect-password")) }
             } finally {
                 store.remove(source.id)
             }
@@ -121,13 +121,13 @@ class MusicFoldersDeviceTest {
     @Test fun readOnlyShareListsMusicSeeksAndReportsMissingFolders() {
         val source = fixture()
         val client = SmbMusicClient()
-        client.test(source, "")
-        val roots = client.list(source, "", "")
+        client.test(source, MusicFolderSecrets())
+        val roots = client.list(source, MusicFolderSecrets(), "")
         assertEquals(listOf("Album"), roots.map { it.name })
-        val files = client.list(source, "", "Album")
+        val files = client.list(source, MusicFolderSecrets(), "Album")
         assertEquals(2, files.size)
         assertFalse(files.any { it.name == "ignore.txt" })
-        client.open(source, "", files.first().location).use {
+        client.open(source, MusicFolderSecrets(), files.first().location).use {
             assertTrue(it.length > 44)
             val header = ByteArray(4)
             assertEquals(4, it.read(header, 0, 0, 4))
@@ -135,7 +135,7 @@ class MusicFoldersDeviceTest {
             assertEquals(4, it.read(header, 8, 0, 4))
             assertEquals("WAVE", String(header, Charsets.US_ASCII))
         }
-        assertThrows(Exception::class.java) { client.test(source.copy(root = "Missing"), "") }
+        assertThrows(Exception::class.java) { client.test(source.copy(root = "Missing"), MusicFolderSecrets()) }
     }
 
     @Test fun media3PlaysSeeksAndAdvancesBetweenSmbTracksAndRejectsRemovedSource(): Unit =
@@ -145,8 +145,8 @@ class MusicFoldersDeviceTest {
             val store = MusicFolderStore(context)
             val smb = SmbMusicClient()
             store.save(source, "")
-            val files = withContext(Dispatchers.IO) { smb.list(source, "", "Album").sortedBy { it.name } }
-            val factory = MusicFolderDataSourceFactory(context, store, smb).wrap(DefaultDataSource.Factory(context))
+            val files = withContext(Dispatchers.IO) { smb.list(source, MusicFolderSecrets(), "Album").sortedBy { it.name } }
+            val factory = MusicFolderDataSourceFactory(context, store, testFolderClients(smb)).wrap(DefaultDataSource.Factory(context))
             val items =
                 files.map {
                     val uri = source.remoteUri(it.location)
