@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -38,7 +39,6 @@ import io.github.aedev.flow.R
 import io.github.aedev.flow.data.music.model.MusicTrack
 import io.github.aedev.flow.player.EnhancedMusicPlayerManager
 import io.github.aedev.flow.plugin.catalog.ProviderEntityReference
-import io.github.aedev.flow.plugin.mirror.PlaylistMirrorState
 import io.github.aedev.flow.ui.screens.music.CatalogPageViewModel
 import io.github.aedev.flow.ui.tv.catalog.TvCatalogActions
 import io.github.aedev.flow.ui.tv.catalog.TvCatalogEntityHeader
@@ -143,28 +143,6 @@ fun TvCatalogPageScreen(
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun TvPlaylistMirrorStatus(
-    state: PlaylistMirrorState,
-    retry: () -> Unit,
-) {
-    if (!state.isPreparing && !state.ready && state.error == null) return
-    Column {
-        Text(
-            text =
-                when {
-                    state.error != null -> stringResource(R.string.playlist_mirror_failed)
-                    state.ready -> stringResource(R.string.playlist_mirror_ready, state.matched, state.missing)
-                    state.total == 0 -> stringResource(R.string.playlist_mirror_starting)
-                    else -> stringResource(R.string.playlist_mirror_progress, state.matched, state.total, state.missing)
-                },
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        if (state.error != null) TvButton(text = stringResource(R.string.playlist_mirror_retry), onClick = retry)
     }
 }
 

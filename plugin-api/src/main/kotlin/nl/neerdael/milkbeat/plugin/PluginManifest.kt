@@ -81,6 +81,7 @@ data class AudioRole(
     val reportPlayback: Boolean = false,
     /** How the plugin's streams arrive, so the player picks the matching source before resolving one. */
     val delivery: AudioDelivery = AudioDelivery.PROGRESSIVE,
+    val batchMatching: Boolean = false,
 )
 
 @Serializable

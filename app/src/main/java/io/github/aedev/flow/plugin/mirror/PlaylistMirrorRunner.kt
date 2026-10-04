@@ -2,17 +2,23 @@ package io.github.aedev.flow.plugin.mirror
 
 import io.github.aedev.flow.plugin.PluginHost
 import io.github.aedev.flow.plugin.catalog.PluginAccounts
+import io.github.aedev.flow.plugin.playback.AudioBatchIndexingResult
 import io.github.aedev.flow.plugin.playback.PluginTrackMatcher
 import io.github.aedev.flow.plugin.registry.InstalledPlugin
 import io.github.aedev.flow.plugin.registry.PluginRegistry
+import io.github.aedev.flow.plugin.runtime.PluginCallException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.yield
 import nl.neerdael.milkbeat.catalog.Artwork
 import nl.neerdael.milkbeat.catalog.PrivatePlaylistImportMode
+import nl.neerdael.milkbeat.catalog.PrivatePlaylistImportPhase
+import nl.neerdael.milkbeat.catalog.PrivatePlaylistImportProgress
 import nl.neerdael.milkbeat.catalog.PrivatePlaylistImportRequest
+import nl.neerdael.milkbeat.catalog.PrivatePlaylistImportResult
 import nl.neerdael.milkbeat.catalog.ProviderAccount
 import nl.neerdael.milkbeat.catalog.TrackDescriptor
 import nl.neerdael.milkbeat.catalog.TracksRequest
@@ -94,6 +100,7 @@ class PlaylistMirrorRunner
             }
 
             active()
+            onProgress(PlaylistMirrorState(isPreparing = true))
             val (tracks, revision) = read()
             val previous = store.get(key.id)
             val sourceArtwork = artwork ?: previous?.takeIf { it.key == key }?.artwork
@@ -106,15 +113,62 @@ class PlaylistMirrorRunner
                 previous?.takeIf { it.key == key && it.revision == fingerprint }
                     ?: MirrorRecord(key, title, fingerprint, tracks, destination = previous?.destination, artwork = sourceArtwork)
 
+            var phase = MirrorPhase.MATCHING
+            var phaseCompleted = 0
+            var phaseTotal = 0
+
             suspend fun checkpoint() {
                 active()
                 store.put(record)
-                onProgress(PlaylistMirrorState(tracks.size, record.matches.size, record.missed.size, record.ready))
+                onProgress(
+                    PlaylistMirrorState(
+                        tracks.size,
+                        record.matches.size,
+                        record.missed.size,
+                        record.ready,
+                        phase = phase,
+                        phaseCompleted = phaseCompleted,
+                        phaseTotal = phaseTotal,
+                    ),
+                )
             }
 
-            suspend fun import(request: PrivatePlaylistImportRequest) {
-                var cursor: String? = null
+            fun updateProgress(progress: PrivatePlaylistImportProgress?) {
+                progress ?: return
+                phase =
+                    when (progress.phase) {
+                        PrivatePlaylistImportPhase.PREPARING, PrivatePlaylistImportPhase.WRITING -> MirrorPhase.WRITING
+                        PrivatePlaylistImportPhase.VERIFYING -> MirrorPhase.VERIFYING
+                    }
+                phaseCompleted = progress.completed
+                phaseTotal = progress.total
+            }
+
+            suspend fun acceptImport(
+                result: PrivatePlaylistImportResult,
+                mode: PrivatePlaylistImportMode,
+            ) {
+                active()
+                record = record.copy(destination = result.ref ?: record.destination, ready = false)
+                if (mode == PrivatePlaylistImportMode.REPLACE) updateProgress(result.progress)
+                checkpoint()
+            }
+
+            suspend fun import(
+                request: PrivatePlaylistImportRequest,
+                initial: PrivatePlaylistImportResult? = null,
+            ) {
+                var cursor = initial?.next
                 val seen = mutableSetOf<String>()
+                cursor?.let(seen::add)
+                if (request.mode == PrivatePlaylistImportMode.REPLACE) {
+                    record = record.copy(ready = false)
+                    phase = MirrorPhase.WRITING
+                    phaseCompleted = 0
+                    phaseTotal = record.matches.size
+                    checkpoint()
+                }
+                if (cursor != null) initial?.retryAfterMs?.let { delay(it.coerceIn(100L, 5000L)) }
                 do {
                     active()
                     val result =
@@ -125,14 +179,9 @@ class PlaylistMirrorRunner
                                 request.copy(target = record.destination, cursor = cursor),
                             )
                         }
-                    active()
+                    acceptImport(result, request.mode)
                     cursor = result.next
                     if (cursor != null && !seen.add(cursor)) throw MirrorPreparationException(MirrorFailure.INVALID_PAGINATION)
-                    if (request.mode == PrivatePlaylistImportMode.ENSURE && result.ref != null && result.ref != record.destination) {
-                        record = record.copy(matches = emptyList(), missed = emptyList(), nextIndex = 0)
-                    }
-                    record = record.copy(destination = result.ref ?: record.destination, ready = false)
-                    checkpoint()
                     if (cursor != null) result.retryAfterMs?.let { delay(it.coerceIn(100L, 5000L)) }
                 } while (cursor != null)
                 checkNotNull(record.destination) { "The provider did not return the private playlist" }
@@ -155,7 +204,7 @@ class PlaylistMirrorRunner
             checkpoint()
             val image = artworkLoader?.fetch(source, sourceArtwork)
             active()
-            import(
+            val ensureRequest =
                 PrivatePlaylistImportRequest(
                     key.sourceKey,
                     title,
@@ -163,38 +212,62 @@ class PlaylistMirrorRunner
                     expectedAccountKey = key.targetAccount,
                     mode = PrivatePlaylistImportMode.ENSURE,
                     artwork = image,
-                ),
-            )
+                )
+            val batched =
+                target.manifest.roles.audio
+                    ?.batchMatching == true
+            var ensured: PrivatePlaylistImportResult? = null
+            if (!batched || record.nextIndex >= tracks.size) import(ensureRequest)
             while (record.nextIndex < tracks.size) {
                 active()
-                val position = record.nextIndex
-                val track = tracks[position]
-                val candidate =
+                val start = record.nextIndex
+                val batch = tracks.subList(start, minOf(start + if (batched) MATCH_BATCH_SIZE else 1, tracks.size))
+                val outcome =
                     gate.match(key.id, background) {
                         active()
-                        withContext(NonCancellable) { matcher.matchForIndexing(track, key.targetPlugin) }
+                        val callerContext = currentCoroutineContext()
+                        withContext(NonCancellable) {
+                            if (batched) {
+                                matcher.matchBatchForIndexing(
+                                    batch,
+                                    key.targetPlugin,
+                                    ensureRequest.copy(target = record.destination).takeIf { ensured == null },
+                                    ensureCallerActive = {
+                                        callerContext.ensureActive()
+                                        validate()
+                                    },
+                                )
+                            } else {
+                                AudioBatchIndexingResult(
+                                    listOf(matcher.matchForIndexing(batch.single(), key.targetPlugin)),
+                                )
+                            }
+                        }
                     }
                 active()
-                if (candidate != null) {
-                    import(
-                        PrivatePlaylistImportRequest(
-                            key.sourceKey,
-                            title,
-                            listOf(candidate.ref),
-                            expectedAccountKey = key.targetAccount,
-                            mode = PrivatePlaylistImportMode.APPEND,
-                            startIndex = record.matches.size,
-                        ),
-                    )
+                outcome.playlist?.let {
+                    ensured = it
+                    acceptImport(it, PrivatePlaylistImportMode.ENSURE)
                 }
-                record =
-                    if (candidate == null) {
-                        record.copy(missed = record.missed + track, nextIndex = position + 1)
-                    } else {
-                        record.copy(matches = record.matches + MirrorMatch(position, track, candidate), nextIndex = position + 1)
-                    }
-                checkpoint()
+                outcome.playlistError?.let { throw PluginCallException(key.targetPlugin, it) }
+                if (batched) checkNotNull(ensured) { "The provider did not return playlist creation state" }
+                check(outcome.matches.size == batch.size) { "The provider returned an incomplete match batch" }
+                batch.forEachIndexed { index, track ->
+                    outcome.errors.getOrNull(index)?.let { throw PluginCallException(key.targetPlugin, it) }
+                    val position = start + index
+                    val candidate = outcome.matches[index]
+                    record =
+                        if (candidate == null) {
+                            record.copy(missed = record.missed + track, nextIndex = position + 1)
+                        } else {
+                            record.copy(matches = record.matches + MirrorMatch(position, track, candidate), nextIndex = position + 1)
+                        }
+                    checkpoint()
+                }
+                yield()
             }
+            if (ensured?.next != null) import(ensureRequest, ensured)
+            checkNotNull(record.destination) { "The provider did not return the private playlist" }
             if (tracks.isNotEmpty() && record.matches.isEmpty()) throw MirrorPreparationException(MirrorFailure.NO_MATCHES)
             // A revisionless source is read again too: its ordered contents are the revision.
             val (confirmed, confirmedRevision) = read()
@@ -211,6 +284,10 @@ class PlaylistMirrorRunner
             record = record.copy(ready = true)
             checkpoint()
             return record
+        }
+
+        private companion object {
+            const val MATCH_BATCH_SIZE = 16
         }
 
         private fun samePackage(
