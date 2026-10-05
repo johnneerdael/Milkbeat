@@ -34,7 +34,7 @@ Local folder playback is independent of provider radio. **Play folder** queues t
 
 The visualizer uses projectM through ProjectM TV, with 9,606 Cream of the Crop presets. Its input comes from Milkbeat's player. With controls hidden, Left and Right step through presets.
 
-Out of the box the engine uses ProjectM TV's defaults for your device: 30 fps, automatic resolution, automatic transitions, a memory limit and slow-preset skipping. The target is not a promise that every preset reaches 30 fps; performance varies by preset and device. Every one of these can be changed in [Settings → Visualizations](settings.md#visualizations).
+Out of the box the engine uses ProjectM TV's defaults for your device: a 30 fps target, automatic resolution and transitions, Standard native trails and slow-preset skipping. Performance varies by preset and device. Resolution and RAM budgeting stay automatic; the frame rate, trails and other offered controls are in [Settings → Visualizations](settings.md#visualizations).
 
 Rendering and audio monitoring stop when the visualizer leaves the screen or the app goes into the background. A visible visualizer can keep drifting on silence when music is paused.
 
@@ -44,15 +44,13 @@ Rendering and audio monitoring stop when the visualizer leaves the screen or the
 
 Settings → Visualizations contains the visualizer switch, the projectM settings, diagnostics and the timing offset. Resolution adapts automatically to the target frame rate and live memory headroom, up to native 4K on a 4K panel. Native trails defaults to Standard; Medium and High add detail above 1330p and may lower the resolution Auto can sustain. Raise the timing value if the visuals arrive after the beat; lower it if they arrive before. Adjust by listening and watching on your own audio setup.
 
-Diagnostics show measured fps, target fps, render dimensions and whether the size is automatic or fixed, transition state, audio level and preset. Use these values when investigating slow visuals instead of judging performance from a still screenshot.
+Diagnostics show measured fps, target fps, render dimensions and the automatic render size, transition state, audio level and preset. Use these values when investigating slow visuals instead of judging performance from a still screenshot.
 
 ![Diagnostics with the defaults: 30 fps target, automatic resolution, adaptive blend](images/visualizer-diagnostics-defaults.png)
 
 ## What the visualizer settings change
 
-The diagnostics line shows each setting at work. With **Render resolution** at 720p and **Frame rate** at 60 fps, the line reads `of 60 fps · 1280×720 fixed`:
-
-![Fixed 720p at 60 fps](images/visualizer-effect-720p-60fps.png)
+The diagnostics line shows the actual automatic render size and selected FPS target. Raising **Frame rate** can cause Auto to lower resolution; Standard trails and shorter transitions reduce rendering work. The resulting size depends on the preset, device and available memory rather than a fixed-height setting.
 
 With **Transition style** set to Lightweight, presets cut and the old one fades out on top; the line reads `lightweight` instead of `blend`:
 
