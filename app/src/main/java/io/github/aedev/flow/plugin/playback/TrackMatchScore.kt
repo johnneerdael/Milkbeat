@@ -31,10 +31,10 @@ internal object TrackMatchScore {
     private val mixedExcerpt = Regex("\\s*(?:[-–—]\\s*mixed|[\\[(]\\s*mixed[)\\]])\\s*$", RegexOption.IGNORE_CASE)
     private val formatDecoration =
         Regex(
-            "[\\[(]\\s*(?:extended (?:mix|edit|version)|radio (?:mix|edit|version))[)\\]]|\\s+[-–—]\\s*(?:extended (?:mix|edit|version)|radio (?:mix|edit|version))\\s*$",
+            "[\\[(]\\s*(?:(?:extended|full(?: length)?) (?:mix|edit|version)|radio (?:mix|edit|version))[)\\]]|\\s+[-–—]\\s*(?:(?:extended|full(?: length)?) (?:mix|edit|version)|radio (?:mix|edit|version))\\s*$",
             RegexOption.IGNORE_CASE,
         )
-    private val formatPrefix = Regex("\\b(?:extended|radio)\\s+(?=(?:mix|remix|edit|version)\\b)")
+    private val formatPrefix = Regex("\\b(?:extended|full(?: length)?|radio)\\s+(?=(?:mix|remix|edit|version)\\b)")
     private val versionAbbreviation = Regex("\\bver\\b")
     private val versionWord = Regex("\\bversion\\b")
     private val latinAccents = Regex("(?<=\\p{sc=Latin})\\p{M}+")
@@ -136,12 +136,18 @@ internal object TrackMatchScore {
     ): Evidence =
         Evidence(
             textSimilarity(recordingTitle(track), recordingTitle(candidate)),
-            artistSimilarity(
-                performerCredits(track).firstOrNull().orEmpty(),
-                performerCredits(candidate).firstOrNull().orEmpty(),
-            ),
+            performerSimilarity(track, candidate),
             durationScore(track.durationMs, candidate.durationMs),
         )
+
+    private fun performerSimilarity(
+        track: TrackDescriptor,
+        candidate: TrackDescriptor,
+    ): Double {
+        val source = collectiveMembers(track) ?: listOf(performerCredits(track).firstOrNull().orEmpty())
+        val target = collectiveMembers(candidate) ?: listOf(performerCredits(candidate).firstOrNull().orEmpty())
+        return source.maxOf { artist -> target.maxOf { artistSimilarity(artist, it) } }
+    }
 
     private fun artistSimilarity(
         artist: String,
@@ -167,7 +173,10 @@ internal object TrackMatchScore {
         return !isrc.isNullOrBlank() && isrc.equals(candidate.ids[ISRC], ignoreCase = true)
     }
 
-    private fun guestCredits(track: TrackDescriptor): Set<String> {
+    private fun guestCredits(
+        track: TrackDescriptor,
+        collectivePerformers: List<String>,
+    ): Set<String> {
         val explicit =
             (listOf(track.title) + track.artists.map { it.name }).flatMap { text ->
                 (bracketedFeature.findAll(text) + trailingFeature.findAll(text))
@@ -179,6 +188,7 @@ internal object TrackMatchScore {
         return (performerCredits(track).drop(1) + explicit)
             .map(::normalizeText)
             .filter { it !in unavailableArtists }
+            .filterNot { credit -> collectivePerformers.any { artistSimilarity(credit, it) >= MIN_ARTIST_SIMILARITY } }
             .filterNot { credit ->
                 Regex("(?:^| )${Regex.escape(foldLatinAccents(credit))} (?:remix|edit|rework)(?: |$)").containsMatchIn(title)
             }.toSet()
@@ -188,8 +198,9 @@ internal object TrackMatchScore {
         track: TrackDescriptor,
         candidate: TrackDescriptor,
     ): Boolean {
-        val a = guestCredits(track)
-        val b = guestCredits(candidate)
+        val collectivePerformers = collectiveMembers(track).orEmpty() + collectiveMembers(candidate).orEmpty()
+        val a = guestCredits(track, collectivePerformers)
+        val b = guestCredits(candidate, collectivePerformers)
         if (a.isEmpty() || b.isEmpty()) return true
 
         fun creditMatches(
@@ -268,7 +279,10 @@ internal object TrackMatchScore {
         val candidateMs = candidate.durationMs
         return trackMs == null || candidateMs == null || trackMs <= 0 || candidateMs <= 0 ||
             abs(trackMs - candidateMs) <= MAX_DURATION_DELTA_MS ||
-            (candidateMs > trackMs && foldLatinAccents(recordingTitle(track)) == foldLatinAccents(recordingTitle(candidate)))
+            (
+                candidateMs > trackMs &&
+                    foldLatinAccents(recordingTitle(track)) == foldLatinAccents(recordingTitle(candidate))
+            )
     }
 
     /** The Dice coefficient of the two strings' character bigrams. */

@@ -12,7 +12,7 @@ Press OK in the full music player to show seeking, shuffle, previous, play/pause
 
 Open the queue to inspect upcoming tracks or jump to one. Holding Up or Down accelerates scrolling. Queue preparation follows playback order and matches the entire remaining queue one track at a time while music plays. Jumping elsewhere gives the new playback position priority. Tracks with native audio IDs do not need cross-provider matching.
 
-When matching streaming recordings, Milkbeat prefers full recordings over mixed excerpts and permits a longer full or extended version when the song, performers and named remix/edit agree. Remixer credits may be supplied in either the title or artist list.
+When matching streaming recordings, Milkbeat prefers full recordings over mixed excerpts and permits any longer recording when the title, performers and named remix/edit agree, without a duration cap or required full/extended label. Remixer credits may be supplied in either the title or artist list.
 
 Confirmed unmatched tracks can be removed from the future queue. Temporary failures remain retryable. Preparation reduces the work needed at a transition, but does not guarantee gapless playback under every network, format or provider condition.
 

@@ -48,6 +48,35 @@ class TrackMatchRecordingIdentityTest {
     }
 
     @Test
+    fun `collective performers match even when the destination credits them in the opposite order`() {
+        val source = track("Cluster - Rebuke Edit", 325, "Cox and Coe", "Carl Cox", "Christopher Coe", "Rebūke")
+        val candidate = track("Cluster (Rebuke Edit)", 325, "Christopher Coe", "Carl Cox")
+        assertThat(TrackMatchScore.best(source, listOf(candidate))?.candidate).isEqualTo(candidate)
+        assertThat(TrackMatchScore.best(candidate, listOf(source))?.candidate).isEqualTo(source)
+    }
+
+    @Test
+    fun `a collective cannot match a different primary performer featuring its members`() {
+        val source = track("Cluster - Rebuke Edit", 325, "Cox and Coe", "Carl Cox", "Christopher Coe", "Rebūke")
+        val candidate = track("Cluster (Rebuke Edit)", 325, "Different Primary", "Christopher Coe", "Carl Cox")
+        assertThat(TrackMatchScore.best(source, listOf(candidate))).isNull()
+    }
+
+    @Test
+    fun `any duration increase is allowed when the title performers and named edit agree`() {
+        val source = track("Nocturnal (Rebūke Edit)", 207, "Carl Cox", "Christopher Coe")
+        val full = track("Nocturnal (Rebūke Edit)", 3600, "Carl Cox", "Christopher Coe")
+        assertThat(TrackMatchScore.best(source, listOf(full))?.candidate).isEqualTo(full)
+    }
+
+    @Test
+    fun `explicit full length versions are permitted without an arbitrary duration ratio limit`() {
+        val source = track("Together (Radio Edit)", 180, "Primary")
+        val full = track("Together (Full Length Version)", 1200, "Primary")
+        assertThat(TrackMatchScore.best(source, listOf(full))?.candidate).isEqualTo(full)
+    }
+
+    @Test
     fun `a longer extended original may replace the short original`() {
         val source = track("I'm Just Calling", 234, "Claude VonStroke", "Rebūke")
         val candidate = track("I'm Just Calling (Extended Mix)", 380, "Claude VonStroke", "Rebūke")

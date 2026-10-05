@@ -151,7 +151,7 @@ class TrackMatchScoreTest {
     }
 
     @Test
-    fun `shorter excerpts reject otherwise exact metadata while full recordings are allowed`() {
+    fun `shorter excerpts reject otherwise exact metadata while longer recordings are allowed`() {
         assertThat(TrackMatchScore.best(spotify, listOf(track("Sky and Sand", "Paul Kalkbrenner", 290)))).isNotNull()
         assertThat(TrackMatchScore.best(spotify, listOf(track("Sky and Sand", "Paul Kalkbrenner", 180)))).isNull()
     }
