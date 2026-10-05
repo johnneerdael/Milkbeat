@@ -75,9 +75,6 @@ class VisualizerEngine
             if (last?.musicCategory != settings.musicCategory) ProjectMJNI.setMusicCategory(settings.musicCategory)
             if (last?.beatCuts != settings.beatCuts) ProjectMJNI.setBeatCuts(settings.beatCuts)
             if (last?.presetSeconds != settings.presetSeconds) ProjectMJNI.setPresetDuration(settings.presetSeconds)
-            if (last?.clampedTransitionSeconds != settings.clampedTransitionSeconds) {
-                ProjectMJNI.setSoftCutDuration(settings.clampedTransitionSeconds)
-            }
             if (last?.blankDetection != settings.blankDetection) ProjectMJNI.setBlankDetection(settings.blankDetection)
             if (last?.transitionMode != settings.transitionMode) {
                 ProjectMJNI.setTransitionMode(settings.transitionMode, profile.lowerBlendResolutionByDefault())

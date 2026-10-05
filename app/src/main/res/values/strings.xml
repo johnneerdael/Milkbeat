@@ -777,4 +777,10 @@
     <string name="radio_mode_familiar">Familiar</string>
     <string name="radio_mode_popular">Popular</string>
     <string name="radio_mode_discover">Discover</string>
+    <string name="visualizer_automatic_quality">Resolution adjusts automatically to the frame rate target and available memory, up to your screen’s native size.</string>
+    <string name="visualizer_native_trails">Native trails</string>
+    <string name="visualizer_native_trails_subtitle">Standard preserves authored feedback. Medium and High add native trail detail above 1330p and may reduce the automatic resolution.</string>
+    <string name="visualizer_native_trails_standard">Standard</string>
+    <string name="visualizer_native_trails_medium">Medium</string>
+    <string name="visualizer_native_trails_high">High</string>
 </resources>

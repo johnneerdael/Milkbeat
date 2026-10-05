@@ -24,8 +24,7 @@ class VisualizerSettingsTest {
         assertThat(high.meshLevel).isEqualTo(3)
         assertThat(high.autoChange).isTrue()
         assertThat(high.presetSeconds).isEqualTo(30)
-        assertThat(high.renderHeight).isEqualTo(VisualizerSettings.AUTO_RENDER_HEIGHT)
-        assertThat(high.memoryLimit).isTrue()
+        assertThat(high.clampedNativeTrails).isEqualTo(0)
         assertThat(high.blankDetection).isTrue()
         assertThat(high.beatCuts).isFalse()
     }

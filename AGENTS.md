@@ -628,6 +628,12 @@ revision must pass the configured ktlint rules.
 - `:plugin-api` defines the plain Kotlin catalog/plugin contract; `:spike-plugin-runtime` contains
   runtime experiments. `:benchmark` is the Android baseline-profile and benchmark module
   configured in `settings.gradle.kts` (there is no `:baselineprofile` module).
+- The visualizer consumes the canonical single Native ProjectM-TV core AAR. `TvVisualizerHost`
+  owns a `QualityController` in Auto, acknowledges `BudgetStatsListener` context generations,
+  revalidates live memory before resume, and publishes size/trails/transition as one reviewed
+  `setRenderConfiguration` tuple. Drop stale FPS generations and dimensions; budget allocation
+  changes before native publication. Fixed-height/RAM-toggle preferences are retired. Standard
+  trails is default; Medium/High activate above 1330p. Keep the audio tap and player owners intact.
 - Use JDK 21, as CI does, with an Android SDK containing platform 37 (`compileSdk = 37`).
   Supply the SDK through `ANDROID_HOME` or an untracked `local.properties` containing `sdk.dir`.
   The app targets Android 36, supports API 26+, and compiles Java/Kotlin to JVM 17.

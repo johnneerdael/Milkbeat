@@ -199,17 +199,16 @@ private fun LazyListScope.engineSettingsItems(
     pickerRow(VisualizerPicker.TRANSITION_STYLE)
 
     sectionHeader("quality", R.string.visualizer_section_quality)
-    pickerRow(VisualizerPicker.RESOLUTION)
+    item(key = "visualizer-automatic-quality") {
+        Text(
+            text = stringResource(R.string.visualizer_automatic_quality),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+    pickerRow(VisualizerPicker.NATIVE_TRAILS, R.string.visualizer_native_trails_subtitle)
     pickerRow(VisualizerPicker.FRAME_RATE, R.string.visualizer_frame_rate_subtitle)
     pickerRow(VisualizerPicker.DETAIL, R.string.visualizer_detail_subtitle)
-    toggleRow("memory-limit", R.string.visualizer_memory_limit, settings.memoryLimit, {
-        val height = viewModel.memoryLimitHeight
-        if (height > 0) {
-            stringResource(R.string.visualizer_memory_limit_subtitle, heightLabel(height))
-        } else {
-            stringResource(R.string.visualizer_memory_limit_none)
-        }
-    }) { setMemoryLimit(it) }
     toggleRow("diagnostics", R.string.visualizer_diagnostics, diagnostics, { stringResource(R.string.visualizer_diagnostics_subtitle) }) {
         setDiagnostics(it)
     }

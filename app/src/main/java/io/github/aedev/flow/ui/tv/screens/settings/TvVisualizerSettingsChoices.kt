@@ -12,15 +12,13 @@ import kotlin.math.abs
 // Ahead of the player's own timing for audio stacks that report it late, behind it for the rare early one.
 private val VISUALIZER_TIMING_OPTIONS_MS = listOf(-100, -50, -25, 0, 25, 50, 75, 100, 150, 200)
 
-private const val HEIGHT_4K = 2160
-
 /** The visualizer settings that pick one of several values, each opened in a side panel. */
 internal enum class VisualizerPicker {
     PRESET_DURATION,
     MUSIC_CATEGORY,
     TRANSITION_LENGTH,
     TRANSITION_STYLE,
-    RESOLUTION,
+    NATIVE_TRAILS,
     FRAME_RATE,
     DETAIL,
     TIMING,
@@ -104,17 +102,14 @@ internal fun visualizerChoices(
             )
         }
 
-        VisualizerPicker.RESOLUTION -> {
+        VisualizerPicker.NATIVE_TRAILS -> {
             choices(
-                title = stringResource(R.string.visualizer_resolution),
-                values = listOf(VisualizerSettings.AUTO_RENDER_HEIGHT) + viewModel.renderHeights(settings.memoryLimit),
-                current = viewModel.effectiveRenderHeight(settings),
-                default = null,
-                label = { heightLabel(it) },
-                supportingText = {
-                    if (it == VisualizerSettings.AUTO_RENDER_HEIGHT) stringResource(R.string.visualizer_resolution_auto_subtitle) else null
-                },
-                onSelect = { viewModel.update { setRenderHeight(it) } },
+                title = stringResource(R.string.visualizer_native_trails),
+                values = TRAIL_LABELS.indices.toList(),
+                current = settings.clampedNativeTrails,
+                default = 0,
+                label = { stringResource(TRAIL_LABELS[it]) },
+                onSelect = { viewModel.update { setNativeTrails(it) } },
             )
         }
 
@@ -179,13 +174,12 @@ private fun <T> choices(
     )
 }
 
-@Composable
-internal fun heightLabel(height: Int): String =
-    when (height) {
-        VisualizerSettings.AUTO_RENDER_HEIGHT -> stringResource(R.string.visualizer_resolution_auto_option)
-        HEIGHT_4K -> stringResource(R.string.visualizer_height_4k)
-        else -> stringResource(R.string.visualizer_height_value, height)
-    }
+private val TRAIL_LABELS =
+    listOf(
+        R.string.visualizer_native_trails_standard,
+        R.string.visualizer_native_trails_medium,
+        R.string.visualizer_native_trails_high,
+    )
 
 private val DETAIL_LABELS =
     listOf(

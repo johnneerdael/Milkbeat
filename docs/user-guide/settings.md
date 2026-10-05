@@ -74,17 +74,17 @@ Whether now playing shows the visualizer, the music video or the artwork is chos
 
 ### Picture quality
 
+Resolution is always **Auto**. It responds to the frame rate target and live memory headroom, up to your screen’s native size, including 4K. The core estimates rendering allocations and reserves memory for playback; Android can still reclaim processes under other system pressure. Previously saved fixed resolutions and memory-limit toggles now use automatic budgeting.
+
+
 | Setting | Purpose | Default |
 | --- | --- | --- |
-| Render resolution | **Auto** adapts the render size to keep the frame rate smooth; a fixed height renders every preset at that size. Heights are limited to your screen and the memory limit | Auto |
+| Native trails | **Standard** retains authored feedback; **Medium** and **High** add native trail detail above 1330p. Extra detail costs GPU work and can cause Auto to choose a lower resolution | Standard |
 | Frame rate | Your display's refresh rate divided by 1, 2 or 4, at least 24 fps. A lower rate leaves room for a sharper picture | 30 fps |
 | Detail | The per-vertex mesh, from Minimal to Ultra: finer warps and zooms at more processor time per frame | Medium (by device) |
-| Memory limit | Caps the render height on devices with little memory so Android keeps room for the music. On devices with enough memory it has no effect | On |
 | Show diagnostics | Show frame rate, render size, transition, audio level and preset in the playback controls | Off |
 
 ![Picture quality settings](images/visualizer-settings-quality.png)
-
-![Render resolution picker](images/visualizer-picker-resolution.png)
 
 ![Frame rate picker](images/visualizer-picker-frame-rate.png)
 

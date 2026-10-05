@@ -42,7 +42,7 @@ Rendering and audio monitoring stop when the visualizer leaves the screen or the
 
 ## Timing and diagnostics
 
-Settings → Visualizations contains the visualizer switch, the projectM settings, diagnostics and the timing offset. Raise the timing value if the visuals arrive after the beat; lower it if they arrive before. Adjust by listening and watching on your own audio setup.
+Settings → Visualizations contains the visualizer switch, the projectM settings, diagnostics and the timing offset. Resolution adapts automatically to the target frame rate and live memory headroom, up to native 4K on a 4K panel. Native trails defaults to Standard; Medium and High add detail above 1330p and may lower the resolution Auto can sustain. Raise the timing value if the visuals arrive after the beat; lower it if they arrive before. Adjust by listening and watching on your own audio setup.
 
 Diagnostics show measured fps, target fps, render dimensions and whether the size is automatic or fixed, transition state, audio level and preset. Use these values when investigating slow visuals instead of judging performance from a still screenshot.
 

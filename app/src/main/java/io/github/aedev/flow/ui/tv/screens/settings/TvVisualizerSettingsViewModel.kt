@@ -20,7 +20,6 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import nl.neerdael.projectm.core.DisplayInfo
-import nl.neerdael.projectm.core.QualityController
 import javax.inject.Inject
 
 /** The TV settings' Visualizations category. */
@@ -76,24 +75,6 @@ class TvVisualizerSettingsViewModel
         val defaults: VisualizerSettings get() = engine.defaults
 
         val frameRates: List<Int> by lazy { frameRateOptions(display.refreshRate) }
-
-        /** The highest height the memory limit allows, 0 when this device needs none. */
-        val memoryLimitHeight: Int by lazy {
-            val safe = engine.profile.memorySafeHeight()
-            if (safe > 0) QualityController.manualHeights(display, safe).last() else 0
-        }
-
-        /** Fixed render heights on this panel, with or without the memory limit; Auto comes on top of these. */
-        fun renderHeights(memoryLimit: Boolean): List<Int> =
-            QualityController.manualHeights(display, if (memoryLimit) engine.profile.memorySafeHeight() else 0).toList()
-
-        /** The saved height as the visualizer will use it: 0 (Auto) when this panel or the memory limit rules it out. */
-        fun effectiveRenderHeight(settings: VisualizerSettings): Int =
-            QualityController.validFixedHeight(
-                display,
-                if (settings.memoryLimit) engine.profile.memorySafeHeight() else 0,
-                settings.renderHeight,
-            )
 
         fun musicCategories(): List<String> = engine.musicCategories()
 

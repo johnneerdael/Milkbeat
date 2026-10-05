@@ -16,17 +16,17 @@ data class VisualizerSettings(
     val transitionSeconds: Int = 7,
     val transitionMode: Int = ProjectMJNI.TRANSITION_AUTO,
     val frameRateCap: Int = 30,
-    val renderHeight: Int = AUTO_RENDER_HEIGHT,
     val meshLevel: Int = 2,
-    val memoryLimit: Boolean = true,
+    val nativeTrails: Int = 0,
 ) {
+    val clampedNativeTrails: Int get() = nativeTrails.takeIf { it in 0..2 } ?: 0
+
     val clampedMeshLevel: Int get() = meshLevel.coerceIn(0, DeviceProfile.MESH_SIZES.lastIndex)
 
     val clampedTransitionSeconds: Int get() = transitionSeconds.coerceIn(0, MAX_TRANSITION_SECONDS)
 
     companion object {
         const val DEFAULT_PRESET_SECONDS = 30
-        const val AUTO_RENDER_HEIGHT = 0
         const val MAX_TRANSITION_SECONDS = 10
         val PRESET_SECONDS = listOf(10, 15, 20, 30, 45, 60, 90)
         val TRANSITION_MODES =
