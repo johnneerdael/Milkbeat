@@ -66,4 +66,17 @@ class DocumentMusicFoldersFileTest {
             assertThat(source.isValid()).isFalse()
         }
     }
+
+    @Test fun unreadableDescendantDoesNotHideReadableMusic() {
+        val root = temporary.newFolder("Music")
+        val hidden = File(root, "Unavailable").apply { mkdir() }
+        File(root, "Song.flac").writeText("audio")
+        val source = documents.add(Uri.fromFile(root))
+        hidden.setReadable(false, false)
+        try {
+            assertThat(documents.list(source, "").map { it.name }).containsExactly("Song.flac")
+        } finally {
+            hidden.setReadable(true, true)
+        }
+    }
 }

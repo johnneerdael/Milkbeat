@@ -14,7 +14,7 @@ import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasText
-import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.performScrollToNode
@@ -28,6 +28,7 @@ import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.Until
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
+import io.github.aedev.flow.FolderPickerTestActivity
 import io.github.aedev.flow.R
 import io.github.aedev.flow.data.folders.LocalStorageFolders
 import io.github.aedev.flow.data.folders.MusicFolderMetadata
@@ -56,7 +57,7 @@ class TvLocalFolderPickerDeviceTest {
     val hilt = HiltAndroidRule(this)
 
     @get:Rule(order = 1)
-    val compose = createComposeRule()
+    val compose = createAndroidComposeRule<FolderPickerTestActivity>()
 
     @Inject internal lateinit var storage: LocalStorageFolders
 
@@ -100,19 +101,20 @@ class TvLocalFolderPickerDeviceTest {
             device.executeShellCommand("appops set --uid ${context.packageName} MANAGE_EXTERNAL_STORAGE allow")
         } else {
             device.executeShellCommand("pm grant ${context.packageName} android.permission.READ_EXTERNAL_STORAGE")
-            if (Build.VERSION.SDK_INT <=
-                28
-            ) {
-                device.executeShellCommand("pm grant ${context.packageName} android.permission.WRITE_EXTERNAL_STORAGE")
-            }
         }
         assumeTrue(storage.hasAccess())
         val fixture = File(Environment.getExternalStorageDirectory(), "MilkbeatPicker-${UUID.randomUUID()}")
-        assertTrue(fixture.mkdirs())
-        File(fixture, "Albums").mkdir()
-        instrumentation.context.assets.open("folders/tagged.flac").use { input ->
-            File(fixture, "track.flac").outputStream().use { output -> input.copyTo(output) }
-        }
+        val audio =
+            instrumentation.context.assets
+                .open("folders/tagged.flac")
+                .use { it.readBytes() }
+        val fixturePath = fixture.absolutePath
+        val sample = File(requireNotNull(context.externalCacheDir), "picker-track-${UUID.randomUUID()}.flac")
+        sample.writeBytes(audio)
+        device.executeShellCommand("mkdir -p $fixturePath/Albums")
+        device.executeShellCommand("cp ${sample.absolutePath} $fixturePath/track.flac")
+        sample.delete()
+        assertTrue(fixture.isDirectory)
         val vm = MusicFoldersViewModel(repository, metadata, storage)
         val store = show(vm)
         try {
@@ -141,10 +143,12 @@ class TvLocalFolderPickerDeviceTest {
             assertTrue(tracks.single().name == "track.flac")
             val tagged = runBlocking { metadata.enrich(tracks.single().track(saved)) }
             assertTrue(tagged.title != "track")
-            runBlocking { repository.remove(saved) }
         } finally {
             compose.runOnIdle { store.clear() }
-            fixture.deleteRecursively()
+            runBlocking {
+                for (source in repository.folders.first().filter { it.name == fixture.name }) repository.remove(source)
+            }
+            device.executeShellCommand("rm -r $fixturePath")
         }
     }
 

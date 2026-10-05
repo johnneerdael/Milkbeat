@@ -46,7 +46,7 @@ internal fun TvLocalFolderPicker(
             )
         }
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            TvButton(stringResource(R.string.music_folders_back), viewModel::localPickerBack, enabled = !state.saving)
+            TvButton(stringResource(R.string.music_folders_editor_back), viewModel::localPickerBack, enabled = !state.saving)
             TvButton(
                 stringResource(R.string.music_folders_refresh),
                 viewModel::refreshLocalPicker,

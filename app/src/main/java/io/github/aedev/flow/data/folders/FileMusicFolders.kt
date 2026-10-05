@@ -38,6 +38,7 @@ internal object FileMusicFolders {
         val children = directory.listFiles() ?: throw FileNotFoundException("Folder no longer available")
         return children.mapNotNull { child ->
             if (Thread.currentThread().isInterrupted) throw InterruptedException()
+            if (!child.canRead()) return@mapNotNull null
             val canonical = child.canonicalFile
             if (!canonical.toPath().startsWith(root.toPath())) return@mapNotNull null
             val directoryChild = child.isDirectory

@@ -6,7 +6,7 @@
 
 1. Open Settings → Music folders.
 2. Select **Choose local folder**.
-3. If needed, allow storage access: Android 10 and older show a read-storage permission prompt; Android 11 and newer open the app's **All files access** setting. Return to Milkbeat after enabling it.
+3. If needed, allow storage access: Android 10 and older show a read-storage permission prompt; Android 11 and newer open Android's **All files access** settings. Select Milkbeat if Android shows a list of apps, then enable access and return to Milkbeat.
 4. Choose the TV's storage or a mounted USB/SD drive. Use the remote to open folders, then select **Choose this folder**.
 5. Open Library → Folders and select the saved source.
 
@@ -17,6 +17,10 @@ If permission is denied, network folders and the rest of Milkbeat remain usable.
 A USB drive must be mounted by Android. Select **Refresh** after connecting a drive. Moving or disconnecting storage can make a saved source unavailable; reconnect it and refresh. Device firmware controls which mounts are accessible. Symbolic links that leave the selected folder are not followed.
 
 ![Music folders settings with local folder, SMB, WebDAV, SFTP and NFS actions](images/settings-folders.png)
+
+![Milkbeat's native storage-device picker](images/local-folder-drives.png)
+
+![The D-pad folder browser with Back, Refresh and Choose this folder](images/local-folder-selection.png)
 
 ## Add an SMB share
 
