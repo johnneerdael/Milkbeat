@@ -74,8 +74,8 @@ class TvNativeTrailsSettingsDeviceTest {
             compose.waitUntil(15_000) { viewModel.settings.value != null }
             val trails = context.getString(R.string.visualizer_native_trails)
             compose.onNode(hasScrollAction()).performScrollToNode(hasText(trails))
-            compose.onNodeWithText(context.getString(R.string.visualizer_resolution)).assertDoesNotExist()
-            compose.onNodeWithText(context.getString(R.string.visualizer_memory_limit)).assertDoesNotExist()
+            compose.onNodeWithText("Render resolution").assertDoesNotExist()
+            compose.onNodeWithText("Memory limit").assertDoesNotExist()
             assertTrue(device.takeScreenshot(File(context.externalCacheDir, "native-quality-settings.png")))
             device.pressDPadDown() // Exit touch mode on the owned phone emulator before remote input.
             val opener = compose.onNode(hasText(trails) and hasClickAction())
