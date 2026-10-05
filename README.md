@@ -34,7 +34,8 @@ services and play music videos. Everything is built for the TV remote.
   one at a time across the remaining queue.
 - **Radio discovery:** every queue continues as a radio, steered by every preset YouTube Music offers for it (All, Popular, Discover, Deep cuts, moods and decades).
 - **Optional private playlists:** prepare Spotify playlists in a signed-in YouTube Music account for
-  native collection playback and autoplay. This is off by default.
+  native collection playback and autoplay. Recently verified copies reopen without another
+  preparation pass. This is off by default.
 - **MilkDrop visuals:** projectM reacts to the audio from Milkbeat's player.
 
 Behind the music runs [projectM](https://github.com/projectM-visualizer/projectm), the open-source

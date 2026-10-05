@@ -18,7 +18,7 @@ import org.junit.Test
 
 class PlaylistMirrorRunnerTest {
     @Test
-    fun `fresh runner reuses persisted destination and matches after checking source`() =
+    fun `fresh runner opens a ready persisted mirror without source fetch matching or import`() =
         runTest {
             val initial = PlaylistMirrorRunnerFixture(3)
             val prepared = initial.runner.prepare(initial.key, "Playlist")
@@ -37,7 +37,7 @@ class PlaylistMirrorRunnerTest {
                 PrivatePlaylistImportResult(prepared.destination)
             }
             val result = restarted.runner.prepare(restarted.key, "Playlist")
-            assertThat(events).containsExactly("source", "REPLACE").inOrder()
+            assertThat(events).isEmpty()
             assertThat(result.destination).isEqualTo(prepared.destination)
             assertThat(result.matches).isEqualTo(prepared.matches)
             assertThat(result.ready).isTrue()
@@ -61,7 +61,7 @@ class PlaylistMirrorRunnerTest {
                 assertThat(request.target).isEqualTo(prepared.destination)
                 PrivatePlaylistImportResult(prepared.destination)
             }
-            val result = restarted.runner.prepare(restarted.key, "Renamed")
+            val result = restarted.runner.prepare(restarted.key, "Renamed", background = true)
             assertThat(result.destination).isEqualTo(prepared.destination)
             assertThat(result.title).isEqualTo("Renamed")
             assertThat(result.ready).isTrue()
@@ -120,7 +120,7 @@ class PlaylistMirrorRunnerTest {
             assertThat(second.revision).isEqualTo(first.revision)
             assertThat(second.artwork).isEqualTo(cover)
             assertThat(f.calls).hasSize(3)
-            coVerify(exactly = 3) { f.host.call("target", PluginOperations.importPrivatePlaylist, any()) }
+            coVerify(exactly = 2) { f.host.call("target", PluginOperations.importPrivatePlaylist, any()) }
         }
 
     @Test
@@ -155,7 +155,7 @@ class PlaylistMirrorRunnerTest {
             assertThat(fixture.calls).hasSize(122)
             fixture.runner.prepare(fixture.key, "Playlist")
             assertThat(fixture.calls).hasSize(122)
-            coVerify(exactly = 3) { fixture.host.call("target", PluginOperations.importPrivatePlaylist, any()) }
+            coVerify(exactly = 2) { fixture.host.call("target", PluginOperations.importPrivatePlaylist, any()) }
         }
 
     @Test

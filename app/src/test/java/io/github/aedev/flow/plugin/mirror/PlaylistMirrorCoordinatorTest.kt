@@ -108,10 +108,15 @@ class PlaylistMirrorCoordinatorTest {
         val pairs = MutableStateFlow(setOf(PlaylistMirrorStore.pairId("source", "target")))
         val record =
             MirrorRecord(key, "Playlist", "r1", emptyList(), destination = EntityRef(EntityKind.PLAYLIST, "private-copy"), ready = true)
+        val store =
+            mockk<PlaylistMirrorStore> {
+                every { enabledPairs } returns pairs
+                coEvery { this@mockk.get(any()) } returns null
+            }
         val coordinator =
             PlaylistMirrorCoordinator(
                 runner,
-                mockk { every { enabledPairs } returns pairs },
+                store,
                 mockk {
                     every { state } returns
                         plugins
@@ -124,6 +129,56 @@ class PlaylistMirrorCoordinatorTest {
             coEvery { runner.prepare(any(), any(), any(), any(), any()) } returns record
         }
     }
+
+    @Test
+    fun `account replacement during ready backfill cannot return the previous accounts copy`() =
+        runTest {
+            val f = PlaybackFixture()
+            f.plugins.value = PluginRegistryState(listOf(plugin("source", true), plugin("target")))
+            coEvery { f.store.get(f.key.id) } returns f.record
+            val started = CompletableDeferred<Unit>()
+            val finish = CompletableDeferred<Unit>()
+            coEvery { f.store.backfillReady(any(), any()) } coAnswers {
+                started.complete(Unit)
+                finish.await()
+            }
+            val play = async { runCatching { f.coordinator.prepareForPlayback(f.key, "Playlist") } }
+            started.await()
+            f.accountStates.value = f.accountStates.value + ("target" to ProviderAccount.SignedIn("other"))
+            finish.complete(Unit)
+            val failure = play.await().exceptionOrNull() as MirrorPreparationException
+            assertThat(failure.reason).isEqualTo(MirrorFailure.ACCOUNT_CHANGED)
+            assertThat(
+                f.coordinator
+                    .state(f.key)
+                    .value.ready,
+            ).isFalse()
+        }
+
+    @Test
+    fun `fresh ready copy starts playback while background refresh remains in flight`() =
+        runTest {
+            val f = PlaybackFixture()
+            val source = plugin("source", true)
+            val target = plugin("target")
+            f.plugins.value = PluginRegistryState(listOf(source, target))
+            val ready = f.record.copy(verifiedAtMs = System.currentTimeMillis(), verifiedPackages = mirrorPackageContext(source, target))
+            coEvery { f.store.get(f.key.id) } returns ready
+            val started = CompletableDeferred<Unit>()
+            val finish = CompletableDeferred<MirrorRecord>()
+            coEvery { f.runner.prepare(any(), any(), any(), any(), any()) } coAnswers {
+                started.complete(Unit)
+                finish.await()
+            }
+            val background = async { f.coordinator.prepare(f.key, "Playlist", background = true) }
+            started.await()
+            var notices = 0
+            assertThat(f.coordinator.prepareForPlayback(f.key, "Playlist") { notices++ }).isSameInstanceAs(ready)
+            assertThat(notices).isEqualTo(0)
+            assertThat(background.isCompleted).isFalse()
+            finish.complete(ready)
+            background.await()
+        }
 
     @Test
     fun `Play reuses a successful page preparation exactly once`() =
@@ -447,7 +502,10 @@ class PlaylistMirrorCoordinatorTest {
             val coordinator =
                 PlaylistMirrorCoordinator(
                     runner,
-                    mockk { every { enabledPairs } returns pairs },
+                    mockk {
+                        every { enabledPairs } returns pairs
+                        coEvery { this@mockk.get(any()) } returns null
+                    },
                     mockk { every { state } returns installed },
                     mockk { every { accounts } returns accountStates },
                     MirrorExecutionGate(),
