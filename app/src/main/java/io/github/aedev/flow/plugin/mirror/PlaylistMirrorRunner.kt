@@ -4,6 +4,7 @@ import io.github.aedev.flow.plugin.PluginHost
 import io.github.aedev.flow.plugin.catalog.PluginAccounts
 import io.github.aedev.flow.plugin.playback.AudioBatchIndexingResult
 import io.github.aedev.flow.plugin.playback.PluginTrackMatcher
+import io.github.aedev.flow.plugin.playback.TrackMatchScore
 import io.github.aedev.flow.plugin.registry.InstalledPlugin
 import io.github.aedev.flow.plugin.registry.PluginRegistry
 import io.github.aedev.flow.plugin.runtime.PluginCallException
@@ -103,9 +104,20 @@ class PlaylistMirrorRunner
             }
 
             active()
+            val previous = store.get(key.id)
+            val packages = mirrorPackageContext(source, target)
+            if (!background) {
+                previous.reusableReadyMirror(key, title, artwork, packages)?.let { ready ->
+                    active()
+                    if (ready !== previous) store.put(ready)
+                    active()
+                    onProgress(ready.readyState())
+                    active()
+                    return ready
+                }
+            }
             onProgress(PlaylistMirrorState(isPreparing = true))
             val (tracks, revision) = read()
-            val previous = store.get(key.id)
             val sourceArtwork = artwork ?: previous?.takeIf { it.key == key }?.artwork
             val fingerprint =
                 digest(
@@ -115,6 +127,12 @@ class PlaylistMirrorRunner
             var record =
                 previous?.takeIf { it.key == key && it.revision == fingerprint }
                     ?: MirrorRecord(key, title, fingerprint, tracks, destination = previous?.destination, artwork = sourceArtwork)
+
+            if (record.missed.isNotEmpty() && record.matchingPolicyVersion != TrackMatchScore.POLICY_VERSION) {
+                record = record.copy(matches = emptyList(), missed = emptyList(), nextIndex = 0, ready = false)
+            }
+
+            record = record.copy(matchingPolicyVersion = TrackMatchScore.POLICY_VERSION)
 
             var phase = MirrorPhase.MATCHING
             var phaseCompleted = 0
@@ -202,7 +220,13 @@ class PlaylistMirrorRunner
                         artwork = image,
                     ),
                 )
-                record = record.copy(ready = true)
+                record =
+                    record.copy(
+                        ready = true,
+                        verifiedAtMs = System.currentTimeMillis(),
+                        verifiedPackages = packages,
+                        matchingPolicyVersion = TrackMatchScore.POLICY_VERSION,
+                    )
                 checkpoint()
                 return record
             }
@@ -290,7 +314,13 @@ class PlaylistMirrorRunner
                     expectedAccountKey = key.targetAccount,
                 ),
             )
-            record = record.copy(ready = true)
+            record =
+                record.copy(
+                    ready = true,
+                    verifiedAtMs = System.currentTimeMillis(),
+                    verifiedPackages = packages,
+                    matchingPolicyVersion = TrackMatchScore.POLICY_VERSION,
+                )
             checkpoint()
             return record
         }

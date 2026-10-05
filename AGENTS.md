@@ -618,6 +618,23 @@ revision must pass the configured ktlint rules.
 5. GitHub Actions runs `spotlessCheck` before tests and builds. A formatting violation fails the
 `Build APK` job. Add any future first-party Kotlin module to the Spotless target list explicitly.
 
+## Playlist mirror reuse
+
+- Mirror preparation lives in `app/src/main/java/io/github/aedev/flow/plugin/mirror/`; recording
+  identity checks live in `plugin/playback/TrackMatchScore.kt`. Playlist mirrors persist in
+  `files/datastore/playlist_mirrors.preferences_pb`; track matches use Room's `TrackMatchDao`.
+- Foreground preparation may reuse a ready mirror for six hours after verification, scoped to its
+  source and destination account keys and verified provider packages. Legacy ready records receive
+  that deadline and package context on first reuse.
+  Matching-policy revisions invalidate saved misses and recheck incomplete matches once; preserve
+  successful match caching. Background preparation always checks the source and reconciles the private destination. Preserve
+  that distinction when changing page opening or playback handoff.
+- TV queue rows scale on focus. Keep padding inside the lazy list for the scaled border, including
+  when the radio provider supplies no presets. Do not invent radio presets for unsupported contexts.
+- Focused mirror regressions run with `./gradlew :app:testGithubDebugUnitTest --tests '*PlaylistMirror*'`.
+  `:app:assembleGithubDebugAndroidTest` builds the device tests; `TvQueueFocusPaddingDeviceTest`
+  exercises the queue's first-row focus without radio presets.
+
 ## Building and testing your changes
 
 ### Modules, source paths and local setup

@@ -3,6 +3,7 @@ package io.github.aedev.flow.ui.tv.music
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.lazy.LazyColumn
@@ -34,6 +35,7 @@ import io.github.aedev.flow.ui.tv.components.TvFilterChip
 import io.github.aedev.flow.ui.tv.components.TvMusicTrackRow
 import io.github.aedev.flow.ui.tv.components.TvSidePanel
 import io.github.aedev.flow.ui.tv.focus.tvAcceleratedDpad
+import io.github.aedev.flow.ui.tv.theme.LocalTvDimens
 import kotlinx.coroutines.launch
 
 private const val QUEUE_PANEL_ALPHA = 0.5f
@@ -53,6 +55,8 @@ fun BoxScope.TvMusicQueuePanel(
             .RadioTuningState(),
     onTune: (String) -> Unit = {},
 ) {
+    val dimens = LocalTvDimens.current
+    val focusPadding = dimens.trackRowHeight * ((dimens.focusScale - 1f) / 2f) + dimens.focusBorderWidth
     val queue by manager.queue.collectAsStateWithLifecycle()
     val automix by manager.automixItems.collectAsStateWithLifecycle()
     val currentIndex by manager.currentQueueIndex.collectAsStateWithLifecycle()
@@ -94,6 +98,7 @@ fun BoxScope.TvMusicQueuePanel(
             TvRadioFilterControls(tuning, onTune, presetFocus, listFocus)
             LazyColumn(
                 state = listState,
+                contentPadding = PaddingValues(vertical = focusPadding),
                 modifier =
                     Modifier
                         .weight(1f)

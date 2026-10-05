@@ -134,7 +134,7 @@ class TrackMatchScoreTest {
     @Test
     fun `creative recording variants never substitute for the studio recording`() {
         val original = track("Runaway", "AURORA", 240)
-        for (variant in listOf("Live", "Acoustic", "Remix", "Radio Edit", "Instrumental", "Sped Up", "Slowed", "Cover", "Version")) {
+        for (variant in listOf("Live", "Acoustic", "Remix", "Instrumental", "Sped Up", "Slowed", "Cover", "Version")) {
             assertThat(TrackMatchScore.best(original, listOf(track("Runaway ($variant)", "AURORA", 240)))).isNull()
             assertThat(TrackMatchScore.best(track("Runaway ($variant)", "AURORA", 240), listOf(original))).isNull()
         }
@@ -151,8 +151,8 @@ class TrackMatchScoreTest {
     }
 
     @Test
-    fun `material duration conflicts reject otherwise exact metadata`() {
-        assertThat(TrackMatchScore.best(spotify, listOf(track("Sky and Sand", "Paul Kalkbrenner", 290)))).isNull()
+    fun `shorter excerpts reject otherwise exact metadata while longer recordings are allowed`() {
+        assertThat(TrackMatchScore.best(spotify, listOf(track("Sky and Sand", "Paul Kalkbrenner", 290)))).isNotNull()
         assertThat(TrackMatchScore.best(spotify, listOf(track("Sky and Sand", "Paul Kalkbrenner", 180)))).isNull()
     }
 

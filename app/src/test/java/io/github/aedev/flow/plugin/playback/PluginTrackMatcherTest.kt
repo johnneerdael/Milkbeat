@@ -79,6 +79,14 @@ class PluginTrackMatcherTest {
         }
 
     @Test
+    fun `a miss recorded before the recording identity policy changed is searched again`() =
+        runTest {
+            dao.row = TrackMatchEntity(PluginTrackMatcher.fingerprint(original), "youtube", null, 0.0, System.currentTimeMillis())
+            assertThat(matcher.match(original, "youtube")).isEqualTo(candidate)
+            coVerify(exactly = 1) { host.call("youtube", PluginOperations.matchAudio, any()) }
+        }
+
+    @Test
     fun `a transient search failure remains uncached`() =
         runTest {
             coEvery { host.call("youtube", PluginOperations.matchAudio, any()) } throws
