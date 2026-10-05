@@ -91,7 +91,8 @@ In particular, an instruction requiring an explicit request before Markdown edit
   1.7.12 schema needs narrowly scoped ignores for the documented `cache-mode`/concurrency `queue`
   keys; both are verified against GitHub's current workflow syntax and concurrency documentation.
 - Main's `build.yml` calls every reusable validation suite before publication. `docs.yml` builds
-  and deploys Pages through this main pipeline; ProjectM-TV's AAR repository is outside this change.
+  and deploys Pages through this main pipeline. Keep the shared Pages deployment lock and post-lock
+  freshness check across manual and reusable entry points; ProjectM-TV's AAR repository is outside this change.
 
 ## 4. Open a pull request against main
 

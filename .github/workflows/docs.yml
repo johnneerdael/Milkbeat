@@ -39,12 +39,29 @@ jobs:
     if: github.ref == 'refs/heads/main' && !inputs.pr_build
     needs: build
     runs-on: ubuntu-latest
+    concurrency:
+      group: milkbeat-pages-deployment
+      queue: max
+      cancel-in-progress: false
     permissions:
+      contents: read
       pages: write
       id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - name: Reject a stale guide build after acquiring the deployment lock
+        id: freshness
+        uses: actions/github-script@v8
+        env:
+          SOURCE_SHA: ${{ inputs.source_ref || github.sha }}
+        with:
+          script: |
+            const { data } = await github.rest.git.getRef({ ...context.repo, ref: 'heads/main' });
+            const current = data.object.sha === process.env.SOURCE_SHA;
+            core.setOutput('current', current);
+            if (!current) core.notice('Skipped guide deployment: main changed after this build started.');
       - uses: actions/deploy-pages@v4
+        if: steps.freshness.outputs.current == 'true'
         id: deployment

@@ -75,6 +75,18 @@ class WorkflowPolicyTests(unittest.TestCase):
         self.assertIn("refs/pull", publish["ref"])
         self.assertIn("source_ref", publish["sha"])
 
+    def test_pages_deployments_share_a_lock_and_reject_stale_main(self):
+        docs = workflow("docs.yml")
+        deploy = docs["jobs"]["deploy"]
+        self.assertEqual(deploy["concurrency"]["group"], "milkbeat-pages-deployment")
+        self.assertEqual(deploy["concurrency"]["cancel-in-progress"], "false")
+        self.assertEqual(deploy["permissions"]["contents"], "read")
+        freshness = next(step for step in deploy["steps"] if step.get("id") == "freshness")
+        self.assertIn("heads/main", freshness["with"]["script"])
+        self.assertIn("SOURCE_SHA", freshness["with"]["script"])
+        publish = next(step for step in deploy["steps"] if step.get("id") == "deployment")
+        self.assertEqual(publish["if"], "steps.freshness.outputs.current == 'true'")
+
     def test_manual_provider_maintenance_is_main_only(self):
         self.assertIn("refs/heads/main", workflow("spotify-totp.yml")["jobs"]["extract"]["if"])
 

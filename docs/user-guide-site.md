@@ -24,7 +24,9 @@ debug/docs-env/bin/mkdocs build --strict
 
 The reusable User guide workflow builds reviewed pull requests targeting `main`. The full main
 pipeline calls it to build and publish the guide after merge. Unreviewed and non-main PRs skip the
-site build; the review controller checks readiness before dispatching validation.
+site build; the review controller checks readiness before dispatching validation. Manual and main
+pipeline deployments share one Pages lock; a build of an older main commit is skipped after
+acquiring it, so it cannot replace the newer guide.
 Before the first deployment, set the repository's **Settings → Pages → Source**
 to **GitHub Actions**. The site address is
 `https://johnneerdael.github.io/Milkbeat/`.
