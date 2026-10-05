@@ -41,6 +41,9 @@ data class MirrorRecord(
     val destination: EntityRef? = null,
     val ready: Boolean = false,
     val artwork: nl.neerdael.milkbeat.catalog.Artwork? = null,
+    val verifiedAtMs: Long = 0,
+    val verifiedPackages: String? = null,
+    val matchingPolicyVersion: Int = 0,
 )
 
 data class PlaylistMirrorState(

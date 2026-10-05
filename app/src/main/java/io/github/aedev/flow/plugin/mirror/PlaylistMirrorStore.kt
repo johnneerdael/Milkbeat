@@ -56,6 +56,17 @@ class PlaylistMirrorStore
             data.edit { it[stringPreferencesKey("record:${record.key.id}")] = PluginJson.encodeToString(MirrorRecord.serializer(), record) }
         }
 
+        suspend fun backfillReady(
+            expected: MirrorRecord,
+            ready: MirrorRecord,
+        ) {
+            data.edit { prefs ->
+                val key = stringPreferencesKey("record:${expected.key.id}")
+                val current = prefs[key]?.let { PluginJson.decodeFromString(MirrorRecord.serializer(), it) }
+                if (current == expected) prefs[key] = PluginJson.encodeToString(MirrorRecord.serializer(), ready)
+            }
+        }
+
         companion object {
             private val ENABLED = stringSetPreferencesKey("enabled")
 

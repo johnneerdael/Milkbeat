@@ -172,7 +172,10 @@ class PlaylistMirrorReconciliationTest {
         val coordinator =
             PlaylistMirrorCoordinator(
                 runner,
-                mockk { every { enabledPairs } returns pairs },
+                mockk {
+                    every { enabledPairs } returns pairs
+                    coEvery { this@mockk.get(any()) } returns null
+                },
                 mockk { every { state } returns plugins },
                 mockk { every { accounts } returns accountStates },
                 MirrorExecutionGate(),

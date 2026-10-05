@@ -14,6 +14,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -162,6 +163,29 @@ class PlaylistMirrorCoordinator
             forPlayback: Boolean = false,
             onWaiting: () -> Unit = {},
         ): MirrorRecord {
+            if (!background && key(key.sourcePlugin, key.targetPlugin, key.source) == key) {
+                val context = verificationContext(key)
+                val previous = store.get(key.id)
+                val source = registry.state.value.plugin(key.sourcePlugin)
+                val target = registry.state.value.plugin(key.targetPlugin)
+                if (source != null && target != null && context == verificationContext(key)) {
+                    previous.reusableReadyMirror(key, title, artwork, mirrorPackageContext(source, target))?.let { ready ->
+                        currentCoroutineContext().ensureActive()
+                        if (ready !== previous) store.backfillReady(previous!!, ready)
+                        currentCoroutineContext().ensureActive()
+                        if (context != verificationContext(key) || key(key.sourcePlugin, key.targetPlugin, key.source) != key) {
+                            val accountChanged =
+                                (accounts.accounts.value[key.sourcePlugin] as? ProviderAccount.SignedIn)?.key != key.sourceAccount ||
+                                    (accounts.accounts.value[key.targetPlugin] as? ProviderAccount.SignedIn)?.key != key.targetAccount
+                            throw MirrorPreparationException(
+                                if (accountChanged) MirrorFailure.ACCOUNT_CHANGED else MirrorFailure.PLUGIN_CHANGED,
+                            )
+                        }
+                        states.getOrPut(key.id) { MutableStateFlow(PlaylistMirrorState()) }.value = ready.readyState()
+                        return ready
+                    }
+                }
+            }
             val preparation =
                 synchronized(tasks) {
                     if (forPlayback && tasks[key.id]?.job?.isActive != true) {
