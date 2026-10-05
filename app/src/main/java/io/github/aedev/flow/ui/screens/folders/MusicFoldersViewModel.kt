@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.aedev.flow.R
+import io.github.aedev.flow.data.folders.LocalStorageFolders
 import io.github.aedev.flow.data.folders.MusicFolder
 import io.github.aedev.flow.data.folders.MusicFolderEntry
 import io.github.aedev.flow.data.folders.MusicFolderKind
@@ -77,6 +78,7 @@ internal class MusicFoldersViewModel
     constructor(
         private val repository: MusicFolderRepository,
         private val metadata: MusicFolderMetadata,
+        private val localStorage: LocalStorageFolders,
         private val scans: LibraryScanJobs? = null,
     ) : ViewModel() {
         val folders = repository.folders.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
@@ -86,6 +88,9 @@ internal class MusicFoldersViewModel
         val browser = mutableBrowser.asStateFlow()
         private val mutableMessage = MutableStateFlow<Int?>(null)
         val message = mutableMessage.asStateFlow()
+        private val mutableLocalSelection = MutableStateFlow<LocalFolderSelection?>(null)
+        val localSelection = mutableLocalSelection.asStateFlow()
+        private var localSelectionJob: Job? = null
         private var accessJob: Job? = null
         private var settingsJob: Job? = null
         private var browseJob: Job? = null
@@ -210,11 +215,13 @@ internal class MusicFoldersViewModel
                 viewModelScope.launch {
                     try {
                         repository.addLocal(uri)
+                        mutableLocalSelection.value = null
                         mutableMessage.value = R.string.music_folders_saved
                         scans?.scanIfStale()
                     } catch (cancelled: CancellationException) {
                         throw cancelled
                     } catch (_: Exception) {
+                        mutableLocalSelection.update { it?.copy(saving = false, failed = true) }
                         pickerFailed()
                     }
                 }
@@ -242,6 +249,73 @@ internal class MusicFoldersViewModel
 
         fun pickerFailed() {
             mutableMessage.value = R.string.music_folders_picker_failed
+        }
+
+        fun storageAccessDenied() {
+            mutableMessage.value = R.string.music_folders_storage_denied
+        }
+
+        fun openLocalPicker() {
+            mutableMessage.value = null
+            mutableLocalSelection.value = LocalFolderSelection()
+            refreshLocalPicker()
+        }
+
+        fun openLocalDirectory(entry: MusicFolderEntry) {
+            val state = mutableLocalSelection.value ?: return
+            if (!entry.isDirectory || entry !in state.entries || state.loading || state.saving) return
+            mutableLocalSelection.value = state.copy(stack = state.stack + FolderLocation(entry.location, entry.name))
+            refreshLocalPicker()
+        }
+
+        fun refreshLocalPicker() {
+            val state = mutableLocalSelection.value ?: return
+            if (state.saving) return
+            localSelectionJob?.cancel()
+            localSelectionJob =
+                viewModelScope.launch {
+                    mutableLocalSelection.value = state.copy(entries = emptyList(), loading = true, failed = false)
+                    try {
+                        val entries =
+                            if (state.stack.isEmpty()) {
+                                withContext(PerformanceDispatcher.diskIO) { localStorage.roots() }
+                            } else {
+                                val root = state.stack.first()
+                                val source = MusicFolder(name = root.name, kind = MusicFolderKind.LOCAL, treeUri = root.path)
+                                repository.list(source, state.stack.last().path).filter { it.isDirectory }
+                            }
+                        mutableLocalSelection.value = state.copy(entries = entries, loading = false)
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (_: Exception) {
+                        mutableLocalSelection.value = state.copy(loading = false, failed = true)
+                    }
+                }
+        }
+
+        fun localPickerBack() {
+            val state = mutableLocalSelection.value ?: return
+            if (state.saving) return
+            if (state.stack.isEmpty()) {
+                closeLocalPicker()
+            } else {
+                mutableLocalSelection.value = state.copy(stack = state.stack.dropLast(1))
+                refreshLocalPicker()
+            }
+        }
+
+        fun closeLocalPicker() {
+            if (mutableLocalSelection.value?.saving == true) return
+            localSelectionJob?.cancel()
+            mutableLocalSelection.value = null
+        }
+
+        fun chooseLocalFolder() {
+            val state = mutableLocalSelection.value ?: return
+            if (state.loading || state.failed || state.saving || settingsJob?.isActive == true) return
+            val folder = state.stack.lastOrNull() ?: return
+            mutableLocalSelection.value = state.copy(saving = true)
+            addLocal(Uri.parse(folder.path))
         }
 
         fun openSource(source: MusicFolder) {

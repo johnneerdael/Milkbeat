@@ -12,7 +12,7 @@ Install packages, select metadata/audio/video roles, set audio priority, manage 
 
 ## Music folders
 
-Choose local folders, add SMB shares and WebDAV, SFTP or NFS servers, test access, and edit or remove sources. See [Folders](folders.md).
+Choose local folders with Milkbeat's D-pad browser (storage access is requested only after **Choose local folder**), add SMB shares and WebDAV, SFTP or NFS servers, test access, and edit or remove sources. See [Folders](folders.md).
 
 ![Music folders settings with local folder, SMB, WebDAV, SFTP and NFS actions](images/settings-folders.png)
 

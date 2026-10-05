@@ -766,4 +766,11 @@
     <string name="visualizer_category_chill">Chill</string>
     <string name="visualizer_category_normal">Normal</string>
     <string name="visualizer_category_intense">Intense</string>
+    <string name="music_folders_storage_denied">Storage access was not granted. Choose local folder again to allow access, or use Android’s folder picker.</string>
+    <string name="music_folders_choose_directory">Choose this folder</string>
+    <string name="music_folders_choose_drive">Choose a storage device</string>
+    <string name="music_folders_no_drives">No mounted storage devices found</string>
+    <string name="music_folders_no_subfolders">No subfolders. You can choose this folder.</string>
+    <string name="music_folders_android_picker">Use Android folder picker</string>
+    <string name="music_folders_storage_settings">Storage permissions</string>
 </resources>

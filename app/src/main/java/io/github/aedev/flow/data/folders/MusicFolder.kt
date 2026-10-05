@@ -60,8 +60,8 @@ data class MusicFolder(
             when (kind) {
                 MusicFolderKind.LOCAL -> {
                     runCatching {
-                        Uri.parse(treeUri).scheme == "content" &&
-                            DocumentsContract.isTreeUri(Uri.parse(treeUri))
+                        val uri = Uri.parse(treeUri)
+                        isFileFolderUri(uri) || (uri.scheme == "content" && DocumentsContract.isTreeUri(uri))
                     }.getOrDefault(false)
                 }
 

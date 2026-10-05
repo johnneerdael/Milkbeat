@@ -15,6 +15,7 @@ import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -37,12 +38,19 @@ internal fun TvMusicFoldersSettingsPane(viewModel: MusicFoldersViewModel = hiltV
     val folders by viewModel.folders.collectAsStateWithLifecycle()
     val editor by viewModel.editor.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
+    val localSelection by viewModel.localSelection.collectAsStateWithLifecycle()
+    val storageAccess = rememberLocalFolderAccessRequest(viewModel::openLocalPicker, viewModel::storageAccessDenied)
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri -> uri?.let(viewModel::addLocal) }
     BackHandler(editor != null) { viewModel.closeEditor() }
+    BackHandler(localSelection != null) { viewModel.localPickerBack() }
+    DisposableEffect(viewModel) { onDispose { viewModel.closeLocalPicker() } }
     ProvideTvColumnPivot {
-        Box(Modifier.fillMaxSize().tvInitialFocus(editor?.source?.id, onFirstComposition = false).focusGroup()) {
+        Box(Modifier.fillMaxSize().tvInitialFocus(editor?.source?.id, localSelection != null, onFirstComposition = false).focusGroup()) {
             val draft = editor
-            if (draft != null) {
+            val selection = localSelection
+            if (selection != null) {
+                TvLocalFolderPicker(selection, viewModel)
+            } else if (draft != null) {
                 TvMusicFolderEditor(draft, folders.any { it.id == draft.source.id }, viewModel)
             } else {
                 LazyColumn(
@@ -60,7 +68,15 @@ internal fun TvMusicFoldersSettingsPane(viewModel: MusicFoldersViewModel = hiltV
                         }
                     }
                     item(key = "local") {
-                        TvButton(stringResource(R.string.music_folders_add_local), onClick = {
+                        TvButton(stringResource(R.string.music_folders_add_local), storageAccess.choose)
+                    }
+                    if (message == R.string.music_folders_storage_denied) {
+                        item(key = "storage-settings") {
+                            TvButton(stringResource(R.string.music_folders_storage_settings), storageAccess.settings)
+                        }
+                    }
+                    item(key = "android-picker") {
+                        TvButton(stringResource(R.string.music_folders_android_picker), onClick = {
                             try {
                                 picker.launch(null)
                             } catch (_: Exception) {

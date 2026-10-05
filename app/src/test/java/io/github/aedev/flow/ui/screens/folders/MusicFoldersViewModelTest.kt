@@ -1,11 +1,13 @@
 package io.github.aedev.flow.ui.screens.folders
 
 import com.google.common.truth.Truth.assertThat
+import io.github.aedev.flow.data.folders.LocalStorageFolders
 import io.github.aedev.flow.data.folders.MusicFolder
 import io.github.aedev.flow.data.folders.MusicFolderEntry
 import io.github.aedev.flow.data.folders.MusicFolderKind
 import io.github.aedev.flow.data.folders.MusicFolderRepository
 import io.mockk.coEvery
+import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -44,7 +46,7 @@ class MusicFoldersViewModelTest {
             val pending = CompletableDeferred<List<MusicFolderEntry>>()
             coEvery { repository.list(first, "") } coAnswers { pending.await() }
             coEvery { repository.list(second, "") } returns listOf(MusicFolderEntry("track.mp3", "track.mp3", false))
-            val vm = MusicFoldersViewModel(repository, mockk(relaxed = true))
+            val vm = MusicFoldersViewModel(repository, mockk(relaxed = true), mockk())
             vm.openSource(first)
             advanceUntilIdle()
             vm.openSource(second)
@@ -71,7 +73,7 @@ class MusicFoldersViewModelTest {
             val source = MusicFolder(name = "NAS", kind = MusicFolderKind.SMB, host = "nas", share = "Music")
             coEvery { repository.folders } returns flowOf(listOf(source))
             coEvery { repository.list(source, "") } throws IOException()
-            val vm = MusicFoldersViewModel(repository, mockk(relaxed = true))
+            val vm = MusicFoldersViewModel(repository, mockk(relaxed = true), mockk())
             vm.openSource(source)
             advanceUntilIdle()
             assertThat(vm.browser.value.failed).isTrue()
@@ -91,7 +93,7 @@ class MusicFoldersViewModelTest {
             val repository = mockk<MusicFolderRepository>()
             coEvery { repository.folders } returns flowOf(emptyList())
             coEvery { repository.test(any(), any(), any()) } answers { firstArg() }
-            val vm = MusicFoldersViewModel(repository, mockk(relaxed = true))
+            val vm = MusicFoldersViewModel(repository, mockk(relaxed = true), mockk())
             vm.edit(MusicFolder(name = "NAS", kind = MusicFolderKind.SMB, host = "nas", share = "Music"))
             vm.testAccess()
             advanceUntilIdle()
@@ -105,7 +107,7 @@ class MusicFoldersViewModelTest {
             Dispatchers.setMain(StandardTestDispatcher(testScheduler))
             val repository = mockk<MusicFolderRepository>()
             coEvery { repository.folders } returns flowOf(emptyList())
-            val vm = MusicFoldersViewModel(repository, mockk(relaxed = true))
+            val vm = MusicFoldersViewModel(repository, mockk(relaxed = true), mockk())
             for ((kind, port) in listOf(MusicFolderKind.SMB to "445", MusicFolderKind.SFTP to "22", MusicFolderKind.NFS to "2049")) {
                 vm.create(kind)
                 val draft = vm.editor.value!!
@@ -122,7 +124,7 @@ class MusicFoldersViewModelTest {
             val repository = mockk<MusicFolderRepository>()
             coEvery { repository.folders } returns flowOf(emptyList())
             coEvery { repository.test(any(), any(), any()) } answers { firstArg<MusicFolder>().copy(hostKey = "ssh-ed25519 SHA256:abc") }
-            val vm = MusicFoldersViewModel(repository, mockk(relaxed = true))
+            val vm = MusicFoldersViewModel(repository, mockk(relaxed = true), mockk())
             vm.create(MusicFolderKind.SFTP)
             vm.updateDraft { copy(source = source.copy(name = "Box", host = "box", username = "me"), password = "pw") }
             vm.testAccess()
@@ -140,7 +142,7 @@ class MusicFoldersViewModelTest {
             Dispatchers.setMain(StandardTestDispatcher(testScheduler))
             val repository = mockk<MusicFolderRepository>()
             coEvery { repository.folders } returns flowOf(emptyList())
-            val vm = MusicFoldersViewModel(repository, mockk(relaxed = true))
+            val vm = MusicFoldersViewModel(repository, mockk(relaxed = true), mockk())
             vm.create(MusicFolderKind.WEBDAV)
             vm.updateDraft { copy(source = source.copy(name = "Cloud", url = "https://user:pw@cloud.test/dav")) }
             vm.testAccess()
@@ -154,7 +156,7 @@ class MusicFoldersViewModelTest {
             val repository = mockk<MusicFolderRepository>()
             coEvery { repository.folders } returns flowOf(emptyList())
             coEvery { repository.test(any(), any(), any()) } answers { firstArg() }
-            val vm = MusicFoldersViewModel(repository, mockk(relaxed = true))
+            val vm = MusicFoldersViewModel(repository, mockk(relaxed = true), mockk())
             val box =
                 MusicFolder(name = "Box", kind = MusicFolderKind.SFTP, host = "box", username = "me", hostKey = "ssh-ed25519 SHA256:abc")
             vm.edit(box)
@@ -174,7 +176,7 @@ class MusicFoldersViewModelTest {
             val repository = mockk<MusicFolderRepository>(relaxed = true)
             coEvery { repository.folders } returns flowOf(emptyList())
             coEvery { repository.test(any(), any(), any()) } answers { firstArg<MusicFolder>().copy(hostKey = "ssh-ed25519 SHA256:abc") }
-            val vm = MusicFoldersViewModel(repository, mockk(relaxed = true))
+            val vm = MusicFoldersViewModel(repository, mockk(relaxed = true), mockk())
             vm.create(MusicFolderKind.SFTP)
             vm.updateDraft { copy(source = source.copy(name = "Box", host = "box", username = "me"), password = "pw") }
             vm.save()
@@ -189,5 +191,48 @@ class MusicFoldersViewModelTest {
             advanceUntilIdle()
             io.mockk.coVerify(exactly = 1) { repository.save(match { it.hostKey == "ssh-ed25519 SHA256:abc" }, "pw", "") }
             assertThat(vm.editor.value).isNull()
+        }
+
+    @Test fun localStorageIsNotOpenedUntilTheUserRequestsIt() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            val repository = mockk<MusicFolderRepository>()
+            coEvery { repository.folders } returns flowOf(emptyList())
+            val storage = mockk<LocalStorageFolders>()
+            val drive = MusicFolderEntry("USB", "file:///storage/USB", true)
+            every { storage.roots() } returns listOf(drive)
+            val vm = MusicFoldersViewModel(repository, mockk(relaxed = true), storage)
+            advanceUntilIdle()
+            assertThat(vm.localSelection.value).isNull()
+            vm.openLocalPicker()
+            withContext(Dispatchers.Default) {
+                withTimeout(5_000) { vm.localSelection.first { it != null && !it.loading } }
+            }
+            assertThat(vm.localSelection.value?.entries).containsExactly(drive)
+            vm.localPickerBack()
+            assertThat(vm.localSelection.value).isNull()
+        }
+
+    @Test fun closingThePickerCancelsAStaleDirectoryListing() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            val repository = mockk<MusicFolderRepository>()
+            coEvery { repository.folders } returns flowOf(emptyList())
+            val pending = CompletableDeferred<List<MusicFolderEntry>>()
+            coEvery { repository.list(any(), any()) } coAnswers { pending.await() }
+            val storage = mockk<LocalStorageFolders>()
+            val drive = MusicFolderEntry("USB", "file:///storage/USB", true)
+            every { storage.roots() } returns listOf(drive)
+            val vm = MusicFoldersViewModel(repository, mockk(relaxed = true), storage)
+            vm.openLocalPicker()
+            withContext(Dispatchers.Default) {
+                withTimeout(5_000) { vm.localSelection.first { it != null && !it.loading } }
+            }
+            vm.openLocalDirectory(drive)
+            advanceUntilIdle()
+            vm.closeLocalPicker()
+            pending.complete(listOf(MusicFolderEntry("Late", "file:///storage/USB/Late", true)))
+            advanceUntilIdle()
+            assertThat(vm.localSelection.value).isNull()
         }
 }
