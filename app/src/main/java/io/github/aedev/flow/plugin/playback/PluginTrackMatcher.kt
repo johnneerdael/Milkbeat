@@ -236,6 +236,7 @@ class PluginTrackMatcher
             pluginId: String,
         ) {
             matches.delete(fingerprint(track), pluginId)
+            matches.delete(missFingerprint(fingerprint(track)), pluginId)
             matches.delete(batchMissFingerprint(fingerprint(track)), pluginId)
         }
 
@@ -263,7 +264,11 @@ class PluginTrackMatcher
             fingerprint: String,
             pluginId: String,
         ): Cached? {
-            val hit = cached(fingerprint, pluginId) ?: cached(batchMissFingerprint(fingerprint), pluginId) ?: return null
+            val hit =
+                cached(fingerprint, pluginId)?.takeIf { it.candidate != null }
+                    ?: cached(missFingerprint(fingerprint), pluginId)
+                    ?: cached(batchMissFingerprint(fingerprint), pluginId)
+                    ?: return null
             val candidate = hit.candidate ?: return hit
             if (TrackMatchScore.best(track, listOf(candidate)) != null) return hit
             matches.delete(fingerprint, pluginId)
@@ -293,10 +298,13 @@ class PluginTrackMatcher
             pluginId: String,
             best: TrackMatchScore.Scored?,
         ): TrackDescriptor? {
-            if (best != null) matches.delete(batchMissFingerprint(fingerprint), pluginId)
+            if (best != null) {
+                matches.delete(batchMissFingerprint(fingerprint), pluginId)
+                matches.delete(missFingerprint(fingerprint), pluginId)
+            }
             matches.upsert(
                 TrackMatchEntity(
-                    fingerprint = fingerprint,
+                    fingerprint = if (best == null && !fingerprint.startsWith("batch-miss:")) missFingerprint(fingerprint) else fingerprint,
                     pluginId = pluginId,
                     candidate = best?.candidate?.let { PluginJson.encodeToString(TrackDescriptor.serializer(), it) },
                     confidence = best?.score ?: 0.0,
@@ -307,7 +315,9 @@ class PluginTrackMatcher
         }
 
         companion object {
-            private fun batchMissFingerprint(fingerprint: String): String = "batch-miss:$fingerprint"
+            private fun missFingerprint(fingerprint: String): String = "miss:${TrackMatchScore.POLICY_VERSION}:$fingerprint"
+
+            private fun batchMissFingerprint(fingerprint: String): String = "batch-miss:${TrackMatchScore.POLICY_VERSION}:$fingerprint"
 
             /** A track's identity across plugins: its ISRC when it has one, else every id it carries. */
             internal fun fingerprint(track: TrackDescriptor): String =
