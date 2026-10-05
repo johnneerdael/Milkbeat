@@ -24,8 +24,7 @@ class VisualizerSettingsTest {
         assertThat(high.meshLevel).isEqualTo(3)
         assertThat(high.autoChange).isTrue()
         assertThat(high.presetSeconds).isEqualTo(30)
-        assertThat(high.renderHeight).isEqualTo(VisualizerSettings.AUTO_RENDER_HEIGHT)
-        assertThat(high.memoryLimit).isTrue()
+        assertThat(high.clampedNativeTrails).isEqualTo(0)
         assertThat(high.blankDetection).isTrue()
         assertThat(high.beatCuts).isFalse()
     }
@@ -48,14 +47,15 @@ class VisualizerSettingsTest {
 
     @Test
     fun `music categories keep unknown ids out and offer only filled ones once indexed`() {
-        assertThat(VisualizerMusicCategory.normalize("jazz")).isEqualTo("jazz")
+        assertThat(VisualizerMusicCategory.normalize("chill")).isEqualTo("chill")
+        assertThat(VisualizerMusicCategory.normalize("jazz")).isEqualTo(VisualizerMusicCategory.ALL)
         assertThat(VisualizerMusicCategory.normalize("polka")).isEqualTo(VisualizerMusicCategory.ALL)
         assertThat(VisualizerMusicCategory.normalize(null)).isEqualTo(VisualizerMusicCategory.ALL)
 
         assertThat(VisualizerMusicCategory.available { 0 }).isEqualTo(VisualizerMusicCategory.IDS)
-        val counts = mapOf("rock" to 12, "jazz" to 3)
+        val counts = mapOf("normal" to 12, "chill" to 3)
         assertThat(VisualizerMusicCategory.available { counts[it] ?: 0 })
-            .containsExactly(VisualizerMusicCategory.ALL, "rock", "jazz")
+            .containsExactly(VisualizerMusicCategory.ALL, "chill", "normal")
             .inOrder()
     }
 }

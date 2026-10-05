@@ -35,15 +35,43 @@ internal class TvVisualizerHost(
     private var quality: QualityController? = null
     private var targetFps = 0
     private var listening = false
+    private var closed = false
+    private var applyingSettings = false
+    private var budgetGeneration = 0L
     private val renderer =
         VisualizerRenderer(
-            object : VisualizerRenderer.StatsListener {
+            object : VisualizerRenderer.BudgetStatsListener {
                 override fun onFpsSample(fps: Float) {
-                    main.post { onFps(fps) }
+                    // Managed hosts accept only samples tagged with their reviewed surface.
+                }
+
+                override fun onBudgetFpsSample(
+                    fps: Float,
+                    generation: Long,
+                    width: Int,
+                    height: Int,
+                ) {
+                    main.post {
+                        val quality = quality
+                        if (!closed && listening && quality != null && generation == budgetGeneration &&
+                            height == quality.currentHeight() && width == display.widthForHeight(height)
+                        ) {
+                            onFps(fps, width, height)
+                        }
+                    }
+                }
+
+                override fun onRenderBudgetRequested(generation: Long) {
+                    main.post {
+                        if (!closed && generation > budgetGeneration) {
+                            budgetGeneration = generation
+                            quality?.revalidateForResume(true)
+                        }
+                    }
                 }
 
                 override fun onPresetChanged() {
-                    main.post { quality?.onPresetChanged() }
+                    main.post { if (!closed) quality?.onPresetChanged() }
                 }
             },
         )
@@ -69,34 +97,40 @@ internal class TvVisualizerHost(
         val last = settings
         if (next == last) return
         settings = next
-        engine.apply(next)
-        if (next.frameRateCap != last.frameRateCap) {
-            applyFrameRateCap(next.frameRateCap)
-            ProjectMJNI.setForceHardCut(false)
-        }
-        if (next.memoryLimit != last.memoryLimit) {
-            quality = createQuality()
-            return
-        }
         val quality = quality ?: return
-        if (next.renderHeight != last.renderHeight) quality.setMode(fixedHeight(next), engine.lastAutoHeight)
-        if (next.skipSlowPresets != last.skipSlowPresets) quality.setSkipSlowPresets(next.skipSlowPresets)
-        if (next.clampedTransitionSeconds != last.clampedTransitionSeconds) {
-            quality.setTransitionSeconds(next.clampedTransitionSeconds)
+        // Flow emissions can change both allocation settings together. Publish only after both
+        // have been reviewed against live memory, so no intermediate tuple can allocate on GL.
+        applyingSettings = true
+        try {
+            if (next.clampedTransitionSeconds != last.clampedTransitionSeconds ||
+                next.clampedNativeTrails != last.clampedNativeTrails
+            ) {
+                quality.setRenderAllocationSettings(next.clampedNativeTrails, next.clampedTransitionSeconds)
+            }
+            if (next.skipSlowPresets != last.skipSlowPresets) quality.setSkipSlowPresets(next.skipSlowPresets)
+            if (next.frameRateCap != last.frameRateCap) applyFrameRateCap(next.frameRateCap)
+            engine.apply(next)
+        } finally {
+            applyingSettings = false
         }
+        val allocationChanged =
+            (next.clampedTransitionSeconds > 0) != (last.clampedTransitionSeconds > 0) ||
+                (next.clampedNativeTrails > 0) != (last.clampedNativeTrails > 0)
+        if (allocationChanged) {
+            // Reject old FPS for reductions too. Pending allocations retain zero resident credit;
+            // confirmed reductions sample pressure after GL releases the old textures.
+            budgetGeneration = ProjectMJNI.requireRenderBudget()
+            quality.revalidateForAllocationChange()
+        }
+        publishRenderConfiguration(quality.currentHeight())
     }
 
-    private fun memoryLimit(): Int = if (settings.memoryLimit) engine.profile.memorySafeHeight() else 0
-
-    private fun fixedHeight(settings: VisualizerSettings): Int =
-        QualityController.validFixedHeight(display, memoryLimit(), settings.renderHeight)
-
     private fun createQuality(): QualityController =
-        QualityController(display, engine.profile, memoryLimit(), ::applyRenderHeight).apply {
-            setTransitionSeconds(settings.clampedTransitionSeconds)
+        QualityController(display, engine.profile, 0, ::applyRenderHeight).apply {
+            setRenderAllocationSettings(settings.clampedNativeTrails, settings.clampedTransitionSeconds)
             setSkipSlowPresets(settings.skipSlowPresets)
             setTargetFps(display.refreshRate / frameDivisor(display.refreshRate, settings.frameRateCap))
-            setMode(fixedHeight(settings), engine.lastAutoHeight)
+            setMode(0, engine.lastAutoHeight)
         }
 
     private fun applyFrameRateCap(cap: Int) {
@@ -107,6 +141,8 @@ internal class TvVisualizerHost(
     }
 
     fun resume() {
+        if (closed) return
+        quality?.revalidateForResume(false)
         view.onResume()
         if (!listening) viewModel.startListening()
         listening = true
@@ -120,22 +156,40 @@ internal class TvVisualizerHost(
 
     /** projectM owns GL objects, so it is released on the GL thread; a later start cleans up if that thread is gone. */
     fun close() {
+        if (closed) return
+        closed = true
         pause()
         engine.renderStats = null
         main.removeCallbacksAndMessages(null)
         view.queueEvent(renderer::release)
     }
 
-    private fun onFps(fps: Float) {
+    private fun onFps(
+        fps: Float,
+        width: Int,
+        height: Int,
+    ) {
+        if (ProjectMJNI.getCompletedRenderBudgetGeneration() != budgetGeneration) return
         val quality = quality ?: return
         if (quality.onFpsSample(fps) == QualityController.ACTION_SKIP) ProjectMJNI.skipCurrentPreset()
-        engine.renderStats = VisualizerRenderStats(fps, targetFps, renderer.surfaceWidth, renderer.surfaceHeight, quality.isAuto)
+        engine.renderStats = VisualizerRenderStats(fps, targetFps, width, height, quality.isAuto)
     }
 
     private fun applyRenderHeight(height: Int) {
-        view.setRenderSize(display.widthForHeight(height), height)
+        if (quality?.wasLastChangeForMemoryPressure() == true) ProjectMJNI.onMemoryPressure()
+        if (!applyingSettings) publishRenderConfiguration(height)
         ProjectMJNI.setForceHardCut(false)
         quality?.takeIf { it.isAuto }?.let { engine.lastAutoHeight = it.autoHeightToRemember() }
+    }
+
+    private fun publishRenderConfiguration(height: Int) {
+        view.setRenderConfiguration(
+            display.widthForHeight(height),
+            height,
+            settings.clampedNativeTrails,
+            settings.clampedTransitionSeconds,
+            budgetGeneration,
+        )
     }
 
     override fun onTrimMemory(level: Int) {

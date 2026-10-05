@@ -230,7 +230,9 @@ Crop* collection, blending from one to the next. The visuals take their sound st
 Milkbeat's player, so they follow the track you hear and not the TV's output.
 
 The embedded ProjectM TV core starts on its defaults for your device: a 30 fps target, automatic
-render resolution and transitions, a memory limit and slow-preset skipping. Rendering stops when
+render resolution and transitions, Standard native trails and slow-preset skipping. Resolution
+can reach the native panel size, including 4K, when frame rate and live memory headroom allow it.
+Rendering stops when
 the visualizer leaves the screen or the app goes into the background.
 
 - **Left and Right** step through presets while the controls are hidden.
@@ -241,8 +243,9 @@ the visualizer leaves the screen or the app goes into the background.
 - **Diagnostics**: an optional status line with frame rate, render size, blend state, audio level
   and preset name.
 - **ProjectM TV's settings** in Settings > Visualizations: automatic preset changes, preset
-  duration, music category, cuts on loud beats, skipping blank or slow presets (and resetting
-  them), transition length and style, render resolution, frame rate, detail and the memory limit.
+  duration, beta preset moods, cuts on loud beats, skipping blank or slow presets (and resetting
+  them), transition length and style, native trails, frame rate and detail. Resolution and memory
+  budgeting are automatic; saved fixed resolutions and memory toggles no longer control them.
   See the [user guide](docs/user-guide/settings.md#visualizations).
 
 <table>

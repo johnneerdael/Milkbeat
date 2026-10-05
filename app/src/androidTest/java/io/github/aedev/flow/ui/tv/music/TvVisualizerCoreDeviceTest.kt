@@ -56,6 +56,19 @@ class TvVisualizerCoreDeviceTest {
             assertEquals(30, engine.profile.defaultFrameRateCap())
             assertTrue(stats.autoResolution)
             assertTrue(stats.width > 0 && stats.height > 0)
+            assertTrue(ProjectMJNI.getCompletedRenderBudgetGeneration() > 0)
+            val firstGeneration = ProjectMJNI.getCompletedRenderBudgetGeneration()
+            val firstFrame = ProjectMJNI.getRenderedFrameSerial()
+            compose.runOnIdle {
+                host.apply(engine.defaults.copy(nativeTrails = 2, transitionSeconds = 0))
+                host.apply(engine.defaults.copy(nativeTrails = 0, transitionSeconds = 0))
+                host.apply(engine.defaults.copy(nativeTrails = 2, transitionSeconds = 10))
+            }
+            compose.waitUntil(15_000) {
+                ProjectMJNI.getRenderedFrameSerial() > firstFrame &&
+                    ProjectMJNI.getCompletedRenderBudgetGeneration() > firstGeneration &&
+                    ProjectMJNI.getNativeTrailsStatus().startsWith("High")
+            }
             val before = ProjectMJNI.getPresetChangeCounter()
             viewModel.stepPreset(true)
             compose.waitUntil(30_000) { ProjectMJNI.getPresetChangeCounter() > before }

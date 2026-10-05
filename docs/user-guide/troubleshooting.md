@@ -71,7 +71,7 @@ Check the provider is installed, enabled and signed in. Library merges eligible 
 
 Enable diagnostics and note the preset, fps, target and render dimensions. Automatic resolution and preset skipping can adapt to load. Check the visualizer is enabled and the device supports OpenGL ES 3.0. Report persistent issues with the device model and app version; a screenshot alone cannot establish an fps improvement or regression.
 
-To lighten the load, set **Detail** lower, **Transition style** to Lightweight, or **Render resolution** back to Auto in Settings → Visualizations. **Skip blank presets** and **Skip slow presets** leave presets that stay black or slow; **Reset skipped presets** brings them back if a skip was wrong.
+To lighten the load, set **Detail** lower, **Transition style** to Lightweight, or **Native trails** to Standard in Settings → Visualizations. Resolution and memory budgeting remain automatic. **Skip blank presets** and **Skip slow presets** leave presets that stay black or slow; **Reset skipped presets** brings them back if a skip was wrong.
 
 ## A plugin update was not installed with an app update
 
