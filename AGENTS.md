@@ -632,9 +632,10 @@ revision must pass the configured ktlint rules.
   owns a `QualityController` in Auto, acknowledges `BudgetStatsListener` context generations,
   revalidates live memory before resume, and publishes size/trails/transition as one reviewed
   `setRenderConfiguration` tuple. Drop stale FPS generations and dimensions; budget allocation
-  changes before native publication using `revalidateForAllocationChange(growing)`: confirmed
+  changes before native publication using `revalidateForAllocationChange()`: confirmed
   reductions wait for a new-generation frame to release old textures before assessing pressure;
-  growth and pending allocations receive a full budget check. Visibility resumes still use
+  growth and pending allocations receive a full budget check. The controller retains the pre-edit
+  allocation estimate across height callbacks; do not recompute both topologies at the new size. Visibility resumes still use
   `revalidateForResume`. Fixed-height/RAM-toggle preferences are retired. Standard
   trails is default; Medium/High activate above 1330p. Keep the audio tap and player owners intact.
 - Use JDK 21, as CI does, with an Android SDK containing platform 37 (`compileSdk = 37`).

@@ -13,7 +13,6 @@ import io.github.aedev.flow.player.audio.visualizer.frameDivisor
 import nl.neerdael.projectm.core.DisplayInfo
 import nl.neerdael.projectm.core.ProjectMJNI
 import nl.neerdael.projectm.core.QualityController
-import nl.neerdael.projectm.core.RenderMemoryBudget
 import nl.neerdael.projectm.core.VisualizerRenderer
 import nl.neerdael.projectm.core.VisualizerView
 import javax.microedition.khronos.egl.EGLConfig
@@ -118,15 +117,10 @@ internal class TvVisualizerHost(
             (next.clampedTransitionSeconds > 0) != (last.clampedTransitionSeconds > 0) ||
                 (next.clampedNativeTrails > 0) != (last.clampedNativeTrails > 0)
         if (allocationChanged) {
-            val height = quality.currentHeight()
-            val width = display.widthForHeight(height)
-            val growing =
-                RenderMemoryBudget.estimatedBytes(width, height, next.clampedNativeTrails, next.clampedTransitionSeconds > 0) >
-                    RenderMemoryBudget.estimatedBytes(width, height, last.clampedNativeTrails, last.clampedTransitionSeconds > 0)
             // Reject old FPS for reductions too. Pending allocations retain zero resident credit;
             // confirmed reductions sample pressure after GL releases the old textures.
             budgetGeneration = ProjectMJNI.requireRenderBudget()
-            quality.revalidateForAllocationChange(growing)
+            quality.revalidateForAllocationChange()
         }
         publishRenderConfiguration(quality.currentHeight())
     }
