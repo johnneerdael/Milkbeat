@@ -36,3 +36,10 @@ Plugin capabilities depend on the installed version, account and subscription. A
 - [Prepare private playlists](providers.md#prepare-private-playlists)
 - [Use radio modes and the queue](playback.md#mixes)
 - [All GitHub releases](https://github.com/johnneerdael/Milkbeat/releases)
+
+## When a new build becomes available
+
+Feature branches do not publish updates. A pull request to `main` must finish a Codex review of its
+current commit and resolve review findings before the complete validation/build suites run. After
+merge, the full main pipeline validates the app before publishing signed APKs. The in-app updater
+then sees the new release. A queued or cancelled GitHub build does not make an update available.

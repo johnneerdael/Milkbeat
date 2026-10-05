@@ -1,0 +1,260 @@
+name: Android build
+
+on:
+  workflow_call:
+    inputs:
+      source_ref:
+        type: string
+        default: ''
+      pr_build:
+        type: boolean
+        default: false
+    secrets:
+      RELEASE_KEYSTORE_BASE64:
+        required: false
+      STORE_PASSWORD:
+        required: false
+      KEY_ALIAS:
+        required: false
+      KEY_PASSWORD:
+        required: false
+    outputs:
+      version:
+        value: ${{ jobs.build.outputs.version }}
+      core_version:
+        value: ${{ jobs.build.outputs.core_version }}
+
+permissions:
+  contents: read
+
+env:
+  EXPECTED_SIGNER_SHA256: fefb39d0d5f3df3bbbd0b7ccf7fed716a0a13ebd17ac529b0c1a8ec3c1f7a3f8
+
+jobs:
+  build:
+    name: Build TV APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      core_version: ${{ steps.core.outputs.version }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.source_ref || github.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+
+      # Every published build is the next patch of the major.minor line in gradle.properties:
+      # one past the highest existing vX.Y.* tag, or .0 for a new line.
+      - name: Resolve release version
+        id: version
+        run: |
+          set -euo pipefail
+          line=$(sed -n 's/^milkbeatVersion=//p' gradle.properties)
+          last=$(git tag --list "v$line.*" | sed "s/^v$line\.//" | grep -E '^[0-9]+$' | sort -n | tail -1 || true)
+          patch=$(( ${last:--1} + 1 ))
+          minimum=$(sed -n 's/^milkbeatMinimumPatch=//p' gradle.properties)
+          minimum=${minimum:-0}
+          if ! [[ "$minimum" =~ ^[0-9]+$ ]]; then
+            echo "::error::milkbeatMinimumPatch must be a non-negative integer"
+            exit 1
+          fi
+          if (( patch < minimum )); then patch=$minimum; fi
+          echo "version=$line.$patch" >> "$GITHUB_OUTPUT"
+          echo "ORG_GRADLE_PROJECT_milkbeatPatch=$patch" >> "$GITHUB_ENV"
+          echo "Building Milkbeat $line.$patch"
+
+      # gradle.properties follows the newest stable ProjectM-TV core ("latest"); pin the exact
+      # release here so the whole build uses one core and the release notes can name it.
+      - name: Resolve ProjectM-TV core
+        id: core
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          core=$(sed -n 's/^projectmCoreVersion=//p' gradle.properties)
+          if [ "$core" = "latest" ]; then
+            core=$(gh api repos/johnneerdael/ProjectM-TV/releases/latest --jq '.tag_name | ltrimstr("v")')
+          fi
+          echo "version=$core" >> "$GITHUB_OUTPUT"
+          echo "ORG_GRADLE_PROJECT_projectmCoreVersion=$core" >> "$GITHUB_ENV"
+          echo "Building with ProjectM-TV core $core"
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v6
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-disabled: ${{ inputs.pr_build }}
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Check Kotlin formatting
+        run: >
+          ./gradlew spotlessCheck
+          --build-cache --stacktrace
+
+      - name: Decode Keystore
+        if: ${{ !inputs.pr_build }}
+        id: keystore
+        env:
+          RELEASE_KEYSTORE_BASE64: ${{ !inputs.pr_build && secrets.RELEASE_KEYSTORE_BASE64 || '' }}
+        run: |
+          if [ -n "$RELEASE_KEYSTORE_BASE64" ]; then
+            echo "$RELEASE_KEYSTORE_BASE64" | base64 --decode > release.keystore
+            echo "signed=true" >> "$GITHUB_OUTPUT"
+            echo "Release keystore decoded."
+          else
+            # Main builds are published as releases; unsigned APKs
+            # cannot be installed, so refuse rather than publish them.
+            echo "::error::RELEASE_KEYSTORE_BASE64 is unavailable. Refusing to build unsigned release APKs."
+            exit 1
+          fi
+
+      - name: Run unit tests
+        run: >
+          ./gradlew :app:testGithubDebugUnitTest :app:compileFossDebugKotlin
+          --max-workers=1 --build-cache --stacktrace
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: plugins/package-lock.json
+
+      # The plugin API's JSON Schema must match its Kotlin model, and the SDK's TypeScript must match
+      # the schema; either drifting means plugins and the host no longer agree.
+      - name: Check the plugin API contract
+        run: |
+          node --test .github/scripts/test_phone_viewer.mjs
+          node --test tools/plugin-download-codes.test.mjs
+          ./gradlew :plugin-api:test --build-cache --stacktrace
+          cd plugins
+          npm ci --no-audit --no-fund
+          npm run --workspaces --if-present check
+
+      - name: Verify third-party publication data
+        run: |
+          cd plugins
+          cp published.json ../app/src/androidTest/assets/published-plugins.json
+          npm test
+          node scripts/verify-published-plugins.mjs
+
+      # Instrumentation tests are not executed in CI, but they must still
+      # compile: breakage here otherwise lands on main unnoticed.
+      - name: Compile instrumentation tests
+        run: >
+          ./gradlew :app:compileGithubDebugAndroidTestKotlin
+          --build-cache --stacktrace
+
+      - name: Lint TV release
+        run: >
+          ./gradlew :app:lintGithubRelease
+          --build-cache --stacktrace
+
+      - name: Build TV release APKs
+        run: >
+          ./gradlew :app:assembleGithubRelease
+          --max-workers=1 --build-cache --stacktrace
+        env:
+          STORE_PASSWORD: ${{ !inputs.pr_build && secrets.STORE_PASSWORD || '' }}
+          KEY_ALIAS: ${{ !inputs.pr_build && secrets.KEY_ALIAS || '' }}
+          KEY_PASSWORD: ${{ !inputs.pr_build && secrets.KEY_PASSWORD || '' }}
+
+      # A wrong or missing key is unrecoverable for installed copies, so fail
+      # the build rather than publish. Skipped when no keystore was available,
+      # e.g. on fork PRs.
+      - name: Verify release signing certificate
+        if: ${{ steps.keystore.outputs.signed == 'true' }}
+        run: |
+          set -uo pipefail
+          apksigner=$(find "$ANDROID_SDK_ROOT/build-tools" -name apksigner -type f | sort -V | tail -1)
+          if [ -z "$apksigner" ]; then
+            echo "::error::apksigner was not found in the runner Android SDK."
+            exit 1
+          fi
+
+          status=0
+          for apk in \
+            app/build/outputs/apk/github/release/app-github-universal-release.apk \
+            app/build/outputs/apk/github/release/app-github-arm64-v8a-release.apk \
+            app/build/outputs/apk/github/release/app-github-armeabi-v7a-release.apk
+          do
+            if [ ! -f "$apk" ]; then
+              echo "::error::Missing expected APK $apk"
+              status=1
+              continue
+            fi
+            actual=$("$apksigner" verify --print-certs "$apk" | grep -m1 'certificate SHA-256 digest' | awk '{print $NF}')
+            if [ "$actual" != "$EXPECTED_SIGNER_SHA256" ]; then
+              echo "::error::$(basename "$apk") is signed with '$actual', expected '$EXPECTED_SIGNER_SHA256'"
+              status=1
+            else
+              echo "OK $(basename "$apk") -> $actual"
+            fi
+          done
+          exit $status
+
+      - name: Report individual APK sizes
+        shell: bash
+        run: |
+          shopt -s nullglob
+          apks=(
+            app/build/outputs/apk/github/release/app-github-universal-release*.apk
+            app/build/outputs/apk/github/release/app-github-arm64-v8a-release*.apk
+            app/build/outputs/apk/github/release/app-github-armeabi-v7a-release*.apk
+          )
+          expected=3
+
+          if (( ${#apks[@]} != expected )); then
+            printf 'Expected %d published APKs, found %d.\n' "$expected" "${#apks[@]}" >&2
+            exit 1
+          fi
+
+          {
+            echo '## Individual APK sizes'
+            echo
+            echo '| APK | Size | Exact bytes |'
+            echo '|---|---:|---:|'
+            for apk in "${apks[@]}"; do
+              bytes=$(stat --format='%s' "$apk")
+              size=$(awk -v bytes="$bytes" 'BEGIN { printf "%.2f MiB", bytes / 1048576 }')
+              printf '| \x60%s\x60 | %s | %s |\n' "$(basename "$apk")" "$size" "$bytes"
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload TV universal APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: milkbeat-universal-release-apk
+          path: app/build/outputs/apk/github/release/app-github-universal-release*.apk
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+
+      - name: Upload TV ARM64 APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: milkbeat-arm64-release-apk
+          path: app/build/outputs/apk/github/release/app-github-arm64-v8a-release*.apk
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+
+      - name: Upload TV ARMv7 APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: milkbeat-armeabi-v7a-release-apk
+          path: app/build/outputs/apk/github/release/app-github-armeabi-v7a-release*.apk
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0

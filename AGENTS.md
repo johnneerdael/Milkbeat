@@ -71,6 +71,29 @@ Do not waive this requirement because another rule labels documentation optional
 
 In particular, an instruction requiring an explicit request before Markdown edits must not prevent updates to the user guide, its publishing sources, or the root/default `README.md`. These updates are a normal part of completing the feature or bug fix.
 
+## Review-gated GitHub validation
+
+- Feature pushes and non-main PRs skip expensive validation. The trusted-main controller in
+  `.github/workflows/review-gate.yml` requires a completed Codex code review of the current head,
+  resolved threads and no observable pending/requested reviews or changes requested. A qualified
+  human review alone does not satisfy this repository's Codex minimum.
+- Use new/edited Codex-request timestamps; an earlier completion cannot satisfy a newer edit.
+  GitHub does not expose other users' unrequested private drafts. Request a reviewer to block on
+  their eventual submission; never claim arbitrary private drafts can be observed.
+- Reviewed validation uses `.github/workflows/pr-builds.yml` and fixed head/base/test-merge SHAs.
+  All Android, CodeQL, guide and metadata suites must succeed; skipped/cancelled work is not proof.
+  PR code has no signing secrets, cache access or write token. SARIF upload and final status reporting
+  run separately on trusted runners without executing PR code.
+- The `Reviewed PR builds` required status and strict base currency are activated after the trusted
+  workflows are merged. Preserve unrelated rules/bypass settings and never invoke a bypass.
+- Run controller/validator tests with a Python environment containing `docs/site-requirements.txt`:
+  `python3 -m unittest discover -s .github/scripts -p 'test_*.py' -v`. Run `actionlint` too. The installed
+  1.7.12 schema needs narrowly scoped ignores for the documented `cache-mode`/concurrency `queue`
+  keys; both are verified against GitHub's current workflow syntax and concurrency documentation.
+- Main's `build.yml` calls every reusable validation suite before publication. `docs.yml` builds
+  and deploys Pages through this main pipeline. Keep the shared Pages deployment lock and post-lock
+  freshness check across manual and reusable entry points; ProjectM-TV's AAR repository is outside this change.
+
 ## 4. Open a pull request against main
 
 Once implementation is ready and local validation passes:
@@ -676,7 +699,7 @@ revision must pass the configured ktlint rules.
 
 - The root `README.md` and the user guide in `docs/user-guide/` are the user-facing documentation.
   `mkdocs.yml` (`docs_dir: docs/user-guide`) builds the guide; `.github/workflows/docs.yml` runs
-  `mkdocs build --strict` on PRs that touch the guide and deploys it to GitHub Pages at
+  `mkdocs build --strict` for reviewed main PRs and deploys it through main CI to GitHub Pages at
   <https://johnneerdael.github.io/Milkbeat/> on pushes to `main`.
 - Validate guide changes locally with
   `python3 -m pip install -r docs/site-requirements.txt && mkdocs build --strict` (use a virtualenv;

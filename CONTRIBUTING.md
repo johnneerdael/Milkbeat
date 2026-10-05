@@ -555,6 +555,35 @@ Both flavors must compile — a change that only builds `github` will fail CI on
 **Keep pull requests focused.** One concern per PR. A UI fix bundled with a refactor and a dependency
 bump takes three times as long to review and is three times as likely to be reverted.
 
+## Review-gated CI
+
+Feature-branch pushes and PRs targeting other branches do not start app builds. For a ready PR to
+`main`, finish a Codex code review of its latest head and resolve every published review thread.
+Human approvals alone do not satisfy the Codex gate. New or edited `@codex review` requests block
+builds until completion after the request; requested human reviews and visible pending reviews also
+block. GitHub hides unrequested private draft reviews, so request a reviewer when their submission
+must hold the gate closed.
+
+Lightweight review-state and PR-text checks run before compilation. Once eligible, a trusted-main
+controller dispatches Android, CodeQL, user-guide and repository-metadata validation against a fixed
+head/base/test-merge snapshot. PR code gets no signing secrets, write token or cache access. The
+`Reviewed PR builds` status succeeds only after every required suite actually succeeds and the
+snapshot/review state still matches. Skipped and cancelled builds do not pass the gate.
+
+Review/thread changes trigger a recheck; a five-minute fallback catches thread resolution without
+another comment. Failed builds require a fix or an explicit **PR review gate → Run workflow** retry.
+A repeated review of an unchanged revision can reuse its earlier verified builds; a changed head,
+base or test merge needs fresh validation. PR body edits are revalidated before reusing success.
+
+The installed main ruleset requires `Reviewed PR builds` from GitHub Actions and an up-to-date
+branch. Codex uses COMMENTED reviews or completion comments, so the native approving-review count
+stays zero. The bootstrap change is reviewed under the existing rules; activate the new required
+status only after its trusted controller is on main. Never bypass protection to install it.
+
+Every main merge runs the complete suites before publishing signed APKs and the in-app update.
+ProjectM-TV's own AAR publication is unchanged; its existing core-release event still rebuilds
+Milkbeat on main.
+
 ## 📋 Code Review Process
 
 - Maintainers will review your PR

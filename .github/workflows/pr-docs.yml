@@ -4,8 +4,6 @@ on:
   pull_request:
     branches: [ main ]
     types: [ opened, synchronize, reopened, edited, ready_for_review ]
-  push:
-    branches: [ main ]
 
 permissions:
   contents: read
@@ -21,8 +19,10 @@ jobs:
       pull-requests: read
     steps:
       - uses: actions/checkout@v7
-      - name: Test the docs check
-        run: python3 -m unittest discover -s .github/scripts -p 'test_pr_docs.py' -v
+      - name: Install validator dependencies
+        run: python3 -m pip install -r docs/site-requirements.txt
+      - name: Test metadata and review policy
+        run: python3 -m unittest discover -s .github/scripts -p 'test_*.py' -v
       - name: Require a README or user guide update, or a reason in ## Docs
         env:
           GH_TOKEN: ${{ github.token }}
@@ -31,17 +31,3 @@ jobs:
           set -euo pipefail
           gh api "repos/$GITHUB_REPOSITORY/pulls/$NUMBER/files" --paginate --jq '.[].filename' > "$RUNNER_TEMP/changed.txt"
           python3 .github/scripts/pr_docs.py --event-file "$GITHUB_EVENT_PATH" --changed-files "$RUNNER_TEMP/changed.txt"
-
-  # The plugin publisher rewrites these tables when it updates plugins/published.json;
-  # this catches hand edits and a publisher run that did not sync them.
-  plugin-codes:
-    name: Plugin codes match publication
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 22
-      - run: node --test .github/scripts/test_plugin_codes.mjs
-      - run: node .github/scripts/plugin-codes.mjs check
