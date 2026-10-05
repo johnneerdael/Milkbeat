@@ -13,6 +13,7 @@ import io.github.aedev.flow.player.audio.visualizer.frameDivisor
 import nl.neerdael.projectm.core.DisplayInfo
 import nl.neerdael.projectm.core.ProjectMJNI
 import nl.neerdael.projectm.core.QualityController
+import nl.neerdael.projectm.core.RenderMemoryBudget
 import nl.neerdael.projectm.core.VisualizerRenderer
 import nl.neerdael.projectm.core.VisualizerView
 import javax.microedition.khronos.egl.EGLConfig
@@ -102,11 +103,10 @@ internal class TvVisualizerHost(
         // have been reviewed against live memory, so no intermediate tuple can allocate on GL.
         applyingSettings = true
         try {
-            if (next.clampedTransitionSeconds != last.clampedTransitionSeconds) {
-                quality.setTransitionSeconds(next.clampedTransitionSeconds)
-            }
-            if (next.clampedNativeTrails != last.clampedNativeTrails) {
-                quality.setNativeTrailsLevel(next.clampedNativeTrails)
+            if (next.clampedTransitionSeconds != last.clampedTransitionSeconds ||
+                next.clampedNativeTrails != last.clampedNativeTrails
+            ) {
+                quality.setRenderAllocationSettings(next.clampedNativeTrails, next.clampedTransitionSeconds)
             }
             if (next.skipSlowPresets != last.skipSlowPresets) quality.setSkipSlowPresets(next.skipSlowPresets)
             if (next.frameRateCap != last.frameRateCap) applyFrameRateCap(next.frameRateCap)
@@ -118,18 +118,22 @@ internal class TvVisualizerHost(
             (next.clampedTransitionSeconds > 0) != (last.clampedTransitionSeconds > 0) ||
                 (next.clampedNativeTrails > 0) != (last.clampedNativeTrails > 0)
         if (allocationChanged) {
-            // A reviewed intermediate estimate is not resident RAM. A new generation rejects
-            // queued samples, and a full budget stays conservative until this tuple really draws.
+            val height = quality.currentHeight()
+            val width = display.widthForHeight(height)
+            val growing =
+                RenderMemoryBudget.estimatedBytes(width, height, next.clampedNativeTrails, next.clampedTransitionSeconds > 0) >
+                    RenderMemoryBudget.estimatedBytes(width, height, last.clampedNativeTrails, last.clampedTransitionSeconds > 0)
+            // Reject old FPS for reductions too. Pending allocations retain zero resident credit;
+            // confirmed reductions only sample live headroom rather than budget a full rebuild.
             budgetGeneration = ProjectMJNI.requireRenderBudget()
-            quality.revalidateForResume(true)
+            quality.revalidateForResume(growing)
         }
         publishRenderConfiguration(quality.currentHeight())
     }
 
     private fun createQuality(): QualityController =
         QualityController(display, engine.profile, 0, ::applyRenderHeight).apply {
-            setTransitionSeconds(settings.clampedTransitionSeconds)
-            setNativeTrailsLevel(settings.clampedNativeTrails)
+            setRenderAllocationSettings(settings.clampedNativeTrails, settings.clampedTransitionSeconds)
             setSkipSlowPresets(settings.skipSlowPresets)
             setTargetFps(display.refreshRate / frameDivisor(display.refreshRate, settings.frameRateCap))
             setMode(0, engine.lastAutoHeight)
