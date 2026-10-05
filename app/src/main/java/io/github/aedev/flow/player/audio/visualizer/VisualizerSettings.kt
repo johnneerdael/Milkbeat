@@ -45,22 +45,7 @@ data class VisualizerSettings(
 /** The preset groups the engine sorts its library into, as ProjectM-TV offers them. */
 object VisualizerMusicCategory {
     const val ALL = "all"
-    val IDS =
-        listOf(
-            ALL,
-            "dance",
-            "pop",
-            "rock",
-            "hip-hop",
-            "rnb-soul",
-            "jazz",
-            "classical",
-            "ambient",
-            "folk-acoustic",
-            "country",
-            "reggae",
-            "latin",
-        )
+    val IDS = listOf(ALL, "chill", "normal", "intense")
 
     fun normalize(id: String?): String = id?.takeIf { it in IDS } ?: ALL
 

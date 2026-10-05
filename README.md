@@ -242,7 +242,7 @@ the visualizer leaves the screen or the app goes into the background.
 - **Diagnostics**: an optional status line with frame rate, render size, blend state, audio level
   and preset name.
 - **ProjectM TV's settings** in Settings > Visualizations: automatic preset changes, preset
-  duration, music category, cuts on loud beats, skipping blank or slow presets (and resetting
+  duration, beta preset moods, cuts on loud beats, skipping blank or slow presets (and resetting
   them), transition length and style, native trails, frame rate and detail. Resolution and memory
   budgeting are automatic; saved fixed resolutions and memory toggles no longer control them.
   See the [user guide](docs/user-guide/settings.md#visualizations).

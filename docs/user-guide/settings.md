@@ -47,7 +47,7 @@ Whether now playing shows the visualizer, the music video or the artwork is chos
 | --- | --- | --- |
 | Change presets automatically | Move on to another preset after the preset duration. Left and Right on the remote always switch | On |
 | Preset duration | How long a preset plays before the next one: 10 to 90 s | 30 s |
-| Music category | Prefer presets tagged for a kind of music. Only categories that hold presets are offered | All |
+| Preset mood | All, or the core’s beta Chill, Normal and Intense collections. Previously saved retired music categories use All | All |
 | Cut on loud beats | A loud beat can cut to the next preset before its time is up | Off |
 | Skip blank presets | Leave presets that stay black, often because a texture is missing | On |
 | Skip slow presets | Leave presets that stay far below the frame rate even at the lowest resolution | On |
@@ -57,7 +57,7 @@ Whether now playing shows the visualizer, the music video or the artwork is chos
 
 ![Preset duration picker with the device default marked](images/visualizer-picker-preset-duration.png)
 
-![Music category picker](images/visualizer-picker-music-category.png)
+The current core offers beta preset moods. The earlier music-category picker screenshot has been retired.
 
 ![Reset skipped presets after resetting](images/visualizer-reset-skipped-after.png)
 
@@ -84,7 +84,9 @@ Resolution is always **Auto**. It responds to the frame rate target and live mem
 | Detail | The per-vertex mesh, from Minimal to Ultra: finer warps and zooms at more processor time per frame | Medium (by device) |
 | Show diagnostics | Show frame rate, render size, transition, audio level and preset in the playback controls | Off |
 
-![Picture quality settings](images/visualizer-settings-quality.png)
+![Automatic quality controls in the isolated TV settings component](images/visualizer-settings-quality-native.png)
+
+![Native trails picker with Standard selected](images/visualizer-picker-native-trails.png)
 
 ![Frame rate picker](images/visualizer-picker-frame-rate.png)
 

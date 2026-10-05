@@ -362,8 +362,8 @@
     <string name="visualizer_auto_change_subtitle">Move on to another preset after the preset duration. Left and right on the remote always switch.</string>
     <string name="visualizer_preset_duration">Preset duration</string>
     <string name="visualizer_seconds_value">%1$d s</string>
-    <string name="visualizer_music_category">Music category</string>
-    <string name="visualizer_music_category_subtitle">Prefer presets that suit this kind of music</string>
+    <string name="visualizer_music_category">Preset mood</string>
+    <string name="visualizer_music_category_subtitle">Choose All or a beta Chill, Normal or Intense collection</string>
     <string name="visualizer_category_all">All</string>
     <string name="visualizer_category_dance">Dance</string>
     <string name="visualizer_category_pop">Pop</string>
@@ -783,4 +783,7 @@
     <string name="visualizer_native_trails_standard">Standard</string>
     <string name="visualizer_native_trails_medium">Medium</string>
     <string name="visualizer_native_trails_high">High</string>
+    <string name="visualizer_category_chill">Chill</string>
+    <string name="visualizer_category_normal">Normal</string>
+    <string name="visualizer_category_intense">Intense</string>
 </resources>

@@ -209,17 +209,8 @@ private fun transitionStyleSubtitle(mode: Int): Int =
 @StringRes
 private fun musicCategoryLabel(id: String): Int =
     when (id) {
-        "dance" -> R.string.visualizer_category_dance
-        "pop" -> R.string.visualizer_category_pop
-        "rock" -> R.string.visualizer_category_rock
-        "hip-hop" -> R.string.visualizer_category_hip_hop
-        "rnb-soul" -> R.string.visualizer_category_rnb_soul
-        "jazz" -> R.string.visualizer_category_jazz
-        "classical" -> R.string.visualizer_category_classical
-        "ambient" -> R.string.visualizer_category_ambient
-        "folk-acoustic" -> R.string.visualizer_category_folk_acoustic
-        "country" -> R.string.visualizer_category_country
-        "reggae" -> R.string.visualizer_category_reggae
-        "latin" -> R.string.visualizer_category_latin
+        "chill" -> R.string.visualizer_category_chill
+        "normal" -> R.string.visualizer_category_normal
+        "intense" -> R.string.visualizer_category_intense
         else -> R.string.visualizer_category_all
     }
