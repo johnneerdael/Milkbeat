@@ -53,7 +53,7 @@ providers, local and network folder music, every settings category and troublesh
 |---|---|
 | **Downloader app** (Google TV, Fire TV, NVIDIA SHIELD) | Install [Downloader](https://www.aftvnews.com/downloader/) and enter code **`7170062`** |
 | **Direct link** (always the latest build) | https://github.com/johnneerdael/Milkbeat/releases/latest/download/milkbeat-universal.apk |
-| **All builds** | [Releases](https://github.com/johnneerdael/Milkbeat/releases): every push to `main` is published automatically, with release notes |
+| **All builds** | [Releases](https://github.com/johnneerdael/Milkbeat/releases): reviewed PRs are validated before merge; every successful `main` build is published automatically, with release notes |
 
 Each release also has smaller per-ABI APKs (`milkbeat-arm64-v8a.apk`, `milkbeat-armeabi-v7a.apk`).
 

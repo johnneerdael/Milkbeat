@@ -24,7 +24,8 @@ BOT = "chatgpt-codex-connector[bot]"
 def snapshot():
     return dict(number=42, state="open", draft=False, base=dict(ref="main", sha=BASE),
                 head=dict(sha=HEAD), mergeable=True, merge_commit_sha=MERGE,
-                user=dict(login="author"), requested_reviewers=[], requested_teams=[])
+                user=dict(login="author", type="User"), requested_reviewers=[], requested_teams=[],
+                body="## Release notes\n- Internal: Gate validation on completed Codex review.\n## Docs\nNot needed: CI-only change.")
 
 
 def human(state="APPROVED", sha=HEAD, login="reviewer"):
@@ -74,6 +75,16 @@ class EligibilityTests(unittest.TestCase):
         completed = summary()
         completed["updated_at"] = "2026-10-05T12:00:00Z"
         self.assertTrue(self.eligible(comments=[summary(), completed, request]))
+
+    def test_edited_codex_request_uses_the_edit_time(self):
+        request = dict(user=dict(login="author"), body="@codex review", created_at="2026-10-05T09:00:00Z",
+                       updated_at="2026-10-05T11:00:00Z")
+        self.assertFalse(self.eligible(comments=[summary(), request]))
+        completed = summary()
+        completed["updated_at"] = "2026-10-05T12:00:00Z"
+        self.assertTrue(self.eligible(comments=[completed, request]))
+        request["updated_at"] = "2026-10-05T13:00:00Z"
+        self.assertFalse(self.eligible(comments=[completed, request]))
 
     def test_completed_old_codex_request_does_not_validate_later_commits(self):
         request = dict(user=dict(login="author"), body="@codex review", created_at="2026-10-05T09:00:00Z")
@@ -132,6 +143,12 @@ class EligibilityTests(unittest.TestCase):
         review["body"] = ""
         self.assertFalse(self.eligible([review]))
 
+    def test_codex_report_with_conflicting_native_and_written_commit_is_rejected(self):
+        review = human(state="COMMENTED", login=BOT)
+        review["user"]["type"] = "Bot"
+        review["body"] = f"### Codex Review\n**Reviewed commit:** `{BASE[:10]}`"
+        self.assertFalse(self.eligible([review]))
+
     def test_dismissed_review_does_not_count(self):
         self.assertFalse(self.eligible([human(state="DISMISSED")]))
 
@@ -166,7 +183,11 @@ class FakeGitHub:
         return self.pr, (self.ready, "Waiting for review")
 
     def pages(self, path, key=None):
-        return self.runs if path.startswith("actions/") else self.statuses
+        if path.startswith("actions/"):
+            return self.runs
+        if path.startswith("pulls/"):
+            return []
+        return self.statuses
 
     def status(self, head, state, description, url=None):
         self.writes.append((state, description))
@@ -243,15 +264,73 @@ class ReconciliationTests(unittest.TestCase):
         self.gate.reconcile(self.api, 42, retry=True)
         self.assertTrue(self.api.writes[-1][0].endswith("/dispatches"))
 
+    def test_resolved_same_head_rereview_restores_a_previously_verified_build(self):
+        self.api.statuses = [
+            dict(context=self.gate.CONTEXT, state="pending", description="Waiting for Codex review"),
+            dict(context=self.gate.CONTEXT, state="success", description=self.gate.passed_description(self.api.pr)),
+        ]
+        self.api.runs = [self.api.run("completed", "success")]
+        self.gate.reconcile(self.api, 42)
+        self.assertEqual(self.api.writes[0][0], "success")
+        self.assertFalse(any(path.endswith("/dispatches") for path, _ in self.api.writes))
+
+    def test_invalid_pr_body_revokes_a_prior_success_without_launching_builds(self):
+        self.api.pr["body"] = "## Release notes\n- TODO"
+        self.api.statuses = [dict(context=self.gate.CONTEXT, state="success", description="previous success")]
+        self.gate.reconcile(self.api, 42)
+        self.assertEqual(self.api.writes[0][0], "failure")
+        self.assertFalse(any(path.endswith("/dispatches") for path, _ in self.api.writes))
+
+    def test_newer_failed_run_cannot_reuse_an_older_success(self):
+        self.api.statuses = [dict(context=self.gate.CONTEXT, state="success", description=self.gate.passed_description(self.api.pr))]
+        self.api.runs = [self.api.run("completed", "failure")]
+        self.gate.reconcile(self.api, 42)
+        self.assertEqual(self.api.writes[0][0], "failure")
+
+    def test_explicit_retry_after_newer_failure_must_dispatch_instead_of_restore_success(self):
+        self.api.statuses = [dict(context=self.gate.CONTEXT, state="success", description=self.gate.passed_description(self.api.pr))]
+        self.api.runs = [self.api.run("completed", "failure")]
+        self.gate.reconcile(self.api, 42, retry=True)
+        self.assertTrue(self.api.writes[-1][0].endswith("/dispatches"))
+        self.assertNotIn("success", [state for state, _ in self.api.writes])
+
+    def test_retargeting_to_non_main_cancels_even_if_commit_tuple_is_identical(self):
+        self.api.runs = [self.api.run()]
+        self.api.pr["base"]["ref"] = "release"
+        self.gate.reconcile(self.api, 42)
+        self.assertIn(("actions/runs/1/cancel", {}), self.api.writes)
+        self.assertFalse(any(path.endswith("/dispatches") for path, _ in self.api.writes))
+
     def test_success_is_reused_only_for_current_base(self):
         self.api.statuses = [dict(context=self.gate.CONTEXT, state="success",
-                                 description=f"Passed all builds against main {BASE}")]
+                                 description=self.gate.passed_description(self.api.pr))]
         self.gate.reconcile(self.api, 42)
-        self.assertEqual(self.api.writes, [])
+        self.assertEqual(self.api.writes, [("success", self.gate.passed_description(self.api.pr))])
         self.api.pr["base"]["sha"] = HEAD
         self.gate.reconcile(self.api, 42)
         self.assertTrue(self.api.writes[-1][0].endswith("/dispatches"))
 
+
+
+class SnapshotTests(unittest.TestCase):
+    def test_merge_commit_must_contain_the_reported_base_and_reviewed_head(self):
+        gate = load_gate()
+        class Api(gate.GitHub):
+            def get(self, path):
+                if path.startswith("pulls/"):
+                    return snapshot()
+                if path.startswith("git/commits/"):
+                    return {"sha": MERGE, "parents": [{"sha": BASE}, {"sha": BASE}]}
+                return {"sha": HEAD}
+            def pages(self, path, key=None):
+                return [summary()] if path.startswith("issues/") else []
+            def request(self, endpoint, data=None, paginate=False):
+                return {"data": {"repository": {"pullRequest": {"reviewThreads": {
+                    "nodes": [], "pageInfo": {"hasNextPage": False, "endCursor": None}
+                }}}}}
+        pr, (ready, reason) = Api("owner/repo").snapshot(42)
+        self.assertFalse(ready)
+        self.assertIn("merge", reason.lower())
 
 if __name__ == "__main__":
     unittest.main()

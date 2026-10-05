@@ -1,0 +1,46 @@
+name: PR metadata validation
+
+on:
+  workflow_call:
+    inputs:
+      source_ref:
+        type: string
+        required: true
+      pr_number:
+        type: string
+        required: true
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  metadata:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.source_ref }}
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Install validator dependencies
+        run: python3 -m pip install -r docs/site-requirements.txt
+      - name: Test repository validators
+        run: |
+          python3 -m unittest discover -s .github/scripts -p 'test_*.py' -v
+          node --test .github/scripts/test_phone_viewer.mjs .github/scripts/test_plugin_codes.mjs
+          node .github/scripts/plugin-codes.mjs check
+      - name: Validate current PR documentation and release notes
+        if: inputs.pr_number != '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ inputs.pr_number }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" --jq '{pull_request: .}' > "$RUNNER_TEMP/pr-event.json"
+          gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/files" --paginate --jq '.[].filename' > "$RUNNER_TEMP/changed.txt"
+          python3 .github/scripts/pr_docs.py --event-file "$RUNNER_TEMP/pr-event.json" --changed-files "$RUNNER_TEMP/changed.txt"
+          python3 .github/scripts/release_notes.py validate --event-file "$RUNNER_TEMP/pr-event.json"

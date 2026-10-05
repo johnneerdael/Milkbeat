@@ -8,6 +8,9 @@ from pathlib import Path
 import re
 import subprocess
 
+from pr_docs import validate_docs
+from release_notes import is_bot, validate_release_notes
+
 CONTEXT = "Reviewed PR builds"
 BUILD_JOBS = {"android", "codeql", "docs", "metadata"}
 WORKFLOW = "pr-builds.yml"
@@ -23,7 +26,7 @@ def eligibility(pr, reviews, comments, threads):
     if any(not thread["isResolved"] for thread in threads):
         return False, "Waiting for all review threads to be resolved"
     if any(review["state"] == "PENDING" for review in reviews):
-        return False, "Waiting for pending reviews"
+        return False, "Waiting for a visible pending review"
     # A comment-only follow-up does not revoke a request for changes.
     decisions = {}
     for review in reviews:
@@ -44,9 +47,10 @@ def eligibility(pr, reviews, comments, threads):
         user = comment["user"]["login"]
         trusted = user == pr["user"]["login"] or comment.get("author_association") in TRUSTED
         request = re.match(r"^@codex\s+(security\s+)?review\b", (comment.get("body") or "").strip(), re.I)
-        if trusted and request and comment.get("created_at"):
+        requested_at = comment.get("updated_at") or comment.get("created_at")
+        if trusted and request and requested_at:
             kind = "security" if request[1] else "code"
-            timestamp = datetime.fromisoformat(comment["created_at"].replace("Z", "+00:00"))
+            timestamp = datetime.fromisoformat(requested_at.replace("Z", "+00:00"))
             requests[kind] = max(timestamp, requests.get(kind, timestamp))
     for comment in comments:
         if comment["user"]["login"] != CODEX or comment["user"].get("type") != "Bot":
@@ -78,6 +82,10 @@ def eligibility(pr, reviews, comments, threads):
         user = review["user"]
         report = (user["login"] == CODEX and user.get("type") == "Bot"
                   and re.search(r"Codex(?: Security)? Review", review.get("body") or "", re.I))
+        marker = re.search(r"\*\*Reviewed commit:\*\*\s*`([0-9a-f]{7,40})`", review.get("body") or "")
+        if marker:
+            written = review.get("_reviewed_commits", {}).get(marker[1], marker[1] if len(marker[1]) == 40 else None)
+            report = report and written == head
         if (report and review.get("submitted_at") and review["commit_id"] == head
                 and review["state"] in {"APPROVED", "COMMENTED"}):
             kind = "security" if re.search(r"Codex Security Review", review.get("body") or "", re.I) else "code"
@@ -129,7 +137,7 @@ class GitHub:
         reviews = self.pages(f"pulls/{number}/reviews?per_page=100")
         comments = self.pages(f"issues/{number}/comments?per_page=100")
         resolved = {}
-        for comment in comments:
+        for comment in comments + reviews:
             if comment["user"]["login"] != CODEX or comment["user"].get("type") != "Bot":
                 continue
             prefixes = [prefix for prefix in re.findall(r"`([0-9a-f]{7,40})`", comment.get("body") or "")
@@ -166,7 +174,13 @@ class GitHub:
         current = self.get(f"pulls/{number}")
         if not matches(current, pr["head"]["sha"], pr["base"]["sha"], pr.get("merge_commit_sha")):
             return current, (False, "PR changed while reading reviews; recheck required")
-        return current, eligibility(current, reviews, comments, threads)
+        ready, reason = eligibility(current, reviews, comments, threads)
+        if ready:
+            merge = self.get(f"git/commits/{current['merge_commit_sha']}")
+            parents = [parent["sha"] for parent in merge["parents"]]
+            if merge["sha"] != current["merge_commit_sha"] or parents != [current["base"]["sha"], current["head"]["sha"]]:
+                return current, (False, "Waiting for a test merge with the current base and reviewed head")
+        return current, (ready, reason)
 
     def status(self, head, state, description, url=None):
         previous = next((s for s in self.pages(f"commits/{head}/statuses?per_page=100")
@@ -180,7 +194,20 @@ class GitHub:
 
 
 def title(pr):
-    return f"Reviewed PR #{pr['number']} @ {pr['head']['sha']} + {pr['base']['sha']}"
+    return f"Reviewed PR #{pr['number']} @ {pr['head']['sha']} + {pr['base']['sha']} = {pr['merge_commit_sha']}"
+
+
+def passed_description(pr):
+    return f"Passed builds: main {pr['base']['sha']} merge {pr['merge_commit_sha']}"
+
+
+def validate_metadata(api, pr):
+    if is_bot(pr):
+        return
+    body = pr.get("body") or ""
+    validate_release_notes(body)
+    changed = [item["filename"] for item in api.pages(f"pulls/{pr['number']}/files?per_page=100")]
+    validate_docs(body, changed)
 
 
 def reconcile(api, number, retry=False):
@@ -188,7 +215,7 @@ def reconcile(api, number, retry=False):
     all_runs = [run for run in api.pages(f"actions/workflows/{WORKFLOW}/runs?event=workflow_dispatch&per_page=100", "workflow_runs")
                 if run["head_branch"] == "main" and run["display_title"].startswith(f"Reviewed PR #{number} @ ")]
     for run in all_runs:
-        if run["status"] != "completed" and (run["display_title"] != title(pr) or pr["state"] != "open"):
+        if run["status"] != "completed" and (run["display_title"] != title(pr) or pr["state"] != "open" or pr["base"]["ref"] != "main"):
             api.post(f"actions/runs/{run['id']}/cancel", {})
     if pr["state"] != "open" or pr["base"]["ref"] != "main":
         return
@@ -201,19 +228,26 @@ def reconcile(api, number, retry=False):
         for run in active:
             api.post(f"actions/runs/{run['id']}/cancel", {})
         return
+    try:
+        validate_metadata(api, pr)
+    except ValueError as error:
+        api.status(head, "failure", f"PR metadata: {error}")
+        for run in active:
+            api.post(f"actions/runs/{run['id']}/cancel", {})
+        return
     if active:
         api.status(head, "pending", "Reviewed; full validation is running", active[0]["html_url"])
         return
-    previous = next((s for s in api.pages(f"commits/{head}/statuses?per_page=100") if s["context"] == CONTEXT), None)
-    passed = f"Passed all builds against main {pr['base']['sha']}"
-    if previous and previous["state"] == "success" and previous["description"] == passed:
+    statuses = [status for status in api.pages(f"commits/{head}/statuses?per_page=100") if status["context"] == CONTEXT]
+    previous = next(iter(statuses), None)
+    if runs and not retry and runs[0]["conclusion"] not in {"success", "cancelled", "skipped"}:
+        api.status(head, "failure", "Validation did not pass; fix the PR or rerun validation", runs[0]["html_url"])
         return
-    # A failed build is actionable; do not spend minutes retrying it every five minutes.
-    if runs and not retry:
-        last = runs[0]
-        if last["conclusion"] not in {"cancelled", "skipped"}:
-            api.status(head, "failure", "Validation did not pass; fix the PR or rerun validation", last["html_url"])
-            return
+    passed = passed_description(pr)
+    retrying_failure = retry and runs and runs[0]["conclusion"] != "success"
+    if not retrying_failure and any(status["state"] == "success" and status["description"] == passed for status in statuses):
+        api.status(head, "success", passed)
+        return
     # Dispatch reservations prevent duplicate runs while GitHub queues a new workflow.
     reservation = f"Queued builds against main {pr['base']['sha']}"
     if previous and previous["state"] == "pending" and previous["description"] == reservation:
@@ -269,7 +303,7 @@ def main():
                               merge=pr.get("merge_commit_sha"), eligible=ready, reason=reason)))
         return
     if args.mode == "reconcile":
-        numbers = [args.pr] if args.pr else [pr["number"] for pr in api.pages("pulls?state=open&base=main&per_page=100")]
+        numbers = [args.pr] if args.pr else [pr["number"] for pr in api.pages("pulls?state=open&per_page=100")]
         reconcile_safely(api, numbers, args.retry)
         return
     head, base, merge = (os.environ[name] for name in ["PR_HEAD", "PR_BASE", "PR_MERGE"])
@@ -291,7 +325,12 @@ def main():
     if not ready:
         api.status(head, "pending", "Review or base changed; fresh validation required", url)
     elif builds_passed(results):
-        api.status(head, "success", f"Passed all builds against main {base}", url)
+        try:
+            validate_metadata(api, pr)
+        except ValueError as error:
+            api.status(head, "failure", f"PR metadata: {error}", url)
+            raise
+        api.status(head, "success", passed_description(pr), url)
     else:
         api.status(head, "failure", "Validation failed, was cancelled, or skipped a required build", url)
         raise RuntimeError(f"Required builds did not pass: {results}")
