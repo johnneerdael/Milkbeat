@@ -124,9 +124,9 @@ internal class TvVisualizerHost(
                 RenderMemoryBudget.estimatedBytes(width, height, next.clampedNativeTrails, next.clampedTransitionSeconds > 0) >
                     RenderMemoryBudget.estimatedBytes(width, height, last.clampedNativeTrails, last.clampedTransitionSeconds > 0)
             // Reject old FPS for reductions too. Pending allocations retain zero resident credit;
-            // confirmed reductions only sample live headroom rather than budget a full rebuild.
+            // confirmed reductions sample pressure after GL releases the old textures.
             budgetGeneration = ProjectMJNI.requireRenderBudget()
-            quality.revalidateForResume(growing)
+            quality.revalidateForAllocationChange(growing)
         }
         publishRenderConfiguration(quality.currentHeight())
     }

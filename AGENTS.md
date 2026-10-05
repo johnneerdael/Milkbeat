@@ -632,7 +632,10 @@ revision must pass the configured ktlint rules.
   owns a `QualityController` in Auto, acknowledges `BudgetStatsListener` context generations,
   revalidates live memory before resume, and publishes size/trails/transition as one reviewed
   `setRenderConfiguration` tuple. Drop stale FPS generations and dimensions; budget allocation
-  changes before native publication. Fixed-height/RAM-toggle preferences are retired. Standard
+  changes before native publication using `revalidateForAllocationChange(growing)`: confirmed
+  reductions wait for a new-generation frame to release old textures before assessing pressure;
+  growth and pending allocations receive a full budget check. Visibility resumes still use
+  `revalidateForResume`. Fixed-height/RAM-toggle preferences are retired. Standard
   trails is default; Medium/High activate above 1330p. Keep the audio tap and player owners intact.
 - Use JDK 21, as CI does, with an Android SDK containing platform 37 (`compileSdk = 37`).
   Supply the SDK through `ANDROID_HOME` or an untracked `local.properties` containing `sdk.dir`.
