@@ -28,9 +28,9 @@ requested, and whether the app still works without it.
 | `RECORD_AUDIO` | runtime | Microphone song recognition | No |
 | `READ_MEDIA_VIDEO` | runtime, API 33+ | Local video browser, recovering existing downloads | No |
 | `READ_MEDIA_AUDIO` | runtime, API 33+ | Local music browser, recovering existing downloads | No |
-| `READ_EXTERNAL_STORAGE` | runtime, API 32 and below | Same as the two above on older Android | No |
+| `READ_EXTERNAL_STORAGE` | runtime, API 32 and below | Local-folder browser on Android 10 and older; legacy media access | No |
 | `WRITE_EXTERNAL_STORAGE` | runtime, API 28 and below | Writing downloads on older Android | No |
-| `MANAGE_EXTERNAL_STORAGE` | special access | Saving downloads to a user-chosen public folder | No |
+| `MANAGE_EXTERNAL_STORAGE` | special access | Direct local-folder browser on Android 11+; optional public downloads | No |
 | `SYSTEM_ALERT_WINDOW` | special access | Fallback popup player where the ROM has no working PiP | No |
 | `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` | special access | Keeping background alerts and playback alive on aggressive OEMs | No |
 | `DOWNLOAD_WITHOUT_NOTIFICATION` | install-time | Legacy, no longer used, scheduled for removal | No |
@@ -173,7 +173,16 @@ newer releases.
 unless the user opts into a custom location in Download settings, at which point Milkbeat can write to
 the public `Movies` and `Music` folders so the files survive an uninstall and are visible to other
 apps. The app checks `Environment.isExternalStorageManager()` and sends the user to the system
-settings page rather than assuming the grant. Users who keep the default never see the prompt.
+settings page rather than assuming the grant.
+
+For the TV's local-folder browser, access is requested only after Settings → Music folders →
+**Choose local folder**. Android 10 and older request read-storage permission; Android 11 and
+newer open Android's all-files access settings. Opening the app or Settings alone does not request
+access. Denying it leaves other features usable. The native browser only reads selected music
+folders, but Android's all-files grant permits broader read/write access to shared storage.
+**Use Android folder picker** remains available for a grant limited to the chosen folder; existing
+folder grants are preserved. No root privileges are used. Android 10's legacy-storage compatibility
+flag allows direct paths on that version; it does not grant a permission by itself.
 
 ### Battery
 

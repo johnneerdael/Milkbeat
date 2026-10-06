@@ -28,10 +28,14 @@ internal class MusicFolderMetadataReader
                     if (access.source.kind == MusicFolderKind.LOCAL) {
                         val tree = Uri.parse(access.source.treeUri)
                         val uri = Uri.parse(ref.location)
-                        require(
-                            uri.scheme == "content" && uri.authority == tree.authority &&
-                                DocumentsContract.getTreeDocumentId(uri) == DocumentsContract.getTreeDocumentId(tree),
-                        )
+                        if (tree.scheme == "file") {
+                            FileMusicFolders.resolve(access.source, ref.location)
+                        } else {
+                            require(
+                                uri.scheme == "content" && uri.authority == tree.authority &&
+                                    DocumentsContract.getTreeDocumentId(uri) == DocumentsContract.getTreeDocumentId(tree),
+                            )
+                        }
                         retriever.setDataSource(context, uri)
                     } else {
                         remote = clients[access.source.kind].open(access.source, access.secrets, ref.location)

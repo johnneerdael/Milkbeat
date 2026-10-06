@@ -645,6 +645,25 @@ revision must pass the configured ktlint rules.
 5. GitHub Actions runs `spotlessCheck` before tests and builds. A formatting violation fails the
 `Build APK` job. Add any future first-party Kotlin module to the Spotless target list explicitly.
 
+## Local music folder selection
+
+- Settings → Music folders → Choose local folder uses the in-app D-pad picker in
+  `ui/tv/screens/folders/TvLocalFolderPicker.kt`. Request storage only from this user action,
+  never app startup or opening Settings. API 26–29 use READ_EXTERNAL_STORAGE; API 30+ use
+  Android's all-files settings and recheck Environment.isExternalStorageManager on return.
+  Keep the system folder picker as an explicit alternative with its persisted URI grants.
+- `LocalStorageFolders` discovers mounted roots on diskIO. API 30+ use StorageVolume.directory;
+  older versions validate /storage mount candidates through StorageManager (the public directory
+  API is absent there). Do not move filesystem checks, listings or mount discovery onto the main thread.
+- LOCAL sources retain the existing treeUri preference field: content tree URIs use the document
+  provider; file URIs use `FileMusicFolders`. Canonicalize and constrain listings/metadata to the
+  selected root, excluding escaping or ancestor symlinks and deduplicating canonical locations.
+  Media3 already supports file playback; preserve its wiring.
+- Focused regressions: `./gradlew :app:testGithubDebugUnitTest --tests '*DocumentMusicFoldersFileTest' --tests '*MusicFoldersViewModelTest' --tests '*TvMusicFoldersFocusTest'`.
+  `TvLocalFolderPickerDeviceTest` covers contextual denial, D-pad selection, saved-source access,
+  embedded metadata and focus return. Its permission setup affects only the debug package.
+  Android 10 opts into legacy direct storage with requestLegacyExternalStorage; no Room migration.
+
 ## Playlist mirror reuse
 
 - Mirror preparation lives in `app/src/main/java/io/github/aedev/flow/plugin/mirror/`; recording

@@ -14,6 +14,7 @@ class DocumentMusicFolders
         @ApplicationContext private val context: Context,
     ) {
         fun add(uri: Uri): MusicFolder {
+            if (uri.scheme == "file") return FileMusicFolders.add(uri)
             require(uri.scheme == "content" && DocumentsContract.isTreeUri(uri))
             context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
             val root = DocumentsContract.buildDocumentUriUsingTree(uri, DocumentsContract.getTreeDocumentId(uri))
@@ -26,6 +27,7 @@ class DocumentMusicFolders
 
         fun root(source: MusicFolder): String {
             val tree = Uri.parse(source.treeUri)
+            if (tree.scheme == "file") return tree.toString()
             return DocumentsContract.buildDocumentUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree)).toString()
         }
 
@@ -35,6 +37,7 @@ class DocumentMusicFolders
             includePlaylists: Boolean = false,
         ): List<MusicFolderEntry> {
             val tree = Uri.parse(source.treeUri)
+            if (tree.scheme == "file") return FileMusicFolders.list(source, location, includePlaylists)
             val folder = Uri.parse(location.ifEmpty { root(source) })
             require(
                 folder.authority == tree.authority &&
@@ -106,6 +109,7 @@ class DocumentMusicFolders
         fun release(source: MusicFolder) = release(Uri.parse(source.treeUri))
 
         fun release(uri: Uri) {
+            if (uri.scheme == "file") return
             context.contentResolver.releasePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
     }

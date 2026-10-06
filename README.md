@@ -71,8 +71,11 @@ link still work, and now install Milkbeat.
 No plugin or streaming account is needed for folder playback.
 
 1. Open **Settings > Music folders**.
-2. Choose **Choose local folder** for a folder on the TV or an attached USB drive. Access depends
-   on the storage locations exposed by the device's folder picker.
+2. Choose **Choose local folder** to open Milkbeat's remote-friendly storage and folder browser.
+   Storage access is requested only after this choice: a read-storage prompt on Android 10 and
+   older, or Android's all-files access settings on Android 11 and newer. Choose a drive, open
+   the desired folder and select **Choose this folder**. **Use Android folder picker** remains
+   available for granting access to just one folder.
 3. For a NAS or computer, choose **Add SMB share**. Enter a name, the server's hostname or IP
    address, the share name and, optionally, a folder within the share. SMB 2/3 is supported;
    the default port is 445.

@@ -45,7 +45,7 @@ A successful network connection does not imply permission to read the share. Tes
 
 ## A USB folder is missing
 
-Check that Android has mounted the drive and exposes it in the folder picker. Reconnect storage or grant access to the folder again if necessary. Device firmware controls which locations the picker exposes.
+Check that Android has mounted the drive, then select **Refresh** in Milkbeat's local-folder browser. If access was denied or revoked, choose **Choose local folder** or **Storage permissions** in Settings → Music folders to allow it. **Use Android folder picker** is an alternative for granting access to one folder. Previously saved system-picker folders may need a new folder grant after moving storage. Device firmware controls which mounts are accessible.
 
 ## Tags or covers are missing
 

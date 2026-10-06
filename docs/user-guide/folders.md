@@ -6,12 +6,21 @@
 
 1. Open Settings → Music folders.
 2. Select **Choose local folder**.
-3. In Android's folder picker, choose the folder and grant access.
-4. Open Library → Folders and select the saved source.
+3. If needed, allow storage access: Android 10 and older show a read-storage permission prompt; Android 11 and newer open Android's **All files access** settings. Select Milkbeat if Android shows a list of apps, then enable access and return to Milkbeat.
+4. Choose the TV's storage or a mounted USB/SD drive. Use the remote to open folders, then select **Choose this folder**.
+5. Open Library → Folders and select the saved source.
 
-A USB drive must be mounted and exposed by the device's folder picker. Folder-picker support differs between TV devices. The grant applies to the chosen folder and its children; moving or disconnecting storage can make the source unavailable.
+Storage permission is not requested at startup or just by opening Settings. It is requested only when selecting **Choose local folder**. The browser runs inside Milkbeat and supports D-pad navigation, Back and Refresh. Milkbeat reads the selected folder; it does not modify your music. Android's permission covers more than the selected folder: on newer versions, all-files access also permits writes, although this browser only reads.
+
+If permission is denied, network folders and the rest of Milkbeat remain usable. **Storage permissions** opens Android settings to retry. Alternatively, **Use Android folder picker** uses the device's system picker to grant access to just one folder. Previously saved system-picker sources continue to work.
+
+A USB drive must be mounted by Android. Select **Refresh** after connecting a drive. Moving or disconnecting storage can make a saved source unavailable; reconnect it and refresh. Device firmware controls which mounts are accessible. Symbolic links that leave the selected folder or lead back to an ancestor are not followed. Multiple aliases of the same file or directory appear once.
 
 ![Music folders settings with local folder, SMB, WebDAV, SFTP and NFS actions](images/settings-folders.png)
+
+![Milkbeat's native storage-device picker](images/local-folder-drives.png)
+
+![The D-pad folder browser with Back, Refresh and Choose this folder](images/local-folder-selection.png)
 
 ## Add an SMB share
 

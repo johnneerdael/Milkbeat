@@ -43,7 +43,7 @@ class TvMusicFoldersFocusTest {
     @Test fun returningFromSmbEditorKeepsFocusInMusicFolderPane() {
         val repository = mockk<MusicFolderRepository>()
         every { repository.folders } returns MutableStateFlow(emptyList())
-        val viewModel = MusicFoldersViewModel(repository, mockk(relaxed = true))
+        val viewModel = MusicFoldersViewModel(repository, mockk(relaxed = true), mockk())
         compose.setContent {
             val input = LocalInputModeManager.current
             LaunchedEffect(Unit) { input.requestInputMode(InputMode.Keyboard) }
@@ -69,7 +69,7 @@ class TvMusicFoldersFocusTest {
         val repository = mockk<MusicFolderRepository>()
         every { repository.folders } returns MutableStateFlow(listOf(source))
         coEvery { repository.test(any(), any(), any()) } returns source
-        val viewModel = MusicFoldersViewModel(repository, mockk(relaxed = true))
+        val viewModel = MusicFoldersViewModel(repository, mockk(relaxed = true), mockk())
         viewModel.edit(source)
         compose.setContent {
             val input = LocalInputModeManager.current
