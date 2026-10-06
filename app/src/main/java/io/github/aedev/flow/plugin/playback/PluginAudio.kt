@@ -1,5 +1,6 @@
 package io.github.aedev.flow.plugin.playback
 
+import androidx.media3.datasource.DataSource
 import io.github.aedev.flow.plugin.PluginHost
 import io.github.aedev.flow.plugin.catalog.PluginAccounts
 import io.github.aedev.flow.plugin.registry.PluginRegistry
@@ -17,6 +18,8 @@ import nl.neerdael.milkbeat.plugin.PluginOperations
 import nl.neerdael.milkbeat.plugin.ReportPlaybackRequest
 import nl.neerdael.milkbeat.plugin.ResolveAudioRequest
 import nl.neerdael.milkbeat.plugin.StreamFailure
+import okhttp3.OkHttpClient
+import java.io.IOException
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
@@ -171,6 +174,7 @@ class PluginAudio
                                 PluginError(PluginErrorCode.UNAVAILABLE, "The audio provider has no picture for this recording"),
                             )
                         }
+                        validateDrm(plugin.id, stream)
                         val lifetime = stream.expiresInMs ?: DEFAULT_LIFETIME_MS
                         return ResolvedAudio(
                             plugin.id,
@@ -215,13 +219,14 @@ class PluginAudio
         suspend fun refreshBound(audio: ResolvedAudio): ResolvedAudio {
             val request = audio.request ?: ResolveAudioRequest(audio.track, video = audio.withPicture)
             val stream = host.call(audio.pluginId, PluginOperations.resolveAudio, request)
+            validateDrm(audio.pluginId, stream)
             val previousHls =
                 audio.stream.mimeType
                     .substringBefore(';')
                     .lowercase() in setOf("application/x-mpegurl", "application/vnd.apple.mpegurl")
             val nextHls =
                 stream.mimeType.substringBefore(';').lowercase() in setOf("application/x-mpegurl", "application/vnd.apple.mpegurl")
-            if (previousHls != nextHls || (audio.withPicture && stream.video == null)) {
+            if (previousHls != nextHls || audio.stream.drm?.scheme != stream.drm?.scheme || (audio.withPicture && stream.video == null)) {
                 throw PluginCallException(
                     audio.pluginId,
                     PluginError(PluginErrorCode.UNAVAILABLE, "The provider changed this recording's delivery format"),
@@ -238,6 +243,42 @@ class PluginAudio
                 audio.preparationContext,
             )
         }
+
+        private fun validateDrm(
+            pluginId: String,
+            stream: AudioStream,
+        ) {
+            val drm = stream.drm ?: return
+            try {
+                checkedPluginDrmUrl(
+                    drm.licenseUrl,
+                    registry.state.value
+                        .plugin(pluginId)
+                        ?.grantedNetwork
+                        .orEmpty(),
+                )
+            } catch (error: IOException) {
+                throw PluginCallException(
+                    pluginId,
+                    PluginError(
+                        PluginErrorCode.UNSUPPORTED,
+                        error.message ?: "Invalid plugin DRM destination",
+                    ),
+                )
+            }
+        }
+
+        /** A dedicated license transport; media caches and media headers never carry license data. */
+        fun drmDataSourceFactory(
+            audio: ResolvedAudio,
+            base: OkHttpClient,
+        ): DataSource.Factory =
+            pluginDrmDataSourceFactory(base) {
+                registry.state.value
+                    .plugin(audio.pluginId)
+                    ?.grantedNetwork
+                    .orEmpty()
+            }
 
         /** How the first audio plugin that would play [track] delivers its streams. */
         fun deliveryFor(

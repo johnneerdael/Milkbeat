@@ -26,7 +26,7 @@ services and play music videos. Everything is built for the TV remote.
 
 - **Your own music:** local folders and SMB 2/3, WebDAV, SFTP and NFS (v3, v4.0, v4.1) servers,
   with embedded tags and album artwork.
-- **Streaming catalogs:** YouTube Music, Spotify and Beatport plugins are available now.
+- **Streaming catalogs:** optional YouTube Music, Spotify, Beatport and SoundCloud plugins.
 - **One library:** app and provider playlists together, including Liked songs; folder music has
   its own Folders section.
 - **Ordered audio providers:** try one provider first, then fall back to the next.
@@ -120,12 +120,18 @@ Plugins can provide separate roles:
 | YouTube Music | Home, Search, artists, albums, playlists and account library | YouTube streams, matching and mixes | YouTube videos, channels and playlists |
 | Beatport | Catalog, genres, charts, artists, labels and account library | Full-length streams with a streaming subscription | — |
 | Spotify | Home, Search, artists, albums, playlists and account library | **None — select another audio provider** | — |
+| SoundCloud | Discover, Stream, Search, Artists, albums, playlists, Liked Songs and history | Available full tracks, cross-provider matching and stations | — |
 
 ### Sign-in and account requirements
 
 - **YouTube Music:** sign-in is optional. Signing in changes Home into a personalized feed based on the account and makes its library available. Free YouTube accounts are supported; Premium is not required for this personalization.
 - **Spotify:** a metadata provider with **no audio source**. It can technically access catalog metadata without sign-in, but its practical value is your personalized feed, playlists, Liked songs and library after signing in. Select a separate audio provider for playback.
 - **Beatport:** requires sign-in and an active Beatport streaming subscription to be useful in Milkbeat. Without those, it provides no usable listening experience.
+- **SoundCloud:** sign in for personalized Home and Library. Public search and catalog pages can
+  work without sign-in. Playback depends on each recording and your listening entitlement;
+  previews and restricted recordings are not treated as full tracks. Artist Pro is a creator
+  membership and does not grant Go+ listening rights. The SoundCloud package requires a Milkbeat
+  build supporting plugin API 4; its encrypted streams use the device's Widevine implementation.
 
 ### Provider selection and phone sign-in
 
@@ -173,9 +179,9 @@ to fetch and review the available package. An update must have the same plugin I
 author; older versions are rejected. An app update does not by itself guarantee that installed
 plugins have been updated.
 
-## Home from three metadata providers
+## Home from metadata providers
 
-Choose YouTube Music, Spotify or Beatport for metadata. Each supplies its own feed, rendered
+Choose YouTube Music, Spotify, Beatport or SoundCloud for metadata. Each supplies its own feed, rendered
 through Milkbeat's TV interface. Your selected audio providers handle playback independently.
 
 | YouTube Music | Spotify | Beatport |
@@ -185,6 +191,12 @@ through Milkbeat's TV interface. Your selected audio providers handle playback i
 YouTube Music supplies mood chips, Quick picks, albums, mixes, artist portraits and music-video
 shelves. Spotify supplies its recommendations and catalog. Beatport supplies genre filters,
 recommendations, charts and releases. Personalized content depends on the signed-in account.
+
+SoundCloud supplies personalized Discover shelves and a separate Stream feed. Its Library labels
+the accounts you follow **Artists**, and includes playlists, albums, Liked Songs and history.
+Select SoundCloud as an audio provider to match another catalog's recordings, including Beatport
+metadata; a match still depends on recording/version agreement and SoundCloud availability.
+HLS and DRM streams currently support playback, not offline downloads.
 
 ![Audio providers in priority order](docs/user-guide/images/audio-priority.png)
 

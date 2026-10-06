@@ -1,9 +1,11 @@
 package io.github.aedev.flow.player
 
 import androidx.annotation.OptIn
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DataSource
+import androidx.media3.exoplayer.drm.DefaultDrmSessionManagerProvider
 import androidx.media3.exoplayer.hls.HlsMediaSource
 import androidx.media3.exoplayer.source.MediaSource
 import androidx.media3.exoplayer.source.MergingMediaSource
@@ -11,6 +13,7 @@ import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import io.github.aedev.flow.player.datasource.PluginMusicDataSourceFactory
 import io.github.aedev.flow.player.resolver.ResolvingMusicMediaSource
 import io.github.aedev.flow.plugin.playback.ResolvedAudio
+import nl.neerdael.milkbeat.plugin.AudioDrmScheme
 
 /**
  * The music player's sources. A queue item goes to [default] as ever, except a song whose audio plugin
@@ -47,9 +50,34 @@ class MusicMediaSourceFactory(
         mediaItem: MediaItem,
         audio: ResolvedAudio?,
         sourceFactory: DataSource.Factory = dataSourceFallback,
+        licenseFactory: DataSource.Factory? = audio?.takeIf { it.stream.drm != null }?.let { resolver?.drm?.invoke(it) },
     ): MediaSource {
+        val soundItem =
+            audio?.stream?.drm?.let { drm ->
+                mediaItem
+                    .buildUpon()
+                    .setDrmConfiguration(
+                        MediaItem.DrmConfiguration
+                            .Builder(
+                                when (drm.scheme) {
+                                    AudioDrmScheme.WIDEVINE -> C.WIDEVINE_UUID
+                                },
+                            ).setLicenseUri(drm.licenseUrl)
+                            .setLicenseRequestHeaders(drm.headers)
+                            .setForceDefaultLicenseUri(true)
+                            .build(),
+                    ).build()
+            } ?: mediaItem
         val progressive = ProgressiveMediaSource.Factory(sourceFactory)
         val hls = HlsMediaSource.Factory(sourceFactory)
+        if (audio?.stream?.drm != null) {
+            val provider = DefaultDrmSessionManagerProvider()
+            provider.setDrmHttpDataSourceFactory(
+                requireNotNull(licenseFactory) { "Plugin DRM requires a permission-checked license transport" },
+            )
+            progressive.setDrmSessionManagerProvider(provider)
+            hls.setDrmSessionManagerProvider(provider)
+        }
         val withPicture = mediaItem.localConfiguration?.uri?.scheme == MusicVideoItems.SCHEME
         val sound =
             if (audio
@@ -59,9 +87,9 @@ class MusicMediaSourceFactory(
                     ?.lowercase() in
                 setOf("application/x-mpegurl", "application/vnd.apple.mpegurl")
             ) {
-                hls.createMediaSource(mediaItem)
+                hls.createMediaSource(soundItem)
             } else {
-                progressive.createMediaSource(mediaItem)
+                progressive.createMediaSource(soundItem)
             }
         if (!withPicture) return sound
         val videoId = mediaItem.mediaId

@@ -691,6 +691,14 @@ revision must pass the configured ktlint rules.
 - `:plugin-api` defines the plain Kotlin catalog/plugin contract; `:spike-plugin-runtime` contains
   runtime experiments. `:benchmark` is the Android baseline-profile and benchmark module
   configured in `settings.gradle.kts` (there is no `:baselineprofile` module).
+- Plugin API 4 adds optional `AudioStream.drm` for platform Widevine playback. Keep DRM license
+  transport separate from media caches and headers; validate initial, redirect and provisioning
+  destinations against the installed plugin's current network grants. Do not implement decryption
+  or offline licenses. The current file downloader rejects HLS and DRM streams explicitly.
+  Generate contract changes with `./gradlew :plugin-api:test -PupdatePluginSchema`, then run
+  `npm run generate` and `npm run check` in `plugins/sdk/`. Existing clear-stream descriptors remain
+  compatible. Provider source/build/signing lives in the separate private plugin repository;
+  this repository owns the public SDK, generic host and verified publication catalog.
 - The visualizer consumes the canonical single Native ProjectM-TV core AAR. `TvVisualizerHost`
   owns a `QualityController` in Auto, acknowledges `BudgetStatsListener` context generations,
   revalidates live memory before resume, and publishes size/trails/transition as one reviewed

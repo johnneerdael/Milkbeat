@@ -1,7 +1,7 @@
 {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "title": "MilkbeatPluginApi",
-    "description": "Plugin API v3, generated from the plugin-api module. Do not edit.",
+    "description": "Plugin API v4, generated from the plugin-api module. Do not edit.",
     "type": "object",
     "properties": {
         "manifest": {
@@ -2096,6 +2096,34 @@
             ],
             "title": "AudioDelivery"
         },
+        "nl.neerdael.milkbeat.plugin.AudioDrm": {
+            "type": "object",
+            "required": [
+                "scheme",
+                "licenseUrl"
+            ],
+            "properties": {
+                "scheme": {
+                    "$ref": "#/$defs/nl.neerdael.milkbeat.plugin.AudioDrmScheme"
+                },
+                "licenseUrl": {
+                    "type": "string"
+                },
+                "headers": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                }
+            },
+            "title": "AudioDrm"
+        },
+        "nl.neerdael.milkbeat.plugin.AudioDrmScheme": {
+            "enum": [
+                "WIDEVINE"
+            ],
+            "title": "AudioDrmScheme"
+        },
         "nl.neerdael.milkbeat.plugin.AudioMatchStrategy": {
             "enum": [
                 "SONGS",
@@ -2283,6 +2311,16 @@
                         },
                         {
                             "$ref": "#/$defs/nl.neerdael.milkbeat.plugin.MediaFormat"
+                        }
+                    ]
+                },
+                "drm": {
+                    "oneOf": [
+                        {
+                            "type": "null"
+                        },
+                        {
+                            "$ref": "#/$defs/nl.neerdael.milkbeat.plugin.AudioDrm"
                         }
                     ]
                 }

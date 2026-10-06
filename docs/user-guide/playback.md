@@ -20,6 +20,15 @@ Streamed music loads well ahead of the playing position: Milkbeat keeps loading 
 
 ![Upcoming queue beside the player controls](images/queue-open.png)
 
+## Encrypted provider audio
+
+Compatible plugins can supply Widevine-protected audio through the device's DRM implementation.
+Milkbeat fetches licenses separately from audio and limits license destinations to the plugin's
+approved network access. Availability depends on the account, recording and device. SoundCloud
+previews are not substituted for full tracks, and a creator membership does not imply a listening
+subscription. The current offline downloader supports clear progressive audio; HLS playlists and
+DRM audio cannot be downloaded for offline playback.
+
 ## Mixes
 
 Once a streaming queue starts playing, Milkbeat seeds a mix from the queue's first song. When the metadata provider has no radio, Milkbeat tries compatible audio providers in priority order.

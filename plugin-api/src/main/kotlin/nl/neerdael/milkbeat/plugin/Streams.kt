@@ -76,8 +76,8 @@ enum class AudioQuality {
 }
 
 /**
- * Where the host fetches a track's sound, and optionally its picture. The URL must accept HTTP range
- * requests; the host reads it in chunks and asks again once [expiresInMs] has passed. [cacheKey]
+ * Where the host fetches a track's sound, and optionally its picture. Progressive URLs must accept
+ * HTTP range requests; HLS URLs identify a playlist. The host asks again once [expiresInMs] has passed. [cacheKey]
  * names the bytes across URL refreshes, so cached audio stays valid; [renditionId] names the exact
  * encoding, and a new one makes the host drop what it cached under [cacheKey].
  */
@@ -98,7 +98,20 @@ data class AudioStream(
     /** Opaque; handed back with [ReportPlaybackRequest] so the plugin can report the listen. */
     val trackingToken: String? = null,
     val video: MediaFormat? = null,
+    /** Platform DRM for this rendition; license credentials are distinct from media headers. */
+    val drm: AudioDrm? = null,
 )
+
+/** License information consumed by the host's platform DRM implementation. */
+@Serializable
+data class AudioDrm(
+    val scheme: AudioDrmScheme,
+    val licenseUrl: String,
+    val headers: Map<String, String> = emptyMap(),
+)
+
+@Serializable
+enum class AudioDrmScheme { WIDEVINE, }
 
 /** A played-enough listen or view, reported to the provider's history when the listener allows it. */
 @Serializable

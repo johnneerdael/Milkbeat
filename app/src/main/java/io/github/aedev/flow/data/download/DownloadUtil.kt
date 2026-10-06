@@ -170,6 +170,7 @@ class DownloadUtil
                     Log.e(TAG, "[$source] Failed to resolve $mediaId: ${e.message}")
                     throw IOException("Could not resolve URL for $mediaId: ${e.message}", e)
                 }
+            requireDownloadablePluginAudio(resolved.stream)
             val playable = PlayableUrl(resolved.stream.url, resolved.stream.headers, resolved.validUntilMs)
             songUrlCache[mediaId] = playable
             downloadUrlCache[mediaId] = playable
@@ -309,6 +310,7 @@ class DownloadUtil
                     if (cached) null else resolveForPlayback(uri, picture)
                 },
                 bind = { audio -> resolvingFactory(audio) },
+                drm = { audio -> pluginAudio.drmDataSourceFactory(audio, okHttpClient) },
             )
         }
 

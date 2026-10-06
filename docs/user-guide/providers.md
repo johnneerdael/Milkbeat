@@ -44,12 +44,20 @@ These two captures show the code-enabled development build. New catalog entries 
 | YouTube Music | Home, Search, artists, albums, playlists, library | Streams, cross-provider matching and radio | YouTube videos, channels and playlists |
 | Spotify | Home, Search, artists, albums, playlists, library | **None — select a separate audio provider** | None |
 | Beatport | Catalog, genres, charts, artists, labels, library | Full streams with a streaming subscription | None |
+| SoundCloud | Discover, Stream, Search, Artists, albums, playlists, Liked Songs and history | Available full tracks, matching and stations | None |
 
 ## Sign-in and account requirements
 
 - **YouTube Music:** sign-in is optional. Signing in changes Home into a personalized feed based on the account and makes its library available. Free YouTube accounts are supported; Premium is not required for this personalization.
 - **Spotify:** a metadata provider with **no audio source**. It can technically access catalog metadata without sign-in, but its practical value is your personalized feed, playlists, Liked songs and library after signing in. Select a separate audio provider for playback.
 - **Beatport:** requires sign-in and an active Beatport streaming subscription to be useful in Milkbeat. Without those, it provides no usable listening experience.
+- **SoundCloud:** sign in for personalized Home, playlists, Liked Songs, history and Artists
+  (the accounts SoundCloud calls Following). Public search and catalog pages can work anonymously.
+  Full-track availability and quality depend on the recording and consumer subscription;
+  Artist Pro does not grant Go+ listening rights. Preview-only or restricted recordings can still
+  appear as metadata, but cannot supply full-track audio. Enable another audio provider as a fallback.
+  Install a Milkbeat build with plugin API 4 support before installing the SoundCloud package.
+  Encrypted playback uses Widevine and depends on device support and the account's license access.
 
 ## Select metadata and video
 

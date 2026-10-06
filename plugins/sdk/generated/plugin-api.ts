@@ -1,4 +1,4 @@
-/* Plugin API v1, generated from plugin-api by scripts/generate-types.mjs. Do not edit. */
+/* Generated from plugin-api by scripts/generate-types.mjs. Do not edit. */
 
 export type MetadataSurface = 'HOME' | 'SEARCH' | 'SUGGEST' | 'ENTITY' | 'TRACKS' | 'LIBRARY' | 'RADIO';
 export type EntityKind =
@@ -16,6 +16,7 @@ export type PrivatePlaylistImportMode = 'REPLACE' | 'ENSURE' | 'APPEND';
 export type PrivatePlaylistImportPhase = 'PREPARING' | 'WRITING' | 'VERIFYING';
 export type AudioQuality = 'AUTO' | 'HIGH' | 'MEDIUM' | 'LOW';
 export type FormatType = 'AUDIO' | 'VIDEO';
+export type AudioDrmScheme = 'WIDEVINE';
 export type AudioMatchStrategy = 'SONGS' | 'ALTERNATE_SONGS' | 'VIDEOS';
 export type PluginErrorCode =
   | 'NOT_FOUND'
@@ -34,7 +35,7 @@ export type HashAlgorithm = 'SHA1' | 'SHA256';
 export type LogLevel = 'DEBUG' | 'INFO' | 'WARN' | 'ERROR';
 
 /**
- * Plugin API v3, generated from the plugin-api module. Do not edit.
+ * Plugin API v4, generated from the plugin-api module. Do not edit.
  */
 export interface MilkbeatPluginApi {
   manifest: PluginManifest;
@@ -501,6 +502,7 @@ export interface AudioStream {
   loudnessDb?: number | null;
   trackingToken?: string | null;
   video?: null | MediaFormat;
+  drm?: null | AudioDrm;
 }
 export interface MediaFormat {
   id: string;
@@ -534,6 +536,13 @@ export interface AudioTrackInfo {
   language?: string | null;
   original?: boolean;
   drc?: boolean;
+}
+export interface AudioDrm {
+  scheme: AudioDrmScheme;
+  licenseUrl: string;
+  headers?: {
+    [k: string]: string;
+  };
 }
 export interface MatchAudioRequest {
   track: TrackDescriptor;
