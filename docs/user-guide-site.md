@@ -27,6 +27,10 @@ pipeline calls it to build and publish the guide after merge. Unreviewed and non
 site build; the review controller checks readiness before dispatching validation. Manual and main
 pipeline deployments share one Pages lock; a build of an older main commit is skipped after
 acquiring it, so it cannot replace the newer guide.
+Reusable callers must allow the deployment job's Pages/OIDC permissions even when `pr_build`
+skips deployment: GitHub validates the whole workflow before evaluating that condition. The
+guide build job explicitly limits its token to `contents: read`, so building PR source does not
+receive Pages or OIDC write access. Deployment remains disabled for PR validation.
 Before the first deployment, set the repository's **Settings → Pages → Source**
 to **GitHub Actions**. The site address is
 `https://johnneerdael.github.io/Milkbeat/`.

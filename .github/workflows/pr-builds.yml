@@ -83,6 +83,10 @@ jobs:
 
   docs:
     needs: preflight
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
     uses: ./.github/workflows/docs.yml
     with:
       source_ref: ${{ needs.preflight.outputs.merge_sha }}
