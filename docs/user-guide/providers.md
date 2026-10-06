@@ -50,7 +50,10 @@ These two captures show the code-enabled development build. New catalog entries 
 
 - **YouTube Music:** sign-in is optional. Signing in changes Home into a personalized feed based on the account and makes its library available. Free YouTube accounts are supported; Premium is not required for this personalization.
 - **Spotify:** a metadata provider with **no audio source**. It can technically access catalog metadata without sign-in, but its practical value is your personalized feed, playlists, Liked songs and library after signing in. Select a separate audio provider for playback.
-- **Beatport:** requires sign-in and an active Beatport streaming subscription to be useful in Milkbeat. Without those, it provides no usable listening experience.
+- **Beatport:** sign in for catalog metadata and your library. Beatport's own full-length audio
+  requires an active streaming subscription. You can instead select SoundCloud or YouTube Music
+  for audio and let Milkbeat match the available recording. Catalog access and matching still
+  depend on the account and service; a free account is not a guarantee of a particular match.
 - **SoundCloud:** sign in for personalized Home, playlists, Liked Songs, history and Artists
   (the accounts SoundCloud calls Following). Public search and catalog pages can work anonymously.
   Full-track availability and quality depend on the recording and consumer subscription;

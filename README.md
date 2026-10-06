@@ -126,7 +126,10 @@ Plugins can provide separate roles:
 
 - **YouTube Music:** sign-in is optional. Signing in changes Home into a personalized feed based on the account and makes its library available. Free YouTube accounts are supported; Premium is not required for this personalization.
 - **Spotify:** a metadata provider with **no audio source**. It can technically access catalog metadata without sign-in, but its practical value is your personalized feed, playlists, Liked songs and library after signing in. Select a separate audio provider for playback.
-- **Beatport:** requires sign-in and an active Beatport streaming subscription to be useful in Milkbeat. Without those, it provides no usable listening experience.
+- **Beatport:** sign in for its catalog and account library. Full-length audio from Beatport needs
+  an active streaming subscription. A separate audio provider, such as SoundCloud or YouTube
+  Music, can match recordings from Beatport metadata; availability depends on both catalogs and
+  the account's access.
 - **SoundCloud:** sign in for personalized Home and Library. Public search and catalog pages can
   work without sign-in. Playback depends on each recording and your listening entitlement;
   previews and restricted recordings are not treated as full tracks. Artist Pro is a creator
