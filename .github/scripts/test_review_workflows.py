@@ -12,6 +12,29 @@ def workflow(name):
 
 
 class WorkflowPolicyTests(unittest.TestCase):
+    def test_reusable_jobs_cannot_request_permissions_missing_from_the_caller(self):
+        levels = {"none": 0, "read": 1, "write": 2}
+        for caller_name in ["build.yml", "pr-builds.yml"]:
+            caller = workflow(caller_name)
+            for name, call in caller["jobs"].items():
+                reference = call.get("uses", "")
+                if not reference.startswith("./.github/workflows/"):
+                    continue
+                allowed = call.get("permissions", caller.get("permissions", {}))
+                callee = workflow(reference.rsplit("/", 1)[-1])
+                for nested_name, nested in callee["jobs"].items():
+                    requested = nested.get("permissions", callee.get("permissions", {}))
+                    for permission, level in requested.items():
+                        with self.subTest(caller=caller_name, job=name, nested=nested_name, permission=permission):
+                            self.assertLessEqual(levels[level], levels[allowed.get(permission, "none")])
+
+    def test_guide_build_code_has_only_read_permissions(self):
+        docs = workflow("docs.yml")
+        build = docs["jobs"]["build"]
+        permissions = build.get("permissions", docs["permissions"])
+        self.assertEqual(permissions.get("contents"), "read")
+        self.assertFalse(any(level == "write" for level in permissions.values()))
+
     def test_only_main_pushes_start_full_publication(self):
         main = workflow("build.yml")
         self.assertEqual(main["on"]["push"]["branches"], ["main"])
@@ -78,6 +101,7 @@ class WorkflowPolicyTests(unittest.TestCase):
     def test_pages_deployments_share_a_lock_and_reject_stale_main(self):
         docs = workflow("docs.yml")
         deploy = docs["jobs"]["deploy"]
+        self.assertIn("!inputs.pr_build", deploy["if"])
         self.assertEqual(deploy["concurrency"]["group"], "milkbeat-pages-deployment")
         self.assertEqual(deploy["concurrency"]["cancel-in-progress"], "false")
         self.assertEqual(deploy["permissions"]["contents"], "read")

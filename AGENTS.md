@@ -93,6 +93,10 @@ In particular, an instruction requiring an explicit request before Markdown edit
 - Main's `build.yml` calls every reusable validation suite before publication. `docs.yml` builds
   and deploys Pages through this main pipeline. Keep the shared Pages deployment lock and post-lock
   freshness check across manual and reusable entry points; ProjectM-TV's AAR repository is outside this change.
+- Reusable callers must allow every callee job's requested permissions, even for skipped jobs.
+  The PR guide caller therefore allows Pages/OIDC deployment capabilities, but `docs.yml`'s build
+  job explicitly restricts its token to `contents: read`; deployment stays disabled for PRs.
+  `test_review_workflows.py` checks permission ceilings across both main and reviewed-PR call graphs.
 
 ## 4. Open a pull request against main
 
