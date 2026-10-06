@@ -1,5 +1,6 @@
 package io.github.aedev.flow.player
 
+import io.github.aedev.flow.data.localmedia.LocalMediaIds
 import io.github.aedev.flow.data.music.model.MusicTrack
 
 /**
@@ -30,6 +31,10 @@ internal object MusicRadioPlanner {
         val previous =
             previousIds
                 ?: return QueueContext(reseed = true, explicit = false, knownIds = queueIds)
+
+        if (LocalMediaIds.isLocal(currentId) && queueIds.size == 1 && queueIds != previous) {
+            return QueueContext(reseed = true, explicit = false, knownIds = queueIds)
+        }
 
         // Same session when the track was already part of the previous queue: skips and queue
         // jumps rebuild the playlist (sometimes with a pruned list), but the user never left

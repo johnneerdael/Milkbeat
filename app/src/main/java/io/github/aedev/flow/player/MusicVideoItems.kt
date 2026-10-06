@@ -1,8 +1,10 @@
 package io.github.aedev.flow.player
 
 import android.net.Uri
+import io.github.aedev.flow.data.localmedia.LocalMediaIds
 import io.github.aedev.flow.data.music.model.MusicTrack
 import io.github.aedev.flow.plugin.catalog.trackDescriptor
+import nl.neerdael.milkbeat.catalog.ArtistCredit
 import nl.neerdael.milkbeat.catalog.EntityKind
 import nl.neerdael.milkbeat.catalog.EntityRef
 import nl.neerdael.milkbeat.catalog.TrackDescriptor
@@ -48,14 +50,30 @@ object MusicVideoItems {
         return decoded ?: TrackDescriptor(ref = EntityRef(EntityKind.TRACK, id), title = id, ids = mapOf(LEGACY_ID_SPACE to id))
     }
 
-    fun descriptor(track: MusicTrack): TrackDescriptor =
-        track.trackDescriptor()
-            ?: TrackDescriptor(
-                ref = EntityRef(EntityKind.TRACK, track.videoId),
-                title = track.title,
-                ids =
-                    mapOf(LEGACY_ID_SPACE to track.videoId),
-            )
+    fun descriptor(track: MusicTrack): TrackDescriptor {
+        track.trackDescriptor()?.let { return it }
+        val local = LocalMediaIds.isLocal(track.videoId)
+        return TrackDescriptor(
+            ref = EntityRef(EntityKind.TRACK, track.videoId),
+            title = track.title,
+            artists =
+                if (local) {
+                    track.artists.map { ArtistCredit(it.name) }.ifEmpty {
+                        listOfNotNull(track.artist.takeIf(String::isNotBlank)?.let(::ArtistCredit))
+                    }
+                } else {
+                    emptyList()
+                },
+            durationMs =
+                track.duration
+                    .takeIf { local && it > 0 }
+                    ?.toLong()
+                    ?.times(1000),
+            album = track.album.takeIf { local && it.isNotBlank() },
+            ids =
+                if (local) emptyMap() else mapOf(LEGACY_ID_SPACE to track.videoId),
+        )
+    }
 
     fun preferredProvider(uri: Uri): String? = uri.getQueryParameter("provider")
 

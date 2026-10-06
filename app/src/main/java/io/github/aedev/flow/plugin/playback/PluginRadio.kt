@@ -1,6 +1,7 @@
 package io.github.aedev.flow.plugin.playback
 
 import android.util.Log
+import io.github.aedev.flow.data.localmedia.LocalMediaIds
 import io.github.aedev.flow.plugin.PluginHost
 import io.github.aedev.flow.plugin.catalog.PluginAccounts
 import io.github.aedev.flow.plugin.catalog.ProviderEntityReference
@@ -88,6 +89,23 @@ class PluginRadio
             seedTrack: TrackDescriptor? = null,
         ): RadioPage? {
             val state = registry.state.value
+            if (LocalMediaIds.isLocal(seed.providerId)) {
+                val track = seedTrack ?: return null
+                for (plugin in state.plugins.filter {
+                    it.enabled &&
+                        it.manifest.roles.audio
+                            ?.let { role -> "ytm" in role.idSpaces && role.match && role.radio } == true
+                }) {
+                    try {
+                        val matched = audio.playableIn(track.copy(ids = emptyMap()), plugin.id) ?: continue
+                        val tracks = request(plugin.id, PluginOperations.audioRadio, RadioRequest(matched.ref))
+                        if (tracks.tracks.isNotEmpty()) return RadioPage(plugin.id, tracks, matched.ref, fromAudio = true)
+                    } catch (e: PluginCallException) {
+                        Log.w("PluginRadio", "Local song radio unavailable from ${plugin.id}: ${e.error.code}")
+                    }
+                }
+                return null
+            }
             val scoped = ProviderEntityReference.decode(seed.providerId)?.takeIf { seedTrack == null || it.entity == seedTrack.ref }
             val compatible =
                 state.plugins.filter { plugin ->

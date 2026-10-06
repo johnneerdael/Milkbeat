@@ -30,7 +30,17 @@ Every queue continues as a radio: a [prepared private playlist](providers.md#pre
 
 Press Right on a queue track to focus the pinned radio presets. Move Left or Right between presets, then press Down to return to the track you left, with the queue's scroll position retained. If that track was removed while you changed the mix, focus falls back to an available row.
 
-Local folder playback is independent of provider radio. **Play folder** queues tracks from the current folder.
+Local music keeps playing from its device, USB or network-folder file. With an enabled YouTube
+Music plugin, Milkbeat matches the first queued local song's title, artists and duration in the
+background and uses that match only to seed YouTube Music radio. It does not replace local audio
+with a YouTube stream. A local album, playlist or artist queue uses its first song as the seed.
+Collection queues continue with suggestions when endless radio is enabled. Selecting one local
+track requests its radio explicitly, as it does for streaming tracks. Without the plugin, a
+connection or a confident match, the local queue still plays and earlier radio suggestions are cleared.
+
+Selecting a track in **Local library** plays only that track followed by its radio. This applies
+to artist, release, album, playlist, year, genre and label pages. Use the collection's **Play** or
+**Shuffle** button to queue the whole collection. **Play folder** queues tracks from the current folder.
 
 ## MilkDrop visualizer
 

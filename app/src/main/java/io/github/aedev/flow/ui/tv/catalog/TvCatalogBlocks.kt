@@ -22,6 +22,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.aedev.flow.R
+import io.github.aedev.flow.data.localmedia.LocalMediaIds
 import io.github.aedev.flow.data.music.model.MusicTrack
 import io.github.aedev.flow.ui.tv.components.TvButton
 import io.github.aedev.flow.ui.tv.focus.tvInitialFocus
@@ -162,7 +163,7 @@ private val PageBlock.catalogItemCount: Int
 internal val PageBlock.isTrackTable: Boolean
     get() = this is CollectionBlock && layout == CollectionLayout.TRACK_TABLE
 
-private fun playFromTable(
+internal fun playFromTable(
     item: MetadataItem,
     table: CollectionBlock,
     source: String,
@@ -174,7 +175,11 @@ private fun playFromTable(
         actions.onOpen(item.entity)
         return
     }
-    actions.onPlayList(track, table.items.mapNotNull(actions.trackFor), source, queueId)
+    if (LocalMediaIds.isLocal(track.videoId)) {
+        actions.onPlayMix(track)
+    } else {
+        actions.onPlayList(track, table.items.mapNotNull(actions.trackFor), source, queueId)
+    }
 }
 
 /** A header in its style, with the buttons that play what the page lists and, for an artist, Follow. */
