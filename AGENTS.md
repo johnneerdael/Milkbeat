@@ -653,7 +653,8 @@ revision must pass the configured ktlint rules.
   API is absent there). Do not move filesystem checks, listings or mount discovery onto the main thread.
 - LOCAL sources retain the existing treeUri preference field: content tree URIs use the document
   provider; file URIs use `FileMusicFolders`. Canonicalize and constrain listings/metadata to the
-  selected root, excluding escaping symlinks. Media3 already supports file playback; preserve its wiring.
+  selected root, excluding escaping or ancestor symlinks and deduplicating canonical locations.
+  Media3 already supports file playback; preserve its wiring.
 - Focused regressions: `./gradlew :app:testGithubDebugUnitTest --tests '*DocumentMusicFoldersFileTest' --tests '*MusicFoldersViewModelTest' --tests '*TvMusicFoldersFocusTest'`.
   `TvLocalFolderPickerDeviceTest` covers contextual denial, D-pad selection, saved-source access,
   embedded metadata and focus return. Its permission setup affects only the debug package.

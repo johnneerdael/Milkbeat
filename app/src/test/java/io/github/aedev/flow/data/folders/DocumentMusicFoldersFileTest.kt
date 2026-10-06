@@ -79,4 +79,26 @@ class DocumentMusicFoldersFileTest {
             hidden.setReadable(true, true)
         }
     }
+
+    @Test fun aliasesCannotCreateDuplicateDirectoryKeys() {
+        val root = temporary.newFolder("Music")
+        val albums = File(root, "Albums").apply { mkdir() }
+        java.nio.file.Files
+            .createSymbolicLink(File(root, "Shortcut").toPath(), albums.toPath())
+        val source = documents.add(Uri.fromFile(root))
+
+        val entries = documents.list(source, "")
+        assertThat(entries.map { it.location }).containsNoDuplicates()
+        assertThat(entries).hasSize(1)
+    }
+
+    @Test fun directoryLinksCannotLeadBackToAnAncestor() {
+        val root = temporary.newFolder("Music")
+        val albums = File(root, "Albums").apply { mkdir() }
+        java.nio.file.Files
+            .createSymbolicLink(File(albums, "Loop").toPath(), root.toPath())
+        val source = documents.add(Uri.fromFile(root))
+
+        assertThat(documents.list(source, Uri.fromFile(albums).toString())).isEmpty()
+    }
 }

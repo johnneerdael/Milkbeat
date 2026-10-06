@@ -14,7 +14,7 @@ Storage permission is not requested at startup or just by opening Settings. It i
 
 If permission is denied, network folders and the rest of Milkbeat remain usable. **Storage permissions** opens Android settings to retry. Alternatively, **Use Android folder picker** uses the device's system picker to grant access to just one folder. Previously saved system-picker sources continue to work.
 
-A USB drive must be mounted by Android. Select **Refresh** after connecting a drive. Moving or disconnecting storage can make a saved source unavailable; reconnect it and refresh. Device firmware controls which mounts are accessible. Symbolic links that leave the selected folder are not followed.
+A USB drive must be mounted by Android. Select **Refresh** after connecting a drive. Moving or disconnecting storage can make a saved source unavailable; reconnect it and refresh. Device firmware controls which mounts are accessible. Symbolic links that leave the selected folder or lead back to an ancestor are not followed. Multiple aliases of the same file or directory appear once.
 
 ![Music folders settings with local folder, SMB, WebDAV, SFTP and NFS actions](images/settings-folders.png)
 

@@ -36,15 +36,17 @@ internal object FileMusicFolders {
         val root = file(Uri.parse(source.treeUri))
         val directory = resolve(source, location)
         val children = directory.listFiles() ?: throw FileNotFoundException("Folder no longer available")
-        return children.mapNotNull { child ->
-            if (Thread.currentThread().isInterrupted) throw InterruptedException()
-            if (!child.canRead()) return@mapNotNull null
-            val canonical = child.canonicalFile
-            if (!canonical.toPath().startsWith(root.toPath())) return@mapNotNull null
-            val directoryChild = child.isDirectory
-            if (!directoryChild && (!child.isFile || !isListedFile(child.name, null, includePlaylists))) return@mapNotNull null
-            MusicFolderEntry(child.name, Uri.fromFile(canonical).toString(), directoryChild, child.length(), child.lastModified())
-        }
+        return children
+            .mapNotNull { child ->
+                if (Thread.currentThread().isInterrupted) throw InterruptedException()
+                if (!child.canRead()) return@mapNotNull null
+                val canonical = child.canonicalFile
+                if (!canonical.toPath().startsWith(root.toPath())) return@mapNotNull null
+                val directoryChild = child.isDirectory
+                if (directoryChild && directory.toPath().startsWith(canonical.toPath())) return@mapNotNull null
+                if (!directoryChild && (!child.isFile || !isListedFile(child.name, null, includePlaylists))) return@mapNotNull null
+                MusicFolderEntry(child.name, Uri.fromFile(canonical).toString(), directoryChild, child.length(), child.lastModified())
+            }.distinctBy { it.location }
     }
 
     private fun file(uri: Uri): File {
