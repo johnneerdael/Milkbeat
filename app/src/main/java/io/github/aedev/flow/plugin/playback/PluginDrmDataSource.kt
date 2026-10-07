@@ -4,6 +4,8 @@ import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.ResolvingDataSource
 import androidx.media3.datasource.okhttp.OkHttpDataSource
 import io.github.aedev.flow.plugin.host.hostAllowed
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
 import okhttp3.CookieJar
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
@@ -31,6 +33,7 @@ internal fun checkedPluginDrmUrl(
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 internal fun pluginDrmDataSourceFactory(
     base: OkHttpClient,
+    binding: BoundPluginAudio? = null,
     allowedHosts: () -> List<String>,
 ): DataSource.Factory {
     val client =
@@ -40,8 +43,45 @@ internal fun pluginDrmDataSourceFactory(
             .followRedirects(false)
             .followSslRedirects(false)
             .build()
-    return ResolvingDataSource.Factory(OkHttpDataSource.Factory(client)) { request ->
-        checkedPluginDrmUrl(request.uri.toString(), allowedHosts())
-        request
+    val upstream = OkHttpDataSource.Factory(client)
+    return DataSource.Factory {
+        var firstOpen = true
+        var licenseHeaders: Map<String, String> = emptyMap()
+        ResolvingDataSource(upstream.createDataSource()) { request ->
+            val initialLicense =
+                binding
+                    ?.initial
+                    ?.stream
+                    ?.drm
+                    ?.licenseUrl
+            // Widevine key requests are binary; Media3 provisioning is JSON, even if a platform
+            // happens to report the same URL. A redirect reuses this data source after its first open.
+            val binaryChallenge =
+                request.httpRequestHeaders.any { (name, value) ->
+                    name.equals("Content-Type", ignoreCase = true) &&
+                        value.substringBefore(';').trim().equals("application/octet-stream", ignoreCase = true)
+                }
+            val licenseOpen = firstOpen && binaryChallenge && initialLicense != null && request.uri.toString() == initialLicense
+            firstOpen = false
+            val destination =
+                if (licenseOpen) {
+                    val current = runBlocking(Dispatchers.IO) { binding.current() }
+                    val drm = current.stream.drm ?: throw IOException("The provider removed this recording's DRM")
+                    licenseHeaders = drm.headers
+                    drm.licenseUrl
+                } else {
+                    request.uri.toString()
+                }
+            checkedPluginDrmUrl(destination, allowedHosts())
+            val headers =
+                request.httpRequestHeaders.filterKeys { name ->
+                    licenseHeaders.keys.none { it.equals(name, ignoreCase = true) }
+                } + licenseHeaders
+            request
+                .buildUpon()
+                .setUri(destination)
+                .setHttpRequestHeaders(headers)
+                .build()
+        }
     }
 }

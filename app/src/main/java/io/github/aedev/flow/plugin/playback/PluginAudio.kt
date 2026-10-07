@@ -269,13 +269,13 @@ class PluginAudio
         }
 
         /** A dedicated license transport; media caches and media headers never carry license data. */
-        fun drmDataSourceFactory(
-            audio: ResolvedAudio,
+        internal fun drmDataSourceFactory(
+            binding: BoundPluginAudio,
             base: OkHttpClient,
         ): DataSource.Factory =
-            pluginDrmDataSourceFactory(base) {
+            pluginDrmDataSourceFactory(base, binding) {
                 registry.state.value
-                    .plugin(audio.pluginId)
+                    .plugin(binding.initial.pluginId)
                     ?.grantedNetwork
                     .orEmpty()
             }

@@ -10,6 +10,7 @@ import androidx.media3.exoplayer.hls.HlsMediaSource
 import androidx.media3.exoplayer.source.MediaSource
 import androidx.media3.exoplayer.source.MergingMediaSource
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
+import io.github.aedev.flow.player.datasource.BoundPluginMusicDataSourceFactory
 import io.github.aedev.flow.player.datasource.PluginMusicDataSourceFactory
 import io.github.aedev.flow.player.resolver.ResolvingMusicMediaSource
 import io.github.aedev.flow.plugin.playback.ResolvedAudio
@@ -50,7 +51,7 @@ class MusicMediaSourceFactory(
         mediaItem: MediaItem,
         audio: ResolvedAudio?,
         sourceFactory: DataSource.Factory = dataSourceFallback,
-        licenseFactory: DataSource.Factory? = audio?.takeIf { it.stream.drm != null }?.let { resolver?.drm?.invoke(it) },
+        licenseFactory: DataSource.Factory? = (sourceFactory as? BoundPluginMusicDataSourceFactory)?.drm,
     ): MediaSource {
         val soundItem =
             audio?.stream?.drm?.let { drm ->
@@ -63,7 +64,6 @@ class MusicMediaSourceFactory(
                                     AudioDrmScheme.WIDEVINE -> C.WIDEVINE_UUID
                                 },
                             ).setLicenseUri(drm.licenseUrl)
-                            .setLicenseRequestHeaders(drm.headers)
                             .setForceDefaultLicenseUri(true)
                             .build(),
                     ).build()

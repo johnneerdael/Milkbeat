@@ -693,7 +693,9 @@ revision must pass the configured ktlint rules.
   configured in `settings.gradle.kts` (there is no `:baselineprofile` module).
 - Plugin API 4 adds optional `AudioStream.drm` for platform Widevine playback. Keep DRM license
   transport separate from media caches and headers; validate initial, redirect and provisioning
-  destinations against the installed plugin's current network grants. Do not implement decryption
+  destinations against the installed plugin's current network grants. Share the bound stream's
+  refresh state between media and license requests so key acquisition/renewal never retains stale
+  license URLs or headers; do not retarget provisioning or redirect opens. Do not implement decryption
   or offline licenses. The current file downloader rejects HLS and DRM streams explicitly.
   Generate contract changes with `./gradlew :plugin-api:test -PupdatePluginSchema`, then run
   `npm run generate` and `npm run check` in `plugins/sdk/`. Existing clear-stream descriptors remain

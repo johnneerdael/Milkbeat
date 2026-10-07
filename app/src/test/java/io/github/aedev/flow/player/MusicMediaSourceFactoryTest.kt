@@ -9,6 +9,7 @@ import androidx.media3.exoplayer.hls.HlsMediaSource
 import androidx.media3.exoplayer.source.MediaSource
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import com.google.common.truth.Truth.assertThat
+import io.github.aedev.flow.player.datasource.BoundPluginMusicDataSourceFactory
 import io.github.aedev.flow.plugin.playback.ResolvedAudio
 import io.mockk.mockk
 import nl.neerdael.milkbeat.catalog.EntityKind
@@ -51,12 +52,13 @@ class MusicMediaSourceFactoryTest {
     @Test
     fun `encrypted HLS uses the provider license rather than a manifest license`() {
         val drm = AudioDrm(AudioDrmScheme.WIDEVINE, "https://license.example/playback", mapOf("Authorization" to "fixture"))
-        val source = factory.resolvedSource(item, audio("application/x-mpegURL", drm), licenseFactory = mockk<DataSource.Factory>())
+        val bound = BoundPluginMusicDataSourceFactory(mockk<DataSource.Factory>(), mockk<DataSource.Factory>())
+        val source = factory.resolvedSource(item, audio("application/x-mpegURL", drm), sourceFactory = bound)
         val configuration = source.mediaItem.localConfiguration!!.drmConfiguration
         assertThat(configuration).isNotNull()
         assertThat(configuration!!.scheme).isEqualTo(C.WIDEVINE_UUID)
         assertThat(configuration.licenseUri.toString()).isEqualTo(drm.licenseUrl)
-        assertThat(configuration.licenseRequestHeaders).containsExactly("Authorization", "fixture")
+        assertThat(configuration.licenseRequestHeaders).isEmpty()
         assertThat(configuration.forceDefaultLicenseUri).isTrue()
     }
 
