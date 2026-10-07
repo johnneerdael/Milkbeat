@@ -2,6 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {verifyPublishedPlugins} from '../scripts/verify-published-plugins.mjs';
+import {readCatalog} from '../../tools/plugin-download-codes.mjs';
 const author='a'.repeat(64),id='dev.milkbeat.fixture';
 function fixture(){
  const row={id,name:'Fixture',code:'007',sha256:'b'.repeat(64),size:10,fingerprint:author,version:'1',versionCode:1};
@@ -25,4 +26,11 @@ test('native promotion fixture tracks the exact published descriptor',()=>{
  const descriptor=JSON.parse(readFileSync(new URL('../published.json',import.meta.url)));
  const native=JSON.parse(readFileSync(new URL('../../app/src/androidTest/assets/published-plugins.json',import.meta.url)));
  assert.deepEqual(native,descriptor);
+});
+
+test('the default publication validator accepts all registered providers including SoundCloud',()=>{
+ const descriptor=JSON.parse(readFileSync(new URL('../published.json',import.meta.url)));
+ const catalog=readCatalog(new URL('../../app/src/main/assets/plugin-download-catalog.json',import.meta.url)).entries;
+ const rows=verifyPublishedPlugins({descriptor,catalog});
+ assert.ok(rows.some(row=>row.id==='nl.neerdael.soundcloud'));
 });
