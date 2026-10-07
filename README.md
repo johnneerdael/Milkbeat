@@ -144,7 +144,7 @@ Plugins can provide separate roles:
 - **SoundCloud:** sign in for personalized Home and Library. Public search and catalog pages can
   work without sign-in. Playback depends on each recording and your listening entitlement;
   previews and restricted recordings are not treated as full tracks. Artist Pro is a creator
-  membership and does not grant Go+ listening rights. The SoundCloud package requires a Milkbeat
+  membership and does not grant Go+ listening rights. SoundCloud plugin 0.2.0 requires a Milkbeat
   build supporting plugin API 5. Pair it with the provider’s TV activation code or QR code.
   TV-paired accounts currently play clear HLS streams only. Protected-only recordings cannot play
   through this session; the mobile license exchange remains unverified. Existing web sessions retain

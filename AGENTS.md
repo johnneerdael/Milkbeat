@@ -707,6 +707,8 @@ revision must pass the configured ktlint rules.
   downloader-code tables with `node .github/scripts/plugin-codes.mjs sync`; validate with its
   `check` command, `npm test` in `plugins/` and `node plugins/scripts/verify-published-plugins.mjs`
   from the root. Canonical signed provider packages stay outside this public Git repository.
+  SoundCloud 0.2.0 uses API 5 TV pairing; its stable downloader code remains 089. Preserve
+  checkpointed signed bytes when retrying publication after a GitHub promotion failure.
 - The visualizer consumes the canonical single Native ProjectM-TV core AAR. `TvVisualizerHost`
   owns a `QualityController` in Auto, acknowledges `BudgetStatsListener` context generations,
   revalidates live memory before resume, and publishes size/trails/transition as one reviewed

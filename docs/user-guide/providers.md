@@ -60,7 +60,7 @@ These two captures show the code-enabled development build. New catalog entries 
   Full-track availability and quality depend on the recording and consumer subscription;
   Artist Pro does not grant Go+ listening rights. Preview-only or restricted recordings can still
   appear as metadata, but cannot supply full-track audio. Enable another audio provider as a fallback.
-  Install a Milkbeat build with plugin API 5 support before installing the SoundCloud package.
+  Install a Milkbeat build with plugin API 5 support before installing SoundCloud plugin 0.2.0.
   TV-paired accounts currently play clear HLS streams only. Protected-only recordings cannot play
   with this session because the mobile license exchange remains unverified. Existing web sessions
   retain their Widevine playback path, subject to device support and account license access.

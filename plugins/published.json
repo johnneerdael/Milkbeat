@@ -37,12 +37,12 @@
     {
       "id": "nl.neerdael.soundcloud",
       "name": "SoundCloud",
-      "version": "0.1.0",
-      "versionCode": 1,
-      "sha256": "dc6566fc825c85ffe89b9d21dc9ac37ecd1408a6a3b1b19e35caf91ab0439388",
-      "size": 14748,
+      "version": "0.2.0",
+      "versionCode": 2,
+      "sha256": "0b1165d8202d3f498bf965ff627654586ec05685a9492aae9c0a7e7aa72b53a8",
+      "size": 21897,
       "fingerprint": "39dca3d132c56262c0873ec96faf22cc8ed9ca30c7ed1f135049f8570b943adc",
-      "contentDigest": "7102b410aef02a7f2ebca3c1403c3ec1197e941862c16b27cd927e4774ed7ae8",
+      "contentDigest": "d9c1528bb6bb0d6bbf51399371add0cfdbf3758ce6b144ed2063912741b2ca92",
       "code": "089"
     }
   ]
