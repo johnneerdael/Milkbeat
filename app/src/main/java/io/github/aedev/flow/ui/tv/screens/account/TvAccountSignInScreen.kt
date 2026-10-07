@@ -26,9 +26,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.aedev.flow.R
 import io.github.aedev.flow.data.account.signin.PhoneInput
 import io.github.aedev.flow.ui.components.shared.FlowWebViewStream
+import io.github.aedev.flow.ui.components.shared.QrCodeImage
 import io.github.aedev.flow.ui.screens.account.AccountSignInState
 import io.github.aedev.flow.ui.screens.account.AccountSignInViewModel
-import io.github.aedev.flow.ui.screens.sync.QrCodeImage
 import io.github.aedev.flow.ui.tv.components.TvButton
 import io.github.aedev.flow.ui.tv.components.TvLoadingState
 import io.github.aedev.flow.ui.tv.components.TvMessageState

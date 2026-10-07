@@ -7,6 +7,7 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
@@ -15,6 +16,7 @@ import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import nl.neerdael.milkbeat.catalog.ProviderAccount
+import nl.neerdael.milkbeat.plugin.DeviceCodeSession
 import nl.neerdael.milkbeat.plugin.PluginError
 import nl.neerdael.milkbeat.plugin.PluginErrorCode
 import nl.neerdael.milkbeat.plugin.PluginOperations
@@ -195,6 +197,36 @@ class PluginAccountsTest {
                 runCurrent()
 
                 assertThat(accounts.accounts.value["youtube"]).isEqualTo(expected)
+            }
+        }
+
+    @Test
+    fun `device pairing does not cache the candidate before explicit confirmation returns`() =
+        runTest {
+            val answer = CompletableDeferred<ProviderAccount>()
+            coEvery { host.call("soundcloud", PluginOperations.confirmSignIn, DeviceCodeSession("pairing")) } coAnswers { answer.await() }
+            val accounts = accounts()
+            val accepted = async { accounts.acceptDeviceSignIn("soundcloud", "pairing") }
+            runCurrent()
+            assertThat(accounts.accounts.value).isEmpty()
+            coVerify(exactly = 1) { host.call("soundcloud", PluginOperations.confirmSignIn, DeviceCodeSession("pairing")) }
+            val account = ProviderAccount.SignedIn("validated", "Listener")
+            answer.complete(account)
+            assertThat(accepted.await()).isEqualTo(account)
+            assertThat(accounts.accounts.value["soundcloud"]).isEqualTo(account)
+        }
+
+    @Test
+    fun `invalid confirmation does not replace the cached account`() =
+        runTest {
+            val old = ProviderAccount.SignedIn("existing")
+            coEvery { host.call("soundcloud", PluginOperations.account, Unit) } returns old
+            val accounts = accounts()
+            accounts.refresh("soundcloud")
+            for (invalid in listOf(ProviderAccount.Anonymous, ProviderAccount.Expired, ProviderAccount.SignedIn(""))) {
+                coEvery { host.call("soundcloud", PluginOperations.confirmSignIn, DeviceCodeSession("pairing")) } returns invalid
+                assertThat(runCatching { accounts.acceptDeviceSignIn("soundcloud", "pairing") }.isFailure).isTrue()
+                assertThat(accounts.accounts.value["soundcloud"]).isEqualTo(old)
             }
         }
 }

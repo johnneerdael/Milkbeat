@@ -11,11 +11,13 @@ import io.github.aedev.flow.plugin.registry.PluginRegistry
 import io.github.aedev.flow.plugin.runtime.PluginCallException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import nl.neerdael.milkbeat.catalog.ProviderAccount
 import nl.neerdael.milkbeat.plugin.DeviceCodeChallenge
 import nl.neerdael.milkbeat.plugin.DeviceCodeMethod
@@ -30,6 +32,8 @@ sealed interface DeviceCodeSignInState {
         val challenge: DeviceCodeChallenge,
     ) : DeviceCodeSignInState
 
+    data object Completing : DeviceCodeSignInState
+
     data object Expired : DeviceCodeSignInState
 
     data object Denied : DeviceCodeSignInState
@@ -39,7 +43,7 @@ sealed interface DeviceCodeSignInState {
     ) : DeviceCodeSignInState
 
     data class Failed(
-        val message: String,
+        val message: String? = null,
     ) : DeviceCodeSignInState
 }
 
@@ -74,6 +78,7 @@ class DeviceCodeSignInViewModel internal constructor(
     }
 
     fun retry() {
+        if (_state.value == DeviceCodeSignInState.Completing) return
         cancelAttempt()
         _state.value = DeviceCodeSignInState.Starting
         if (visible) start()
@@ -119,12 +124,21 @@ class DeviceCodeSignInViewModel internal constructor(
                             }
 
                             DeviceCodeStatus.SIGNED_IN -> {
-                                val account =
-                                    result.account as? ProviderAccount.SignedIn
-                                        ?: error("Pairing completed without a signed-in account")
-                                accounts.acceptDeviceSignIn(pluginId, account)
-                                created = null
-                                _state.value = DeviceCodeSignInState.SignedIn(account.name)
+                                require(result.account is ProviderAccount.SignedIn) { "Pairing completed without a signed-in account" }
+                                _state.value = DeviceCodeSignInState.Completing
+                                // Navigation cannot interrupt accepted intent, but an unsuccessful confirmation still releases its candidate.
+                                withContext(NonCancellable) {
+                                    try {
+                                        val account = accounts.acceptDeviceSignIn(pluginId, challenge.session)
+                                        created = null
+                                        _state.value = DeviceCodeSignInState.SignedIn(account.name)
+                                    } catch (e: CancellationException) {
+                                        _state.value = DeviceCodeSignInState.Failed()
+                                        throw e
+                                    } catch (e: Exception) {
+                                        _state.value = DeviceCodeSignInState.Failed(failureMessage(e))
+                                    }
+                                }
                                 return@launch
                             }
 
@@ -142,17 +156,17 @@ class DeviceCodeSignInViewModel internal constructor(
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
-                    if (current(expected)) {
-                        _state.value =
-                            DeviceCodeSignInState.Failed(
-                                if (e is PluginCallException) e.error.userMessage ?: e.error.message else "Unable to start TV pairing",
-                            )
+                    if (current(expected) || _state.value == DeviceCodeSignInState.Completing) {
+                        _state.value = DeviceCodeSignInState.Failed(failureMessage(e))
                     }
                 } finally {
                     created?.let { cancelSession(it) }
                 }
             }
     }
+
+    private fun failureMessage(error: Exception): String? =
+        (error as? PluginCallException)?.error?.let { (it.userMessage ?: it.message).takeIf(String::isNotBlank) }
 
     private fun current(expected: Long) = visible && epoch == expected
 

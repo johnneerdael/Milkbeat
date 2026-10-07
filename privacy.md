@@ -241,7 +241,9 @@ SoundCloud TV pairing opens the provider’s activation page directly in the pho
 creates and polls a short-lived challenge only while its pairing screen is visible. Its session token
 stays in the plugin’s encrypted secret storage. Provider protocol requests can include OS version,
 device model and a random identity generated for that plugin installation, never a captured device
-or advertising identifier. TV-paired playback currently does not submit listening-history reports.
+or advertising identifier. TV-paired playback currently does not submit listening-history reports and uses clear HLS only;
+its mobile license exchange remains unverified. The protected playback path below applies to
+supported providers and existing SoundCloud web sessions.
 
 Installed plugins declare their own network hosts for review during installation. The SoundCloud
 plugin uses SoundCloud metadata, playback and image services, plus its license service for protected

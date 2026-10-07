@@ -77,6 +77,7 @@ object PluginOperations {
 
     val beginSignIn = PluginOperation("signIn.begin", DeviceCodeBeginRequest.serializer(), DeviceCodeChallenge.serializer())
     val pollSignIn = PluginOperation("signIn.poll", DeviceCodeSession.serializer(), DeviceCodePollResult.serializer())
+    val confirmSignIn = PluginOperation("signIn.confirm", DeviceCodeSession.serializer(), ProviderAccount.serializer())
     val cancelSignIn = PluginOperation("signIn.cancel", DeviceCodeSession.serializer(), Unit.serializer())
 
     val completeSignIn = PluginOperation("signIn.complete", WebLoginResult.serializer(), ProviderAccount.serializer())
@@ -115,6 +116,7 @@ object PluginOperations {
             reportView,
             beginSignIn,
             pollSignIn,
+            confirmSignIn,
             cancelSignIn,
             completeSignIn,
             account,

@@ -1,4 +1,4 @@
-package io.github.aedev.flow.ui.screens.sync
+package io.github.aedev.flow.ui.components.shared
 
 import android.graphics.Bitmap
 import android.graphics.Color

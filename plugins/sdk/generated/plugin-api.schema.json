@@ -414,6 +414,22 @@
                     ],
                     "additionalProperties": false
                 },
+                "signIn.confirm": {
+                    "type": "object",
+                    "properties": {
+                        "request": {
+                            "$ref": "#/$defs/nl.neerdael.milkbeat.plugin.DeviceCodeSession"
+                        },
+                        "response": {
+                            "$ref": "#/$defs/nl.neerdael.milkbeat.catalog.ProviderAccount"
+                        }
+                    },
+                    "required": [
+                        "request",
+                        "response"
+                    ],
+                    "additionalProperties": false
+                },
                 "signIn.cancel": {
                     "type": "object",
                     "properties": {
@@ -508,6 +524,7 @@
                 "video.reportPlayback",
                 "signIn.begin",
                 "signIn.poll",
+                "signIn.confirm",
                 "signIn.cancel",
                 "signIn.complete",
                 "signIn.account",

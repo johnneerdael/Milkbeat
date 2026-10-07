@@ -141,6 +141,10 @@ export interface MilkbeatPluginApi {
       request: DeviceCodeSession;
       response: DeviceCodePollResult;
     };
+    'signIn.confirm': {
+      request: DeviceCodeSession;
+      response: ProviderAccount;
+    };
     'signIn.cancel': {
       request: DeviceCodeSession;
     };

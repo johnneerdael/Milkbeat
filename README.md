@@ -146,7 +146,9 @@ Plugins can provide separate roles:
   previews and restricted recordings are not treated as full tracks. Artist Pro is a creator
   membership and does not grant Go+ listening rights. The SoundCloud package requires a Milkbeat
   build supporting plugin API 5. Pair it with the provider’s TV activation code or QR code.
-  Its encrypted streams use the device's Widevine implementation.
+  TV-paired accounts currently play clear HLS streams only. Protected-only recordings cannot play
+  through this session; the mobile license exchange remains unverified. Existing web sessions retain
+  their Widevine playback path where the account and device support it.
 
 ### Provider selection and phone sign-in
 

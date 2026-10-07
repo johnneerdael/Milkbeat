@@ -29,6 +29,10 @@ previews are not substituted for full tracks, and a creator membership does not 
 subscription. The current offline downloader supports clear progressive audio; HLS playlists and
 DRM audio cannot be downloaded for offline playback.
 
+SoundCloud TV-paired accounts currently supply clear HLS playback only. Protected-only recordings
+are unavailable through this session: the mobile license exchange has not been validated. Existing
+SoundCloud web sessions retain their Widevine path when the recording, account and device allow it.
+
 ## Mixes
 
 Once a streaming queue starts playing, Milkbeat seeds a mix from the queue's first song. When the metadata provider has no radio, Milkbeat tries compatible audio providers in priority order.

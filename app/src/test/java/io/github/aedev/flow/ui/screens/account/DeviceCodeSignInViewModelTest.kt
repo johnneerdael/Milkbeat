@@ -11,6 +11,7 @@ import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -140,6 +141,7 @@ class DeviceCodeSignInViewModelTest {
     @Test fun `signed in result publishes account once and stops polling`() =
         runTest(dispatcher) {
             val account = ProviderAccount.SignedIn("account", "Listener")
+            coEvery { accounts.acceptDeviceSignIn(plugin.id, "session") } returns account
             coEvery { accounts.pollDeviceSignIn(any(), any()) } returns
                 DeviceCodePollResult(DeviceCodeStatus.SIGNED_IN, account)
             val vm = model()
@@ -148,7 +150,7 @@ class DeviceCodeSignInViewModelTest {
             advanceTimeBy(5000)
             runCurrent()
             assertThat(vm.state.value).isEqualTo(DeviceCodeSignInState.SignedIn("Listener"))
-            verify(exactly = 1) { accounts.acceptDeviceSignIn(plugin.id, account) }
+            coVerify(exactly = 1) { accounts.acceptDeviceSignIn(plugin.id, "session") }
             advanceTimeBy(60_000)
             runCurrent()
             coVerify(exactly = 1) { accounts.pollDeviceSignIn(any(), any()) }
@@ -211,7 +213,7 @@ class DeviceCodeSignInViewModelTest {
             answer.complete(DeviceCodePollResult(DeviceCodeStatus.SIGNED_IN, ProviderAccount.SignedIn("account")))
             runCurrent()
             assertThat(vm.state.value).isInstanceOf(DeviceCodeSignInState.Failed::class.java)
-            verify(exactly = 0) { accounts.acceptDeviceSignIn(any(), any()) }
+            coVerify(exactly = 0) { accounts.acceptDeviceSignIn(any(), any()) }
         }
 
     @Test fun `cancelled pending request cannot publish a late account`() =
@@ -228,7 +230,7 @@ class DeviceCodeSignInViewModelTest {
             runCurrent()
             answer.complete(DeviceCodePollResult(DeviceCodeStatus.SIGNED_IN, ProviderAccount.SignedIn("account")))
             runCurrent()
-            verify(exactly = 0) { accounts.acceptDeviceSignIn(any(), any()) }
+            coVerify(exactly = 0) { accounts.acceptDeviceSignIn(any(), any()) }
         }
 
     @Test fun `a challenge arriving after pause is cleaned up without exposing it`() =
@@ -261,6 +263,57 @@ class DeviceCodeSignInViewModelTest {
             answer.complete(DeviceCodePollResult(DeviceCodeStatus.SIGNED_IN, ProviderAccount.SignedIn("account")))
             runCurrent()
             assertThat(vm.state.value).isEqualTo(DeviceCodeSignInState.Expired)
-            verify(exactly = 0) { accounts.acceptDeviceSignIn(any(), any()) }
+            coVerify(exactly = 0) { accounts.acceptDeviceSignIn(any(), any()) }
+        }
+
+    @Test fun `a dispatched confirmation is terminal intent and survives pause`() =
+        runTest(dispatcher) {
+            val account = ProviderAccount.SignedIn("account", "Listener")
+            coEvery { accounts.pollDeviceSignIn(any(), any()) } returns DeviceCodePollResult(DeviceCodeStatus.SIGNED_IN, account)
+            val confirmation = CompletableDeferred<ProviderAccount.SignedIn>()
+            coEvery { accounts.acceptDeviceSignIn(plugin.id, "session") } coAnswers { confirmation.await() }
+            val vm = model()
+            vm.setVisible(true)
+            runCurrent()
+            advanceTimeBy(5000)
+            runCurrent()
+            assertThat(vm.state.value).isEqualTo(DeviceCodeSignInState.Completing)
+            vm.setVisible(false)
+            runCurrent()
+            verify(exactly = 0) { accounts.cancelDeviceSignInAsync(any(), any()) }
+            confirmation.complete(account)
+            runCurrent()
+            assertThat(vm.state.value).isEqualTo(DeviceCodeSignInState.SignedIn("Listener"))
+            coVerify(exactly = 1) { accounts.acceptDeviceSignIn(plugin.id, "session") }
+        }
+
+    @Test fun `failed confirmation cancels its candidate and leaves retry available even after pause`() =
+        runTest(dispatcher) {
+            val account = ProviderAccount.SignedIn("account", "Listener")
+            coEvery { accounts.pollDeviceSignIn(any(), any()) } returns DeviceCodePollResult(DeviceCodeStatus.SIGNED_IN, account)
+            val failures =
+                listOf(
+                    false to IllegalStateException("temporary failure"),
+                    true to IllegalStateException("temporary failure"),
+                    true to CancellationException("provider confirmation cancelled"),
+                )
+            for ((pause, error) in failures) {
+                val confirmation = CompletableDeferred<ProviderAccount.SignedIn>()
+                coEvery { accounts.acceptDeviceSignIn(plugin.id, "session") } coAnswers { confirmation.await() }
+                val vm = model()
+                vm.setVisible(true)
+                runCurrent()
+                advanceTimeBy(5000)
+                runCurrent()
+                assertThat(vm.state.value).isEqualTo(DeviceCodeSignInState.Completing)
+                if (pause) {
+                    vm.setVisible(false)
+                    runCurrent()
+                }
+                confirmation.completeExceptionally(error)
+                runCurrent()
+                assertThat(vm.state.value).isEqualTo(DeviceCodeSignInState.Failed())
+            }
+            verify(exactly = 3) { accounts.cancelDeviceSignInAsync(plugin.id, "session") }
         }
 }

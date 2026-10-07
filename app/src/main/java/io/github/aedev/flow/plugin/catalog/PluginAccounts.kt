@@ -102,12 +102,17 @@ class PluginAccounts internal constructor(
     }
 
     /** Called only after the visible pairing controller has accepted this session's completed result. */
-    fun acceptDeviceSignIn(
+    suspend fun acceptDeviceSignIn(
         pluginId: String,
-        account: ProviderAccount.SignedIn,
-    ) {
+        session: String,
+    ): ProviderAccount.SignedIn {
+        val account =
+            host.call(pluginId, PluginOperations.confirmSignIn, DeviceCodeSession(session)) as? ProviderAccount.SignedIn
+                ?: error("Pairing confirmation did not return a signed-in account")
+        require(account.key.isNotBlank()) { "Pairing confirmation returned an empty account identity" }
         cancelRevalidation(pluginId)
         _accounts.update { it + (pluginId to account) }
+        return account
     }
 
     suspend fun signOut(pluginId: String) {
