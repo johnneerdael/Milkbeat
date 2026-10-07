@@ -688,6 +688,9 @@ revision must pass the configured ktlint rules.
 - `:app` is the Android app. Kotlin sources live in `app/src/main/java/io/github/aedev/flow/`;
   the TV shell and navigation are in `ui/tv/`, and route ViewModels are in `ui/screens/`.
   Unit tests live in `app/src/test/`, with device tests in `app/src/androidTest/`.
+  `app/src/test/resources/robolectric.properties` defaults unit tests to `android.app.Application`;
+  override it with `@Config(application = …)` when testing application-owned startup. AGP-backed
+  Robolectric ignores `Config.NONE`, so it does not isolate tests from `FlowApplication` startup.
 - `:plugin-api` defines the plain Kotlin catalog/plugin contract; `:spike-plugin-runtime` contains
   runtime experiments. `:benchmark` is the Android baseline-profile and benchmark module
   configured in `settings.gradle.kts` (there is no `:baselineprofile` module).
