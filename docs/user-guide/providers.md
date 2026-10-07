@@ -27,6 +27,7 @@ A plugin can provide more than one role. Local and network folder playback (SMB,
 | **393** | Beatport |
 | **981** | Spotify |
 | **494** | YouTube Music |
+| **089** | SoundCloud |
 <!-- /plugin-codes -->
 
 Codes need a Milkbeat build with download-code support; earlier releases accept URLs. Each code identifies a registered download in the app's bundled catalog. An unknown code reports an error; try its full URL or update the app.

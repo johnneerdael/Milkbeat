@@ -113,6 +113,7 @@ Add optional **third-party plugins** in **Settings > Plugins** using their downl
 | Beatport | **393** | 102 |
 | Spotify | **981** | 772 |
 | YouTube Music | **494** | 416 |
+| SoundCloud | **089** | — |
 <!-- /plugin-codes -->
 
 You can also enter a plugin download URL, including a supported Buzzheavier file page; a bare
