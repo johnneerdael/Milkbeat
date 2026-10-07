@@ -1,0 +1,21 @@
+# Video matching preview
+
+Install the prerelease APK named **Milkbeat Preview**. It uses a separate app ID and keeps its own settings, plugins and account sessions. Open that launcher entry to test; your stable Milkbeat app remains available.
+
+## Set up
+
+1. Install the Preview APK from the linked GitHub prerelease.
+2. In **Milkbeat Preview**, install the preview YouTube Music plugin using downloader code **494**. This feature requires YouTube Music **0.2.9-preview.1** together with the preview app.
+3. Install SoundCloud using **089** and sign in with its TV code if you want personalized Home and Library. YouTube sign-in is optional for matching and playback.
+4. Select SoundCloud for metadata and put YouTube Music first under Audio in **Settings > Plugins**.
+
+## Check playback
+
+- Play a recorded live set or regular track. Video matching should run while playback remains audio-only in Visualizer or Artwork view.
+- Open Now Playing controls. Use the view button after the heart to choose Video when a match is available. Art Tracks with static artwork count as video choices.
+- Switching views should retain the recording and playback position. Hiding the player or returning to artwork should stop video rendering.
+- A missing or unsupported picture should retain audio playback through the existing fallback. Matching should reject a different performer, event, year, creative version or short excerpt.
+
+The live guest probes found Fideles at CRSSD Fall 2023 and Agents Of Time at Hï Ibiza 2024 with nearly identical recording lengths and available H.264 1080p pictures. These probes validate matching/format availability; confirm actual playback on your TV.
+
+Report the track title, chosen view, preferred audio provider, what happened and the Preview app/plugin versions. The preview uses a separate installation, so setup and sign-in are not copied from stable Milkbeat.

@@ -121,6 +121,54 @@ class PlaylistPreloadRunnerTest {
     }
 
     @Test
+    fun `video-capable preload uses video search while audio-only fallback keeps Songs`() =
+        runTest {
+            state.value =
+                state.value.copy(
+                    plugins =
+                        state.value.plugins.map { installed ->
+                            if (installed.id == "youtube") {
+                                installed.copy(
+                                    manifest =
+                                        installed.manifest.copy(
+                                            roles =
+                                                Roles(
+                                                    audio =
+                                                        installed.manifest.roles.audio!!
+                                                            .copy(musicVideo = true),
+                                                ),
+                                        ),
+                                )
+                            } else {
+                                installed
+                            }
+                        },
+                )
+            assertThat(runner.run("spotify", "listener", listOf("youtube", "beatport")) { })
+                .isEqualTo(PlaylistPreloadProgress(3, 3, 3, 3, 0, true))
+            coVerify(exactly = 3) {
+                host.call(
+                    "youtube",
+                    PluginOperations.matchAudio,
+                    match {
+                        it.strategy ==
+                            nl.neerdael.milkbeat.plugin.AudioMatchStrategy.VIDEOS
+                    },
+                )
+            }
+            coVerify(exactly = 1) {
+                host.call(
+                    "beatport",
+                    PluginOperations.matchAudio,
+                    match {
+                        it.strategy ==
+                            nl.neerdael.milkbeat.plugin.AudioMatchStrategy.SONGS
+                    },
+                )
+            }
+        }
+
+    @Test
     fun `all library and track pages include likes and index duplicate tracks once`() =
         runTest {
             val progress = mutableListOf<PlaylistPreloadProgress>()

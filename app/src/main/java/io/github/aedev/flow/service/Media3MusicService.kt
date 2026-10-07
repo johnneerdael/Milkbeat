@@ -46,6 +46,7 @@ import io.github.aedev.flow.player.audio.visualizer.VisualizerEngine
 import io.github.aedev.flow.player.audio.visualizer.VisualizerTapProcessor
 import io.github.aedev.flow.player.audio.visualizer.followPlayerClock
 import io.github.aedev.flow.player.factory.LoadControlFactory
+import io.github.aedev.flow.player.setVideoCapablePlaybackIds
 import io.github.aedev.flow.plugin.catalog.PluginAccounts
 import io.github.aedev.flow.plugin.playback.PluginAudio
 import io.github.aedev.flow.plugin.playback.PluginRadio
@@ -261,6 +262,10 @@ class Media3MusicService : MediaLibraryService() {
         }
 
         initializePlayer()
+        lifecycleScope.launch {
+            combine(pluginAudio.videoCapablePlaybackIds, EnhancedMusicPlayerManager.currentTrack) { ids, _ -> ids }
+                .collect(EnhancedMusicPlayerManager::setVideoCapablePlaybackIds)
+        }
         musicSession.initializeSession()
         observeEqualizer()
 
@@ -547,6 +552,7 @@ class Media3MusicService : MediaLibraryService() {
 
     override fun onDestroy() {
         EnhancedMusicPlayerManager.prefetcher = null
+        EnhancedMusicPlayerManager.setVideoCapablePlaybackIds(emptySet())
         // Flush the in-flight listen session before the player goes away.
         finalizeListenSession()
 

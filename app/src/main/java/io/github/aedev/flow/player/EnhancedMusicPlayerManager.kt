@@ -169,6 +169,8 @@ object EnhancedMusicPlayerManager {
     // decoded or downloaded that nobody sees (collapsed now-playing, background, screen off).
     internal var videoSurfaces = 0
 
+    val videoAvailable: StateFlow<Boolean> = musicVideoAvailableState.asStateFlow()
+
     internal val videoShownState = MutableStateFlow(false)
 
     /** Whether the playing track's picture is shown rather than the visualizer. */
@@ -341,8 +343,6 @@ object EnhancedMusicPlayerManager {
         LocalMediaIds.audioUri(track.videoId)
             ?: MusicVideoItems.uri(track, withPicture = carriesPicture(track))
 
-    internal fun carriesPicture(track: MusicTrack): Boolean = showVideo && track.isVideoSong && track.videoId !in videoUnavailableIds
-
     /**
      * Shows or hides music videos' pictures. Hiding turns the playing track's picture off while its sound
      * plays on; showing gives it back, reloading the track once if it started as a song. Queued tracks
@@ -355,7 +355,6 @@ object EnhancedMusicPlayerManager {
 
     fun releaseVideoSurface() = performReleaseVideoSurface()
 
-    /** The service found no playable picture for [videoId]; it plays as its song from now on. */
     fun onVideoUnavailable(videoId: String) = performOnVideoUnavailable(videoId)
 
     internal fun clearPendingPlayNext() {

@@ -19,12 +19,25 @@ import nl.neerdael.milkbeat.catalog.PrivatePlaylistImportProgress
 import nl.neerdael.milkbeat.catalog.PrivatePlaylistImportRequest
 import nl.neerdael.milkbeat.catalog.PrivatePlaylistImportResult
 import nl.neerdael.milkbeat.catalog.ProviderAccount
+import nl.neerdael.milkbeat.plugin.AudioMatchStrategy
 import nl.neerdael.milkbeat.plugin.PluginError
 import nl.neerdael.milkbeat.plugin.PluginErrorCode
 import nl.neerdael.milkbeat.plugin.PluginOperations
 import org.junit.Test
 
 class PlaylistMirrorBatchRunnerTest {
+    @Test
+    fun `video-capable mirror batches use video matching and preserve destination preparation`() =
+        runTest {
+            val f = PlaylistMirrorRunnerFixture(17, batchMatching = true, videoMatching = true)
+            assertThat(f.runner.prepare(f.key, "Playlist").matches).hasSize(17)
+            assertThat(f.batchCalls.map { it.size }).containsExactly(16, 1).inOrder()
+            assertThat(f.ensureRequests.first()?.mode).isEqualTo(PrivatePlaylistImportMode.ENSURE)
+            coVerify(exactly = 2) {
+                f.matcher.matchBatchForIndexing(any(), "target", any(), AudioMatchStrategy.VIDEOS, any())
+            }
+        }
+
     @Test
     fun `capable target receives bounded matching batches with empty ensure in first root`() =
         runTest {

@@ -8,6 +8,20 @@ import nl.neerdael.milkbeat.catalog.TrackDescriptor
 import org.junit.Test
 
 class TrackMatchScoreTest {
+    private fun video(
+        title: String,
+        uploader: String,
+        durationMs: Long?,
+        id: String = "video-id",
+    ) = TrackDescriptor(
+        ref = EntityRef(EntityKind.MUSIC_VIDEO, id),
+        title = title,
+        artists = listOf(ArtistCredit(uploader)),
+        durationMs = durationMs,
+        hasVideo = true,
+        ids = mapOf("yt" to id),
+    )
+
     private fun track(
         title: String,
         artist: String,
@@ -41,6 +55,99 @@ class TrackMatchScoreTest {
     }
 
     private val spotify = track("Sky and Sand", "Paul Kalkbrenner", 238, mapOf("spotify" to "4uLU"))
+
+    private val fideles = track("Fideles| CRSSD Festival Live Set Fall 2023", "Fideles", null).copy(durationMs = 4_466_860)
+    private val fidelesVideo = video("Fideles @ CRSSD Fall 2023 | Beatport Live", "Beatport", 4_467_000, "Gc5BT-1jjU8")
+    private val agents = track("Agents Of Time - Recorded Live at Hï Ibiza 2024", "Hï Ibiza", null).copy(durationMs = 5_428_036)
+    private val agentsVideo = video("Agents Of Time • Live Mix • Hï Ibiza 2024", "Hï Ibiza", 5_428_000, "cXDbsXs2xto")
+
+    @Test
+    fun `explicit live set performance and event identity accepts the captured Fideles upload`() {
+        assertThat(TrackMatchScore.best(fideles, listOf(fidelesVideo))?.candidate).isSameInstanceAs(fidelesVideo)
+        assertThat(fidelesVideo.artists.single().name).isEqualTo("Beatport")
+    }
+
+    @Test
+    fun `explicit live set performance and event identity accepts the captured Agents Of Time upload`() {
+        assertThat(TrackMatchScore.best(agents, listOf(agentsVideo))?.candidate).isSameInstanceAs(agentsVideo)
+        assertThat(agentsVideo.artists.single().name).isEqualTo("Hï Ibiza")
+    }
+
+    @Test
+    fun `live set title agreement cannot rescue a different performer event or year`() {
+        for (title in listOf(
+            "Someone Else @ CRSSD Fall 2023 | Beatport Live",
+            "Fideles @ CRSSD Spring 2023 | Beatport Live",
+            "Fideles @ CRSSD Fall 2024 | Beatport Live",
+            "Fideles @ Another Festival Fall 2023 | Beatport Live",
+            "Fideles @ CRSSD Fall 2023 Cover | Beatport Live",
+            "Fideles @ CRSSD Fall 2023 Remix | Beatport Live",
+        )) {
+            assertThat(TrackMatchScore.best(fideles, listOf(fidelesVideo.copy(title = title)))).isNull()
+        }
+        assertThat(
+            TrackMatchScore.best(agents, listOf(agentsVideo.copy(title = "Agents Of Time • Live Mix • Ushuaïa Ibiza 2024"))),
+        ).isNull()
+    }
+
+    @Test
+    fun `live set matching requires complete video duration and dated event evidence`() {
+        for (candidate in listOf(
+            fidelesVideo.copy(durationMs = 4_000_000),
+            fidelesVideo.copy(durationMs = 5_000_000),
+            fidelesVideo.copy(durationMs = null),
+            fidelesVideo.copy(hasVideo = false),
+            fidelesVideo.copy(ids = emptyMap()),
+            fidelesVideo.copy(ref = EntityRef(EntityKind.TRACK, "audio")),
+            fidelesVideo.copy(title = "Fideles @ CRSSD Fall | Beatport Live"),
+            fidelesVideo.copy(title = "Fideles @ CRSSD Fall 2023 | Another Label Live"),
+        )) {
+            assertThat(TrackMatchScore.best(fideles, listOf(candidate))).isNull()
+        }
+        assertThat(TrackMatchScore.best(fideles.copy(durationMs = null), listOf(fidelesVideo))).isNull()
+    }
+
+    @Test
+    fun `official video title can explicitly credit the performer when a label is the uploader`() {
+        val source = track("Prophecy", "Anyma", 143)
+        val candidate = video("Anyma - Prophecy (Official Music Video)", "Afterlife", 143_000)
+        assertThat(TrackMatchScore.best(source, listOf(candidate))?.candidate).isSameInstanceAs(candidate)
+        val artTrack = video("Anyma - Prophecy (Official Audio)", "Afterlife", 143_000)
+        assertThat(TrackMatchScore.best(source, listOf(artTrack))?.candidate).isSameInstanceAs(artTrack)
+    }
+
+    @Test
+    fun `video title credit preserves performer recording guest and duration safeguards`() {
+        val source = track("Prophecy", "Anyma", 143)
+        for (candidate in listOf(
+            video("Another Artist - Prophecy (Official Music Video)", "Afterlife", 143_000),
+            video("Anyma - Another Song (Official Music Video)", "Afterlife", 143_000),
+            video("Anyma - Prophecy (Cover)", "Afterlife", 143_000),
+            video("Anyma - Prophecy (Live)", "Afterlife", 143_000),
+            video("Anyma - Prophecy (Remix)", "Afterlife", 143_000),
+            video("Anyma - Prophecy", "Anyma Tribute Band", 143_000),
+            video("Anyma - Prophecy", "Afterlife", 120_000),
+            video("Anyma - Prophecy", "Afterlife", null),
+            video("Anyma - Prophecy", "Afterlife", 143_000).copy(hasVideo = false),
+        )) {
+            assertThat(TrackMatchScore.best(source, listOf(candidate))).isNull()
+        }
+        assertThat(
+            TrackMatchScore.best(source.copy(artists = emptyList()), listOf(video("Anyma - Prophecy", "Afterlife", 143_000))),
+        ).isNull()
+        assertThat(
+            TrackMatchScore.best(
+                track("Prophecy (feat. Real Guest)", "Anyma", 143),
+                listOf(video("Anyma - Prophecy (feat. Wrong Guest)", "Afterlife", 143_000)),
+            ),
+        ).isNull()
+        assertThat(
+            TrackMatchScore.best(
+                source.copy(artists = listOf(ArtistCredit("Anyma & Other"), ArtistCredit("Anyma"), ArtistCredit("Other"))),
+                listOf(video("Anyma - Prophecy", "Afterlife", 143_000)),
+            ),
+        ).isNull()
+    }
 
     @Test
     fun `the same song by the same artist at the same length is nearly certain`() {

@@ -5,6 +5,11 @@ import io.github.aedev.flow.plugin.PluginHost
 import io.github.aedev.flow.plugin.catalog.PluginAccounts
 import io.github.aedev.flow.plugin.registry.PluginRegistry
 import io.github.aedev.flow.plugin.runtime.PluginCallException
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import nl.neerdael.milkbeat.catalog.EntityRef
@@ -75,6 +80,26 @@ class PluginAudio
         private val resolved = ConcurrentHashMap<AudioIdentity, ResolvedAudio>()
         private val playbackIds = ConcurrentHashMap<String, AudioIdentity>()
         private val cacheGeneration = AtomicLong()
+        private val resolvedRevision = MutableStateFlow(0L)
+
+        val videoCapablePlaybackIds: Flow<Set<String>>
+            get() =
+                combine(resolvedRevision, registry.state, accounts.accounts) { _, state, accountState ->
+                    val context = state to accountState
+                    playbackIds.entries
+                        .filter { (_, identity) ->
+                            resolved[identity]?.let { audio ->
+                                audio.preparationContext == context &&
+                                    state
+                                        .plugin(audio.pluginId)
+                                        ?.manifest
+                                        ?.roles
+                                        ?.audio
+                                        ?.musicVideo == true
+                            } == true
+                        }.map { it.key }
+                        .toSet()
+                }.distinctUntilChanged()
 
         private fun streamContext(): Any = registry.state.value to accounts.accounts.value
 
@@ -103,7 +128,10 @@ class PluginAudio
             playbackId: String = track.ref.providerId,
             preferredProviderId: String? = null,
         ): ResolvedAudio {
-            playbackIds[playbackId] = track.audioIdentity()
+            val identity = track.audioIdentity()
+            if (playbackIds.put(playbackId, identity) != identity) {
+                resolvedRevision.update { revision -> revision + 1 }
+            }
             return resolveLocked(track, picture, quality, strict = false, preferredProviderId)
         }
 
@@ -137,9 +165,20 @@ class PluginAudio
             val context = streamContext()
             val version = context to cacheGeneration.get()
             val key = track.audioIdentity()
+            val state = registry.state.value
+            val previous = resolved[key]?.takeIf { it.preparationContext == context }
+            val providers = audioProviderAttempts(state, track, withPicture = picture != null, preferredProviderId = preferredProviderId)
+            val pinned =
+                previous?.takeIf { picture != null || it.validUntilMs <= System.currentTimeMillis() }?.let { audio ->
+                    providers.firstOrNull { it.plugin.id == audio.pluginId }?.let { AudioProviderAttempt(it.plugin, audio.track) }
+                }
             val attempts =
-                audioProviderAttempts(registry.state.value, track, withPicture = picture != null, preferredProviderId = preferredProviderId)
-            val order = attempts.map { "${it.plugin.id}:${it.plugin.manifest.versionCode}" }
+                when {
+                    pinned == null -> providers
+                    picture != null -> listOf(pinned)
+                    else -> listOf(pinned) + providers.filterNot { it.plugin.id == pinned.plugin.id }
+                }
+            val order = (if (picture != null) attempts else providers).map { "${it.plugin.id}:${it.plugin.manifest.versionCode}" }
             resolved[key]
                 ?.takeIf {
                     it.preparationContext == context && it.providerOrder == order && it.validUntilMs > System.currentTimeMillis() &&
@@ -155,7 +194,7 @@ class PluginAudio
             }
             var last: PluginCallException? = null
             for ((plugin, known) in attempts) {
-                var playable = known ?: match(track, plugin.id, strict) ?: continue
+                var playable = known ?: match(track, plugin.id, strict, strategy = plugin.audioMatchStrategy()) ?: continue
                 for (attempt in 0..1) {
                     val request =
                         ResolveAudioRequest(
@@ -186,7 +225,12 @@ class PluginAudio
                             request,
                             context,
                         ).also {
-                            synchronized(resolved) { if (version == preparationVersion()) resolved[key] = it }
+                            synchronized(resolved) {
+                                if (version == preparationVersion()) {
+                                    resolved[key] = it
+                                    resolvedRevision.update { revision -> revision + 1 }
+                                }
+                            }
                         }
                     } catch (e: PluginCallException) {
                         last = e
@@ -194,7 +238,9 @@ class PluginAudio
                         if (known != null) break
                         matcher.invalidate(track, plugin.id)
                         if (attempt != 0) break
-                        playable = match(track, plugin.id, strict, excludedId = playable.ref.providerId) ?: break
+                        playable =
+                            match(track, plugin.id, strict, excludedId = playable.ref.providerId, strategy = plugin.audioMatchStrategy())
+                                ?: break
                     }
                 }
             }
@@ -213,8 +259,18 @@ class PluginAudio
             pluginId: String,
             strict: Boolean,
             excludedId: String? = null,
+            strategy: nl.neerdael.milkbeat.plugin.AudioMatchStrategy,
         ): TrackDescriptor? =
-            if (strict) matcher.matchForIndexing(track, pluginId, excludedId) else matcher.match(track, pluginId, excludedId)
+            if (strict) {
+                matcher.matchForIndexing(
+                    track,
+                    pluginId,
+                    excludedId,
+                    strategy,
+                )
+            } else {
+                matcher.match(track, pluginId, excludedId, strategy)
+            }
 
         suspend fun refreshBound(audio: ResolvedAudio): ResolvedAudio {
             val request = audio.request ?: ResolveAudioRequest(audio.track, video = audio.withPicture)
@@ -298,8 +354,11 @@ class PluginAudio
             return setOf(native.ref.providerId) + native.ids.filterKeys { it != "isrc" }.values
         }
 
-        /** What was resolved for track [id], if anything still is: its loudness, tracking token and plugin. */
-        fun current(id: String): ResolvedAudio? = playbackIds[id]?.let(resolved::get)
+        /** The current-context stream for [id], excluding a URL invalidated during recovery. */
+        fun current(id: String): ResolvedAudio? =
+            playbackIds[id]?.let(resolved::get)?.takeIf {
+                it.validUntilMs != 0L && it.preparationContext == streamContext()
+            }
 
         /** Playback of [id] failed on [url] with [status]; the next resolve asks the plugin for another. */
         fun failed(
@@ -308,8 +367,13 @@ class PluginAudio
             status: Int?,
         ) {
             val key = playbackIds[id] ?: return
-            resolved.remove(key)
             failures[key] = StreamFailure(url, status)
+            if (status == 403) {
+                forget(id)
+            } else {
+                resolved.remove(key)
+                resolvedRevision.update { it + 1 }
+            }
         }
 
         /** [pluginId]'s own track for [track]: the track itself when the plugin plays its ids, else its match. */
@@ -324,14 +388,30 @@ class PluginAudio
             ) {
                 return null
             }
-            return resolved[track.audioIdentity()]?.takeIf { it.pluginId == pluginId }?.track ?: matcher.match(track, pluginId)
+            return resolved[track.audioIdentity()]?.takeIf { it.pluginId == pluginId }?.track
+                ?: matcher.match(track, pluginId, strategy = plugin.audioMatchStrategy())
         }
 
+        /** Expire URLs for [id], retaining the accepted recording for same-context recovery. */
         fun forget(id: String) {
             synchronized(resolved) {
                 cacheGeneration.incrementAndGet()
-                playbackIds[id]?.let(resolved::remove)
+                playbackIds[id]?.let { key ->
+                    resolved.computeIfPresent(key) { _, audio ->
+                        ResolvedAudio(
+                            audio.pluginId,
+                            audio.track,
+                            audio.stream,
+                            0L,
+                            audio.withPicture,
+                            audio.providerOrder,
+                            audio.request,
+                            audio.preparationContext,
+                        )
+                    }
+                }
             }
+            resolvedRevision.update { it + 1 }
         }
 
         fun forgetAll() {
@@ -339,6 +419,7 @@ class PluginAudio
                 cacheGeneration.incrementAndGet()
                 resolved.clear()
             }
+            resolvedRevision.update { it + 1 }
         }
 
         /** Reports a listen to the plugin that played it, when it reports listens and the listener allows it. */

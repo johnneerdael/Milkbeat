@@ -76,7 +76,7 @@ Under **Metadata**, choose the catalog for the Music tab. Under **Video**, choos
 
 Under **Audio**, enable the providers you want to use. Select **Move earlier** or **Move later** to change their order, then **Done**.
 
-For example, YouTube Music first and Beatport second means Milkbeat tries YouTube first. If it cannot find or play a recording, it tries Beatport. Availability depends on each catalog, account and subscription.
+For example, YouTube Music first and Beatport second means Milkbeat tries YouTube first. If it cannot find or play a recording, it tries Beatport. Availability depends on each catalog, account and subscription. YouTube matching searches recorded videos, including static Art Tracks and archived live sets, regardless of whether you choose the visualizer, artwork or video view. It still checks recording identity; an unrelated performance, cover or excerpt is rejected. The picture loads only when you select Video in Now Playing.
 
 ![Audio provider priority: YouTube Music first and Beatport second](images/audio-priority.png)
 

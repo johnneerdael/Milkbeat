@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Milkbeat</string>
+    <string name="app_name_preview">Milkbeat Preview</string>
     <string name="subscribed">Subscribed</string>
     <string name="retry">Retry</string>
     <string name="library">Library</string>

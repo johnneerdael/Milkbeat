@@ -9,28 +9,28 @@ import org.junit.Test
 class NowPlayingViewTest {
     @Test
     fun `the button steps from the visualizer to the video to the artwork and round again`() {
-        assertThat(nextNowPlayingView(VISUALIZER, VISUALIZER, videoAvailable = true, visualizerAvailable = true)).isEqualTo(VIDEO)
-        assertThat(nextNowPlayingView(VIDEO, VIDEO, videoAvailable = true, visualizerAvailable = true)).isEqualTo(STATIC)
-        assertThat(nextNowPlayingView(STATIC, STATIC, videoAvailable = true, visualizerAvailable = true)).isEqualTo(VISUALIZER)
+        assertThat(nextNowPlayingView(VISUALIZER, videoAvailable = true, visualizerAvailable = true)).isEqualTo(VIDEO)
+        assertThat(nextNowPlayingView(VIDEO, videoAvailable = true, visualizerAvailable = true)).isEqualTo(STATIC)
+        assertThat(nextNowPlayingView(STATIC, videoAvailable = true, visualizerAvailable = true)).isEqualTo(VISUALIZER)
     }
 
     @Test
     fun `a track without a video skips straight to the artwork`() {
-        assertThat(nextNowPlayingView(VISUALIZER, VISUALIZER, videoAvailable = false, visualizerAvailable = true)).isEqualTo(STATIC)
-        assertThat(nextNowPlayingView(STATIC, STATIC, videoAvailable = false, visualizerAvailable = true)).isEqualTo(VISUALIZER)
+        assertThat(nextNowPlayingView(VISUALIZER, videoAvailable = false, visualizerAvailable = true)).isEqualTo(STATIC)
+        assertThat(nextNowPlayingView(STATIC, videoAvailable = false, visualizerAvailable = true)).isEqualTo(VISUALIZER)
     }
 
     @Test
     fun `without a visualizer the button moves between the video and the artwork only`() {
-        assertThat(nextNowPlayingView(STATIC, STATIC, videoAvailable = true, visualizerAvailable = false)).isEqualTo(VIDEO)
-        assertThat(nextNowPlayingView(VIDEO, VIDEO, videoAvailable = true, visualizerAvailable = false)).isEqualTo(STATIC)
-        assertThat(nextNowPlayingView(STATIC, STATIC, videoAvailable = false, visualizerAvailable = false)).isEqualTo(STATIC)
+        assertThat(nextNowPlayingView(STATIC, videoAvailable = true, visualizerAvailable = false)).isEqualTo(VIDEO)
+        assertThat(nextNowPlayingView(VIDEO, videoAvailable = true, visualizerAvailable = false)).isEqualTo(STATIC)
+        assertThat(nextNowPlayingView(STATIC, videoAvailable = false, visualizerAvailable = false)).isEqualTo(STATIC)
     }
 
     @Test
-    fun `a chosen video the track cannot show is skipped rather than chosen again`() {
-        assertThat(nextNowPlayingView(VIDEO, VISUALIZER, videoAvailable = true, visualizerAvailable = true)).isEqualTo(STATIC)
-        assertThat(nextNowPlayingView(VIDEO, STATIC, videoAvailable = true, visualizerAvailable = false)).isEqualTo(STATIC)
+    fun `confirmed video becomes selectable even when the remembered view is Video`() {
+        assertThat(nextNowPlayingView(VISUALIZER, videoAvailable = true, visualizerAvailable = true)).isEqualTo(VIDEO)
+        assertThat(nextNowPlayingView(STATIC, videoAvailable = true, visualizerAvailable = false)).isEqualTo(VIDEO)
     }
 
     @Test

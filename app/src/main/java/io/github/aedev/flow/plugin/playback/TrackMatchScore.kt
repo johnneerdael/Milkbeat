@@ -1,12 +1,13 @@
 package io.github.aedev.flow.plugin.playback
 
+import nl.neerdael.milkbeat.catalog.EntityKind
 import nl.neerdael.milkbeat.catalog.TrackDescriptor
 import java.text.Normalizer
 import java.util.Locale
 import kotlin.math.abs
 
 internal object TrackMatchScore {
-    const val POLICY_VERSION = 2
+    const val POLICY_VERSION = 3
     const val MIN_SCORE = 0.35
     private const val CERTAIN = 1.0
     private const val EARLY_EXIT = 0.95
@@ -18,6 +19,13 @@ internal object TrackMatchScore {
     private const val DURATION_WEIGHT = 0.20
     private const val UNKNOWN_DURATION = 0.5
     private const val ISRC = "isrc"
+    private const val MIN_LIVE_SET_DURATION_MS = 20 * 60 * 1000L
+
+    private val titleCredit = Regex("^(.+?)\\s*(?:[|@•]|\\s+[-–—:]\\s+)\\s*(.+)$")
+    private val trailingUploader = Regex("\\s*[|•]\\s*([^|•]+)$")
+    private val liveWord = Regex("\\blive\\b")
+    private val liveSetWords = Regex("\\b(?:recorded|live|set|mix|festival|at)\\b")
+    private val eventYear = Regex("\\b(?:19|20)\\d{2}\\b")
 
     private val bracketedFeature = Regex("[\\[(]\\s*(?:feat(?:uring)?|ft|with)\\b[^)\\]]*[)\\]]", RegexOption.IGNORE_CASE)
     private val trailingFeature = Regex("\\s+(?:feat(?:uring)?|ft)\\.?\\s+.*?(?=\\s*[\\[(]|\\s+[-–—]\\s+|$)", RegexOption.IGNORE_CASE)
@@ -63,9 +71,15 @@ internal object TrackMatchScore {
         candidates.firstOrNull { sharesIsrc(track, it) && !isMixed(it) }?.let { return Scored(it, CERTAIN) }
         var best: Scored? = candidates.firstOrNull { sharesIsrc(track, it) }?.let { Scored(it, CERTAIN) }
         for (candidate in candidates) {
-            val evidence = evidence(track, candidate)
-            if (evidence.title < MIN_TITLE_SIMILARITY || evidence.artist < MIN_ARTIST_SIMILARITY) continue
-            if (!versionsCompatible(recordingTitle(track), recordingTitle(candidate)) || !durationsCompatible(track, candidate)) continue
+            val ordinary = evidence(track, candidate)
+            val evidence =
+                if (ordinary.title >= MIN_TITLE_SIMILARITY && ordinary.artist >= MIN_ARTIST_SIMILARITY &&
+                    versionsCompatible(recordingTitle(track), recordingTitle(candidate)) && durationsCompatible(track, candidate)
+                ) {
+                    ordinary
+                } else {
+                    videoEvidence(track, candidate) ?: continue
+                }
             if (!collectiveMembersCompatible(track, candidate)) continue
             if (!guestsCompatible(track, candidate)) continue
             val score = evidence.score
@@ -85,7 +99,76 @@ internal object TrackMatchScore {
         candidate: TrackDescriptor,
     ): Double {
         if (sharesIsrc(track, candidate)) return CERTAIN
-        return evidence(track, candidate).score
+        return (videoEvidence(track, candidate) ?: evidence(track, candidate)).score
+    }
+
+    private fun videoEvidence(
+        track: TrackDescriptor,
+        candidate: TrackDescriptor,
+    ): Evidence? {
+        if (!candidate.hasVideo || (candidate.ref.kind != EntityKind.VIDEO && candidate.ref.kind != EntityKind.MUSIC_VIDEO)) return null
+        if (candidate.ids["yt"].isNullOrBlank() && candidate.ids["ytm"].isNullOrBlank()) return null
+        val sourceMs = track.durationMs ?: return null
+        val candidateMs = candidate.durationMs ?: return null
+        if (sourceMs <= 0 || candidateMs <= 0 || abs(sourceMs - candidateMs) > MAX_DURATION_DELTA_MS) return null
+        val credit = titleCredit.matchEntire(candidate.title) ?: return null
+        val performer = foldLatinAccents(normalizeText(credit.groupValues[1]))
+        val sourceArtist = performerCredits(track).firstOrNull() ?: return null
+        val normalizedArtist = foldLatinAccents(normalizeText(sourceArtist.replace(topicSuffix, "")))
+        if (normalizedArtist in unavailableArtists) return null
+        if (!imitationCompatible(
+                normalizedArtist,
+                normalizeText(
+                    candidate.artists
+                        .firstOrNull()
+                        ?.name
+                        .orEmpty(),
+                ),
+            )
+        ) {
+            return null
+        }
+        val title = normalize(credit.groupValues[2])
+        val titleSimilarity = textSimilarity(recordingTitle(track), title)
+        if (normalizedArtist == performer && titleSimilarity >= MIN_TITLE_SIMILARITY &&
+            versionsCompatible(recordingTitle(track), title)
+        ) {
+            return Evidence(titleSimilarity, CERTAIN, durationScore(sourceMs, candidateMs))
+        }
+        if (sourceMs < MIN_LIVE_SET_DURATION_MS || candidateMs < MIN_LIVE_SET_DURATION_MS) return null
+        if (!liveWord.containsMatchIn(normalize(track.title)) || !liveWord.containsMatchIn(normalize(candidate.title))) return null
+        val sourceCredit = titleCredit.matchEntire(track.title) ?: return null
+        if (foldLatinAccents(normalizeText(sourceCredit.groupValues[1])) != performer) return null
+        if (normalizedArtist != performer && performerSimilarity(track, candidate) < MIN_ARTIST_SIMILARITY) return null
+        if ((variantMarkers.findAll(normalize(track.title)) + variantMarkers.findAll(normalize(candidate.title)))
+                .any { it.value != "live" && it.value != "mix" }
+        ) {
+            return null
+        }
+        val event = liveSetEvent(sourceCredit.groupValues[2])
+        val foundEvent = liveSetEvent(withoutUploader(credit.groupValues[2], candidate))
+        if (event != foundEvent || !eventYear.containsMatchIn(event) ||
+            event.replace(eventYear, "").split(" ").count { it.isNotBlank() } < 2
+        ) {
+            return null
+        }
+        return Evidence(CERTAIN, CERTAIN, durationScore(sourceMs, candidateMs))
+    }
+
+    private fun liveSetEvent(title: String): String =
+        foldLatinAccents(normalizeText(title)).replace(liveSetWords, " ").replace(spaces, " ").trim()
+
+    private fun withoutUploader(
+        title: String,
+        candidate: TrackDescriptor,
+    ): String {
+        val suffix = trailingUploader.find(title) ?: return title
+        val uploader = candidate.artists.firstOrNull()?.name ?: return title
+        return if (liveSetEvent(suffix.groupValues[1]) == foldLatinAccents(normalizeText(uploader))) {
+            title.substring(0, suffix.range.first)
+        } else {
+            title
+        }
     }
 
     internal fun normalize(text: String): String {
