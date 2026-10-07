@@ -27,8 +27,8 @@ services and play music videos. Everything is built for the TV remote.
 - **Your own music:** local folders and SMB 2/3, WebDAV, SFTP and NFS (v3, v4.0, v4.1) servers,
   with embedded tags and album artwork.
 - **Streaming catalogs:** optional YouTube Music, Spotify, Beatport and SoundCloud plugins.
-- **One library:** app and provider playlists together, including Liked songs; folder music has
-  its own Folders section.
+- **One library:** app and provider playlists together, including Liked songs; **Local library**
+  groups folder music by artist, release, genre, label and year. **Folders** also supports direct browsing.
 - **Ordered audio providers:** try one provider first, then fall back to the next.
 - **Playback preparation:** index provider playlists in advance and resolve upcoming queue tracks
   one at a time across the remaining queue.
@@ -91,7 +91,17 @@ MP3, FLAC and M4A files have been tested, including playback, seeking and embedd
 Other audio formats depend on the codecs available on your device. Embedded title, artist,
 album, duration and cover art are read in the background as tracks become visible or play.
 Metadata and artwork use a bounded memory cache; this is folder browsing, not a persistent
-scan of the whole library. Sources can be edited, refreshed or removed in Settings.
+scan of the whole library in the Folders browser. **Library > Local library** uses a persistent
+tag index for artists, releases, playlists, genres, labels and years. Sources can be edited,
+refreshed or removed in Settings.
+
+Selecting a track in Local library plays only that file. Use a collection's **Play** or **Shuffle**
+button to queue its tracks. With an enabled YouTube Music plugin, Milkbeat matches the first
+queued song's title, artists and duration in the background to seed radio. The match supplies
+recommendations only: queued local files keep playing from their original storage. Suggestions
+continue after collection queues when endless radio is enabled; selecting one track requests its
+radio explicitly. Offline playback and a missing
+match still play the local queue, with no radio inherited from a previous session.
 
 ## Optional streaming plugins
 

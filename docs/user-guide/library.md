@@ -59,6 +59,7 @@ The search, album and artist examples above are retained captures from the earli
 | Section | Contents |
 | --- | --- |
 | Folders | Configured local and SMB sources |
+| Local library | Folder music indexed by artists, releases, playlists, genres, labels and years |
 | History | Music and video activity recorded by the app |
 | Watch later | Saved items for later playback |
 | Playlists | App playlists and playlists from every enabled, signed-in metadata provider |
@@ -66,4 +67,8 @@ The search, album and artist examples above are retained captures from the earli
 
 There is one Playlists section. Liked videos are omitted from this TV library view. Other account-specific sections depend on the selected provider. Provider lists are paged; an unavailable provider does not hide the others, and failed pages can be retried.
 
-Library → Folders is separate from provider playlists. There is currently no artist/genre/label catalog for the local folder collection.
+Library → Folders browses the storage sources directly. **Local library** organizes their tagged
+music into artists, releases, playlists, genres, labels and years. Selecting a track plays that
+track alone; use a collection's **Play** or **Shuffle** button to queue its tracks. An enabled
+YouTube Music plugin can seed [radio](playback.md#mixes) from the first song without changing
+the local playback source.

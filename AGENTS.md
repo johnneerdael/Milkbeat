@@ -718,6 +718,13 @@ revision must pass the configured ktlint rules.
   collected only by `TvMusicScreen` using `collectAsStateWithLifecycle` for the Music route.
   Automatic first-page retries wait for a state subscriber after backoff; preserve that lifecycle
   gate when adding consumers. Never tie playback or queue preparation to Home visibility.
+- `Media3MusicService` retains the sole music player and media-session ownership. Its existing
+  radio, recovery, listening, locks and session callbacks live in `service/MusicService*.kt`.
+  Local library IDs stay local throughout playback; `MusicVideoItems.descriptor` supplies
+  title, artist credits and duration to `PluginRadio` for metadata-only YouTube Music matching.
+  Local queues seed radio once from their first song, never through `resolveAudio`. Track-row
+  selection in `ui/tv/catalog/TvCatalogBlocks.kt` starts a single-track mix; collection Play/Shuffle
+  retains the full queue. Never put a matched streaming ID in place of a local playback ID or URI.
 
 1. After making changes, build the relevant flavor to check for compilation errors, e.g.:
 

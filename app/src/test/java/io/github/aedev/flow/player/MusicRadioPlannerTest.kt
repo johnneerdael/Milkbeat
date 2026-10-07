@@ -12,6 +12,19 @@ import org.junit.Test
  */
 class MusicRadioPlannerTest {
     @Test
+    fun `selecting one local song leaves the collection station and reseeds its own radio`() {
+        val context =
+            MusicRadioPlanner.resolveQueueContext(
+                currentId = "local_2",
+                queueIds = listOf("local_2"),
+                previousIds = listOf("local_1", "local_2", "local_3"),
+                explicitSeedId = null,
+            )
+        assertThat(context.reseed).isTrue()
+        assertThat(context.explicit).isFalse()
+    }
+
+    @Test
     fun `an explicitly opened collection reseeds even when its first played song was in the old queue`() {
         val context =
             MusicRadioPlanner.resolveQueueContext(

@@ -248,6 +248,8 @@ class MusicPlayerViewModel
             track: MusicTrack,
             queue: List<MusicTrack>,
             localUris: Map<String, Uri>,
+            asRadio: Boolean = false,
+            radioPlaylistId: String? = null,
         ) {
             loadTrackJob?.cancel()
             loadTrackJob =
@@ -262,6 +264,8 @@ class MusicPlayerViewModel
                         )
                     }
                     withContext(kotlinx.coroutines.Dispatchers.Main) {
+                        EnhancedMusicPlayerManager.pendingRadioSeedId = track.videoId.takeIf { asRadio }
+                        EnhancedMusicPlayerManager.pendingRadioPlaylistId = radioPlaylistId.takeUnless { asRadio }
                         EnhancedMusicPlayerManager.playTrack(
                             track = track,
                             audioUrl = localUris[track.videoId]?.toString() ?: "",
@@ -306,6 +310,13 @@ class MusicPlayerViewModel
             // fetching and restarting it; a paused one resumes. The queue is left as it is.
             if (!asRadio && isLoadedInPlayer(track.videoId) &&
                 track.sourcePosition == EnhancedMusicPlayerManager.currentTrack.value?.sourcePosition &&
+                (
+                    !isLocalMediaId(track.videoId) ||
+                        queue.ifEmpty { listOf(track) }.map { it.videoId } ==
+                        EnhancedMusicPlayerManager.queue.value
+                            .filter { it.queueOrigin == io.github.aedev.flow.data.music.model.MusicQueueOrigin.USER }
+                            .map { it.videoId }
+                ) &&
                 (radioPlaylistId == null || radioPlaylistId == EnhancedMusicPlayerManager.queueCollection.value)
             ) {
                 EnhancedMusicPlayerManager.play()
@@ -313,7 +324,7 @@ class MusicPlayerViewModel
             }
             if (isLocalMediaId(track.videoId)) {
                 val localUris = (queue + track).mapNotNull { t -> LocalMediaIds.audioUri(t.videoId)?.let { t.videoId to it } }.toMap()
-                playLocalMusic(track, queue.filter { isLocalMediaId(it.videoId) }, localUris)
+                playLocalMusic(track, queue.filter { isLocalMediaId(it.videoId) }, localUris, asRadio, radioPlaylistId)
                 return
             }
             loadTrackJob?.cancel()

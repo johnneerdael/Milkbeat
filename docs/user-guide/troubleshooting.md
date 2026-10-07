@@ -4,7 +4,10 @@
 
 ## Music Home is empty
 
-Home requires a metadata plugin. Select one in Settings → Plugins and complete sign-in if its feed requires an account. For local music, use Library → Folders; no metadata plugin is needed. When the provider's Home has nothing to show, select **Retry** to ask for it again.
+For a streaming Home feed, select a metadata plugin in Settings → Plugins and complete sign-in
+if its feed requires an account. With no metadata provider selected, Home uses the tagged local
+library. Local music is also available in Library → Local library and Library → Folders without
+a metadata plugin. When the provider's Home has nothing to show, select **Retry** to ask for it again.
 
 ## Music Home says Couldn't load content
 
@@ -49,7 +52,7 @@ Check that Android has mounted the drive, then select **Refresh** in Milkbeat's 
 
 ## Tags or covers are missing
 
-Give visible tracks time to load their embedded metadata. Check that the file actually contains readable tags/artwork and that the format is supported by the device. Refresh the source after changing files. Metadata is not stored as a permanent whole-library index.
+Give visible tracks time to load their embedded metadata. Check that the file actually contains readable tags/artwork and that the format is supported by the device. Refresh the source after changing files. The Folders browser caches metadata in memory; Local library maintains a persistent tag index.
 
 ## A Spotify track cannot play
 
