@@ -60,8 +60,11 @@ These two captures show the code-enabled development build. New catalog entries 
   Full-track availability and quality depend on the recording and consumer subscription;
   Artist Pro does not grant Go+ listening rights. Preview-only or restricted recordings can still
   appear as metadata, but cannot supply full-track audio. Enable another audio provider as a fallback.
-  Install a Milkbeat build with plugin API 4 support before installing the SoundCloud package.
-  Encrypted playback uses Widevine and depends on device support and the account's license access.
+  Install a Milkbeat build with plugin API 5 support before installing the SoundCloud package.
+  TV-paired accounts currently play clear HLS streams only. Protected-only recordings cannot play
+  with this session because the mobile license exchange remains unverified. Existing web sessions
+  retain their Widevine playback path, subject to device support and account license access.
+  Playback from a TV-paired SoundCloud account does not currently report listens to SoundCloud.
 
 ## Select metadata and video
 
@@ -121,7 +124,16 @@ Disable the option to return to normal matching and radio based on the first pla
 
 ## Sign in on your phone
 
-Open the installed plugin's details and choose its sign-in method. Scan the TV's QR code with a phone on the same network. The phone viewer streams the actual provider page on the TV: use touch and typing to complete sign-in and provider verification.
+Open the installed plugin's details and choose its sign-in method.
+
+**SoundCloud TV pairing:** scan the activation QR code or open the displayed address on your phone,
+then enter the short code and approve sign-in. Your phone does not need to share the TV’s network.
+Leave this screen open while approval completes. Leaving it or sending Milkbeat to the background
+cancels the pending attempt; request a fresh code when you return. Expired or declined codes can
+be retried. The plugin checks that the completed session can fetch the account and Home before
+accepting sign-in.
+
+**Web sign-ins:** scan the TV's QR code with a phone on the same network. The phone viewer streams the actual provider page on the TV: use touch and typing to complete sign-in and provider verification.
 
 The viewer handles sign-in. Music browsing and playback remain in Milkbeat's TV interface. When a provider reports that a sign-in expired, Milkbeat immediately asks the plugin again in the background whether the account still signs in, retrying temporary connection failures, and restores it without any action when it does; private playlist preparation then resumes on its own. With YouTube Music 0.2.4 or later, a single refused request, such as a saved playlist YouTube will not open, no longer signs the account out. An account the provider confirms expired needs sign-in again; local folders remain usable.
 
@@ -142,3 +154,11 @@ Select an installed plugin to inspect its account, sign out or remove it. Removi
 ## Third-party plugin downloads
 
 Third-party plugins are optional downloads and are not included in Milkbeat app releases. Install them through the codes above or a plugin download URL. The original codes **102** (Beatport), **772** (Spotify) and **416** (YouTube Music) remain supported.
+
+### SoundCloud TV pairing
+
+Choose **Sign in with a TV code**, scan the QR link or open the displayed address on a phone or computer, sign in to SoundCloud and approve the code. Keep the TV screen open while it waits for confirmation. Back/Cancel or leaving the screen stops the attempt; request a new code when it expires. The plugin accepts the account only after its mobile account and Home requests succeed.
+
+![Example TV pairing screen with a fake demonstration code](images/soundcloud-tv-pairing-example.png)
+
+The image uses a fake code; enter the code shown on the TV. Pairing requires a compatible plugin API 5 build and the updated SoundCloud plugin. Existing web-cookie accounts can continue while accepted by SoundCloud; when reauthentication is needed, pair again. TV sessions do not submit unverified listening-history telemetry.

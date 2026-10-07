@@ -2,6 +2,14 @@
 
 This workspace keeps the TypeScript SDK and JSON schema aligned with Milkbeat's native plugin API. The app's generic plugin runtime, installation, updates, sign-in and download-code support remain in the public app repository.
 
+Plugin API 5 adds generic `deviceCode` sign-in methods and `signIn.begin/poll/confirm/cancel` operations.
+The native screen displays a permission-checked HTTPS activation URL, QR code and user code;
+polling follows the provider’s cadence only while the screen is resumed. Pending sessions are
+cancelled on navigation or pause, and expired/denied results offer retry. `webLogin` remains supported.
+`crypto.randomBytes({length})` returns 1–256 platform-generated random bytes as hex; optional
+`env.get` OS/model fields let plugins describe this installation without captured device IDs.
+Plugins needing these additions must declare API 5 as their minimum.
+
 Plugin API 4 adds optional Widevine audio descriptors (`AudioStream.drm`). The host uses Media3 and
 validates license, redirect and provisioning destinations against installed network grants.
 License headers stay separate from media headers/caches. Media and license requests share refresh

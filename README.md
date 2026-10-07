@@ -145,7 +145,10 @@ Plugins can provide separate roles:
   work without sign-in. Playback depends on each recording and your listening entitlement;
   previews and restricted recordings are not treated as full tracks. Artist Pro is a creator
   membership and does not grant Go+ listening rights. The SoundCloud package requires a Milkbeat
-  build supporting plugin API 4; its encrypted streams use the device's Widevine implementation.
+  build supporting plugin API 5. Pair it with the provider’s TV activation code or QR code.
+  TV-paired accounts currently play clear HLS streams only. Protected-only recordings cannot play
+  through this session; the mobile license exchange remains unverified. Existing web sessions retain
+  their Widevine playback path where the account and device support it.
 
 ### Provider selection and phone sign-in
 
@@ -172,7 +175,10 @@ suggestions stay in the playback queue; they are not added to the private copy. 
 See the [preparation guide](docs/user-guide/providers.md#prepare-private-playlists) and
 [what changed in 0.9.0](docs/user-guide/releases.md#milkbeat-090).
 
-Open an installed plugin's details to sign in. Web sign-ins use the
+Open an installed plugin's details to sign in. SoundCloud TV pairing shows an activation address,
+QR code and short code: complete approval in your phone’s browser. The phone can use any network.
+The TV waits while its sign-in screen is visible; leaving it or putting the app in the background
+cancels the pending attempt. Web sign-ins use the
 [streamed phone viewer](docs/phone-sign-in-remote-view.md): scan the TV's QR code with a phone on
 the same network, then touch the provider's real page and type on your phone. This includes any
 verification the provider requires. The viewer is for sign-in; browsing and playback use Milkbeat's

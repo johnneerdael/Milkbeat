@@ -2,8 +2,9 @@ package nl.neerdael.milkbeat.plugin
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import nl.neerdael.milkbeat.catalog.ProviderAccount
 
-/** A way to sign in that the host knows how to run. Only [WebLoginMethod] exists in API v1. */
+/** A way to sign in that the host knows how to run. Web login remains supported alongside device-code pairing. */
 @Serializable
 sealed interface SignInMethod {
     val id: String
@@ -49,4 +50,57 @@ data class WebLoginResult(
     val method: String,
     val cookies: String,
     val extracted: Map<String, String> = emptyMap(),
+)
+
+/** The plugin creates a challenge; the host displays it and polls only while its screen is visible. */
+@Serializable
+@SerialName("deviceCode")
+data class DeviceCodeMethod(
+    override val id: String,
+    override val label: String,
+) : SignInMethod
+
+@Serializable
+data class DeviceCodeBeginRequest(
+    val method: String,
+)
+
+/** An opaque plugin-owned handle, never an account token. */
+@Serializable
+data class DeviceCodeSession(
+    val session: String,
+)
+
+@Serializable
+data class DeviceCodeChallenge(
+    val session: String,
+    val userCode: String,
+    val verificationUri: String,
+    val verificationUriComplete: String? = null,
+    val intervalMs: Long,
+    val expiresInMs: Long? = null,
+    val message: String? = null,
+)
+
+@Serializable
+enum class DeviceCodeStatus {
+    @SerialName("pending")
+    PENDING,
+
+    @SerialName("signedIn")
+    SIGNED_IN,
+
+    @SerialName("expired")
+    EXPIRED,
+
+    @SerialName("denied")
+    DENIED,
+}
+
+@Serializable
+data class DeviceCodePollResult(
+    val status: DeviceCodeStatus,
+    val account: ProviderAccount? = null,
+    /** The provider may increase the minimum delay after a pending response. */
+    val intervalMs: Long? = null,
 )

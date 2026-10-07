@@ -42,3 +42,11 @@ capture throttling, native screenshots and trusted input inside a sandboxed
 iframe. Validate the real phone viewer and responsive Spotify page on the TV
 before claiming account login works. Verification challenges are completed by
 the person signing in.
+
+## Device-code alternative
+
+API 5 plugins can use device-code pairing instead of this remote WebView. The TV shows a provider
+activation address, QR code and short code; approval happens directly on the provider’s site.
+The native pairing controller requires no LAN viewer, follows the provider’s polling cadence only
+while resumed, and cancels on navigation or pause. SoundCloud uses this method. The existing web
+viewer remains available for providers that declare `webLogin`.

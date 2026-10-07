@@ -794,3 +794,13 @@ run that occupies a physical device, and the resulting diff is thousands of line
   journey on any thread, so moving work to a background thread keeps it in the profile. Use
   `StartupBenchmark` (`:benchmark:connectedBenchmarkReleaseAndroidTest --no-configuration-cache`)
   to measure.
+
+- Plugin API 5 adds `DeviceCodeMethod` and `signIn.begin/poll/confirm/cancel`; keep the generic TV pairing
+  controller in `ui/screens/account/DeviceCodeSignInViewModel.kt` and native presentation in
+  `ui/tv/screens/account/TvDeviceCodeSignInScreen.kt`. Validate both activation URLs against current
+  browser grants, honor provider cadence, stop on lifecycle pause, and reject stale completions.
+  Use `crypto.randomBytes` (SecureRandom, 1–256 bytes) for installation identities; never copy a
+  captured identifier. Web-login compatibility remains required.
+
+- Reuse `ui/components/shared/QrCodeImage.kt` for QR presentation across features; its existing
+  ZXing rendering and quiet zone remain shared by device pairing and the web sign-in viewer.

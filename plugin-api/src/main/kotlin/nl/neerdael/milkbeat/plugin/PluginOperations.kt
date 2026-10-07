@@ -75,6 +75,11 @@ object PluginOperations {
     val liveChat = PluginOperation("video.liveChat", LiveChatRequest.serializer(), LiveChatBatch.serializer())
     val reportView = PluginOperation("video.reportPlayback", ReportPlaybackRequest.serializer(), Unit.serializer())
 
+    val beginSignIn = PluginOperation("signIn.begin", DeviceCodeBeginRequest.serializer(), DeviceCodeChallenge.serializer())
+    val pollSignIn = PluginOperation("signIn.poll", DeviceCodeSession.serializer(), DeviceCodePollResult.serializer())
+    val confirmSignIn = PluginOperation("signIn.confirm", DeviceCodeSession.serializer(), ProviderAccount.serializer())
+    val cancelSignIn = PluginOperation("signIn.cancel", DeviceCodeSession.serializer(), Unit.serializer())
+
     val completeSignIn = PluginOperation("signIn.complete", WebLoginResult.serializer(), ProviderAccount.serializer())
     val account = PluginOperation("signIn.account", Unit.serializer(), ProviderAccount.serializer())
     val signOut = PluginOperation("signIn.signOut", Unit.serializer(), Unit.serializer())
@@ -109,6 +114,10 @@ object PluginOperations {
             comments,
             liveChat,
             reportView,
+            beginSignIn,
+            pollSignIn,
+            confirmSignIn,
+            cancelSignIn,
             completeSignIn,
             account,
             signOut,

@@ -17,6 +17,10 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import nl.neerdael.milkbeat.catalog.ProviderAccount
+import nl.neerdael.milkbeat.plugin.DeviceCodeBeginRequest
+import nl.neerdael.milkbeat.plugin.DeviceCodeChallenge
+import nl.neerdael.milkbeat.plugin.DeviceCodePollResult
+import nl.neerdael.milkbeat.plugin.DeviceCodeSession
 import nl.neerdael.milkbeat.plugin.PluginErrorCode
 import nl.neerdael.milkbeat.plugin.PluginOperations
 import nl.neerdael.milkbeat.plugin.WebLoginResult
@@ -61,6 +65,52 @@ class PluginAccounts internal constructor(
     ): ProviderAccount {
         cancelRevalidation(pluginId)
         val account = host.call(pluginId, PluginOperations.completeSignIn, result)
+        _accounts.update { it + (pluginId to account) }
+        return account
+    }
+
+    suspend fun beginDeviceSignIn(
+        pluginId: String,
+        method: String,
+    ): DeviceCodeChallenge = host.call(pluginId, PluginOperations.beginSignIn, DeviceCodeBeginRequest(method))
+
+    suspend fun pollDeviceSignIn(
+        pluginId: String,
+        session: String,
+    ): DeviceCodePollResult = host.call(pluginId, PluginOperations.pollSignIn, DeviceCodeSession(session))
+
+    suspend fun cancelDeviceSignIn(
+        pluginId: String,
+        session: String,
+    ) {
+        host.call(pluginId, PluginOperations.cancelSignIn, DeviceCodeSession(session))
+    }
+
+    /** Cleanup survives navigation destroying its ViewModel; failure leaves only the provider's expiring challenge. */
+    fun cancelDeviceSignInAsync(
+        pluginId: String,
+        session: String,
+    ) {
+        scope.launch {
+            try {
+                cancelDeviceSignIn(pluginId, session)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+            }
+        }
+    }
+
+    /** Called only after the visible pairing controller has accepted this session's completed result. */
+    suspend fun acceptDeviceSignIn(
+        pluginId: String,
+        session: String,
+    ): ProviderAccount.SignedIn {
+        val account =
+            host.call(pluginId, PluginOperations.confirmSignIn, DeviceCodeSession(session)) as? ProviderAccount.SignedIn
+                ?: error("Pairing confirmation did not return a signed-in account")
+        require(account.key.isNotBlank()) { "Pairing confirmation returned an empty account identity" }
+        cancelRevalidation(pluginId)
         _accounts.update { it + (pluginId to account) }
         return account
     }
