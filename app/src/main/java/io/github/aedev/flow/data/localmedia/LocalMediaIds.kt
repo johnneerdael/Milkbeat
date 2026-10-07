@@ -7,8 +7,8 @@ import io.github.aedev.flow.data.folders.MusicFolderKind
 import java.util.Base64
 
 /**
- * Ids for files on the device. A `local_<mediaStoreId>` id never names a YouTube video, so every
- * online lookup, sync write and engine signal must skip it.
+ * Ids for library files. These never name YouTube videos; online radio matches their metadata
+ * separately, while playback keeps their file URI. Sync writes and engine signals skip these ids.
  */
 object LocalMediaIds {
     const val PREFIX = "local_"
