@@ -5,7 +5,7 @@ Install the prerelease APK named **Milkbeat Preview**. It uses a separate app ID
 ## Set up
 
 1. Install the Preview APK from the linked GitHub prerelease.
-2. In **Milkbeat Preview**, install the preview YouTube Music plugin using downloader code **494**. This feature requires YouTube Music **0.2.9-preview.1** together with the preview app.
+2. In **Milkbeat Preview**, install the preview YouTube Music plugin using downloader code **494**. This feature requires YouTube Music **0.2.9-preview.1** together with the preview app. Preview downloader codes use its bundled catalog, so code 494 installs this test version even while stable publishes another version.
 3. Install SoundCloud using **089** and sign in with its TV code if you want personalized Home and Library. YouTube sign-in is optional for matching and playback.
 4. Select SoundCloud for metadata and put YouTube Music first under Audio in **Settings > Plugins**.
 

@@ -50,7 +50,7 @@ providers, local and network folder music, every settings category and troublesh
 
 ## Install on Android TV
 
-For the video-matching test prerelease, see the [preview setup and checks](docs/user-guide/preview-testing.md).
+For the video-matching test prerelease, see the [preview setup and checks](docs/user-guide/preview-testing.md). The separate Preview app resolves downloader codes from its bundled catalog to install the paired test providers.
 
 | Method | How |
 |---|---|

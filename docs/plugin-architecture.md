@@ -195,6 +195,7 @@ A plugin that fails any step is not stored.
 - Third-party plugin packages are distributed separately from the app.
 - Milkbeat releases contain APKs and checksums. The README lists optional third-party downloader codes.
 - Plugins use the generic installer, signature verification, permission review and update APIs.
+- Stable downloader codes prefer the live publication catalog. The separate Nightly/Preview app loads `plugin-preview-download-catalog.json` from its variant assets and resolves codes without consulting stable publication; main publication metadata and assets remain stable.
 
 ## 4. The runtime
 

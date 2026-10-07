@@ -30,7 +30,7 @@ A plugin can provide more than one role. Local and network folder playback (SMB,
 | **089** | SoundCloud |
 <!-- /plugin-codes -->
 
-Codes need a Milkbeat build with download-code support; earlier releases accept URLs. Each code identifies a registered download in the app's bundled catalog. An unknown code reports an error; try its full URL or update the app.
+Codes need a Milkbeat build with download-code support; earlier releases accept URLs. Stable builds prefer the publisher's live catalog and use the bundled catalog offline. The separate Preview app pins codes to its test catalog. An unknown code reports an error; try its full URL or update the app.
 
 ![Adding Beatport with its three-digit code](images/plugin-download-code.png)
 
@@ -38,7 +38,7 @@ Full URLs still work, including supported Buzzheavier file pages. An address wit
 
 ![Reviewing the author, roles and access after a coded download](images/plugin-download-consent.png)
 
-These two captures show the code-enabled development build. New catalog entries are delivered in app updates; codes do not automatically update installed plugins.
+These two captures show the code-enabled development build. Stable builds can resolve newly published codes without an app update. Preview codes are delivered with the preview APK; entering a code does not update an already-installed plugin.
 
 | Plugin | Metadata | Audio | Video |
 | --- | --- | --- | --- |
