@@ -8,7 +8,7 @@ const typesPath = new URL('../generated/plugin-api.ts', import.meta.url);
 const schema = JSON.parse(await readFile(schemaPath, 'utf8'));
 
 const compiled = await compile(schema, 'MilkbeatPluginApi', {
-  bannerComment: '/* Plugin API v1, generated from plugin-api by scripts/generate-types.mjs. Do not edit. */',
+  bannerComment: '/* Generated from plugin-api by scripts/generate-types.mjs. Do not edit. */',
   additionalProperties: false,
   unreachableDefinitions: false,
   style: { singleQuote: true, printWidth: 120 },

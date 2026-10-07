@@ -24,11 +24,13 @@ import io.github.aedev.flow.di.DownloadCache
 import io.github.aedev.flow.di.PlayerCache
 import io.github.aedev.flow.network.AppProxyManager
 import io.github.aedev.flow.player.MusicVideoItems
+import io.github.aedev.flow.player.datasource.BoundPluginMusicDataSourceFactory
 import io.github.aedev.flow.player.datasource.MusicFolderDataSourceFactory
 import io.github.aedev.flow.player.datasource.PluginMusicDataSourceFactory
 import io.github.aedev.flow.player.datasource.bindCachedMusicRendition
 import io.github.aedev.flow.player.datasource.hasCompleteMusicDownload
 import io.github.aedev.flow.player.stream.VideoCodecUtils
+import io.github.aedev.flow.plugin.playback.BoundPluginAudio
 import io.github.aedev.flow.plugin.playback.PictureLimits
 import io.github.aedev.flow.plugin.playback.PluginAudio
 import io.github.aedev.flow.plugin.playback.QueuePreparationResult
@@ -44,8 +46,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import nl.neerdael.milkbeat.plugin.AudioQuality
 import okhttp3.OkHttpClient
 import java.io.IOException
@@ -170,6 +170,7 @@ class DownloadUtil
                     Log.e(TAG, "[$source] Failed to resolve $mediaId: ${e.message}")
                     throw IOException("Could not resolve URL for $mediaId: ${e.message}", e)
                 }
+            requireDownloadablePluginAudio(resolved.stream)
             val playable = PlayableUrl(resolved.stream.url, resolved.stream.headers, resolved.validUntilMs)
             songUrlCache[mediaId] = playable
             downloadUrlCache[mediaId] = playable
@@ -206,25 +207,13 @@ class DownloadUtil
                 downloadCacheFactory
                     .setUpstreamDataSourceFactory(playerCacheFactory)
 
-            fun resolvingFactory(binding: ResolvedAudio? = null): DataSource.Factory {
-                val renewal = Mutex()
-                var bound = binding
-
+            fun resolvingFactory(binding: BoundPluginAudio? = null): DataSource.Factory {
                 fun resolve(
                     uri: Uri,
                     picture: Boolean,
                 ): ResolvedAudio =
                     runBlocking(Dispatchers.IO) {
-                        renewal.withLock {
-                            val previous = bound
-                            if (previous == null) {
-                                resolveForPlayback(uri, picture)
-                            } else if (previous.validUntilMs > System.currentTimeMillis()) {
-                                previous
-                            } else {
-                                pluginAudio.refreshBound(previous).also { bound = it }
-                            }
-                        }
+                        binding?.current() ?: resolveForPlayback(uri, picture)
                     }
                 val playbackCache = if (binding == null) cachedDataSourceFactory else playerCacheFactory
                 return ResolvingDataSource.Factory(playbackCache) { dataSpec ->
@@ -246,7 +235,7 @@ class DownloadUtil
                     }
 
                     val mediaId = dataSpec.key ?: error("No media id (key) in dataSpec")
-                    binding?.let { snapshot ->
+                    binding?.initial?.let { snapshot ->
                         val video = MusicVideoItems.videoIdOfVideoKey(mediaId) != null
                         val formatId = if (video) snapshot.stream.video?.id else snapshot.stream.renditionId
                         val token = "${snapshot.pluginId}:${snapshot.stream.cacheKey}:$formatId"
@@ -308,7 +297,13 @@ class DownloadUtil
                         }.getOrDefault(false)
                     if (cached) null else resolveForPlayback(uri, picture)
                 },
-                bind = { audio -> resolvingFactory(audio) },
+                bind = { audio ->
+                    val binding = BoundPluginAudio(audio, pluginAudio::refreshBound)
+                    BoundPluginMusicDataSourceFactory(
+                        resolvingFactory(binding),
+                        audio.stream.drm?.let { pluginAudio.drmDataSourceFactory(binding, okHttpClient) },
+                    )
+                },
             )
         }
 

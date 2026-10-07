@@ -3,8 +3,14 @@
 Milkbeat has no account system of its own, no analytics or telemetry SDK, no crash reporting
 service, and no advertising identifier. Nothing is uploaded to a server operated by the project.
 Watch history, subscriptions, playlists, downloads, and recommendation data are stored in a local
-Room database and in local DataStore preferences on the device. They leave the device only if the
-user explicitly starts a backup export or a device-to-device sync over their own local network.
+Room database and in local DataStore preferences on the device. The local databases are exported
+only when the user explicitly starts a backup export or a device-to-device sync over their own
+local network.
+
+Separately installed streaming plugins can access their provider's account library and report
+individual listens to that provider. Playback reporting is on by default and can be switched off
+in the signed-in plugin's details. This does not upload the local history database. Protected
+playback also uses the device's platform DRM license and provisioning exchanges, described below.
 
 Signing in with a Google account is optional; see [Google account sign-in](#google-account-sign-in).
 
@@ -231,6 +237,15 @@ Milkbeat ships two flavors. The permission difference between them is the one ab
 For completeness, these are the hosts the app can contact. All are contacted directly, with no
 project-operated proxy or relay in between.
 
+Installed plugins declare their own network hosts for review during installation. The SoundCloud
+plugin uses SoundCloud metadata, playback and image services, plus its license service for protected
+recordings. Media3 and platform Widevine send license challenges to the plugin's approved license
+destination and may provision the device through an approved platform service such as
+`www.googleapis.com`. These exchanges can carry DRM device/session data defined by the platform
+and provider. License and provisioning requests use a separate transport without the media cookie
+jar or cache; initial and redirected destinations are checked against the installed plugin's
+current network grants. Credentials are refreshed with the bound playback descriptor.
+
 - YouTube and Google: `www.youtube.com`, `m.youtube.com`, `music.youtube.com`, `i.ytimg.com`,
   `img.youtube.com`, `*.googlevideo.com`, `s.youtube.com`, `suggestqueries.google.com`,
   `suggestqueries-clients6.youtube.com`. Content, metadata, thumbnails, search suggestions.
@@ -264,7 +279,9 @@ project-operated proxy or relay in between.
 - No analytics, telemetry, crash reporting, or advertising SDK.
 - No background microphone, camera, or location access. Milkbeat declares no location permission.
 - No reading or uploading of contacts, call logs, SMS, or the installed app list.
-- No sending of watch history, search history, or recommendation data anywhere. The recommendation
-  engine runs entirely on device.
+- No uploading of local history databases or recommendation data to project-operated servers.
+  The recommendation engine runs entirely on device. Enabled provider playback reporting sends
+  individual listens/views to the provider that supplied playback; turn it off in plugin details
+  to keep those reports local.
 - No sharing of the device's media library. `MediaStore` results are read for display and playback
   and are not transmitted.

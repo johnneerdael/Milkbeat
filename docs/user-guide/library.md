@@ -24,6 +24,16 @@ Genre filters, recommendations, charts and releases come from Beatport. Artist a
 
 ![Beatport Home with genre filters, recommendations and charts](images/home-beatport.png)
 
+### SoundCloud Home and Library
+
+SoundCloud Home offers **Discover** shelves supplied by the signed-in account and a separate
+**Stream** activity feed. Shelves can contain mixes, stations, playlists, albums and artist portraits.
+Library includes All, Playlists, Albums, **Artists**, Liked Songs and History. Artists means the
+accounts you follow in SoundCloud; it uses SoundCloud's Following list without changing that list.
+Opening a collection loads its tracks in order, including repeated occurrences. Private or removed
+tracks may be unavailable. Metadata does not guarantee that your SoundCloud account can play the
+full recording.
+
 ## Search
 
 Music search uses the selected metadata provider. Video search uses the video provider. Filters and suggestions depend on that provider's supported features. Opening a result uses the catalog page appropriate to its type.
