@@ -1,0 +1,9 @@
+Synthetic static Art Track fixture. No downloaded or captured media.
+The MP4 is silent. Existing silence.aac is remuxed losslessly into a seekable M4A container to test actual playback-position preservation.
+
+Generated with ffmpeg 9.0.2 using an 8-second, 320x180, 1 fps geometric frame:
+ffmpeg -f lavfi -i 'color=c=0x383c42:s=320x180:r=1:d=8' -vf 'drawbox=x=100:y=30:w=120:h=120:c=0xE0E0E0:t=fill,drawbox=x=130:y=60:w=60:h=60:c=0x383c42:t=fill' -c:v libx264 -profile:v baseline -pix_fmt yuv420p -g 1 -an -movflags +faststart art-track.mp4
+ffmpeg -i art-track.mp4 -frames:v 1 art-track.png
+ffmpeg -i silence.aac -c:a copy -movflags +faststart art-track-audio.m4a
+
+These are test fixtures, not runtime app dependencies or captured account/media data.

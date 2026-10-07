@@ -19,3 +19,19 @@ Install the prerelease APK named **Milkbeat Preview**. It uses a separate app ID
 The live guest probes found Fideles at CRSSD Fall 2023 and Agents Of Time at Hï Ibiza 2024 with nearly identical recording lengths and available H.264 1080p pictures. These probes validate matching/format availability; confirm actual playback on your TV.
 
 Report the track title, chosen view, preferred audio provider, what happened and the Preview app/plugin versions. The preview uses a separate installation, so setup and sign-in are not copied from stable Milkbeat.
+
+## Controlled playback examples
+
+These Android 14 emulator screenshots use a generated static frame and silent local audio, with synthetic provider metadata. They show the actual TV controls and Media3 playback surface; they are not live-provider or account screenshots.
+
+Audio-only before Video is selected:
+
+![Controlled audio-only player](images/video-match-audio-only.png)
+
+After selecting Video, the static Art Track frame renders at the same playback position:
+
+![Controlled Art Track picture](images/video-match-art-track.png)
+
+An unavailable picture returns to artwork while audio resumes from the same position:
+
+![Controlled missing-picture recovery](images/video-match-unavailable-artwork.png)
