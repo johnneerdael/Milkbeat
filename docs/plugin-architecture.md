@@ -558,3 +558,21 @@ Still open:
   trusted publisher signature that marks verified plugins.
 - **Room changes:** the match cache is approved for the Spotify phase. The plugin registry and
   descriptor-based library entries still need explicit approval, and each needs a migration.
+
+## Device-code sign-in (API 5)
+
+A manifest can declare `{ "type": "deviceCode", "id": "tv", "label": "Pair TV" }`.
+The host calls `signIn.begin({method})` and displays its opaque session handle, public user code,
+verification URI, optional complete URI, cadence and expiry. Both verification destinations must
+match the enabled plugin’s current browser grants. `signIn.poll({session})` answers pending,
+signedIn with an account, expired or denied. A pending response may increase the poll interval.
+`signIn.cancel({session})` forgets a pending attempt; provider secrets remain in host secrets.
+
+The controller runs only while its screen is resumed, cancels on pause/disposal, and ignores stale
+results after retry/cancellation. It validates the method and grants before and after polls.
+The plugin validates provider access before answering signedIn; the host then invalidates account-bound
+catalogs through the existing `PluginAccounts` flow. Existing web sign-in methods are unchanged.
+
+`crypto.randomBytes` uses `SecureRandom` with a request bounded to 1–256 bytes. It exposes no system
+identifier. A provider can store its generated installation identity in its own secret namespace.
+`env.get` optionally includes OS version and device model for provider protocol headers.

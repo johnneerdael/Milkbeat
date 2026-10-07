@@ -68,6 +68,17 @@ data class HashResult(
     val hex: String,
 )
 
+/** Returns 1–256 bytes of platform cryptographic randomness as lower-case hex. */
+@Serializable
+data class RandomBytesRequest(
+    val length: Int,
+)
+
+@Serializable
+data class RandomBytesResult(
+    val hex: String,
+)
+
 /**
  * An HMAC of [messageHex] under [keyHex], both hex so binary keys and messages (a TOTP's decoded
  * secret and its eight-byte counter) pass unchanged; answered as a [HashResult].
@@ -115,6 +126,8 @@ data class HostEnvironment(
     val region: String,
     val deviceClass: String,
     val pluginVersion: String,
+    val osVersion: String? = null,
+    val deviceModel: String? = null,
 )
 
 @Serializable
@@ -184,6 +197,7 @@ object HostOperations {
     val secretSet = HostOperation("secrets.set", StorageEntry.serializer(), Unit.serializer())
     val secretDelete = HostOperation("secrets.delete", StorageKey.serializer(), Unit.serializer())
     val hash = HostOperation("crypto.hash", HashRequest.serializer(), HashResult.serializer())
+    val randomBytes = HostOperation("crypto.randomBytes", RandomBytesRequest.serializer(), RandomBytesResult.serializer())
     val hmac = HostOperation("crypto.hmac", HmacRequest.serializer(), HashResult.serializer())
     val codeLoad = HostOperation("code.load", CodeLoadRequest.serializer(), CodeLoadResult.serializer())
     val assetRead = HostOperation("assets.read", AssetRequest.serializer(), AssetText.serializer())
@@ -206,6 +220,7 @@ object HostOperations {
             secretSet,
             secretDelete,
             hash,
+            randomBytes,
             hmac,
             codeLoad,
             assetRead,

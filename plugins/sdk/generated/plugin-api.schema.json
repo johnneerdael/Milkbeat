@@ -1,7 +1,7 @@
 {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "title": "MilkbeatPluginApi",
-    "description": "Plugin API v4, generated from the plugin-api module. Do not edit.",
+    "description": "Plugin API v5, generated from the plugin-api module. Do not edit.",
     "type": "object",
     "properties": {
         "manifest": {
@@ -382,6 +382,50 @@
                     ],
                     "additionalProperties": false
                 },
+                "signIn.begin": {
+                    "type": "object",
+                    "properties": {
+                        "request": {
+                            "$ref": "#/$defs/nl.neerdael.milkbeat.plugin.DeviceCodeBeginRequest"
+                        },
+                        "response": {
+                            "$ref": "#/$defs/nl.neerdael.milkbeat.plugin.DeviceCodeChallenge"
+                        }
+                    },
+                    "required": [
+                        "request",
+                        "response"
+                    ],
+                    "additionalProperties": false
+                },
+                "signIn.poll": {
+                    "type": "object",
+                    "properties": {
+                        "request": {
+                            "$ref": "#/$defs/nl.neerdael.milkbeat.plugin.DeviceCodeSession"
+                        },
+                        "response": {
+                            "$ref": "#/$defs/nl.neerdael.milkbeat.plugin.DeviceCodePollResult"
+                        }
+                    },
+                    "required": [
+                        "request",
+                        "response"
+                    ],
+                    "additionalProperties": false
+                },
+                "signIn.cancel": {
+                    "type": "object",
+                    "properties": {
+                        "request": {
+                            "$ref": "#/$defs/nl.neerdael.milkbeat.plugin.DeviceCodeSession"
+                        }
+                    },
+                    "required": [
+                        "request"
+                    ],
+                    "additionalProperties": false
+                },
                 "signIn.complete": {
                     "type": "object",
                     "properties": {
@@ -462,6 +506,9 @@
                 "video.comments",
                 "video.liveChat",
                 "video.reportPlayback",
+                "signIn.begin",
+                "signIn.poll",
+                "signIn.cancel",
                 "signIn.complete",
                 "signIn.account",
                 "signIn.signOut",
@@ -576,6 +623,22 @@
                         },
                         "response": {
                             "$ref": "#/$defs/nl.neerdael.milkbeat.plugin.HashResult"
+                        }
+                    },
+                    "required": [
+                        "request",
+                        "response"
+                    ],
+                    "additionalProperties": false
+                },
+                "crypto.randomBytes": {
+                    "type": "object",
+                    "properties": {
+                        "request": {
+                            "$ref": "#/$defs/nl.neerdael.milkbeat.plugin.RandomBytesRequest"
+                        },
+                        "response": {
+                            "$ref": "#/$defs/nl.neerdael.milkbeat.plugin.RandomBytesResult"
                         }
                     },
                     "required": [
@@ -753,6 +816,7 @@
                 "secrets.set",
                 "secrets.delete",
                 "crypto.hash",
+                "crypto.randomBytes",
                 "crypto.hmac",
                 "code.load",
                 "assets.read",
@@ -847,6 +911,26 @@
                 }
             },
             "title": "PageBlockCollection"
+        },
+        "deviceCode": {
+            "type": "object",
+            "required": [
+                "type",
+                "id",
+                "label"
+            ],
+            "properties": {
+                "type": {
+                    "const": "deviceCode"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "label": {
+                    "type": "string"
+                }
+            },
+            "title": "SignInMethodDeviceCode"
         },
         "expired": {
             "type": "object",
@@ -2544,6 +2628,115 @@
             },
             "title": "CodeLoadResult"
         },
+        "nl.neerdael.milkbeat.plugin.DeviceCodeBeginRequest": {
+            "type": "object",
+            "required": [
+                "method"
+            ],
+            "properties": {
+                "method": {
+                    "type": "string"
+                }
+            },
+            "title": "DeviceCodeBeginRequest"
+        },
+        "nl.neerdael.milkbeat.plugin.DeviceCodeChallenge": {
+            "type": "object",
+            "required": [
+                "session",
+                "userCode",
+                "verificationUri",
+                "intervalMs"
+            ],
+            "properties": {
+                "session": {
+                    "type": "string"
+                },
+                "userCode": {
+                    "type": "string"
+                },
+                "verificationUri": {
+                    "type": "string"
+                },
+                "verificationUriComplete": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "intervalMs": {
+                    "type": "integer",
+                    "minimum": -9223372036854775808,
+                    "maximum": 9223372036854775807
+                },
+                "expiresInMs": {
+                    "type": [
+                        "integer",
+                        "null"
+                    ],
+                    "minimum": -9223372036854775808,
+                    "maximum": 9223372036854775807
+                },
+                "message": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                }
+            },
+            "title": "DeviceCodeChallenge"
+        },
+        "nl.neerdael.milkbeat.plugin.DeviceCodePollResult": {
+            "type": "object",
+            "required": [
+                "status"
+            ],
+            "properties": {
+                "status": {
+                    "$ref": "#/$defs/nl.neerdael.milkbeat.plugin.DeviceCodeStatus"
+                },
+                "account": {
+                    "oneOf": [
+                        {
+                            "type": "null"
+                        },
+                        {
+                            "$ref": "#/$defs/nl.neerdael.milkbeat.catalog.ProviderAccount"
+                        }
+                    ]
+                },
+                "intervalMs": {
+                    "type": [
+                        "integer",
+                        "null"
+                    ],
+                    "minimum": -9223372036854775808,
+                    "maximum": 9223372036854775807
+                }
+            },
+            "title": "DeviceCodePollResult"
+        },
+        "nl.neerdael.milkbeat.plugin.DeviceCodeSession": {
+            "type": "object",
+            "required": [
+                "session"
+            ],
+            "properties": {
+                "session": {
+                    "type": "string"
+                }
+            },
+            "title": "DeviceCodeSession"
+        },
+        "nl.neerdael.milkbeat.plugin.DeviceCodeStatus": {
+            "enum": [
+                "pending",
+                "signedIn",
+                "expired",
+                "denied"
+            ],
+            "title": "DeviceCodeStatus"
+        },
         "nl.neerdael.milkbeat.plugin.FormatType": {
             "enum": [
                 "AUDIO",
@@ -2636,6 +2829,18 @@
                 },
                 "pluginVersion": {
                     "type": "string"
+                },
+                "osVersion": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "deviceModel": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
                 }
             },
             "title": "HostEnvironment"
@@ -3125,6 +3330,32 @@
             },
             "title": "PluginManifest"
         },
+        "nl.neerdael.milkbeat.plugin.RandomBytesRequest": {
+            "type": "object",
+            "required": [
+                "length"
+            ],
+            "properties": {
+                "length": {
+                    "type": "integer",
+                    "minimum": -2147483648,
+                    "maximum": 2147483647
+                }
+            },
+            "title": "RandomBytesRequest"
+        },
+        "nl.neerdael.milkbeat.plugin.RandomBytesResult": {
+            "type": "object",
+            "required": [
+                "hex"
+            ],
+            "properties": {
+                "hex": {
+                    "type": "string"
+                }
+            },
+            "title": "RandomBytesResult"
+        },
         "nl.neerdael.milkbeat.plugin.ReportPlaybackRequest": {
             "type": "object",
             "required": [
@@ -3369,6 +3600,9 @@
         },
         "nl.neerdael.milkbeat.plugin.SignInMethod": {
             "anyOf": [
+                {
+                    "$ref": "#/$defs/deviceCode"
+                },
                 {
                     "$ref": "#/$defs/webLogin"
                 }

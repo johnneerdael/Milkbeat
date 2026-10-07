@@ -5,7 +5,7 @@ export type EntityKind =
   'TRACK' | 'MUSIC_VIDEO' | 'ALBUM' | 'PLAYLIST' | 'ARTIST' | 'PROFILE' | 'MIX' | 'RADIO' | 'VIDEO' | 'CHANNEL';
 export type AudioDelivery = 'PROGRESSIVE' | 'HLS';
 export type VideoSurface = 'SEARCH' | 'SUGGEST' | 'CHANNEL' | 'PLAYLIST' | 'RELATED' | 'COMMENTS' | 'LIVE_CHAT';
-export type SignInMethod = SignInMethodWebLogin;
+export type SignInMethod = SignInMethodDeviceCode | SignInMethodWebLogin;
 export type SettingType = 'TOGGLE' | 'CHOICE' | 'TEXT';
 export type PageBlock = PageBlockCollection | PageBlockHeader;
 export type CollectionLayout = 'HORIZONTAL_SHELF' | 'MULTI_COLUMN_LIST' | 'TRACK_TABLE';
@@ -29,13 +29,14 @@ export type PluginErrorCode =
   | 'UNSUPPORTED'
   | 'INTERNAL';
 export type VideoKind = 'VOD' | 'LIVE' | 'UPCOMING';
+export type DeviceCodeStatus = 'pending' | 'signedIn' | 'expired' | 'denied';
 export type ProviderAccount = ProviderAccountAnonymous | ProviderAccountExpired | ProviderAccountSignedIn;
 export type HttpBodyEncoding = 'UTF8' | 'BASE64';
 export type HashAlgorithm = 'SHA1' | 'SHA256';
 export type LogLevel = 'DEBUG' | 'INFO' | 'WARN' | 'ERROR';
 
 /**
- * Plugin API v4, generated from the plugin-api module. Do not edit.
+ * Plugin API v5, generated from the plugin-api module. Do not edit.
  */
 export interface MilkbeatPluginApi {
   manifest: PluginManifest;
@@ -132,6 +133,17 @@ export interface MilkbeatPluginApi {
     'video.reportPlayback': {
       request: ReportPlaybackRequest;
     };
+    'signIn.begin': {
+      request: DeviceCodeBeginRequest;
+      response: DeviceCodeChallenge;
+    };
+    'signIn.poll': {
+      request: DeviceCodeSession;
+      response: DeviceCodePollResult;
+    };
+    'signIn.cancel': {
+      request: DeviceCodeSession;
+    };
     'signIn.complete': {
       request: WebLoginResult;
       response: ProviderAccount;
@@ -173,6 +185,10 @@ export interface MilkbeatPluginApi {
     'crypto.hash': {
       request: HashRequest;
       response: HashResult;
+    };
+    'crypto.randomBytes': {
+      request: RandomBytesRequest;
+      response: RandomBytesResult;
     };
     'crypto.hmac': {
       request: HmacRequest;
@@ -267,6 +283,11 @@ export interface VideoRole {
   surfaces: VideoSurface[];
   live?: boolean;
   reportPlayback?: boolean;
+}
+export interface SignInMethodDeviceCode {
+  type: 'deviceCode';
+  id: string;
+  label: string;
 }
 export interface SignInMethodWebLogin {
   type: 'webLogin';
@@ -670,12 +691,25 @@ export interface LiveChatMessage {
   text: string;
   highlight?: string | null;
 }
-export interface WebLoginResult {
+export interface DeviceCodeBeginRequest {
   method: string;
-  cookies: string;
-  extracted?: {
-    [k: string]: string;
-  };
+}
+export interface DeviceCodeChallenge {
+  session: string;
+  userCode: string;
+  verificationUri: string;
+  verificationUriComplete?: string | null;
+  intervalMs: number;
+  expiresInMs?: number | null;
+  message?: string | null;
+}
+export interface DeviceCodeSession {
+  session: string;
+}
+export interface DeviceCodePollResult {
+  status: DeviceCodeStatus;
+  account?: null | ProviderAccount;
+  intervalMs?: number | null;
 }
 export interface ProviderAccountAnonymous {
   type: 'anonymous';
@@ -688,6 +722,13 @@ export interface ProviderAccountSignedIn {
   key: string;
   name?: string | null;
   avatar?: null | Artwork;
+}
+export interface WebLoginResult {
+  method: string;
+  cookies: string;
+  extracted?: {
+    [k: string]: string;
+  };
 }
 export interface SettingOptionsRequest {
   key: string;
@@ -729,6 +770,12 @@ export interface HashRequest {
 export interface HashResult {
   hex: string;
 }
+export interface RandomBytesRequest {
+  length: number;
+}
+export interface RandomBytesResult {
+  hex: string;
+}
 export interface HmacRequest {
   algorithm: HashAlgorithm;
   keyHex: string;
@@ -754,6 +801,8 @@ export interface HostEnvironment {
   region: string;
   deviceClass: string;
   pluginVersion: string;
+  osVersion?: string | null;
+  deviceModel?: string | null;
 }
 export interface LogRequest {
   level: LogLevel;
@@ -792,6 +841,7 @@ export const HOST_OPERATIONS = [
   'secrets.set',
   'secrets.delete',
   'crypto.hash',
+  'crypto.randomBytes',
   'crypto.hmac',
   'code.load',
   'assets.read',

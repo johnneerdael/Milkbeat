@@ -1,5 +1,6 @@
 package io.github.aedev.flow.plugin.host
 
+import android.os.Build
 import android.util.Log
 import io.github.aedev.flow.BuildConfig
 import io.github.aedev.flow.data.local.KeystoreSecretBox
@@ -21,12 +22,14 @@ import nl.neerdael.milkbeat.plugin.PLUGIN_API_VERSION
 import nl.neerdael.milkbeat.plugin.PluginError
 import nl.neerdael.milkbeat.plugin.PluginErrorCode
 import nl.neerdael.milkbeat.plugin.PluginJson
+import nl.neerdael.milkbeat.plugin.RandomBytesResult
 import nl.neerdael.milkbeat.plugin.StorageEntry
 import nl.neerdael.milkbeat.plugin.StoredValue
 import okhttp3.OkHttpClient
 import java.io.File
 import java.io.IOException
 import java.security.MessageDigest
+import java.security.SecureRandom
 import java.util.Locale
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
@@ -85,6 +88,9 @@ internal class PluginHostApi(
                         HashAlgorithm.SHA256 -> "SHA-256"
                     }
                 HashResult(MessageDigest.getInstance(algorithm).digest(request.text.toByteArray()).joinToString("") { "%02x".format(it) })
+            },
+            handler(HostOperations.randomBytes) { request ->
+                pluginRandomBytes(request.length)
             },
             handler(HostOperations.hmac) { request ->
                 val algorithm =
@@ -162,6 +168,8 @@ internal class PluginHostApi(
             region = locale.country.ifEmpty { "US" },
             deviceClass = "tv",
             pluginVersion = plugin.manifest.version,
+            osVersion = Build.VERSION.RELEASE,
+            deviceModel = Build.MODEL,
         )
     }
 
@@ -192,3 +200,8 @@ internal class PluginHostApi(
 }
 
 private fun String.hexBytes(): ByteArray? = runCatching { hexToByteArray() }.getOrNull()
+
+internal fun pluginRandomBytes(length: Int): RandomBytesResult {
+    require(length in 1..256) { "Random byte length must be between 1 and 256" }
+    return RandomBytesResult(ByteArray(length).also(SecureRandom()::nextBytes).toHexString())
+}

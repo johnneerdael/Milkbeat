@@ -143,11 +143,11 @@ class PluginSchemaTest {
             val container = descriptor.kind == StructureKind.LIST || descriptor.kind == StructureKind.MAP
             if (!container && !seen.add(descriptor.serialName)) return
             if (descriptor.kind == PolymorphicKind.SEALED) {
-                val parent = descriptor.serialName.substringAfterLast('.')
+                val parent = descriptor.serialName.removeSuffix("?").substringAfterLast('.')
                 descriptor.getElementDescriptor(1).elementDescriptors.forEach { variant ->
                     variants +=
                         SealedVariant(
-                            parent = descriptor.serialName,
+                            parent = descriptor.serialName.removeSuffix("?"),
                             serialName = variant.serialName,
                             title = parent + variant.serialName.replaceFirstChar(Char::uppercase),
                             hasTypeField = (0 until variant.elementsCount).any { variant.getElementName(it) == "type" },

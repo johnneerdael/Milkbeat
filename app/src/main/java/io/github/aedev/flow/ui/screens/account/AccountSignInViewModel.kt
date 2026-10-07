@@ -92,13 +92,14 @@ class AccountSignInViewModel
         private val pluginId: String = checkNotNull(savedStateHandle[PLUGIN_ARG])
 
         /** The sign-in the plugin declared under the route's method id, or null when it has none. */
-        val method: WebLoginMethod? =
+        val signInMethod =
             registry.state.value
                 .plugin(pluginId)
                 ?.manifest
                 ?.signIn
-                ?.filterIsInstance<WebLoginMethod>()
                 ?.firstOrNull { it.id == savedStateHandle.get<String>(METHOD_ARG) }
+
+        val method: WebLoginMethod? = signInMethod as? WebLoginMethod
 
         private val _state = MutableStateFlow<AccountSignInState>(AccountSignInState.Starting)
         val state: StateFlow<AccountSignInState> = _state.asStateFlow()

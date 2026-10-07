@@ -237,6 +237,12 @@ Milkbeat ships two flavors. The permission difference between them is the one ab
 For completeness, these are the hosts the app can contact. All are contacted directly, with no
 project-operated proxy or relay in between.
 
+SoundCloud TV pairing opens the provider’s activation page directly in the phone’s browser. The TV
+creates and polls a short-lived challenge only while its pairing screen is visible. Its session token
+stays in the plugin’s encrypted secret storage. Provider protocol requests can include OS version,
+device model and a random identity generated for that plugin installation, never a captured device
+or advertising identifier. TV-paired playback currently does not submit listening-history reports.
+
 Installed plugins declare their own network hosts for review during installation. The SoundCloud
 plugin uses SoundCloud metadata, playback and image services, plus its license service for protected
 recordings. Media3 and platform Widevine send license challenges to the plugin's approved license

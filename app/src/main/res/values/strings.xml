@@ -773,4 +773,9 @@
     <string name="music_folders_no_subfolders">No subfolders. You can choose this folder.</string>
     <string name="music_folders_android_picker">Use Android folder picker</string>
     <string name="music_folders_storage_settings">Storage permissions</string>
+    <string name="tv_device_code_instructions">Scan the QR code or open this address on your phone, then enter the code:</string>
+    <string name="tv_device_code_qr_description">Open the provider’s TV activation page</string>
+    <string name="tv_device_code_waiting">Waiting for confirmation on your phone…</string>
+    <string name="tv_device_code_expired">This code expired. Request a new code to sign in.</string>
+    <string name="tv_device_code_denied">Sign-in was declined. Request a new code to try again.</string>
 </resources>
