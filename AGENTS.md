@@ -728,6 +728,18 @@ revision must pass the configured ktlint rules.
   gate when adding consumers. Never tie playback or queue preparation to Home visibility.
 - `Media3MusicService` retains the sole music player and media-session ownership. Its existing
   radio, recovery, listening, locks and session callbacks live in `service/MusicService*.kt`.
+  `player/audio/MusicOutputRecovery` checks actual PCM output frames at 1 Hz only while the
+  engine plays, including background playback. `OutputReportingPlayer` uses Media3's
+  `ForwardingSimpleBasePlayer` to freeze progress and report buffering during output recovery;
+  bind the music session and playback observers to `sessionPlayer`, while retaining the one
+  ExoPlayer engine. Five seconds without frame progress starts at most two output restarts from
+  the last verified position. Only actual frame progress clears recovery; thirty seconds of
+  continuous progress rearms the automatic budget. Pause, seek, Stop, focus loss and changed
+  window identity invalidate pending recovery. Steady offloaded output is not polled. Keep
+  `MusicAudioTrackProbe` delegated to Media3's default AudioTrack factory; its deprecated hook
+  supplies the raw counter that the replacement estimated-position API does not expose.
+  Focused regressions: `./gradlew :app:testGithubDebugUnitTest --tests '*AudioOutputProgressTest'
+  --tests '*OutputReportingPlayerTest' --tests '*MusicOutputRecoveryTest'`.
   Local library IDs stay local throughout playback; `MusicVideoItems.descriptor` supplies
   title, artist credits and duration to `PluginRadio` for metadata-only YouTube Music matching.
   Local queues seed radio once from their first song, never through `resolveAudio`. Track-row

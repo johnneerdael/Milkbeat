@@ -18,6 +18,13 @@ Confirmed unmatched tracks can be removed from the future queue. Temporary failu
 
 Streamed music loads well ahead of the playing position: Milkbeat keeps loading until about 16 MB is buffered (roughly 13 minutes of typical audio, so usually the whole song), then loads more once less than 30 seconds of buffered media remain. A stream link that stops answering after a song has loaded therefore no longer interrupts it. The buffer is shared with a music video's picture, so less of the song is held while the video plays, and a slow network or low memory can keep the buffer shorter. If a stream fails, Milkbeat asks the audio provider for a fresh link to the same recording and resumes where it stopped.
 
+If the TV's audio output stops advancing for about five seconds while music is meant to be playing,
+Milkbeat freezes the displayed progress and reconnects the output from the last position where audio
+was advancing. It keeps the same track and queue, and reports recovery until output resumes. It tries
+twice before leaving the track paused; press Play to retry. Pause, seeking, choosing another track or
+Stop cancels the pending restart. Quiet passages do not trigger recovery while audio frames still advance.
+Recovery may repeat a short stretch of the song so it does not skip ahead using an inaccurate progress estimate.
+
 ![Upcoming queue beside the player controls](images/queue-open.png)
 
 ## Encrypted provider audio

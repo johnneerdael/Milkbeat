@@ -19,12 +19,13 @@ internal fun Media3MusicService.acquireLocks() {
 
 internal fun Media3MusicService.isPlaybackActive(): Boolean {
     if (!playerInitialized) return false
-    return player.isPlaying ||
-        player.playbackState == Player.STATE_BUFFERING ||
+    val current = sessionPlayer
+    return current.isPlaying ||
+        current.playbackState == Player.STATE_BUFFERING ||
         (
-            player.playWhenReady &&
-                player.playbackState != Player.STATE_IDLE &&
-                player.playbackState != Player.STATE_ENDED
+            current.playWhenReady &&
+                current.playbackState != Player.STATE_IDLE &&
+                current.playbackState != Player.STATE_ENDED
         )
 }
 
@@ -42,7 +43,7 @@ internal fun Media3MusicService.updateLocks(isPlaybackActive: Boolean) {
             delay(12_000L)
             if (!isPlaybackActive()) {
                 releaseLocks()
-                if (!isAppInForeground()) {
+                if (!isAppInForeground() && !outputFailureHeld) {
                     stopSelf()
                 }
             }

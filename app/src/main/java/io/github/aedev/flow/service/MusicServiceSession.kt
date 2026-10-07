@@ -30,7 +30,7 @@ import io.github.aedev.flow.player.sessionArtworkBitmapLoader
 internal class MusicServiceSession(
     private val service: Media3MusicService,
 ) {
-    private val player get() = service.player
+    private val player get() = service.sessionPlayer
     private var mediaLibrarySession: MediaLibraryService.MediaLibrarySession
         get() = service.mediaLibrarySession
         set(value) {
@@ -71,7 +71,7 @@ internal class MusicServiceSession(
 
         mediaLibrarySession =
             MediaLibrarySession
-                .Builder(service, player, LibrarySessionCallback())
+                .Builder(service, service.sessionPlayer, LibrarySessionCallback())
                 .setSessionActivity(pendingIntent)
                 .setBitmapLoader(sessionArtworkBitmapLoader(service))
                 .build()

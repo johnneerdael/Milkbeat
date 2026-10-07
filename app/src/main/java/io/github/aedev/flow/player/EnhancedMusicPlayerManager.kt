@@ -89,7 +89,6 @@ object EnhancedMusicPlayerManager {
         }
     internal val scope = CoroutineScope(Dispatchers.Main + SupervisorJob() + exceptionHandler)
 
-    private var retryCount = 0
     private var positionUpdateJob: kotlinx.coroutines.Job? = null
 
     // Persistence
@@ -329,7 +328,6 @@ object EnhancedMusicPlayerManager {
                         appContext?.getString(io.github.aedev.flow.R.string.music_playback_warning_generic)
                             ?: "Music playback failed. Try again or switch networks.",
                     )
-                    retryCount = 0
                 }
             },
         )
@@ -364,17 +362,15 @@ object EnhancedMusicPlayerManager {
 
     private fun updatePlayerState() {
         player?.let { p ->
-            if (p.playbackState == Player.STATE_READY && p.isPlaying) {
-                retryCount = 0
-            }
-
+            val position = p.currentPosition
+            currentPositionState.value = position
             playbackState.value =
                 playbackState.value.copy(
                     isPlaying = p.isPlaying,
                     isEnded = p.playbackState == Player.STATE_ENDED,
                     isBuffering = p.playbackState == Player.STATE_BUFFERING,
                     duration = if (p.duration > 0) p.duration else playbackState.value.duration,
-                    position = p.currentPosition,
+                    position = position,
                 )
         }
     }
