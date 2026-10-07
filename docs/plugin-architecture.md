@@ -7,10 +7,10 @@ Status: architecture proposal, 2026-09-29. It replaces the earlier metadata plug
 Current host extension (plugin API 4): `AudioStream` may include `drm` with `scheme: "WIDEVINE"`,
 `licenseUrl` and optional license `headers`. Media3 owns license challenges and decryption.
 License requests, redirects and provisioning use a separate transport that checks the installed
-plugin's current network grants before sending credentials. Clear descriptors remain compatible;
-media and key requests share the same refreshable bound descriptor, so expired initial licenses
+plugin's current network grants before sending credentials. Clear descriptors remain compatible.
+Media and key requests share the same refreshable bound descriptor, so expired initial licenses
 and later key renewals use current URLs and headers without retargeting provisioning or redirects.
-providers requiring DRM declare `api.min: 4`. HLS/DRM offline downloads are unsupported. The v1
+Providers requiring DRM declare `api.min: 4`. HLS/DRM offline downloads are unsupported. The v1
 non-goals below describe the original proposal, not this implemented extension.
 
 ## 1. What we are building

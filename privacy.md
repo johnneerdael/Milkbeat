@@ -3,8 +3,9 @@
 Milkbeat has no account system of its own, no analytics or telemetry SDK, no crash reporting
 service, and no advertising identifier. Nothing is uploaded to a server operated by the project.
 Watch history, subscriptions, playlists, downloads, and recommendation data are stored in a local
-Room database and in local DataStore preferences on the device. They leave the device only if the
-user explicitly starts a backup export or a device-to-device sync over their own local network.
+Room database and in local DataStore preferences on the device. The local databases are exported
+only when the user explicitly starts a backup export or a device-to-device sync over their own
+local network.
 
 Separately installed streaming plugins can access their provider's account library and report
 individual listens to that provider. Playback reporting is on by default and can be switched off

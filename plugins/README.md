@@ -4,9 +4,10 @@ This workspace keeps the TypeScript SDK and JSON schema aligned with Milkbeat's 
 
 Plugin API 4 adds optional Widevine audio descriptors (`AudioStream.drm`). The host uses Media3 and
 validates license, redirect and provisioning destinations against installed network grants.
-License headers stay separate from media headers/caches. Clear audio remains compatible; plugins
-share media/license refresh state so initial key acquisition and later renewals use current credentials.
-requiring this extension must declare API 4 as their minimum. HLS/DRM offline downloads are unsupported.
+License headers stay separate from media headers/caches. Media and license requests share refresh
+state so initial key acquisition and later renewals use current credentials. Clear audio remains
+compatible. Plugins requiring this extension must declare API 4 as their minimum. HLS/DRM offline
+downloads are unsupported.
 
 Audio providers can opt into `roles.audio.batchMatching` and implement `audio.matchBatch` for up to 16 ordered tracks. Each result slot contains candidates or a per-track error. `SONGS`, `ALTERNATE_SONGS` and `VIDEOS` strategies let the host request fallbacks only after rejecting earlier candidates. An optional empty `ENSURE` import can run alongside the searches within one evaluation; its result or error is reported separately. The host keeps QuickJS root ownership serialized, shares its match cache with playback, and checks cancellation before starting another search strategy.
 
