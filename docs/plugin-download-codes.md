@@ -12,6 +12,7 @@ add-plugin deep link's `url` parameter. Full download URLs remain supported.
 | 393 | Beatport, private publisher |
 | 981 | Spotify, private publisher |
 | 494 | YouTube Music, private publisher |
+| 089 | SoundCloud, private publisher |
 <!-- /plugin-codes -->
 
 ## Register another URL
