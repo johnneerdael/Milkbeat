@@ -11,6 +11,7 @@ internal class OutputTestPlayer : SimpleBasePlayer(Looper.getMainLooper()) {
     var positionMs = 167_000L
     var prepares = 0
     var stops = 0
+    var prepareReady = true
     var onPrepare: () -> Unit = {}
     private var value =
         State
@@ -60,6 +61,16 @@ internal class OutputTestPlayer : SimpleBasePlayer(Looper.getMainLooper()) {
         invalidateState()
     }
 
+    fun suppress() {
+        value = value.buildUpon().setPlaybackSuppressionReason(Player.PLAYBACK_SUPPRESSION_REASON_TRANSIENT_AUDIO_FOCUS_LOSS).build()
+        invalidateState()
+    }
+
+    fun loseFocus() {
+        value = value.buildUpon().setPlayWhenReady(false, Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_FOCUS_LOSS).build()
+        invalidateState()
+    }
+
     override fun handleSetPlayWhenReady(playWhenReady: Boolean): ListenableFuture<*> {
         value = value.buildUpon().setPlayWhenReady(playWhenReady, Player.PLAY_WHEN_READY_CHANGE_REASON_USER_REQUEST).build()
         invalidateState()
@@ -69,7 +80,7 @@ internal class OutputTestPlayer : SimpleBasePlayer(Looper.getMainLooper()) {
     override fun handlePrepare(): ListenableFuture<*> {
         prepares++
         onPrepare()
-        value = value.buildUpon().setPlaybackState(Player.STATE_READY).build()
+        value = value.buildUpon().setPlaybackState(if (prepareReady) Player.STATE_READY else Player.STATE_BUFFERING).build()
         invalidateState()
         return Futures.immediateVoidFuture()
     }

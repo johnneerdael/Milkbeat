@@ -64,12 +64,15 @@ Milkbeat buffers up to about 16 MB of a streamed song ahead (usually all of it) 
 
 ## Music becomes silent while the player keeps advancing
 
-Milkbeat checks the TV's actual audio-frame progress. After about five seconds without output progress,
-it freezes the displayed position and attempts to reconnect the same track, preserving the queue.
+Milkbeat checks actual audio-frame progress for normal decoded TV audio (PCM). After about five seconds
+without output progress while the player still reports playback, it freezes the displayed position
+and attempts to reconnect the same track, preserving the queue.
 The player reports recovery until frames advance again. After two unsuccessful attempts, it leaves
 the track paused and shows **Audio output stopped. Press Play to retry.** Press Play for another attempt,
-or choose another track. Pause or Stop cancels recovery. This check uses output progress rather than
-volume, so a quiet passage alone does not restart the song.
+or choose another track. Pause, seeking, choosing another track or Stop cancels recovery. This check
+uses output progress rather than volume, so a quiet passage alone does not restart the song. Recovery
+may repeat a short stretch of the song. Hardware-offloaded audio and encoded HDMI passthrough are
+outside automatic stall detection.
 
 ## Provider sign-in needs verification
 
