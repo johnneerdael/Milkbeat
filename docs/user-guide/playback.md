@@ -10,7 +10,7 @@ Press OK in the full music player to show seeking, shuffle, previous, play/pause
 
 ## Queues and preparation
 
-Open the queue to inspect upcoming tracks or jump to one. Holding Up or Down accelerates scrolling. Queue preparation follows playback order and matches the entire remaining queue one track at a time while music plays. Jumping elsewhere gives the new playback position priority. Tracks with native audio IDs do not need cross-provider matching.
+Open the queue to inspect upcoming tracks or jump to one. Holding Up or Down accelerates scrolling. Queue preparation follows playback order and matches the entire remaining queue one track at a time while music plays. Jumping elsewhere gives the new playback position priority. Tracks with native audio IDs do not need cross-provider matching. Video-capable audio providers use video matching for ordinary playback, queue preparation and playlist indexing regardless of the chosen view. Successful recording matches stay cached; old Songs-only misses are reconsidered.
 
 When matching streaming recordings, Milkbeat prefers full recordings over mixed excerpts and permits any longer recording when the title, performers and named remix/edit agree, without a duration cap or required full/extended label. Remixer credits may be supplied in either the title or artist list.
 
@@ -91,7 +91,7 @@ With **Change presets automatically** off, a preset stays until you press Left o
 
 The view button in the player steps through three views while audio continues: the visualizer (the default), the music video, and the track's cover filling the screen. Milkbeat remembers the view you leave it on for later tracks and later sessions.
 
-A track without a video skips from the visualizer straight to the artwork, and with the video view chosen it shows the visualizer instead. With visualizations turned off, the button moves between the video and the artwork. Unsupported or unavailable video falls back to audio and visuals.
+A confirmed YouTube audio source can offer Video even when the original SoundCloud or Spotify catalog entry did not advertise a video. Art Tracks with static album artwork are valid video choices. Discovering a match does not start picture loading: select Video with the view button to show it. A track without a usable video skips from the visualizer straight to the artwork, and with the video view chosen it shows the visualizer instead. With visualizations turned off, the button moves between the video and the artwork. Unsupported or unavailable video falls back to audio and visuals.
 
 ![The view button on the visualizer](images/now-playing-view-visualizer.png)
 
@@ -100,3 +100,5 @@ A track without a video skips from the visualizer straight to the artwork, and w
 ![The artwork view: the cover filling the screen](images/now-playing-view-artwork.png)
 
 ![Full-screen music-video example from the existing README](images/music-video.jpg)
+
+The video-matching test prerelease runs beside the stable app. See [preview setup and checks](preview-testing.md).

@@ -50,6 +50,8 @@ providers, local and network folder music, every settings category and troublesh
 
 ## Install on Android TV
 
+For the video-matching test prerelease, see the [preview setup and checks](docs/user-guide/preview-testing.md). The separate Preview app resolves downloader codes from its bundled catalog to install the paired test providers.
+
 | Method | How |
 |---|---|
 | **Downloader app** (Google TV, Fire TV, NVIDIA SHIELD) | Install [Downloader](https://www.aftvnews.com/downloader/) and enter code **`7170062`** |
@@ -296,8 +298,10 @@ you leave it on for every track after.
 
 - A track without a video skips straight from the visualizer to the artwork; with the video view
   chosen, such a track shows the visualizer instead.
-- Music videos come from tracks that YouTube Music lists as videos. The picture is picked for your
-  TV: at most 1080p, in a codec the TV decodes in hardware.
+- YouTube matching searches recorded videos for every track, including Art Tracks and archived
+  live sets, even when the visualizer or artwork is selected. Audio plays until you select Video
+  with the view button. A confirmed YouTube match can offer Video for SoundCloud or Spotify metadata.
+  The picture is picked for your TV: at most 1080p, in a codec the TV decodes in hardware.
 - If a video can't be played, the track carries on as audio with the visuals.
 
 <table>

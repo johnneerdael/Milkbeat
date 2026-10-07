@@ -20,6 +20,7 @@ import nl.neerdael.milkbeat.catalog.TrackDescriptor
 import nl.neerdael.milkbeat.catalog.TrackList
 import nl.neerdael.milkbeat.catalog.TracksRequest
 import nl.neerdael.milkbeat.plugin.ApiRange
+import nl.neerdael.milkbeat.plugin.AudioMatchStrategy
 import nl.neerdael.milkbeat.plugin.AudioRole
 import nl.neerdael.milkbeat.plugin.MetadataRole
 import nl.neerdael.milkbeat.plugin.PluginManifest
@@ -30,6 +31,7 @@ internal class PlaylistMirrorRunnerFixture(
     count: Int,
     batchMatching: Boolean = false,
     artwork: MirrorArtwork? = null,
+    videoMatching: Boolean = false,
 ) {
     val key = MirrorKey("source", "a", "target", "b", EntityRef(EntityKind.PLAYLIST, "playlist"))
     val host = mockk<PluginHost>()
@@ -100,7 +102,14 @@ internal class PlaylistMirrorRunnerFixture(
                                         privatePlaylistImport =
                                             id == "target",
                                     ),
-                                audio = AudioRole(setOf(id), match = true, batchMatching = batchMatching && id == "target"),
+                                audio =
+                                    AudioRole(
+                                        setOf(id),
+                                        match = true,
+                                        batchMatching = batchMatching && id == "target",
+                                        musicVideo =
+                                            videoMatching && id == "target",
+                                    ),
                             ),
                     ),
                     "signer",
@@ -122,13 +131,13 @@ internal class PlaylistMirrorRunnerFixture(
                 TrackList(tracks.drop(60), revision = revision)
             }
         }
-        coEvery { matcher.matchForIndexing(any(), "target", any()) } coAnswers {
+        coEvery { matcher.matchForIndexing(any(), "target", any(), any()) } coAnswers {
             firstArg<TrackDescriptor>().let {
                 calls += it.ref.providerId
                 match(it)
             }
         }
-        coEvery { matcher.matchBatchForIndexing(any(), "target", any(), any()) } coAnswers {
+        coEvery { matcher.matchBatchForIndexing(any(), "target", any(), any<AudioMatchStrategy>(), any()) } coAnswers {
             val tracks = firstArg<List<TrackDescriptor>>()
             val playlist = thirdArg<PrivatePlaylistImportRequest?>()
             batchCalls += tracks

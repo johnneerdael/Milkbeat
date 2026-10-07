@@ -1,7 +1,14 @@
 package io.github.aedev.flow.plugin.install
 
+import android.content.Context
+import android.content.res.AssetManager
 import com.google.common.truth.Truth.assertThat
 import io.github.aedev.flow.sync.crypto.SyncCrypto
+import io.mockk.coEvery
+import io.mockk.coVerify
+import io.mockk.every
+import io.mockk.mockk
+import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
@@ -42,6 +49,33 @@ class PluginDownloadCodesTest {
         assertThat(pluginDownloadSource("555", live) { bundled }.pluginId).isEqualTo("dev.example.newer")
         assertThat(pluginDownloadSource("416", null) { bundled }.url).isEqualTo("https://buzzheavier.com/oldold123456")
     }
+
+    @Test
+    fun `preview installs the bundled provider without consulting stable publication`(): Unit =
+        runTest {
+            val context = mockk<Context>()
+            every { context.packageName } returns "nl.neerdael.milkbeat.nightly"
+            val assets = mockk<AssetManager>()
+            every { context.assets } returns assets
+            every { assets.open("plugin-preview-download-catalog.json") } answers {
+                File("src/nightly/assets/plugin-preview-download-catalog.json").inputStream()
+            }
+            val stableUrl = "https://buzzheavier.com/stable123456"
+            val publication = mockk<PluginPublication>()
+            coEvery { publication.current() } returns
+                Publication(
+                    PublishedPlugins(listOf(PublishedPlugin("nl.neerdael.youtube-music", "0.2.8", 13, "f", "494", "sha"))),
+                    mapOf("494" to PluginDownloadCode("494", "nl.neerdael.youtube-music", "YouTube Music", stableUrl)),
+                )
+            val source = PluginDownloadCodes(context, publication).resolve(" 494 ")
+            val bundled = decodePluginDownloadCatalog(File("src/nightly/assets/plugin-preview-download-catalog.json").readText())
+            assertThat(source.url).isEqualTo(bundled.getValue("494").url)
+            assertThat(source.pluginId).isEqualTo("nl.neerdael.youtube-music")
+            coVerify(exactly = 0) { publication.current() }
+            every { context.packageName } returns "nl.neerdael.milkbeat"
+            assertThat(PluginDownloadCodes(context, publication).resolve("494").url).isEqualTo(stableUrl)
+            coVerify(exactly = 1) { publication.current() }
+        }
 
     @Test
     fun `ordinary URLs do not require decrypting the catalog`() {

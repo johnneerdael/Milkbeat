@@ -5,6 +5,7 @@ import io.github.aedev.flow.plugin.catalog.PluginAccounts
 import io.github.aedev.flow.plugin.playback.AudioBatchIndexingResult
 import io.github.aedev.flow.plugin.playback.PluginTrackMatcher
 import io.github.aedev.flow.plugin.playback.TrackMatchScore
+import io.github.aedev.flow.plugin.playback.audioMatchStrategy
 import io.github.aedev.flow.plugin.registry.InstalledPlugin
 import io.github.aedev.flow.plugin.registry.PluginRegistry
 import io.github.aedev.flow.plugin.runtime.PluginCallException
@@ -262,6 +263,7 @@ class PlaylistMirrorRunner
                                     batch,
                                     key.targetPlugin,
                                     ensureRequest.copy(target = record.destination).takeIf { ensured == null },
+                                    primaryStrategy = target.audioMatchStrategy(),
                                     ensureCallerActive = {
                                         callerContext.ensureActive()
                                         validate()
@@ -269,7 +271,9 @@ class PlaylistMirrorRunner
                                 )
                             } else {
                                 AudioBatchIndexingResult(
-                                    listOf(matcher.matchForIndexing(batch.single(), key.targetPlugin)),
+                                    listOf(
+                                        matcher.matchForIndexing(batch.single(), key.targetPlugin, strategy = target.audioMatchStrategy()),
+                                    ),
                                 )
                             }
                         }

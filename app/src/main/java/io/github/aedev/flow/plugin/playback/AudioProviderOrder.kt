@@ -3,6 +3,10 @@ package io.github.aedev.flow.plugin.playback
 import io.github.aedev.flow.plugin.registry.InstalledPlugin
 import io.github.aedev.flow.plugin.registry.PluginRegistryState
 import nl.neerdael.milkbeat.catalog.TrackDescriptor
+import nl.neerdael.milkbeat.plugin.AudioMatchStrategy
+
+internal fun InstalledPlugin.audioMatchStrategy(): AudioMatchStrategy =
+    if (manifest.roles.audio?.musicVideo == true) AudioMatchStrategy.VIDEOS else AudioMatchStrategy.SONGS
 
 internal data class AudioProviderAttempt(
     val plugin: InstalledPlugin,

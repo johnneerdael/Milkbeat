@@ -14,6 +14,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 private const val CATALOG_ASSET = "plugin-download-catalog.json"
+private const val PREVIEW_CATALOG_ASSET = "plugin-preview-download-catalog.json"
 private const val CATALOG_AAD = "milkbeat/plugin-download-catalog/1"
 
 @Singleton
@@ -23,9 +24,11 @@ class PluginDownloadCodes
         @ApplicationContext private val context: Context,
         private val publication: PluginPublication,
     ) {
+        private val preview = context.packageName.endsWith(".nightly")
+
         private val catalog by lazy {
             context.assets
-                .open(CATALOG_ASSET)
+                .open(if (preview) PREVIEW_CATALOG_ASSET else CATALOG_ASSET)
                 .bufferedReader()
                 .use { decodePluginDownloadCatalog(it.readText()) }
         }
@@ -33,12 +36,13 @@ class PluginDownloadCodes
         /**
          * A code resolves against the publisher's current catalog when it can be read, so every code a
          * plugin was ever given installs its current release and codes newer than this build work too;
-         * offline, the catalog bundled with the app answers.
+         * offline, the catalog bundled with the app answers. The separate Nightly/Preview app pins
+         * downloader codes to its bundled catalog so stable publication cannot replace its test providers.
          */
         internal suspend fun resolve(input: String): PluginDownloadSource =
             withContext(Dispatchers.IO) {
                 val live =
-                    if (isPluginDownloadCode(input.trim())) {
+                    if (isPluginDownloadCode(input.trim()) && !preview) {
                         try {
                             publication.current()
                         } catch (e: CancellationException) {

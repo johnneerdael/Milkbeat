@@ -49,9 +49,10 @@ class PluginTrackMatcher
             track: TrackDescriptor,
             pluginId: String,
             excludedId: String? = null,
+            strategy: AudioMatchStrategy = AudioMatchStrategy.SONGS,
         ): TrackDescriptor? =
             try {
-                find(track, pluginId, excludedId)
+                find(track, pluginId, excludedId, strategy)
             } catch (e: PluginCallException) {
                 Log.w(TAG, "$pluginId could not search for ${track.title}: ${e.error.message}")
                 null
@@ -61,12 +62,13 @@ class PluginTrackMatcher
             track: TrackDescriptor,
             pluginId: String,
             excludedId: String?,
+            strategy: AudioMatchStrategy,
         ): TrackDescriptor? {
             val fingerprint = fingerprint(track)
-            validatedCache(track, fingerprint, pluginId)?.let {
+            validatedCache(track, fingerprint, pluginId, strategy)?.let {
                 if (excludedId == null || it.candidate?.ref?.providerId != excludedId) return it.candidate
             }
-            val key = "$pluginId|$fingerprint|${excludedId.orEmpty()}"
+            val key = "$pluginId|$fingerprint|${strategy.name}|${excludedId.orEmpty()}"
             val mine = CompletableDeferred<TrackDescriptor?>()
             inFlight.putIfAbsent(key, mine)?.let { owner ->
                 try {
@@ -74,11 +76,11 @@ class PluginTrackMatcher
                 } catch (e: CancellationException) {
                     currentCoroutineContext().ensureActive()
                     inFlight.remove(key, owner)
-                    return find(track, pluginId, excludedId)
+                    return find(track, pluginId, excludedId, strategy)
                 }
             }
             try {
-                return lookup(track, fingerprint, pluginId, excludedId).also(mine::complete)
+                return lookup(track, fingerprint, pluginId, excludedId, strategy).also(mine::complete)
             } catch (e: Throwable) {
                 mine.completeExceptionally(e)
                 throw e
@@ -91,12 +93,14 @@ class PluginTrackMatcher
             track: TrackDescriptor,
             pluginId: String,
             excludedId: String? = null,
-        ): TrackDescriptor? = find(track, pluginId, excludedId)
+            strategy: AudioMatchStrategy = AudioMatchStrategy.SONGS,
+        ): TrackDescriptor? = find(track, pluginId, excludedId, strategy)
 
         suspend fun matchBatchForIndexing(
             tracks: List<TrackDescriptor>,
             pluginId: String,
             playlist: PrivatePlaylistImportRequest? = null,
+            primaryStrategy: AudioMatchStrategy = AudioMatchStrategy.SONGS,
             ensureCallerActive: () -> Unit = {},
         ): AudioBatchIndexingResult {
             require(tracks.size <= 16) { "An indexing batch may contain at most 16 tracks" }
@@ -109,14 +113,14 @@ class PluginTrackMatcher
             var preparation: nl.neerdael.milkbeat.catalog.PrivatePlaylistImportResult? = null
             var preparationError: PluginError? = null
 
-            fun flightKey(fingerprint: String) = "$pluginId|$fingerprint|"
+            fun flightKey(fingerprint: String) = "$pluginId|$fingerprint|${primaryStrategy.name}|"
 
             suspend fun finish(
                 fingerprint: String,
                 best: TrackMatchScore.Scored?,
             ) {
-                val cacheKey = if (best == null) batchMissFingerprint(fingerprint) else fingerprint
-                resolved[fingerprint] = remember(cacheKey, pluginId, best)
+                val cacheKey = if (best == null) batchMissFingerprint(fingerprint, primaryStrategy) else fingerprint
+                resolved[fingerprint] = remember(cacheKey, pluginId, best, primaryStrategy)
                 owned.getValue(fingerprint).complete(best?.candidate)
             }
 
@@ -130,8 +134,12 @@ class PluginTrackMatcher
 
             try {
                 for ((fingerprint, track) in distinct) {
-                    val hit = validatedCache(track, fingerprint, pluginId)
-                    if (hit != null && (hit.candidate != null || cached(batchMissFingerprint(fingerprint), pluginId) != null)) {
+                    val hit = validatedCache(track, fingerprint, pluginId, primaryStrategy)
+                    if (hit != null && (
+                            hit.candidate != null || primaryStrategy == AudioMatchStrategy.VIDEOS ||
+                                cached(batchMissFingerprint(fingerprint, primaryStrategy), pluginId) != null
+                        )
+                    ) {
                         resolved[fingerprint] = hit.candidate
                         continue
                     }
@@ -141,9 +149,10 @@ class PluginTrackMatcher
                     if (owner == null) owned[fingerprint] = mine else waiting[fingerprint] = owner
                 }
                 var pending = owned.keys.filterNot { it in primaryMisses }
-                for (strategy in AudioMatchStrategy.entries) {
+                val strategies = if (primaryStrategy == AudioMatchStrategy.VIDEOS) listOf(primaryStrategy) else AudioMatchStrategy.entries
+                for (strategy in strategies) {
                     if (strategy == AudioMatchStrategy.ALTERNATE_SONGS) pending = pending + primaryMisses.filter { it in owned }
-                    val ensure = playlist.takeIf { strategy == AudioMatchStrategy.SONGS }
+                    val ensure = playlist.takeIf { strategy == strategies.first() }
                     if (pending.isEmpty() && ensure == null) continue
                     ensureCallerActive()
                     currentCoroutineContext().ensureActive()
@@ -193,7 +202,9 @@ class PluginTrackMatcher
                     ensureCallerActive()
                     try {
                         val candidate = owner.await()
-                        if (candidate != null || cached(batchMissFingerprint(fingerprint), pluginId) != null) {
+                        if (candidate != null || primaryStrategy == AudioMatchStrategy.VIDEOS ||
+                            cached(batchMissFingerprint(fingerprint, primaryStrategy), pluginId) != null
+                        ) {
                             resolved[fingerprint] = candidate
                         } else {
                             inFlight.remove(flightKey(fingerprint), owner)
@@ -201,6 +212,7 @@ class PluginTrackMatcher
                                 matchBatchForIndexing(
                                     listOf(distinct.getValue(fingerprint)),
                                     pluginId,
+                                    primaryStrategy = primaryStrategy,
                                     ensureCallerActive = ensureCallerActive,
                                 )
                             resolved[fingerprint] = retry.matches.single()
@@ -210,7 +222,12 @@ class PluginTrackMatcher
                         currentCoroutineContext().ensureActive()
                         inFlight.remove(flightKey(fingerprint), owner)
                         val retry =
-                            matchBatchForIndexing(listOf(distinct.getValue(fingerprint)), pluginId, ensureCallerActive = ensureCallerActive)
+                            matchBatchForIndexing(
+                                listOf(distinct.getValue(fingerprint)),
+                                pluginId,
+                                primaryStrategy = primaryStrategy,
+                                ensureCallerActive = ensureCallerActive,
+                            )
                         resolved[fingerprint] = retry.matches.single()
                         retry.errors.singleOrNull()?.let { errors[fingerprint] = it }
                     } catch (error: PluginCallException) {
@@ -236,8 +253,10 @@ class PluginTrackMatcher
             pluginId: String,
         ) {
             matches.delete(fingerprint(track), pluginId)
-            matches.delete(missFingerprint(fingerprint(track)), pluginId)
-            matches.delete(batchMissFingerprint(fingerprint(track)), pluginId)
+            for (strategy in AudioMatchStrategy.entries) {
+                matches.delete(missFingerprint(fingerprint(track), strategy), pluginId)
+                matches.delete(batchMissFingerprint(fingerprint(track), strategy), pluginId)
+            }
         }
 
         private class Cached(
@@ -263,11 +282,12 @@ class PluginTrackMatcher
             track: TrackDescriptor,
             fingerprint: String,
             pluginId: String,
+            strategy: AudioMatchStrategy,
         ): Cached? {
             val hit =
                 cached(fingerprint, pluginId)?.takeIf { it.candidate != null }
-                    ?: cached(missFingerprint(fingerprint), pluginId)
-                    ?: cached(batchMissFingerprint(fingerprint), pluginId)
+                    ?: cached(missFingerprint(fingerprint, strategy), pluginId)
+                    ?: cached(batchMissFingerprint(fingerprint, strategy), pluginId)
                     ?: return null
             val candidate = hit.candidate ?: return hit
             if (TrackMatchScore.best(track, listOf(candidate)) != null) return hit
@@ -280,8 +300,9 @@ class PluginTrackMatcher
             fingerprint: String,
             pluginId: String,
             excludedId: String?,
+            strategy: AudioMatchStrategy,
         ): TrackDescriptor? {
-            val result = host.call(pluginId, PluginOperations.matchAudio, MatchAudioRequest(track))
+            val result = host.call(pluginId, PluginOperations.matchAudio, MatchAudioRequest(track, strategy))
             result.error?.let { throw PluginCallException(pluginId, it) }
             val candidates = result.candidates
             val best = TrackMatchScore.best(track, candidates.filter { it.ref.providerId != excludedId })
@@ -290,21 +311,25 @@ class PluginTrackMatcher
                 "${track.title}: ${candidates.size} candidates from $pluginId, best ${best?.score?.let { "%.2f".format(it) } ?: "none"}",
             )
             if (best == null && excludedId != null) return null
-            return remember(fingerprint, pluginId, best)
+            return remember(fingerprint, pluginId, best, strategy)
         }
 
         private suspend fun remember(
             fingerprint: String,
             pluginId: String,
             best: TrackMatchScore.Scored?,
+            strategy: AudioMatchStrategy,
         ): TrackDescriptor? {
             if (best != null) {
-                matches.delete(batchMissFingerprint(fingerprint), pluginId)
-                matches.delete(missFingerprint(fingerprint), pluginId)
+                for (scope in AudioMatchStrategy.entries) {
+                    matches.delete(batchMissFingerprint(fingerprint, scope), pluginId)
+                    matches.delete(missFingerprint(fingerprint, scope), pluginId)
+                }
             }
             matches.upsert(
                 TrackMatchEntity(
-                    fingerprint = if (best == null && !fingerprint.startsWith("batch-miss:")) missFingerprint(fingerprint) else fingerprint,
+                    fingerprint =
+                        if (best == null && !fingerprint.startsWith("batch-miss:")) missFingerprint(fingerprint, strategy) else fingerprint,
                     pluginId = pluginId,
                     candidate = best?.candidate?.let { PluginJson.encodeToString(TrackDescriptor.serializer(), it) },
                     confidence = best?.score ?: 0.0,
@@ -315,9 +340,20 @@ class PluginTrackMatcher
         }
 
         companion object {
-            private fun missFingerprint(fingerprint: String): String = "miss:${TrackMatchScore.POLICY_VERSION}:$fingerprint"
+            private fun searchFingerprint(
+                fingerprint: String,
+                strategy: AudioMatchStrategy,
+            ): String = if (strategy == AudioMatchStrategy.SONGS) fingerprint else "${strategy.name}:$fingerprint"
 
-            private fun batchMissFingerprint(fingerprint: String): String = "batch-miss:${TrackMatchScore.POLICY_VERSION}:$fingerprint"
+            private fun missFingerprint(
+                fingerprint: String,
+                strategy: AudioMatchStrategy,
+            ): String = "miss:${TrackMatchScore.POLICY_VERSION}:${searchFingerprint(fingerprint, strategy)}"
+
+            private fun batchMissFingerprint(
+                fingerprint: String,
+                strategy: AudioMatchStrategy,
+            ): String = "batch-miss:${TrackMatchScore.POLICY_VERSION}:${searchFingerprint(fingerprint, strategy)}"
 
             /** A track's identity across plugins: its ISRC when it has one, else every id it carries. */
             internal fun fingerprint(track: TrackDescriptor): String =

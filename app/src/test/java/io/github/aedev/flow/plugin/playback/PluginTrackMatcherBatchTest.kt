@@ -40,6 +40,135 @@ class PluginTrackMatcherBatchTest {
     private val other = matchTrack("native-b", "youtube")
 
     @Test
+    fun `video batch preserves accepted and missing positions with one video request and ENSURE result`() =
+        runTest {
+            val destination = EntityRef(EntityKind.PLAYLIST, "video-copy")
+            val ensure = PrivatePlaylistImportRequest("source", "Title", emptyList(), mode = PrivatePlaylistImportMode.ENSURE)
+            val requests = mutableListOf<MatchAudioBatchRequest>()
+            coEvery { host.call("youtube", PluginOperations.matchAudioBatch, any()) } coAnswers {
+                requests += thirdArg<MatchAudioBatchRequest>()
+                AudioMatchesBatch(
+                    listOf(AudioMatches(listOf(candidate)), AudioMatches()),
+                    PrivatePlaylistImportResult(destination, "next"),
+                )
+            }
+            val result = matcher.matchBatchForIndexing(listOf(first, second, first), "youtube", ensure, AudioMatchStrategy.VIDEOS)
+            assertThat(result.matches).containsExactly(candidate, null, candidate).inOrder()
+            assertThat(result.errors).containsExactly(null, null, null).inOrder()
+            assertThat(result.playlist?.ref).isEqualTo(destination)
+            assertThat(result.playlist?.next).isEqualTo("next")
+            assertThat(requests).hasSize(1)
+            assertThat(requests.single().tracks).containsExactly(first, second).inOrder()
+            assertThat(requests.single().strategy).isEqualTo(AudioMatchStrategy.VIDEOS)
+            assertThat(requests.single().playlist).isEqualTo(ensure)
+        }
+
+    @Test
+    fun `cached and empty video batches still send ENSURE without searches`() =
+        runTest {
+            coEvery { host.call("youtube", PluginOperations.matchAudioBatch, any()) } returns
+                AudioMatchesBatch(listOf(AudioMatches(listOf(candidate))))
+            matcher.matchBatchForIndexing(listOf(first), "youtube", primaryStrategy = AudioMatchStrategy.VIDEOS)
+            val ensure = PrivatePlaylistImportRequest("source", "Title", emptyList(), mode = PrivatePlaylistImportMode.ENSURE)
+            val requests = mutableListOf<MatchAudioBatchRequest>()
+            val destination = EntityRef(EntityKind.PLAYLIST, "video-copy")
+            coEvery { host.call("youtube", PluginOperations.matchAudioBatch, any()) } coAnswers {
+                requests += thirdArg<MatchAudioBatchRequest>()
+                AudioMatchesBatch(emptyList(), PrivatePlaylistImportResult(destination))
+            }
+            val cached = matcher.matchBatchForIndexing(listOf(first), "youtube", ensure, AudioMatchStrategy.VIDEOS)
+            val empty = matcher.matchBatchForIndexing(emptyList(), "youtube", ensure, AudioMatchStrategy.VIDEOS)
+            assertThat(cached.matches).containsExactly(candidate)
+            assertThat(empty.matches).isEmpty()
+            assertThat(cached.playlist?.ref).isEqualTo(destination)
+            assertThat(empty.playlist?.ref).isEqualTo(destination)
+            assertThat(requests).hasSize(2)
+            requests.forEach {
+                assertThat(it.tracks).isEmpty()
+                assertThat(it.strategy).isEqualTo(AudioMatchStrategy.VIDEOS)
+                assertThat(it.playlist).isEqualTo(ensure)
+            }
+        }
+
+    @Test
+    fun `video batch reuses its misses independently of Songs misses`() =
+        runTest {
+            coEvery { host.call("youtube", PluginOperations.matchAudio, any()) } returns AudioMatches()
+            assertThat(matcher.matchForIndexing(first, "youtube", strategy = AudioMatchStrategy.SONGS)).isNull()
+            coEvery { host.call("youtube", PluginOperations.matchAudioBatch, any()) } returns AudioMatchesBatch(listOf(AudioMatches()))
+            assertThat(matcher.matchBatchForIndexing(listOf(first), "youtube", primaryStrategy = AudioMatchStrategy.VIDEOS).matches)
+                .containsExactly(null)
+            assertThat(matcher.matchBatchForIndexing(listOf(first), "youtube", primaryStrategy = AudioMatchStrategy.VIDEOS).matches)
+                .containsExactly(null)
+            assertThat(matcher.matchForIndexing(first, "youtube", strategy = AudioMatchStrategy.VIDEOS)).isNull()
+            coVerify(exactly = 1) {
+                host.call("youtube", PluginOperations.matchAudioBatch, match { it.strategy == AudioMatchStrategy.VIDEOS })
+            }
+            coVerify(exactly = 1) { host.call("youtube", PluginOperations.matchAudio, any()) }
+        }
+
+    @Test
+    fun `video single shares an active video batch lookup`() =
+        runTest {
+            val response = CompletableDeferred<AudioMatchesBatch>()
+            coEvery { host.call("youtube", PluginOperations.matchAudioBatch, any()) } coAnswers { response.await() }
+            val batch = async { matcher.matchBatchForIndexing(listOf(first), "youtube", primaryStrategy = AudioMatchStrategy.VIDEOS) }
+            runCurrent()
+            val single = async { matcher.matchForIndexing(first, "youtube", strategy = AudioMatchStrategy.VIDEOS) }
+            runCurrent()
+            response.complete(AudioMatchesBatch(listOf(AudioMatches(listOf(candidate)))))
+            assertThat(batch.await().matches).containsExactly(candidate)
+            assertThat(single.await()).isEqualTo(candidate)
+            coVerify(exactly = 1) {
+                host.call("youtube", PluginOperations.matchAudioBatch, match { it.strategy == AudioMatchStrategy.VIDEOS })
+            }
+            coVerify(exactly = 0) { host.call("youtube", PluginOperations.matchAudio, any()) }
+        }
+
+    @Test
+    fun `video batch shares an active video single miss without fallback searches`() =
+        runTest {
+            val response = CompletableDeferred<AudioMatches>()
+            coEvery { host.call("youtube", PluginOperations.matchAudio, any()) } coAnswers { response.await() }
+            val single = async { matcher.matchForIndexing(first, "youtube", strategy = AudioMatchStrategy.VIDEOS) }
+            runCurrent()
+            val batch = async { matcher.matchBatchForIndexing(listOf(first), "youtube", primaryStrategy = AudioMatchStrategy.VIDEOS) }
+            runCurrent()
+            response.complete(AudioMatches())
+            assertThat(single.await()).isNull()
+            assertThat(batch.await().matches).containsExactly(null)
+            assertThat(matcher.matchBatchForIndexing(listOf(first), "youtube", primaryStrategy = AudioMatchStrategy.VIDEOS).matches)
+                .containsExactly(null)
+            coVerify(exactly = 1) {
+                host.call("youtube", PluginOperations.matchAudio, match { it.strategy == AudioMatchStrategy.VIDEOS })
+            }
+            coVerify(exactly = 0) { host.call("youtube", PluginOperations.matchAudioBatch, any()) }
+        }
+
+    @Test
+    fun `video batch does not join an active Songs single lookup`() =
+        runTest {
+            val songsResponse = CompletableDeferred<AudioMatches>()
+            coEvery { host.call("youtube", PluginOperations.matchAudio, any()) } coAnswers { songsResponse.await() }
+            coEvery { host.call("youtube", PluginOperations.matchAudioBatch, any()) } returns
+                AudioMatchesBatch(listOf(AudioMatches(listOf(candidate))))
+            val songs = async { matcher.matchForIndexing(first, "youtube", strategy = AudioMatchStrategy.SONGS) }
+            runCurrent()
+            val videos = async { matcher.matchBatchForIndexing(listOf(first), "youtube", primaryStrategy = AudioMatchStrategy.VIDEOS) }
+            runCurrent()
+            assertThat(videos.isCompleted).isTrue()
+            songsResponse.complete(AudioMatches())
+            assertThat(videos.await().matches).containsExactly(candidate)
+            assertThat(songs.await()).isNull()
+            coVerify(exactly = 1) {
+                host.call("youtube", PluginOperations.matchAudioBatch, match { it.strategy == AudioMatchStrategy.VIDEOS })
+            }
+            coVerify(exactly = 1) {
+                host.call("youtube", PluginOperations.matchAudio, match { it.strategy == AudioMatchStrategy.SONGS })
+            }
+        }
+
+    @Test
     fun `batch caches distinct tracks and preserves repeated source positions`() =
         runTest {
             val requests = mutableListOf<MatchAudioBatchRequest>()

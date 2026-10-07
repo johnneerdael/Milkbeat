@@ -24,6 +24,7 @@ nav:
   - Providers and sign-in: providers.md
   - Home, Search and Library: library.md
   - Playback and visuals: playback.md
+  - Video matching preview: preview-testing.md
   - Settings reference: settings.md
   - Troubleshooting: troubleshooting.md
   - Release notes: releases.md

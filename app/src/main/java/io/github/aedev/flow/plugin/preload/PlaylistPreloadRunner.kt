@@ -3,6 +3,7 @@ package io.github.aedev.flow.plugin.preload
 import io.github.aedev.flow.plugin.PluginHost
 import io.github.aedev.flow.plugin.catalog.PluginAccounts
 import io.github.aedev.flow.plugin.playback.PluginTrackMatcher
+import io.github.aedev.flow.plugin.playback.audioMatchStrategy
 import io.github.aedev.flow.plugin.playback.audioProviderAttempts
 import io.github.aedev.flow.plugin.registry.PluginRegistry
 import io.github.aedev.flow.plugin.runtime.PluginCallException
@@ -167,7 +168,9 @@ class PlaylistPreloadRunner
                         // Interrupting QuickJS can leave a rejected host promise for its next evaluation.
                         // Finish this bounded request; validation then stops a cancelled indexing job.
                         retryingTransient(beforeRetry = validate) {
-                            withContext(NonCancellable) { matcher.matchForIndexing(track, attempt.plugin.id) }
+                            withContext(NonCancellable) {
+                                matcher.matchForIndexing(track, attempt.plugin.id, strategy = attempt.plugin.audioMatchStrategy())
+                            }
                         }
                     } catch (e: PluginCallException) {
                         validate()

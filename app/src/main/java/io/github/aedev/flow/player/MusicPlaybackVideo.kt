@@ -10,6 +10,17 @@ import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import io.github.aedev.flow.data.localmedia.LocalMediaIds
 import io.github.aedev.flow.data.music.model.MusicTrack
+import kotlinx.coroutines.flow.MutableStateFlow
+
+@Volatile
+private var videoCapablePlaybackIds: Set<String> = emptySet()
+
+internal val musicVideoAvailableState = MutableStateFlow(false)
+
+internal fun EnhancedMusicPlayerManager.canShowVideo(track: MusicTrack): Boolean =
+    (track.isVideoSong || track.videoId in videoCapablePlaybackIds) && track.videoId !in videoUnavailableIds
+
+internal fun EnhancedMusicPlayerManager.carriesPicture(track: MusicTrack): Boolean = showVideo && canShowVideo(track)
 
 @OptIn(UnstableApi::class)
 internal fun EnhancedMusicPlayerManager.buildMediaItem(
@@ -54,20 +65,27 @@ internal fun EnhancedMusicPlayerManager.buildMediaItem(
 
 @OptIn(UnstableApi::class)
 internal fun EnhancedMusicPlayerManager.performSetVideoMode(show: Boolean) {
-    if (show == showVideo) return
+    if (show != showVideo) Log.d("EnhancedMusicPlayer", "Music video pictures ${if (show) "shown" else "hidden"}")
     showVideo = show
-    Log.d("EnhancedMusicPlayer", "Music video pictures ${if (show) "shown" else "hidden"}")
     val controller = player ?: return
     val playing = controller.currentMediaItemIndex
     val position = controller.currentPosition
     val tracks = queueState.value.associateBy { it.videoId }
-    for (index in (if (show) playing else playing + 1) until controller.mediaItemCount) {
-        val track = tracks[controller.getMediaItemAt(index).mediaId]?.takeIf { it.isVideoSong } ?: continue
+    for (index in (if (show) playing.coerceAtLeast(0) else playing + 1) until controller.mediaItemCount) {
+        val track = tracks[controller.getMediaItemAt(index).mediaId]?.takeIf(::canShowVideo) ?: continue
         if (track.videoId !in streamItemIds || (track.videoId in videoItemIds) == carriesPicture(track)) continue
         controller.replaceMediaItem(index, buildMediaItem(track))
         if (index == playing) controller.seekTo(index, position)
     }
     applyVideoMode(controller)
+}
+
+/** Updates choices from accepted audio resolutions without loading or replacing any source. */
+@OptIn(UnstableApi::class)
+fun EnhancedMusicPlayerManager.setVideoCapablePlaybackIds(ids: Set<String>) {
+    videoCapablePlaybackIds = ids.toSet()
+    musicVideoAvailableState.value = currentTrackState.value?.let(::canShowVideo) == true
+    player?.let(::applyVideoMode)
 }
 
 @OptIn(UnstableApi::class)
@@ -82,6 +100,7 @@ internal fun EnhancedMusicPlayerManager.performReleaseVideoSurface() {
     player?.let(::applyVideoMode)
 }
 
+/** The service found no playable picture; the recording remains audio-only for this session. */
 @OptIn(UnstableApi::class)
 internal fun EnhancedMusicPlayerManager.performOnVideoUnavailable(videoId: String) {
     videoUnavailableIds += videoId
@@ -91,8 +110,9 @@ internal fun EnhancedMusicPlayerManager.performOnVideoUnavailable(videoId: Strin
 
 @OptIn(UnstableApi::class)
 internal fun EnhancedMusicPlayerManager.applyVideoMode(controller: Player) {
-    val currentId = currentTrackState.value?.videoId
-    videoShownState.value = showVideo && currentId != null && currentId in videoItemIds
+    val track = currentTrackState.value
+    musicVideoAvailableState.value = track?.let(::canShowVideo) == true
+    videoShownState.value = showVideo && musicVideoAvailableState.value && track != null && track.videoId in videoItemIds
     val play = videoShownState.value && videoSurfaces > 0
     val disabled = androidx.media3.common.C.TRACK_TYPE_VIDEO in controller.trackSelectionParameters.disabledTrackTypes
     if (disabled != play) return

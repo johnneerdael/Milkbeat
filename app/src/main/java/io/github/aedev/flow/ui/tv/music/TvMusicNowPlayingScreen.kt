@@ -86,12 +86,12 @@ fun TvMusicNowPlayingScreen(
     val queueIndex by manager.currentQueueIndex.collectAsStateWithLifecycle()
     val automix by manager.automixItems.collectAsStateWithLifecycle()
     val showsVideo by manager.videoShown.collectAsStateWithLifecycle()
+    val videoAvailable by manager.videoAvailable.collectAsStateWithLifecycle()
     val shownView = shownNowPlayingView(view, showsVideo, visualizerAvailable = visualizer != null)
     val nextView =
         nextNowPlayingView(
-            chosen = view,
             shown = shownView,
-            videoAvailable = track?.isVideoSong == true,
+            videoAvailable = videoAvailable,
             visualizerAvailable = visualizer != null,
         )
     val dimens = LocalTvDimens.current
@@ -347,7 +347,10 @@ fun TvMusicNowPlayingScreen(
                         onNext = manager::playNext,
                         onToggleRepeat = manager::toggleRepeat,
                         onToggleLike = viewModel::toggleLike,
-                        onNextView = { onViewChange(nextView) },
+                        onNextView = {
+                            manager.setVideoMode(nextView == NowPlayingView.VIDEO)
+                            onViewChange(nextView)
+                        },
                         onToggleQueue = {
                             panel = if (panel == TvMusicPanel.QUEUE) TvMusicPanel.NONE else TvMusicPanel.QUEUE
                         },

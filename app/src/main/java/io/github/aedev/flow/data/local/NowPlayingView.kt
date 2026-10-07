@@ -28,24 +28,21 @@ fun shownNowPlayingView(
     }
 
 /**
- * The view after [shown], skipping a video the track lacks and a visualizer the device cannot run. A
- * [chosen] video that is not on screen is one this track cannot show, such as a video that failed and
- * plays as its song, so it is skipped too rather than chosen again.
+ * The view after [shown], skipping a video the accepted source cannot supply and a visualizer the
+ * device cannot run. Confirmed video remains selectable when it has not been loaded yet.
  */
 fun nextNowPlayingView(
-    chosen: NowPlayingView,
     shown: NowPlayingView,
     videoAvailable: Boolean,
     visualizerAvailable: Boolean,
 ): NowPlayingView {
-    val videoShowable = videoAvailable && (chosen != NowPlayingView.VIDEO || shown == NowPlayingView.VIDEO)
     val order = NowPlayingView.entries
     return (1..order.size)
         .map { order[(order.indexOf(shown) + it) % order.size] }
         .first {
             when (it) {
                 NowPlayingView.VISUALIZER -> visualizerAvailable
-                NowPlayingView.VIDEO -> videoShowable
+                NowPlayingView.VIDEO -> videoAvailable
                 NowPlayingView.STATIC -> true
             }
         }

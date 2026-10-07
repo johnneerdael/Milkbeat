@@ -195,6 +195,7 @@ A plugin that fails any step is not stored.
 - Third-party plugin packages are distributed separately from the app.
 - Milkbeat releases contain APKs and checksums. The README lists optional third-party downloader codes.
 - Plugins use the generic installer, signature verification, permission review and update APIs.
+- Stable downloader codes prefer the live publication catalog. The separate Nightly/Preview app loads `plugin-preview-download-catalog.json` from its variant assets and resolves codes without consulting stable publication; main publication metadata and assets remain stable.
 
 ## 4. The runtime
 
@@ -414,19 +415,9 @@ Play album (metadata M)
   4. queue end → M.radio(seed = album) if declared, else A.radio(seed), else stop
 ```
 
-- **Collections match in one call.** Before step 3, if A declares `matchCollection`, the host
-  sends the whole album once: `A.matchCollection(album, tracks)`. Then one search maps twelve
-  tracks, instead of twelve searches.
-- **Confidence:** candidates carry a `confidence` from 0 to 1. The host accepts at least 0.8 by
-  default.
-  - An ISRC or exact-id match counts as 1.
-  - Otherwise the host combines normalised title, artist overlap and duration within ±3 s.
-  - The combination rules live in the host, so every audio plugin is judged the same way.
-- **Match cache:** a host table keyed by `(descriptor fingerprint, audio plugin id)` holds
-  `{ id, confidence, matchedAt }`.
-  - Negative results are cached for a day, so a missing track is not searched on every play.
-  - This is a Room schema change. The owner approved it for the Spotify phase on 2026-09-28; it ships
-    with a migration.
+- **Matching strategy:** audio providers declaring `musicVideo` receive `VIDEOS` requests in ordinary playback, queue preparation, preloading and playlist mirroring. The YouTube provider uses the regular site's recorded-video filter, including Art Tracks and archived live sets. Other audio providers keep Songs matching. Playlist batches stay bounded to sixteen ordered slots.
+- **Confidence:** `TrackMatchScore` checks title, credited performer, recording variants and duration. A shared ISRC is authoritative. Ordinary title and artist evidence require 0.88 and 0.92 similarity; known shorter excerpts beyond ten seconds are rejected, while a longer recording can retain the existing exact-identity rule. Video title credits may identify a performer when the upload channel is a label. Long live sets additionally need explicit matching performance/event/year evidence and near-equal known durations; returned metadata is never rewritten.
+- **Match cache:** successful candidates are shared by recording fingerprint and provider. Misses are scoped by matching policy and requested strategy and last one day; Songs misses cannot suppress a Videos search. Concurrent single/batch callers share the same strategy-scoped in-flight lookup. This change does not alter the Room schema.
 - **Resolve lazily:** only the current and the next track, as today. Each resolve is deduped by
   queue position and descriptor fingerprint (AGENTS.md rule 8).
 - **Expiry:** a stream whose URL expires is refreshed by calling `resolve` again with the same
@@ -473,7 +464,7 @@ Play album (metadata M)
 - **Optional stream:** a music video is an optional `video` stream of a track, resolved when the
   listener has video on (today's Video/Visualizer switch).
 - **Any audio provider:** it asks for it by passing `video: true` to `resolve`.
-- **Where it applies:** providers without `musicVideo` keep the visualizer.
+- **Where it applies:** accepted sources from providers declaring `musicVideo` offer a Video choice for the original playback ID, including static Art Tracks. Eligibility is event-driven from accepted resolution and current account/provider context; original catalog IDs and metadata remain intact. Discovery never reloads playback. Explicit view selection requests picture using the accepted recording and preserves position; unavailable picture uses the existing audio recovery. Providers without `musicVideo` keep the visualizer or artwork.
 
 ## 8. Sign-in
 
