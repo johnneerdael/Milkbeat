@@ -84,6 +84,7 @@ public class SabrStream {
     private boolean mediaHeaderInResponse;
     private boolean redirectInResponse;
     private boolean controlInResponse;
+    private boolean completedDiscardedMediaInResponse;
     private volatile boolean discardPartialOnNextResponse;
 
     public void abandonCurrentResponse() {
@@ -100,9 +101,10 @@ public class SabrStream {
         mediaHeaderInResponse = false;
         redirectInResponse = false;
         controlInResponse = false;
+        completedDiscardedMediaInResponse = false;
     }
     public boolean hasResponseBackoffAcknowledgement() { return positiveBackoffInResponse && !mediaHeaderInResponse; }
-    public boolean hasResponseContinuationAcknowledgement() { return (positiveBackoffInResponse || redirectInResponse || controlInResponse) && !mediaHeaderInResponse; }
+    public boolean hasResponseContinuationAcknowledgement() { return completedDiscardedMediaInResponse || ((positiveBackoffInResponse || redirectInResponse || controlInResponse) && !mediaHeaderInResponse); }
     private String url;
     private List<? extends SabrPart> multiResult = null;
     private volatile Runnable liveMetadataListener;
@@ -354,6 +356,7 @@ public class SabrStream {
             bounded.skip(bounded.available());
 
             ProcessMediaEndResult result = processor.processMediaEnd(headerId);
+            completedDiscardedMediaInResponse |= result.completedDiscardedMedia;
 
             if (result.isNewSegment) {
                 receivedNewSegments = true;

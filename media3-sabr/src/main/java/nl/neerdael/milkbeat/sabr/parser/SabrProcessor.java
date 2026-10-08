@@ -322,6 +322,7 @@ public class SabrProcessor {
         }
 
         ProcessMediaEndResult result = new ProcessMediaEndResult();
+        result.completedDiscardedMedia = segment.discard && segment.receivedDataLength > 0;
 
         // Only count received segments as new segments if they are not consumed.
         // Discarded segments that are not consumed are considered new segments.

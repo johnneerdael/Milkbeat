@@ -92,6 +92,21 @@ public class SabrDeferredResponseTest {
             input.init(raw(new byte[0]));assertEquals(SabrPlaybackException.Reason.NO_PROGRESS,assertThrows(SabrPlaybackException.class,()->input.read(new byte[1],0,1)).reason);
         }
     }
+    @Test public void completedCrossTrackDiscardContinuesButPartialDiscardStillFails() throws Exception {
+        byte[] complete=SabrContainerExtractorTest.framed(SabrContainerExtractorTest.fixture("fragmented-short.mp4"),137,"video/mp4");
+        for(boolean truncated:new boolean[]{false,true}) {
+            nl.neerdael.milkbeat.sabr.parser.SabrStream stream=new nl.neerdael.milkbeat.sabr.parser.SabrStream("https://fixture","",StreamerContext.ClientInfo.getDefaultInstance(),-1,-1,0,null,false,null,4500);
+            stream.setFormatSelector(new nl.neerdael.milkbeat.sabr.parser.models.FormatSelector("audio",false,nl.neerdael.milkbeat.sabr.protos.misc.FormatId.newBuilder().setItag(251).build()));
+            nl.neerdael.milkbeat.sabr.parser.misc.SabrExtractorInput input=new nl.neerdael.milkbeat.sabr.parser.misc.SabrExtractorInput(stream);
+            byte[] body=truncated?java.util.Arrays.copyOf(complete,complete.length-3):complete;
+            input.init(raw(body));
+            if(truncated)assertEquals(SabrPlaybackException.Reason.NO_PROGRESS,assertThrows(SabrPlaybackException.class,()->input.read(new byte[1],0,1)).reason);
+            else {
+                assertThrows(SabrRequestDeferredException.class,()->input.read(new byte[1],0,1));assertFalse(stream.hasPendingSegments());
+                input.init(raw(new byte[0]));assertEquals(SabrPlaybackException.Reason.NO_PROGRESS,assertThrows(SabrPlaybackException.class,()->input.read(new byte[1],0,1)).reason);
+            }
+        }
+    }
     private static byte[] frame(int type,byte[] body) {
         assertTrue(body.length<128);byte[] bytes=new byte[body.length+2];bytes[0]=(byte)type;bytes[1]=(byte)body.length;System.arraycopy(body,0,bytes,2,body.length);return bytes;
     }
