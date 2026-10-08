@@ -329,6 +329,21 @@ class TvSearchViewModelTest {
         }
 
     @Test
+    fun `a chip that goes away and comes back searches its provider again`() =
+        runTest(dispatcher) {
+            val vm = viewModel()
+            vm.showSource(MUSIC)
+            vm.onQueryChange("cafe")
+            advanceUntilIdle()
+
+            vm.retainSources(setOf(LOCAL.key, TvSearchSource.Videos.key))
+            vm.showSource(MUSIC)
+            advanceUntilIdle()
+
+            assertThat(music.searches).containsExactly(SearchRequest("cafe"), SearchRequest("cafe"))
+        }
+
+    @Test
     fun `typeahead asks the music chip shown last and the video plugin`() =
         runTest(dispatcher) {
             val vm = viewModel()

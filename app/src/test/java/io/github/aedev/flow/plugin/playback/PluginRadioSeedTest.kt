@@ -62,6 +62,17 @@ class PluginRadioSeedTest {
             assertThat(page?.pluginId).isEqualTo("spotify")
         }
 
+    @Test
+    fun `a track known to several plugins plays the radio of the plugin that described it`() =
+        runTest {
+            val track = TrackDescriptor(EntityRef(EntityKind.TRACK, "bp-1"), "Song", ids = mapOf("sp" to "sp-1", "bp" to "bp-1"))
+
+            val page = radio.page(track.ref, track)
+
+            assertThat(requests).containsExactly("beatport" to RadioRequest(EntityRef(EntityKind.TRACK, "bp-1")))
+            assertThat(page?.pluginId).isEqualTo("beatport")
+        }
+
     private fun plugin(
         id: String,
         idSpace: String,

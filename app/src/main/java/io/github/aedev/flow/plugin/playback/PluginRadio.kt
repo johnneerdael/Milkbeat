@@ -114,7 +114,14 @@ class PluginRadio
                             ?.idSpace,
                     ) == true
                 }
-            val metadataPlugin = scoped?.pluginId ?: compatible.firstOrNull()?.id
+            // A track several plugins know keeps the radio of the plugin that described it.
+            val describing =
+                compatible.firstOrNull { plugin ->
+                    plugin.manifest.roles.metadata
+                        ?.idSpace
+                        ?.let { seedTrack?.ids?.get(it) } == seedTrack?.ref?.providerId
+                }
+            val metadataPlugin = scoped?.pluginId ?: (describing ?: compatible.firstOrNull())?.id
             val ownSeed =
                 scoped?.entity ?: seedTrack?.let { track ->
                     val space =

@@ -115,6 +115,20 @@ class TvSearchViewModel internal constructor(
         search(target, _state.value.results(target).filterId, delayMs = 0L)
     }
 
+    /**
+     * Forgets the chips not among [keys]: a provider whose tab went away (sign-out, disabled, removed)
+     * may come back with another account, so its old answer must not satisfy the same query again.
+     */
+    fun retainSources(keys: Set<String>) {
+        val gone = _state.value.results.keys - keys
+        if (gone.isEmpty()) return
+        gone.forEach { key ->
+            searchJobs.remove(key)?.cancel()
+            moreJobs.remove(key)?.cancel()
+        }
+        _state.update { it.copy(results = it.results - gone) }
+    }
+
     /** Selects a filter of the half on screen, or drops it when picked again; "Show all" selects its section's. */
     fun selectFilter(filterId: String) {
         val target = source
