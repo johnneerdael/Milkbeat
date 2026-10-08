@@ -336,7 +336,7 @@ class TvSearchViewModelTest {
             vm.onQueryChange("cafe")
             advanceUntilIdle()
 
-            vm.retainSources(setOf(LOCAL.key, TvSearchSource.Videos.key))
+            vm.retainSources(mapOf(LOCAL.key to null, TvSearchSource.Videos.key to null))
             vm.showSource(MUSIC)
             advanceUntilIdle()
 
@@ -389,7 +389,7 @@ class TvSearchViewModelTest {
             advanceUntilIdle()
             assertThat(vm.state.value.musicSuggestions).containsExactly("cafe spotify")
 
-            vm.retainSources(setOf(TvSearchSource.Videos.key))
+            vm.retainSources(mapOf(TvSearchSource.Videos.key to null))
             vm.onQueryChange("cafe del")
             advanceUntilIdle()
 
@@ -405,11 +405,30 @@ class TvSearchViewModelTest {
             vm.onQueryChange("cafe")
             advanceTimeBy(100)
 
-            vm.retainSources(setOf(TvSearchSource.Videos.key))
+            vm.retainSources(mapOf(TvSearchSource.Videos.key to null))
             advanceUntilIdle()
 
             assertThat(music.searches).isEmpty()
             assertThat(vm.state.value.results).doesNotContainKey(MUSIC.key)
+        }
+
+    @Test
+    fun `a chip whose provider identity changes searches and suggests afresh`() =
+        runTest(dispatcher) {
+            music.typeahead = { Result.success(Suggestions(listOf("$it spotify"))) }
+            val vm = viewModel()
+            vm.retainSources(mapOf(MUSIC.key to "account-1", TvSearchSource.Videos.key to null))
+            vm.showSource(MUSIC)
+            vm.onQueryChange("cafe")
+            advanceUntilIdle()
+
+            vm.retainSources(mapOf(MUSIC.key to "anonymous", TvSearchSource.Videos.key to null))
+            advanceUntilIdle()
+            assertThat(vm.state.value.musicSuggestions).isEmpty()
+            vm.showSource(MUSIC)
+            advanceUntilIdle()
+
+            assertThat(music.searches).containsExactly(SearchRequest("cafe"), SearchRequest("cafe"))
         }
 
     @Test

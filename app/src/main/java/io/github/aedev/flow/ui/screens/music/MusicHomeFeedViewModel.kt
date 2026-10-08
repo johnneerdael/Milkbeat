@@ -104,6 +104,7 @@ class MusicHomeFeedViewModel internal constructor(
     private var job: Job? = null
     private var loadedKey: FeedKey? = null
     private var loadedAtMs = 0L
+    private var wasShown = false
 
     init {
         // A sign-in, sign-out, expiry or reinstall swaps whose home this is; never keep showing the old one. It is
@@ -114,7 +115,17 @@ class MusicHomeFeedViewModel internal constructor(
                 .map { it > 0 }
                 .distinctUntilChanged()
                 .collectLatest { shown ->
-                    if (!shown) return@collectLatest
+                    if (shown) wasShown = true
+                    if (!shown) {
+                        // A load left running for a tab no longer shown is stopped after the usual grace; the
+                        // next visit loads again.
+                        if (!wasShown || job?.isActive != true) return@collectLatest
+                        delay(SUBSCRIPTION_TIMEOUT_MS)
+                        job?.cancel()
+                        loadedKey = null
+                        _state.update { it.copy(isLoading = false, isLoadingMore = false) }
+                        return@collectLatest
+                    }
                     identity.collect { identity ->
                         val loaded = loadedKey ?: return@collect
                         if (loaded.identity != identity) load(filterId = null, force = true)

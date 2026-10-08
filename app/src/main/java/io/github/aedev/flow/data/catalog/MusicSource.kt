@@ -46,6 +46,8 @@ data class MusicTab(
     /** Shown before its account is known (YouTube Music works signed out); its home waits for the answer. */
     val accountPending: Boolean = false,
     val surfaces: Set<MetadataSurface> = emptySet(),
+    /** Changes with the account and the installation answering for this tab; what it showed is stale then. */
+    val identity: String = "",
 )
 
 /** The music tabs, and whether every account they depend on has answered yet. */

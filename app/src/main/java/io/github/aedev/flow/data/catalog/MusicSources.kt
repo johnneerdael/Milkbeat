@@ -126,12 +126,28 @@ internal fun musicTabs(
                     expired = accounts[plugin.id] == ProviderAccount.Expired,
                     signedIn = accounts[plugin.id] is ProviderAccount.SignedIn,
                     accountPending = plugin.id in pending,
+                    identity = "${accounts[plugin.id].identity}:${plugin.installedAtMs}:${plugin.manifest.versionCode}",
                     surfaces =
                         plugin.manifest.roles.metadata
                             ?.surfaces
                             .orEmpty(),
                 )
             }
-    val local = if (hasFolders) listOf(MusicTab(MusicSource.Local, label = null, iconRes = null)) else emptyList()
+    val local =
+        if (hasFolders) {
+            listOf(
+                MusicTab(MusicSource.Local, label = null, iconRes = null, identity = MusicSource.Local.key),
+            )
+        } else {
+            emptyList()
+        }
     return MusicTabs(providers + local, settled = pending.isEmpty())
 }
+
+private val ProviderAccount?.identity: String
+    get() =
+        when (this) {
+            is ProviderAccount.SignedIn -> "signed-in:$key"
+            ProviderAccount.Expired -> "expired"
+            else -> "anonymous"
+        }

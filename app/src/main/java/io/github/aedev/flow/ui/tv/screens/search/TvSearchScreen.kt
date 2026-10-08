@@ -74,7 +74,8 @@ fun TvSearchScreen(
     var picked by remember { mutableStateOf(startSource) }
     // A chip whose tab went away leaves Search on the start chip.
     val source = picked.takeIf { it in chips } ?: startSource
-    LaunchedEffect(chips) { viewModel.retainSources(chips.mapTo(mutableSetOf()) { it.key }) }
+    val chipIdentities = musicChips.associate { TvSearchSource.Music(it.source).key to it.identity } + (TvSearchSource.Videos.key to null)
+    LaunchedEffect(chipIdentities) { viewModel.retainSources(chipIdentities) }
     LaunchedEffect(source) { viewModel.showSource(source) }
     val localLabel = stringResource(R.string.local_library_title)
     val videosLabel = stringResource(R.string.tv_filter_videos)

@@ -339,6 +339,31 @@ class MusicHomeFeedViewModelTest {
         }
 
     @Test
+    fun `a tab hidden while its continuations load stops loading them`() =
+        runTest(dispatcher) {
+            var continuations = 0
+            provider.pages = { request ->
+                if (request.cursor == null) {
+                    Result.success(page("Home").copy(nextCursor = "c0"))
+                } else {
+                    continuations++
+                    delay(10_000)
+                    Result.success(page("More ${request.cursor}").copy(nextCursor = "c$continuations"))
+                }
+            }
+            val vm = viewModel()
+            val shown = show(vm)
+            vm.load()
+            runCurrent()
+            advanceTimeBy(100)
+            shown.cancelAndJoin()
+
+            advanceTimeBy(60_000)
+
+            assertThat(continuations).isEqualTo(1)
+        }
+
+    @Test
     fun `the tab without a provider asks for one and fetches nothing`() =
         runTest(dispatcher) {
             var fetches = 0

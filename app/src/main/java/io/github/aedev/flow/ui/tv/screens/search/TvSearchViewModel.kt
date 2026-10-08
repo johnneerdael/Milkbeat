@@ -86,6 +86,7 @@ class TvSearchViewModel internal constructor(
     private var source: TvSearchSource = TvSearchSource.Videos
     private var lastMusic: MusicSource? = null
     private val searchJobs = HashMap<String, Job>()
+    private val identities = HashMap<String, String?>()
     private val moreJobs = HashMap<String, Job>()
     private var suggestJob: Job? = null
     private var musicSuggestJob: Job? = null
@@ -125,24 +126,27 @@ class TvSearchViewModel internal constructor(
     }
 
     /**
-     * Forgets the chips not among [keys]: a provider whose tab went away (sign-out, disabled, removed)
-     * may come back with another account, so its old answer must not satisfy the same query again, and
-     * it no longer answers typeahead.
+     * Keeps the chips in [sources], each with its provider's identity. A chip gone (sign-out, disabled,
+     * removed) or whose account or installation changed forgets its answer and typeahead, so the same
+     * query asks the provider again instead of showing another account's results.
      */
-    fun retainSources(keys: Set<String>) {
-        if (lastMusic?.key?.let { it !in keys } == true) {
+    fun retainSources(sources: Map<String, String?>) {
+        val changed = identities.filter { (key, identity) -> key in sources && sources[key] != identity }.keys
+        identities.clear()
+        identities.putAll(sources)
+        if (lastMusic?.key?.let { it !in sources || it in changed } == true) {
             lastMusic = null
             musicSuggestJob?.cancel()
             _state.update { it.copy(musicSuggestions = emptyList()) }
         }
         // A search still in its typing pause has a job but no results yet.
-        val gone = (_state.value.results.keys + searchJobs.keys + moreJobs.keys) - keys
+        val gone = (_state.value.results.keys + searchJobs.keys + moreJobs.keys).filter { it !in sources || it in changed }
         if (gone.isEmpty()) return
         gone.forEach { key ->
             searchJobs.remove(key)?.cancel()
             moreJobs.remove(key)?.cancel()
         }
-        _state.update { it.copy(results = it.results - gone) }
+        _state.update { it.copy(results = it.results - gone.toSet()) }
     }
 
     /** Selects a filter of the half on screen, or drops it when picked again; "Show all" selects its section's. */

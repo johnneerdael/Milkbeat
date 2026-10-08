@@ -107,6 +107,15 @@ class MusicSourcesTest {
     }
 
     @Test
+    fun aTabsIdentityFollowsItsAccountAndInstallation() {
+        val mine = musicTabs(registry(youtube), mapOf(YOUTUBE to signedIn), false, emptySet()).tabs.single()
+        val anonymous = musicTabs(registry(youtube), mapOf(YOUTUBE to ProviderAccount.Anonymous), false, emptySet()).tabs.single()
+        val updated = musicTabs(registry(youtube.copy(installedAtMs = 99)), mapOf(YOUTUBE to signedIn), false, emptySet()).tabs.single()
+
+        assertEquals(3, setOf(mine.identity, anonymous.identity, updated.identity).size)
+    }
+
+    @Test
     fun sourceKeysRoundTrip() {
         listOf(MusicSource.Local, MusicSource.Plugin(SPOTIFY)).forEach { source ->
             assertEquals(source, MusicSource.fromKey(source.key))

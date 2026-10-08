@@ -18,7 +18,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -68,6 +70,7 @@ class CatalogPageViewModelTest {
         accountState: MutableStateFlow<ProviderAccount> = MutableStateFlow(ProviderAccount.Anonymous),
         mirrors: PlaylistMirrorCoordinator? = null,
         playback: CatalogPlayback = CatalogPlayback { null },
+        installation: Flow<Any?> = flowOf(null),
         pages: suspend (String?) -> Result<MetadataPage>,
     ) = CatalogPageViewModel(
         SavedStateHandle(
@@ -90,10 +93,29 @@ class CatalogPageViewModelTest {
         playback,
         mockk<SubscriptionRepository> { every { isSubscribed(any()) } returns flowOf(false) },
         mirrors = mirrors,
+        installation = installation,
     ).also { vm ->
         stores += ViewModelStore().apply { put("catalog", vm) }
         collectors += CoroutineScope(dispatcher).launch { vm.state.collect {} }
     }
+
+    @Test
+    fun `an updated plugin is another page identity, though the account stays the same`() =
+        runTest(dispatcher) {
+            val installation = MutableStateFlow<Any?>("install-1")
+            val vm = viewModel(installation = installation) { Result.success(MetadataPage("p", listOf(header))) }
+            val before = vm.sourceIdentity.first()
+            vm.load(before)
+            advanceUntilIdle()
+
+            installation.value = "install-2"
+            val after = vm.sourceIdentity.first()
+            vm.load(after)
+            advanceUntilIdle()
+
+            assertThat(after).isNotEqualTo(before)
+            assertThat(requests).hasSize(2)
+        }
 
     @Test
     fun `a route without its provider shows an error instead of another provider's page`() =

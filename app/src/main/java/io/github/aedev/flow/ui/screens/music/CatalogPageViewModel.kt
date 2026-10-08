@@ -62,6 +62,7 @@ class CatalogPageViewModel
         pluginCatalog: PluginMetadataProvider? = null,
         private val mirrors: io.github.aedev.flow.plugin.mirror.PlaylistMirrorCoordinator? = null,
         localCatalog: LocalCatalogProvider? = null,
+        installation: Flow<Any?> = flowOf(null),
     ) : ViewModel() {
         /** Every route names the provider whose page it is; one that does not shows the page's error. */
         @Inject
@@ -71,7 +72,19 @@ class CatalogPageViewModel
             pluginCatalog: PluginMetadataProvider,
             mirrors: io.github.aedev.flow.plugin.mirror.PlaylistMirrorCoordinator,
             localCatalog: LocalCatalogProvider,
-        ) : this(savedStateHandle, NoCatalog, NoCatalog, subscriptions, pluginCatalog, mirrors, localCatalog)
+        ) : this(
+            savedStateHandle,
+            NoCatalog,
+            NoCatalog,
+            subscriptions,
+            pluginCatalog,
+            mirrors,
+            localCatalog,
+            savedStateHandle
+                .get<String>(PROVIDER_ARG)
+                ?.takeUnless { it == LocalCatalogProvider.ID }
+                ?.let(pluginCatalog::installationOf) ?: flowOf(null),
+        )
 
         val sourcePluginId: String? = savedStateHandle.get<String>(PROVIDER_ARG)
         private val local = localCatalog?.takeIf { sourcePluginId == LocalCatalogProvider.ID }
@@ -92,7 +105,13 @@ class CatalogPageViewModel
             )
 
         private val _state = MutableStateFlow(CatalogPageState())
-        val sourceIdentity = provider.account.map { sourceKey(it) }.distinctUntilChanged()
+
+        /** The account and the installation answering for it; an in-place plugin update loads the page afresh. */
+        val sourceIdentity =
+            combine(
+                provider.account,
+                installation,
+            ) { account, installed -> "${sourceKey(account)}|$installed" }.distinctUntilChanged()
         val state: StateFlow<CatalogPageState> =
             combine(_state, sourceIdentity) { state, identity ->
                 if (state.sourceKey != null && state.sourceKey != identity) CatalogPageState() else state
@@ -204,19 +223,19 @@ class CatalogPageViewModel
             job?.cancel()
             job =
                 viewModelScope.launch {
-                    val identity = sourceKey(provider.account.first())
+                    val identity = sourceIdentity.first()
                     if (_state.value.sourceKey == identity && _state.value.blocks.isNotEmpty()) return@launch
                     _state.value = CatalogPageState(sourceKey = identity)
                     val first =
                         provider.page(entity).getOrElse { error ->
                             currentCoroutineContext().ensureActive()
-                            if (sourceKey(provider.account.first()) != identity) return@launch
+                            if (sourceIdentity.first() != identity) return@launch
                             Log.w(TAG, "page ${entity.kind} ${entity.providerId} failed", error)
                             _state.update { it.copy(isLoading = false, error = error.listenerMessage) }
                             return@launch
                         }
                     currentCoroutineContext().ensureActive()
-                    if (sourceKey(provider.account.first()) != identity) return@launch
+                    if (sourceIdentity.first() != identity) return@launch
                     _state.update { it.copy(blocks = emptyList<PageBlock>().withPage(first.blocks), isLoading = false) }
                     first.blocks
                         .filterIsInstance<EntityHeader>()
@@ -228,7 +247,7 @@ class CatalogPageViewModel
                     while (cursor != null && seen.add(cursor) && pages++ < MAX_CONTINUATION_PAGES) {
                         val next = provider.page(entity, cursor).getOrNull() ?: break
                         currentCoroutineContext().ensureActive()
-                        if (sourceKey(provider.account.first()) != identity) return@launch
+                        if (sourceIdentity.first() != identity) return@launch
                         _state.update { it.copy(blocks = it.blocks.extendedBy(next.blocks)) }
                         cursor = next.nextCursor
                     }
