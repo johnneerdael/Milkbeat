@@ -116,6 +116,14 @@ class MusicSourcesTest {
     }
 
     @Test
+    fun theLocalTabsIdentityFollowsTheLibraryIndex() {
+        val before = musicTabs(registry(), emptyMap(), true, emptySet(), localIdentity = "local:1").tabs.single()
+        val after = musicTabs(registry(), emptyMap(), true, emptySet(), localIdentity = "local:2").tabs.single()
+
+        assertTrue(before.identity != after.identity)
+    }
+
+    @Test
     fun sourceKeysRoundTrip() {
         listOf(MusicSource.Local, MusicSource.Plugin(SPOTIFY)).forEach { source ->
             assertEquals(source, MusicSource.fromKey(source.key))

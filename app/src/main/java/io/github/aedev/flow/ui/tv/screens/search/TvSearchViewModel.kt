@@ -147,6 +147,8 @@ class TvSearchViewModel internal constructor(
             moreJobs.remove(key)?.cancel()
         }
         _state.update { it.copy(results = it.results - gone.toSet()) }
+        // The chip on screen asks its provider again at once rather than waiting on an answer that was dropped.
+        if (source.key in gone && source.key in sources) search(source, filterId = null, delayMs = 0L)
     }
 
     /** Selects a filter of the half on screen, or drops it when picked again; "Show all" selects its section's. */

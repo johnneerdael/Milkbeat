@@ -424,11 +424,17 @@ class TvSearchViewModelTest {
 
             vm.retainSources(mapOf(MUSIC.key to "anonymous", TvSearchSource.Videos.key to null))
             advanceUntilIdle()
-            assertThat(vm.state.value.musicSuggestions).isEmpty()
+
+            // The chip on screen searches again by itself; showing it again asks nothing more.
+            assertThat(music.searches).containsExactly(SearchRequest("cafe"), SearchRequest("cafe"))
+            assertThat(
+                vm.state.value
+                    .results(MUSIC)
+                    .loaded,
+            ).isTrue()
             vm.showSource(MUSIC)
             advanceUntilIdle()
-
-            assertThat(music.searches).containsExactly(SearchRequest("cafe"), SearchRequest("cafe"))
+            assertThat(music.searches).hasSize(2)
         }
 
     @Test

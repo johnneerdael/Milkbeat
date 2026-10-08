@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.aedev.flow.data.folders.MusicFolderRepository
+import io.github.aedev.flow.data.library.catalog.LocalCatalogProvider
 import io.github.aedev.flow.data.local.safePreferencesDataStore
 import io.github.aedev.flow.plugin.catalog.KnownProviders
 import io.github.aedev.flow.plugin.catalog.PluginAccounts
@@ -17,11 +18,16 @@ import io.github.aedev.flow.plugin.registry.PluginRegistryState
 import io.github.aedev.flow.utils.PerformanceDispatcher
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -37,6 +43,7 @@ private val Context.musicTabsStore: DataStore<Preferences> by safePreferencesDat
  * when a folder is linked. Accounts are known only once a plugin has been asked, so each plugin with
  * a sign-in is asked once; the tabs are settled when all of them have answered.
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 @Singleton
 class MusicSources internal constructor(
     registry: PluginRegistry,
@@ -44,14 +51,29 @@ class MusicSources internal constructor(
     folders: MusicFolderRepository,
     private val store: DataStore<Preferences>,
     private val scope: CoroutineScope,
+    localIdentity: Flow<String?> = flowOf(null),
 ) {
     @Inject
     constructor(
         registry: PluginRegistry,
         accounts: PluginAccounts,
         folders: MusicFolderRepository,
+        local: dagger.Lazy<LocalCatalogProvider>,
         @ApplicationContext context: Context,
-    ) : this(registry, accounts, folders, context.musicTabsStore, CoroutineScope(SupervisorJob() + PerformanceDispatcher.networkIO))
+    ) : this(
+        registry,
+        accounts,
+        folders,
+        context.musicTabsStore,
+        CoroutineScope(SupervisorJob() + PerformanceDispatcher.networkIO),
+        // The index revision, which a scan that changes the library swaps; only read once a folder exists.
+        folders.folders
+            .map { it.isNotEmpty() }
+            .distinctUntilChanged()
+            .flatMapLatest { hasFolders ->
+                if (hasFolders) flow { emitAll(local.get().account.map { (it as? ProviderAccount.SignedIn)?.key }) } else flowOf(null)
+            },
+    )
 
     private val asked = mutableSetOf<String>()
     private val answered = MutableStateFlow<Set<String>>(emptySet())
@@ -62,10 +84,11 @@ class MusicSources internal constructor(
             accounts.accounts,
             folders.folders.map { it.isNotEmpty() }.distinctUntilChanged(),
             answered,
-        ) { state, known, hasFolders, done ->
+            localIdentity,
+        ) { state, known, hasFolders, done, local ->
             val pending = candidates(state).filter { it.manifest.signIn.isNotEmpty() && known[it.id] == null && it.id !in done }
             pending.forEach { ask(it.id) }
-            musicTabs(state, known, hasFolders, pending.mapTo(mutableSetOf()) { it.id })
+            musicTabs(state, known, hasFolders, pending.mapTo(mutableSetOf()) { it.id }, local)
         }.distinctUntilChanged()
 
     val lastUsed: Flow<MusicSource?> = store.data.map { MusicSource.fromKey(it[LAST_USED]) }.distinctUntilChanged()
@@ -109,6 +132,7 @@ internal fun musicTabs(
     accounts: Map<String, ProviderAccount>,
     hasFolders: Boolean,
     pending: Set<String>,
+    localIdentity: String? = null,
 ): MusicTabs {
     val providers =
         candidates(state)
@@ -136,7 +160,7 @@ internal fun musicTabs(
     val local =
         if (hasFolders) {
             listOf(
-                MusicTab(MusicSource.Local, label = null, iconRes = null, identity = MusicSource.Local.key),
+                MusicTab(MusicSource.Local, label = null, iconRes = null, identity = localIdentity ?: MusicSource.Local.key),
             )
         } else {
             emptyList()
