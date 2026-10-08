@@ -15,6 +15,7 @@ export type PersonalCollectionKind = 'OWNED_PLAYLIST' | 'LIKED_SONGS';
 export type PrivatePlaylistImportMode = 'REPLACE' | 'ENSURE' | 'APPEND';
 export type PrivatePlaylistImportPhase = 'PREPARING' | 'WRITING' | 'VERIFYING';
 export type AudioQuality = 'AUTO' | 'HIGH' | 'MEDIUM' | 'LOW';
+export type ServerAbrFailure = 'ATTESTATION_REQUIRED' | 'PLAYBACK_CONTEXT_RELOAD' | 'NO_PROGRESS' | 'URL_EXPIRED';
 export type FormatType = 'AUDIO' | 'VIDEO';
 export type AudioDrmScheme = 'WIDEVINE';
 export type AudioMatchStrategy = 'SONGS' | 'ALTERNATE_SONGS' | 'VIDEOS';
@@ -514,6 +515,7 @@ export interface StreamFailure {
   url: string;
   status?: number | null;
   reloadPlaybackContext?: string | null;
+  serverAbrFailure?: null | ServerAbrFailure;
 }
 export interface AudioStream {
   url: string;
@@ -850,6 +852,7 @@ export interface BrowserOpenRequest {
   html: string;
   baseUrl: string;
   timeoutMs?: number | null;
+  userAgent?: string | null;
 }
 export interface BrowserSession {
   id: string;

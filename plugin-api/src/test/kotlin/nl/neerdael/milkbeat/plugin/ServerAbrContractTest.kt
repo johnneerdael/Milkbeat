@@ -71,6 +71,17 @@ class ServerAbrContractTest {
     }
 
     @Test
+    fun protocolFailuresRemainDistinctFromHttpDenials() {
+        for (reason in listOf("ATTESTATION_REQUIRED", "PLAYBACK_CONTEXT_RELOAD", "NO_PROGRESS", "URL_EXPIRED")) {
+            val raw = """{"url":"https://media.example/video","serverAbrFailure":"$reason","reloadPlaybackContext":"opaque-context"}"""
+            val failure = PluginJson.decodeFromString(StreamFailure.serializer(), raw)
+            val encoded = PluginJson.encodeToJsonElement(StreamFailure.serializer(), failure).jsonObject
+            assertEquals(PluginJson.parseToJsonElement(raw).jsonObject["serverAbrFailure"], encoded["serverAbrFailure"])
+            assertNull(failure.status)
+        }
+    }
+
+    @Test
     fun legacyProgressiveAudioRemainsUnchanged() {
         val raw = """{"url":"https://media.example/audio","cacheKey":"old","renditionId":"old-encoding","mimeType":"audio/mp4"}"""
         val stream = PluginJson.decodeFromString(AudioStream.serializer(), raw)

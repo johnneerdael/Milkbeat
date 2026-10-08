@@ -2556,6 +2556,12 @@
                     ],
                     "minimum": -9223372036854775808,
                     "maximum": 9223372036854775807
+                },
+                "userAgent": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
                 }
             },
             "title": "BrowserOpenRequest"
@@ -3636,6 +3642,15 @@
             },
             "title": "ServerAbrClientInfo"
         },
+        "nl.neerdael.milkbeat.plugin.ServerAbrFailure": {
+            "enum": [
+                "ATTESTATION_REQUIRED",
+                "PLAYBACK_CONTEXT_RELOAD",
+                "NO_PROGRESS",
+                "URL_EXPIRED"
+            ],
+            "title": "ServerAbrFailure"
+        },
         "nl.neerdael.milkbeat.plugin.ServerAbrFormat": {
             "type": "object",
             "required": [
@@ -3906,6 +3921,16 @@
                     "type": [
                         "string",
                         "null"
+                    ]
+                },
+                "serverAbrFailure": {
+                    "oneOf": [
+                        {
+                            "type": "null"
+                        },
+                        {
+                            "$ref": "#/$defs/nl.neerdael.milkbeat.plugin.ServerAbrFailure"
+                        }
                     ]
                 }
             },

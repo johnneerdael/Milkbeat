@@ -36,6 +36,7 @@ spotless {
             "benchmark/src/**/*.kt",
             "plugin-api/src/**/*.kt",
             "spike-plugin-runtime/src/**/*.kt",
+            "media3-sabr/src/**/*.kt",
         )
         targetExclude(
             "**/build/**",

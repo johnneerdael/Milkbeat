@@ -66,6 +66,8 @@ data class StreamFailure(
     val url: String,
     val status: Int? = null,
     val reloadPlaybackContext: String? = null,
+    /** Protocol failures are independent of the transport HTTP status. */
+    val serverAbrFailure: ServerAbrFailure? = null,
 )
 
 @Serializable

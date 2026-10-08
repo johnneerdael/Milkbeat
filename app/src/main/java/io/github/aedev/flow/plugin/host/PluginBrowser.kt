@@ -3,6 +3,7 @@ package io.github.aedev.flow.plugin.host
 import android.annotation.SuppressLint
 import android.content.Context
 import android.webkit.JavascriptInterface
+import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import kotlinx.coroutines.CompletableDeferred
@@ -47,7 +48,7 @@ internal class PluginBrowser(
         }
         if (sessions.size >= MAX_SESSIONS) throw HostCallException(PluginErrorCode.RATE_LIMITED, "Too many browser sessions")
         val page = withContext(Dispatchers.IO) { asset(html).readText() }
-        val session = withContext(Dispatchers.Main) { Session(context) }
+        val session = withContext(Dispatchers.Main) { Session(context, request.userAgent) }
         sessions[session.id] = session
         try {
             withTimeout(timeout(request.timeoutMs)) { session.load(baseUrl, page) }
@@ -77,6 +78,7 @@ internal class PluginBrowser(
     @SuppressLint("SetJavaScriptEnabled")
     private class Session(
         context: Context,
+        userAgent: String?,
     ) {
         val id: String = UUID.randomUUID().toString()
         private val webView = WebView(context)
@@ -85,6 +87,7 @@ internal class PluginBrowser(
         private val loaded = CompletableDeferred<Unit>()
 
         init {
+            configureBrowserUserAgent(webView.settings, userAgent)
             webView.settings.javaScriptEnabled = true
             webView.settings.blockNetworkLoads = true
             webView.settings.allowFileAccess = false
@@ -153,4 +156,12 @@ internal class PluginBrowser(
             }
         }
     }
+}
+
+/** Preserve the platform identity for older plugins that do not specify an attestation identity. */
+internal fun configureBrowserUserAgent(
+    settings: WebSettings,
+    userAgent: String?,
+) {
+    if (userAgent != null) settings.userAgentString = userAgent
 }

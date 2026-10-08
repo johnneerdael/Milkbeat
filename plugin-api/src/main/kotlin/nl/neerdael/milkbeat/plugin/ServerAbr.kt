@@ -38,3 +38,14 @@ data class ServerAbrFormat(
     val lastModified: String,
     val xTags: String? = null,
 )
+
+/** A native SABR protocol instruction passed back to the source provider. */
+@Serializable
+enum class ServerAbrFailure {
+    ATTESTATION_REQUIRED,
+    PLAYBACK_CONTEXT_RELOAD,
+    NO_PROGRESS,
+
+    /** The host observed the accepted presentation lifetime expire. */
+    URL_EXPIRED,
+}

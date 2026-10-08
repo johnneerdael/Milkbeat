@@ -154,6 +154,8 @@ data class BrowserOpenRequest(
     val html: String,
     val baseUrl: String,
     val timeoutMs: Long? = null,
+    /** Match the browser identity to the provider HTTP challenge requests; null retains the system default. */
+    val userAgent: String? = null,
 )
 
 @Serializable
