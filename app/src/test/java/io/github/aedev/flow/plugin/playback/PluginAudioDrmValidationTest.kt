@@ -67,6 +67,7 @@ class PluginAudioDrmValidationTest {
         )
 
     init {
+        coEvery { host.playbackLease(any()) } answers { PluginPlaybackLease(host, { 0L }, {}, {}) }
         every { registry.state } returns state
         coEvery { host.call("soundcloud", PluginOperations.resolveAudio, any()) } returns stream
     }

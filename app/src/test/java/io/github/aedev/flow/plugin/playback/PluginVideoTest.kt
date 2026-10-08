@@ -23,6 +23,10 @@ import nl.neerdael.milkbeat.catalog.MetadataItem
 import nl.neerdael.milkbeat.catalog.MetadataPage
 import nl.neerdael.milkbeat.plugin.ReportPlaybackRequest
 import nl.neerdael.milkbeat.plugin.ResolveVideoRequest
+import nl.neerdael.milkbeat.plugin.ServerAbrClientInfo
+import nl.neerdael.milkbeat.plugin.ServerAbrFailure
+import nl.neerdael.milkbeat.plugin.ServerAbrFormat
+import nl.neerdael.milkbeat.plugin.ServerAbrPlayback
 import nl.neerdael.milkbeat.plugin.StreamFailure
 import nl.neerdael.milkbeat.plugin.VideoKind
 import org.junit.Test
@@ -39,14 +43,124 @@ class PluginVideoTest {
     private val requests = mutableListOf<ResolveVideoRequest>()
     private val pluginVideo = PluginVideo(provider, preferences, limits)
 
+    private var playbackContext: Any = "initial-account"
+    private val runtimeOwner = Any()
+
     init {
+        coEvery { provider.playbackLease(any()) } answers { PluginPlaybackLease(runtimeOwner, { 0L }, {}, {}) }
+        every { provider.selected } returns "fixture-provider"
+        every { provider.playbackContext() } answers { playbackContext }
+        coEvery { provider.preparePlaybackContext(any()) } answers { playbackContext }
+        every { provider.playbackGrants(any()) } returns listOf("media.example")
         every { limits.maxHeight } returns 2160
         every { limits.codecs("auto") } returns listOf("vp9", "h264")
         every { limits.hdr } returns true
         every { preferences.preferredAudioLanguage } returns flowOf("de")
         every { preferences.preferredSubtitleLanguage } returns flowOf("nl")
-        coEvery { provider.resolve(capture(requests)) } returns Result.success(playback().copy(expiresInMs = 6 * 3_600_000L))
+        coEvery { provider.resolveBound(any(), any(), capture(requests)) } returns playback().copy(expiresInMs = 6 * 3_600_000L)
     }
+
+    @Test
+    fun `explicit retry forgets pinned native recovery and uses the current provider and account`() =
+        runTest {
+            val native =
+                ServerAbrPlayback(
+                    "https://media.example/sabr",
+                    VIDEO_ID,
+                    "AQI",
+                    ServerAbrClientInfo(7, "fixture"),
+                    listOf(
+                        ServerAbrFormat(PluginVideoStreamsTest.audioOriginal.copy(url = ""), 251, "100"),
+                        ServerAbrFormat(PluginVideoStreamsTest.video1080.copy(url = ""), 137, "101"),
+                    ),
+                    durationMs = 212000,
+                )
+            coEvery { provider.resolveBound(any(), any(), capture(requests)) } returns playback().copy(serverAbr = native)
+            pluginVideo.resolve(VIDEO_ID).getOrThrow()
+            pluginVideo.failed(VIDEO_ID, native.url, null, "old-context", ServerAbrFailure.PLAYBACK_CONTEXT_RELOAD)
+            pluginVideo.forget(VIDEO_ID)
+            playbackContext = "new-account"
+            every { provider.selected } returns "new-provider"
+            pluginVideo.resolve(VIDEO_ID).getOrThrow()
+            assertThat(requests.last().failure).isNull()
+            coVerify { provider.resolveBound("new-provider", "new-account", any()) }
+        }
+
+    @Test
+    fun `SDR conventional picture takes precedence over a native presentation with only HDR picture`() =
+        runTest {
+            val hdr = PluginVideoStreamsTest.video1080.copy(id = "337", hdr = true)
+            val native =
+                ServerAbrPlayback(
+                    "https://media.example/sabr",
+                    VIDEO_ID,
+                    "fixture",
+                    ServerAbrClientInfo(7, "fixture"),
+                    listOf(
+                        ServerAbrFormat(PluginVideoStreamsTest.audioOriginal.copy(url = ""), 251, "100"),
+                        ServerAbrFormat(hdr.copy(url = ""), 337, "101"),
+                    ),
+                    durationMs = 212000,
+                )
+            val mixed = playback().copy(serverAbr = native)
+            every { limits.hdr } returns false
+            coEvery { provider.resolveBound(any(), any(), any()) } returns mixed
+            val accepted = pluginVideo.resolve(VIDEO_ID).getOrThrow()
+            assertThat(accepted.serverAbr).isNull()
+            assertThat(accepted.formats).contains(PluginVideoStreamsTest.video1080)
+            assertThat(pluginVideo.bindServerAbr(accepted)).isNull()
+            // If no SDR picture exists anywhere, retain the provider's only usable picture.
+            val onlyHdr = mixed.copy(formats = listOf(PluginVideoStreamsTest.audioOriginal))
+            assertThat(withoutUnshownHdr(onlyHdr, false).serverAbr).isEqualTo(native)
+        }
+
+    @Test
+    fun `native and catalog live markers must agree in both directions`() =
+        runTest {
+            val formats =
+                listOf(
+                    ServerAbrFormat(PluginVideoStreamsTest.audioOriginal.copy(url = ""), 251, "100"),
+                    ServerAbrFormat(PluginVideoStreamsTest.video1080.copy(url = ""), 137, "101"),
+                )
+            val rejected =
+                listOf(VideoKind.LIVE to false, VideoKind.VOD to true).map { (kind, nativeLive) ->
+                    val native =
+                        ServerAbrPlayback(
+                            "https://media.example/sabr",
+                            VIDEO_ID,
+                            "fixture",
+                            ServerAbrClientInfo(7, "fixture"),
+                            formats,
+                            durationMs = 212000,
+                            live = nativeLive,
+                        )
+                    coEvery { provider.resolveBound(any(), any(), any()) } returns playback(kind).copy(serverAbr = native)
+                    PluginVideo(provider, preferences, limits).resolve(VIDEO_ID).exceptionOrNull()?.message
+                }
+            assertThat(rejected).containsExactly("Video and SABR live markers disagree", "Video and SABR live markers disagree")
+        }
+
+    @Test
+    fun `consistent live native playback accepts absent duration and retains live kind`() =
+        runTest {
+            val native =
+                ServerAbrPlayback(
+                    "https://media.example/sabr",
+                    VIDEO_ID,
+                    "fixture",
+                    ServerAbrClientInfo(7, "fixture"),
+                    listOf(
+                        ServerAbrFormat(PluginVideoStreamsTest.audioOriginal.copy(url = ""), 251, "100"),
+                        ServerAbrFormat(PluginVideoStreamsTest.video1080.copy(url = ""), 137, "101"),
+                    ),
+                    live = true,
+                )
+            coEvery { provider.resolveBound(any(), any(), any()) } returns playback(VideoKind.LIVE).copy(serverAbr = native)
+            val accepted = pluginVideo.resolve(VIDEO_ID).getOrThrow()
+            assertThat(accepted.kind).isEqualTo(VideoKind.LIVE)
+            assertThat(accepted.serverAbr!!.live).isTrue()
+            assertThat(accepted.serverAbr!!.durationMs).isNull()
+        }
 
     @Test
     fun `an SDR display gets the SDR pictures, unless the video has only HDR ones`() {
@@ -102,7 +216,7 @@ class PluginVideoTest {
     @Test
     fun `a resolve about to expire is asked for again`() =
         runTest {
-            coEvery { provider.resolve(capture(requests)) } returns Result.success(playback().copy(expiresInMs = 30_000L))
+            coEvery { provider.resolveBound(any(), any(), capture(requests)) } returns playback().copy(expiresInMs = 30_000L)
 
             pluginVideo.resolve(VIDEO_ID)
             pluginVideo.resolve(VIDEO_ID)
@@ -139,8 +253,8 @@ class PluginVideoTest {
     @Test
     fun `a premiere is never kept, so its countdown is asked for again`() =
         runTest {
-            coEvery { provider.resolve(capture(requests)) } returns
-                Result.success(playback(kind = VideoKind.UPCOMING).copy(startsInMs = 60_000))
+            coEvery { provider.resolveBound(any(), any(), capture(requests)) } returns
+                playback(kind = VideoKind.UPCOMING).copy(startsInMs = 60_000)
 
             pluginVideo.resolve(VIDEO_ID)
             pluginVideo.resolve(VIDEO_ID)
@@ -151,7 +265,7 @@ class PluginVideoTest {
     @Test
     fun `a failing plugin is not kept either`() =
         runTest {
-            coEvery { provider.resolve(capture(requests)) } returns Result.failure(IllegalStateException("down"))
+            coEvery { provider.resolveBound(any(), any(), capture(requests)) } throws IllegalStateException("down")
 
             assertThat(pluginVideo.resolve(VIDEO_ID).isFailure).isTrue()
             pluginVideo.resolve(VIDEO_ID)
@@ -162,7 +276,7 @@ class PluginVideoTest {
     @Test
     fun `a view is reported with the tracking token its resolve handed out`() =
         runTest {
-            coEvery { provider.resolve(any()) } returns Result.success(playback().copy(trackingToken = "token-1"))
+            coEvery { provider.resolveBound(any(), any(), any()) } returns playback().copy(trackingToken = "token-1")
             val reported = slot<ReportPlaybackRequest>()
             coEvery { provider.reportView(capture(reported)) } returns Unit
 
@@ -172,6 +286,44 @@ class PluginVideoTest {
             assertThat(
                 reported.captured,
             ).isEqualTo(ReportPlaybackRequest(EntityRef(EntityKind.VIDEO, VIDEO_ID), "token-1", 45_000, 212_000))
+        }
+
+    @Test
+    fun `protocol refresh keeps the accepted request and opaque reload context without fake HTTP`() =
+        runTest {
+            pluginVideo.resolve(VIDEO_ID)
+            pluginVideo.failed(
+                VIDEO_ID,
+                "https://media.example/sabr",
+                null,
+                "opaque-reload",
+                ServerAbrFailure.PLAYBACK_CONTEXT_RELOAD,
+            )
+            pluginVideo.resolve(VIDEO_ID)
+            pluginVideo.resolve(VIDEO_ID)
+            assertThat(requests).hasSize(2)
+            assertThat(requests[1].entity).isEqualTo(requests[0].entity)
+            assertThat(requests[1].failure!!.status).isNull()
+            assertThat(requests[1].failure!!.reloadPlaybackContext).isEqualTo("opaque-reload")
+            assertThat(requests[1].failure!!.serverAbrFailure).isEqualTo(ServerAbrFailure.PLAYBACK_CONTEXT_RELOAD)
+        }
+
+    @Test
+    fun `a protocol refresh cannot reuse a former account context or leak its reload token`() =
+        runTest {
+            pluginVideo.resolve(VIDEO_ID)
+            pluginVideo.failed(
+                VIDEO_ID,
+                "https://media.example/sabr",
+                null,
+                "private-reload",
+                ServerAbrFailure.PLAYBACK_CONTEXT_RELOAD,
+            )
+            playbackContext = "other-account"
+            assertThat(pluginVideo.resolve(VIDEO_ID).isFailure).isTrue()
+            assertThat(requests).hasSize(1)
+            pluginVideo.resolve(VIDEO_ID)
+            assertThat(requests.last().failure).isNull()
         }
 
     @Test

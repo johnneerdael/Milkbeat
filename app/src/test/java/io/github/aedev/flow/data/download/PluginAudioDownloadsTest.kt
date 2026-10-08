@@ -22,6 +22,18 @@ class PluginAudioDownloadsTest {
             clear.copy(mimeType = "application/x-mpegURL"),
             clear.copy(mimeType = "application/vnd.apple.mpegurl; charset=utf-8"),
             clear.copy(drm = drm),
+            clear.copy(mimeType = "application/x-server-abr"),
+            clear.copy(
+                serverAbr =
+                    nl.neerdael.milkbeat.plugin.ServerAbrPlayback(
+                        "https://cdn.example/post",
+                        "song",
+                        "fixture",
+                        nl.neerdael.milkbeat.plugin
+                            .ServerAbrClientInfo(7, "fixture"),
+                        emptyList(),
+                    ),
+            ),
         )) {
             val failure = runCatching { requireDownloadablePluginAudio(stream) }.exceptionOrNull()
             assertThat(failure).isInstanceOf(IOException::class.java)

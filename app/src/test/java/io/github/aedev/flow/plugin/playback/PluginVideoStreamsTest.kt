@@ -30,6 +30,51 @@ import org.schabi.newpipe.extractor.MediaFormat as ContainerFormat
  */
 class PluginVideoStreamsTest {
     @Test
+    fun `SABR-only playback retains native presentation with no invented progressive URLs`() {
+        val native =
+            nl.neerdael.milkbeat.plugin.ServerAbrPlayback(
+                "https://media.example/sabr",
+                VIDEO_ID,
+                "dXBzdHJlYW0=",
+                nl.neerdael.milkbeat.plugin
+                    .ServerAbrClientInfo(7, "fixture"),
+                listOf(
+                    nl.neerdael.milkbeat.plugin
+                        .ServerAbrFormat(audioOriginal.copy(url = ""), 251, "18446744073709551615"),
+                ),
+            )
+        val mapped = PluginVideoStreams.playable(playback(formats = emptyList()).copy(serverAbr = native), null)
+        assertThat(mapped.serverAbr).isSameInstanceAs(native)
+        assertThat(mapped.audioStreams).isEmpty()
+        assertThat(mapped.videoStreams).isEmpty()
+    }
+
+    @Test
+    fun `SABR VOD duration enriches unknown details and overrides a stale cached duration`() {
+        val native =
+            nl.neerdael.milkbeat.plugin.ServerAbrPlayback(
+                "https://media.example/sabr",
+                VIDEO_ID,
+                "fixture",
+                nl.neerdael.milkbeat.plugin
+                    .ServerAbrClientInfo(7, "fixture"),
+                emptyList(),
+                durationMs = 212_000L,
+            )
+        val response =
+            playback(
+                formats = emptyList(),
+            ).let { it.copy(details = it.details.copy(durationSeconds = null), serverAbr = native) }
+        val mapped = PluginVideoStreams.playable(response, null)
+        assertThat(mapped.durationSeconds).isEqualTo(212L)
+        assertThat(mapped.video.duration).isEqualTo(212)
+        val stale = mapped.video.copy(duration = 9)
+        assertThat(PluginVideoStreams.playable(response, stale).durationSeconds).isEqualTo(212L)
+        val details = response.copy(details = response.details.copy(durationSeconds = 300))
+        assertThat(PluginVideoStreams.playable(details, stale).durationSeconds).isEqualTo(300L)
+    }
+
+    @Test
     fun `video formats keep their size, codec and byte ranges for the generated manifest`() {
         val streams = PluginVideoStreams.videoStreams(listOf(video1080))
 

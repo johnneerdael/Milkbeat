@@ -26,6 +26,8 @@ import nl.neerdael.milkbeat.plugin.DeviceCodeSession
 import nl.neerdael.milkbeat.plugin.PluginErrorCode
 import nl.neerdael.milkbeat.plugin.PluginOperations
 import nl.neerdael.milkbeat.plugin.WebLoginResult
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -50,6 +52,33 @@ class PluginAccounts internal constructor(
 
     private val _accounts = MutableStateFlow<Map<String, ProviderAccount>>(emptyMap())
     val accounts: StateFlow<Map<String, ProviderAccount>> = _accounts.asStateFlow()
+
+    // Account values can return to their old shape after sign-in/sign-out. Native transports
+    // retain their provider's epoch, so an old visitor/token cannot survive that ABA transition.
+    private val playbackEpochState = MutableStateFlow(0L)
+    internal val playbackEpoch: StateFlow<Long> = playbackEpochState.asStateFlow()
+    private val providerPlaybackEpochs = ConcurrentHashMap<String, AtomicLong>()
+
+    private fun invalidatePlayback(pluginId: String) {
+        providerPlaybackEpochs.getOrPut(pluginId) { AtomicLong() }.incrementAndGet()
+        playbackEpochState.update { it + 1 }
+    }
+
+    internal fun providerPlaybackContext(pluginId: String): Pair<String, Long> =
+        playbackIdentity(_accounts.value[pluginId]) to (providerPlaybackEpochs[pluginId]?.get() ?: 0L)
+
+    internal fun playbackIdentitySnapshot(): Map<String, String> = identitiesOf(_accounts.value)
+
+    internal fun identitiesOf(accounts: Map<String, ProviderAccount>): Map<String, String> =
+        accounts.mapValues { playbackIdentity(it.value) }
+
+    private fun playbackIdentity(account: ProviderAccount?): String =
+        when (account) {
+            is ProviderAccount.SignedIn -> "signed:${account.key}"
+            ProviderAccount.Anonymous -> "anonymous"
+            ProviderAccount.Expired -> "expired"
+            null -> "unknown"
+        }
 
     private val revalidations = mutableMapOf<String, Job>()
 
@@ -98,6 +127,9 @@ class PluginAccounts internal constructor(
         try {
             val asked = check.generation
             val answer = ask(pluginId)
+            if (generation(pluginId) == asked && playbackIdentity(_accounts.value[pluginId]) != playbackIdentity(answer)) {
+                invalidatePlayback(pluginId)
+            }
             // A sign-in or sign-out finished while this check ran is newer than its answer.
             var account = answer
             _accounts.update { known ->
@@ -124,6 +156,7 @@ class PluginAccounts internal constructor(
     ): ProviderAccount {
         supersedeChecks(pluginId)
         cancelRevalidation(pluginId)
+        invalidatePlayback(pluginId)
         val account = host.call(pluginId, PluginOperations.completeSignIn, result)
         _accounts.update { it + (pluginId to account) }
         return account
@@ -166,6 +199,7 @@ class PluginAccounts internal constructor(
         pluginId: String,
         session: String,
     ): ProviderAccount.SignedIn {
+        invalidatePlayback(pluginId)
         val account =
             host.call(pluginId, PluginOperations.confirmSignIn, DeviceCodeSession(session)) as? ProviderAccount.SignedIn
                 ?: error("Pairing confirmation did not return a signed-in account")
@@ -177,6 +211,7 @@ class PluginAccounts internal constructor(
     }
 
     suspend fun signOut(pluginId: String) {
+        invalidatePlayback(pluginId)
         supersedeChecks(pluginId)
         cancelRevalidation(pluginId)
         host.call(pluginId, PluginOperations.signOut, Unit)
@@ -185,6 +220,7 @@ class PluginAccounts internal constructor(
 
     /** A call said the plugin's sign-in expired; the plugin is asked again right away whether it still signs in. */
     fun expired(pluginId: String) {
+        invalidatePlayback(pluginId)
         _accounts.update { it + (pluginId to ProviderAccount.Expired) }
         synchronized(revalidations) {
             if (revalidations[pluginId]?.isActive == true) {
@@ -229,6 +265,11 @@ class PluginAccounts internal constructor(
                     Log.w(TAG, "Re-checking the $pluginId account failed", e)
                     return
                 }
+            if (generation(pluginId) == asked && _accounts.value[pluginId] == ProviderAccount.Expired &&
+                account != ProviderAccount.Expired
+            ) {
+                invalidatePlayback(pluginId)
+            }
             _accounts.update {
                 if (it[pluginId] == ProviderAccount.Expired &&
                     generation(pluginId) == asked

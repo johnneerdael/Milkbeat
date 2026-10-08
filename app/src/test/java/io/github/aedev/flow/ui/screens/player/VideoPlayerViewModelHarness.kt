@@ -102,6 +102,7 @@ internal class VideoPlayerViewModelHarness(
         every { playerManager.isPreparedForPlayback(any()) } returns false
         every { playerManager.isReachedByQueueAdvance(any()) } returns false
         every { playerManager.lastStreamHttpFailure } returns null
+        every { playerManager.lastServerAbrFailure } returns null
 
         // No video plugin answers: every load ends on the generic error, as a failed extraction did.
         coEvery { pluginVideo.resolve(any()) } returns Result.failure(IllegalStateException())

@@ -2,11 +2,14 @@ package io.github.aedev.flow.plugin
 
 import android.net.Uri
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.ResolvingDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.session.MediaController
+import androidx.media3.session.MediaSession
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import io.github.aedev.flow.player.MusicMediaSourceFactory
@@ -17,6 +20,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import nl.neerdael.milkbeat.catalog.Artwork
 import nl.neerdael.milkbeat.catalog.EntityKind
 import nl.neerdael.milkbeat.catalog.EntityRef
 import nl.neerdael.milkbeat.catalog.TrackDescriptor
@@ -61,7 +65,13 @@ class PluginMusicPlaybackTest {
                         ResolvedAudio(
                             "fallback",
                             TrackDescriptor(EntityRef(EntityKind.TRACK, "fixture"), "Fixture"),
-                            AudioStream(url, "fixture", "aac", if (hls) "application/x-mpegURL" else "audio/aac"),
+                            AudioStream(
+                                url,
+                                "fixture",
+                                "aac",
+                                if (hls) "application/x-mpegURL" else "audio/aac",
+                                artwork = Artwork("https://playback.example/maxres.jpg", 1920, 1080),
+                            ),
                             Long.MAX_VALUE,
                             false,
                         )
@@ -80,13 +90,44 @@ class PluginMusicPlaybackTest {
                         .build()
                         .apply {
                             volume = 0f
-                            setMediaItems(listOf(MediaItem.fromUri("music://first"), MediaItem.fromUri("music://second")))
+                            setMediaItems(
+                                listOf("first", "second").map { id ->
+                                    MediaItem
+                                        .Builder()
+                                        .setUri("music://$id")
+                                        .setMediaId("spotify:$id")
+                                        .setMediaMetadata(
+                                            MediaMetadata
+                                                .Builder()
+                                                .setTitle("Original $id")
+                                                .setArtist("Catalog artist")
+                                                .setArtworkUri(Uri.parse("https://catalog.example/cover.jpg"))
+                                                .build(),
+                                        ).build()
+                                },
+                            )
                             prepare()
                             play()
                         }
                 }
+            val session = withContext(Dispatchers.Main) { MediaSession.Builder(context, player).setId("artwork-fixture").build() }
+            val future = withContext(Dispatchers.Main) { MediaController.Builder(context, session.token).buildAsync() }
             try {
+                val controller = withContext(Dispatchers.IO) { future.get(10, java.util.concurrent.TimeUnit.SECONDS) }
                 waitForPlayback(player, 0)
+                withTimeout(10_000) {
+                    while (!withContext(Dispatchers.Main) {
+                            controller.mediaMetadata.artworkUri.toString() == "https://playback.example/maxres.jpg"
+                        }
+                    ) {
+                        delay(50)
+                    }
+                }
+                withContext(Dispatchers.Main) {
+                    assertEquals("spotify:first", controller.currentMediaItem?.mediaId)
+                    assertEquals("Original first", controller.mediaMetadata.title.toString())
+                    assertEquals("Catalog artist", controller.mediaMetadata.artist.toString())
+                }
                 withContext(Dispatchers.Main) { player.pause() }
                 assertTrue(withContext(Dispatchers.Main) { !player.playWhenReady })
                 withContext(Dispatchers.Main) {
@@ -96,7 +137,11 @@ class PluginMusicPlaybackTest {
                 waitForPlayback(player, 1)
                 assertEquals(2, resolutions.get())
             } finally {
-                withContext(Dispatchers.Main) { player.release() }
+                withContext(Dispatchers.Main) {
+                    MediaController.releaseFuture(future)
+                    session.release()
+                    player.release()
+                }
                 directory.deleteRecursively()
             }
         }

@@ -71,6 +71,7 @@ fun TvMusicNowPlayingScreen(
     val tuning by viewModel.radioTuning.state.collectAsStateWithLifecycle()
     val manager = EnhancedMusicPlayerManager
     val track by manager.currentTrack.collectAsStateWithLifecycle()
+    val playbackArtwork by manager.playbackArtwork.collectAsStateWithLifecycle()
     val playerState by manager.playerState.collectAsStateWithLifecycle()
     val radioLoading by manager.radioLoading.collectAsStateWithLifecycle()
     LaunchedEffect(playerState.isEnded, radioLoading) {
@@ -293,7 +294,10 @@ fun TvMusicNowPlayingScreen(
             }
 
             NowPlayingView.STATIC -> {
-                TvNowPlayingArtwork(artworkUrl = artworkUrl)
+                TvNowPlayingArtwork(
+                    artworkUrl = playbackArtwork?.forTrack(track?.videoId) ?: artworkUrl,
+                    fallbackArtworkUrl = artworkUrl,
+                )
             }
         }
 

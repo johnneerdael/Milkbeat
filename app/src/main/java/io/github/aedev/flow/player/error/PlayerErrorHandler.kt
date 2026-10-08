@@ -84,6 +84,20 @@ class PlayerErrorHandler(
         error: PlaybackException,
         player: ExoPlayer?,
     ): Boolean {
+        if (io.github.aedev.flow.plugin.playback
+                .playbackSessionLost(error)
+        ) {
+            onPlaybackShutdown()
+            stateFlow.value =
+                stateFlow.value.copy(isPlaying = false, isBuffering = false, error = appContext.getString(R.string.error_generic))
+            return true
+        }
+        serverAbrFailureOf(error)?.let { failure ->
+            saveStreamProgressState(player)
+            PlayerDiagnostics.logWarning(TAG, "SABR protocol ${failure.serverAbrFailure}; refreshing the accepted source")
+            denialRecovery.handleProtocolFailure(failure)
+            return true
+        }
         Log.e(TAG, "ExoPlayer - onPlayerError() called with:", error)
         PlayerDiagnostics.logPlaybackError(TAG, error)
 

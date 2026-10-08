@@ -102,6 +102,7 @@ class MediaLoader(
         mediaId: String = "",
         mediaMetadata: MediaMetadata = MediaMetadata.EMPTY,
         requestHeaders: StreamRequestHeaders = StreamRequestHeaders.NONE,
+        serverAbr: io.github.aedev.flow.plugin.playback.BoundServerAbr? = null,
     ): Boolean {
         val finalDuration =
             when {
@@ -153,6 +154,7 @@ class MediaLoader(
                         mediaId = mediaId,
                         mediaMetadata = mediaMetadata,
                         requestHeaders = requestHeaders,
+                        serverAbr = serverAbr,
                     )
 
                 if (mediaSource != null) {
@@ -195,6 +197,8 @@ class MediaLoader(
         mediaId: String = "",
         mediaMetadata: MediaMetadata = MediaMetadata.EMPTY,
         requestHeaders: StreamRequestHeaders = StreamRequestHeaders.NONE,
+        serverAbr: io.github.aedev.flow.plugin.playback.BoundServerAbr? = null,
+        hlsUrl: String? = null,
     ): MediaSource? {
         val ctx = context ?: return null
         val dataSourceFactory = (cacheManager?.getDataSourceFactory() ?: DefaultDataSource.Factory(ctx)).withRequestHeaders(requestHeaders)
@@ -207,7 +211,7 @@ class MediaLoader(
                 availableVideoStreams = availableVideoStreams,
                 currentVideoStream = videoStream,
                 dashManifestUrl = dashManifestUrl,
-                hlsUrl = null,
+                hlsUrl = hlsUrl,
                 isLiveStream = false,
                 finalDuration = durationSeconds,
                 localFilePath = null,
@@ -216,6 +220,7 @@ class MediaLoader(
                 mediaId = mediaId,
                 mediaMetadata = mediaMetadata,
                 requestHeaders = requestHeaders,
+                serverAbr = serverAbr,
             )
         } catch (e: Exception) {
             Log.w(TAG, "buildPreloadMediaSource failed", e)
@@ -249,6 +254,7 @@ class MediaLoader(
         mediaId: String = "",
         mediaMetadata: MediaMetadata = MediaMetadata.EMPTY,
         requestHeaders: StreamRequestHeaders = StreamRequestHeaders.NONE,
+        serverAbr: io.github.aedev.flow.plugin.playback.BoundServerAbr? = null,
     ): MediaSource? {
         val mediaSource =
             if (localFilePath != null) {
@@ -269,6 +275,15 @@ class MediaLoader(
                 ProgressiveMediaSource
                     .Factory(DefaultDataSource.Factory(context))
                     .createMediaSource(localItem)
+            } else if (serverAbr != null) {
+                val acceptedItem =
+                    MediaItem
+                        .Builder()
+                        .setMediaId(mediaId)
+                        .setMediaMetadata(mediaMetadata)
+                        .setUri(serverAbr.playback.url)
+                        .build()
+                serverAbr.createMediaSource(acceptedItem, audioOnly)
             } else {
                 val resolver =
                     VideoPlaybackResolver(
@@ -309,9 +324,10 @@ class MediaLoader(
                     selectedStreams,
                     audioStream,
                     dashManifestUrl = if (audioOnly) null else dashManifestUrl,
-                    hlsUrl = if (audioOnly) null else hlsUrl,
+                    hlsUrl = hlsUrl,
                     durationSeconds = finalDuration,
-                    isLiveStream = isLiveStream && !audioOnly,
+                    isLiveStream = isLiveStream,
+                    audioOnly = audioOnly,
                 )
             }
 

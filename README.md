@@ -57,7 +57,8 @@ and sign-in method, playback and radio, the visualizer, every Settings page and 
 - **Optional private playlists:** a Spotify playlist can be prepared as a private YouTube Music
   copy, so autoplay follows the whole playlist rather than its first song.
 - **Visualizer, music video or artwork.** 9,606 MilkDrop presets from the ProjectM TV engine,
-  reacting to Milkbeat's own audio, up to 4K with automatic resolution.
+  reacting to Milkbeat's own audio, up to 4K with automatic resolution. Artwork uses the accepted
+  audio provider's best available thumbnail, with the original catalog cover as a fallback.
 - **Plugins that keep themselves current:** automatic plugin updates, with anything asking for
   new permissions waiting for your review.
 - **Robust playback:** whole songs buffer ahead, failed streams resume the same recording, and
@@ -146,6 +147,11 @@ distributed separately from Milkbeat releases, signature-checked and reviewed be
 | Beatport | Catalog, genres, charts, artists, labels, library | Full streams with a streaming subscription | — |
 | SoundCloud | Discover, Stream, Search, Artists, albums, playlists, Liked Songs, history | Available full tracks, matching and stations | — |
 
+The separate **YouTube Video** preview requires host API 6 and keeps its own account alongside
+YouTube Music. It supplies SmartTube's regular YouTube TV Music feeds, TV-code/QR sign-in and
+native SABR playback through Milkbeat's existing Media3 player.
+[Setup and limitations](docs/user-guide/providers.md#youtube-video-preview).
+
 - **YouTube Music:** sign-in is optional and personalizes Home; free accounts work.
 - **Spotify:** sign in for your feed, playlists and library; playback comes from your audio providers.
 - **Beatport:** sign in for the catalog and library; Beatport's own full-length audio needs a
@@ -164,8 +170,8 @@ reporting, **Index playlists** and, for Spotify, **Prepare private playlists in 
 **OK** in the full player shows the controls: audio level, seek bar, shuffle, previous,
 play/pause, next, repeat, like, the view button and the queue.
 
-- **The view button** steps through the visualizer, the matched music video (at most 1080p, in a
-  hardware-decoded codec) and the artwork. Milkbeat remembers your choice; video only loads when
+- **The view button** steps through the visualizer, the matched music video (up to the TV's physical
+  resolution, capped at 2160p, in a hardware-decoded codec) and the artwork. Milkbeat remembers your choice; video only loads when
   you pick it.
 - **The queue** shows what is coming. Every queue continues as a radio; press Right on a track to
   reach the radio presets and switch the mix without losing your own tracks.
@@ -208,7 +214,7 @@ overview; [ProjectM TV's guide](https://johnneerdael.github.io/ProjectM-TV/) cov
 - The visualizer needs OpenGL ES 3.0 and is on by default with about 2 GB of RAM or more.
 - Streaming plugins are third-party downloads; what they can play depends on each account,
   subscription and catalog. Matching cannot guarantee the same recording exists elsewhere.
-- HLS and DRM audio play but cannot be downloaded for offline use.
+- HLS, DRM and native SABR streams play but cannot be downloaded for offline use.
 
 ## Install
 
@@ -254,6 +260,8 @@ It also builds on:
 - **[PipePipe](https://codeberg.org/NullPointerException/PipePipe)** and its
   [developer docs](https://priveetee.github.io/Docs-PipePipe/): SABR and InnerTube playback
 - **[LibreTube](https://github.com/LibreTube/LibreTube)**: SponsorBlock and DeArrow handling
+- **[SmartTube](https://github.com/yuliskov/SmartTube)**: the parallel YouTube Video provider's
+  TV Music, account and playback approach, with pinned native SABR adaptation
 - **[Media3 / ExoPlayer](https://github.com/androidx/media)**,
   **[Jetpack Compose](https://developer.android.com/jetpack/compose)** and
   **[Material Design 3](https://m3.material.io/)**

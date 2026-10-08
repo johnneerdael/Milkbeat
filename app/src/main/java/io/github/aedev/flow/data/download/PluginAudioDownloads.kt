@@ -10,7 +10,9 @@ internal fun requireDownloadablePluginAudio(stream: AudioStream) {
             .substringBefore(';')
             .trim()
             .lowercase()
-    if (stream.drm != null || mime in setOf("application/x-mpegurl", "application/vnd.apple.mpegurl")) {
-        throw IOException("Offline downloads are unavailable for HLS or protected audio")
+    if (stream.serverAbr != null || mime == "application/x-server-abr" || stream.drm != null ||
+        mime in setOf("application/x-mpegurl", "application/vnd.apple.mpegurl")
+    ) {
+        throw IOException("Offline downloads are unavailable for HLS, SABR or protected audio")
     }
 }

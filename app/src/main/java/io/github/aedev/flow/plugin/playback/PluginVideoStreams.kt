@@ -8,6 +8,7 @@ import nl.neerdael.milkbeat.plugin.CaptionTrack
 import nl.neerdael.milkbeat.plugin.Chapter
 import nl.neerdael.milkbeat.plugin.FormatType
 import nl.neerdael.milkbeat.plugin.MediaFormat
+import nl.neerdael.milkbeat.plugin.ServerAbrPlayback
 import nl.neerdael.milkbeat.plugin.SkipSegment
 import nl.neerdael.milkbeat.plugin.VideoDetails
 import nl.neerdael.milkbeat.plugin.VideoKind
@@ -47,6 +48,8 @@ data class PlayableVideo(
     val chapters: List<StreamSegment>,
     val skipSegments: List<SponsorBlockSegment>,
     val requestHeaders: StreamRequestHeaders,
+    val serverAbr: ServerAbrPlayback? = null,
+    val boundServerAbr: BoundServerAbr? = null,
 )
 
 /** Maps a plugin's [VideoPlayback] onto what the player plays. Pure. */
@@ -55,6 +58,7 @@ internal object PluginVideoStreams {
         playback: VideoPlayback,
         cached: Video?,
         receivedAtElapsedMs: Long = 0L,
+        boundServerAbr: BoundServerAbr? = null,
     ): PlayableVideo {
         val formatDuration =
             playback.formats
@@ -66,6 +70,10 @@ internal object PluginVideoStreams {
                 ?.toLong()
                 ?.takeIf { it > 0 }
                 ?: formatDuration?.takeIf { it > 0 }
+                ?: playback.serverAbr
+                    ?.durationMs
+                    ?.div(1000L)
+                    ?.takeIf { it > 0 }
                 ?: cached
                     ?.duration
                     ?.toLong()
@@ -83,6 +91,8 @@ internal object PluginVideoStreams {
             chapters = chapters(playback.chapters),
             skipSegments = skipSegments(playback.skipSegments),
             requestHeaders = requestHeaders(playback, receivedAtElapsedMs),
+            serverAbr = playback.serverAbr,
+            boundServerAbr = boundServerAbr,
         )
     }
 

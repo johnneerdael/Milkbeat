@@ -144,6 +144,11 @@ object EnhancedMusicPlayerManager {
     internal val currentTrackState = MutableStateFlow<MusicTrack?>(null)
     val currentTrack: StateFlow<MusicTrack?> = currentTrackState.asStateFlow()
 
+    internal val playbackArtworkState = MutableStateFlow<MusicPlaybackArtwork?>(null)
+
+    /** Artwork of the playing Media3 source, independent of the original catalog's cover. */
+    val playbackArtwork: StateFlow<MusicPlaybackArtwork?> = playbackArtworkState.asStateFlow()
+
     internal val shuffleEnabledState = MutableStateFlow(false)
     val shuffleEnabled: StateFlow<Boolean> = shuffleEnabledState.asStateFlow()
 
@@ -270,6 +275,17 @@ object EnhancedMusicPlayerManager {
                     player: Player,
                     events: Player.Events,
                 ) {
+                    if (events.containsAny(
+                            Player.EVENT_MEDIA_METADATA_CHANGED,
+                            Player.EVENT_MEDIA_ITEM_TRANSITION,
+                            Player.EVENT_TIMELINE_CHANGED,
+                        )
+                    ) {
+                        playbackArtworkState.value =
+                            player.currentMediaItem?.let { item ->
+                                MusicPlaybackArtwork(item.mediaId, player.mediaMetadata.artworkUri?.toString())
+                            }
+                    }
                     if (events.containsAny(
                             Player.EVENT_TIMELINE_CHANGED,
                             Player.EVENT_MEDIA_ITEM_TRANSITION,
