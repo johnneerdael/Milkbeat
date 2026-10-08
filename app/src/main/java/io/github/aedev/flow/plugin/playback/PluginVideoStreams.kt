@@ -70,6 +70,10 @@ internal object PluginVideoStreams {
                 ?.toLong()
                 ?.takeIf { it > 0 }
                 ?: formatDuration?.takeIf { it > 0 }
+                ?: playback.serverAbr
+                    ?.durationMs
+                    ?.div(1000L)
+                    ?.takeIf { it > 0 }
                 ?: cached
                     ?.duration
                     ?.toLong()

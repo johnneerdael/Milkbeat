@@ -62,9 +62,12 @@ requests and container extraction in the existing Media3 player; plugins do not 
 or video bytes. Protobuf definitions are generated in `media3-sabr-protocol`.
 
 VOD SABR presentations require a positive `durationMs` so native playback can reach a defined
-end. Live presentations may omit duration. When a video response includes SABR,
+end. When video details and conventional formats omit duration, the accepted SABR duration
+feeds video metadata and resume preparation before any cached duration. Live presentations may omit duration. When a video response includes SABR,
 `VideoPlayback.kind == LIVE` must agree with `ServerAbrPlayback.live`; inconsistent static/live
-markers are rejected before source creation.
+markers are rejected before source creation. Live watch history follows the explicit UI live
+state, including SABR sources without a manifest URL; it records a live visit rather than a
+resumable VOD position. Starting another load clears that live state.
 
 Keep unsigned last-modified values as strings on the JavaScript wire and preserve the complete
 itag/last-modified/xTags identity in Media3 metadata. Protocol failures carry typed renewal
