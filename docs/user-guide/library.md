@@ -55,9 +55,9 @@ Artist, release, label, year and genre pages list their tracks with tagged BPM w
 
 ## Search
 
-![Search with Beatport, Spotify, YouTube Music, Local library and Videos chips](images/search-chips.png)
+![Search with Beatport, Spotify, YouTube Music and Local library chips](images/search-chips.png)
 
-Search shows a chip for each music tab that can search, including **Local library**, followed by **Videos**. It starts on the chip of the music tab you used last. Only the chip on screen searches, so switching chips searches that provider for the same text.
+Search shows a chip for each music tab that can search, including **Local library**. There is no separate video search: install the [YouTube Video plugin](preview-testing.md#youtube-video-plugin), which brings its own chip, to search videos. It is currently offered in the Preview app. It starts on the chip of the music tab you used last. Only the chip on screen searches, so switching chips searches that provider for the same text.
 
 Each provider brings its own filter chips and suggestions, and a chip only ever shows its own provider's suggestions:
 
