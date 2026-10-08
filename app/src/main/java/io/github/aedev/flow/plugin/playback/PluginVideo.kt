@@ -287,7 +287,11 @@ class PluginVideo
                 accepted.playback.availableInMs
                     ?.takeIf { it > 0 }
                     ?.let { accepted.receivedAtElapsedMs + it } ?: 0L
-            return BoundServerAbr(presentation, transport.withRequestHeaders(StreamRequestHeaders(opensAtElapsedMs = opensAt))) {
+            return BoundServerAbr(
+                presentation,
+                transport.withRequestHeaders(StreamRequestHeaders(opensAtElapsedMs = opensAt)),
+                liveSeekable = accepted.playback.dvr,
+            ) {
                 val held = provider.playbackLease(accepted.pluginId)
                 try {
                     accepted.runtimeReceipt?.let(held::verify)

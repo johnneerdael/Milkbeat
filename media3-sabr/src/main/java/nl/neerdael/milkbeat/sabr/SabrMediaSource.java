@@ -63,6 +63,7 @@ public final class SabrMediaSource extends BaseMediaSource {
     private long elapsedRealtimeOffsetMs;
     private int firstPeriodId;
     private final boolean livePresentationDelayOverridesManifest;
+    private final boolean liveSeekable;
 
     /**
      * The default presentation delay for live streams. The presentation delay is the duration by
@@ -78,6 +79,7 @@ public final class SabrMediaSource extends BaseMediaSource {
             LoadErrorHandlingPolicy loadErrorHandlingPolicy,
             long livePresentationDelayMs,
             boolean livePresentationDelayOverridesManifest,
+            boolean liveSeekable,
             @Nullable Object tag,
             MediaItem mediaItem, DrmSessionManager drmSessionManager
     ) {
@@ -89,6 +91,7 @@ public final class SabrMediaSource extends BaseMediaSource {
         this.loadErrorHandlingPolicy = loadErrorHandlingPolicy;
         this.livePresentationDelayMs = livePresentationDelayMs;
         this.livePresentationDelayOverridesManifest = livePresentationDelayOverridesManifest;
+        this.liveSeekable = liveSeekable;
         this.tag = tag;
         periodsById = new SparseArray<>();
         playerEmsgCallback = new DefaultPlayerEmsgCallback();
@@ -250,7 +253,8 @@ public final class SabrMediaSource extends BaseMediaSource {
                         windowDurationUs,
                         windowDefaultStartPositionUs,
                         manifest,
-                        mediaItem);
+                        mediaItem,
+                        liveSeekable);
         refreshSourceInfo(timeline);
     }
 
@@ -269,6 +273,7 @@ public final class SabrMediaSource extends BaseMediaSource {
         private final DefaultCompositeSequenceableLoaderFactory compositeSequenceableLoaderFactory;
         private long livePresentationDelayMs;
         private boolean livePresentationDelayOverridesManifest;
+        private boolean liveSeekable;
         private boolean isCreateCalled;
         @Nullable private Object tag;
         private DrmSessionManagerProvider drmProvider = new DefaultDrmSessionManagerProvider();
@@ -302,6 +307,13 @@ public final class SabrMediaSource extends BaseMediaSource {
             compositeSequenceableLoaderFactory = new DefaultCompositeSequenceableLoaderFactory();
         }
 
+        /** Set the accepted outer playback's live DVR capability; unknown live sources default to false. */
+        public Factory setLiveSeekable(boolean liveSeekable) {
+            Assertions.checkState(!isCreateCalled);
+            this.liveSeekable = liveSeekable;
+            return this;
+        }
+
         @Override
         public MediaSource createMediaSource(MediaItem mediaItem) {
             throw new IllegalArgumentException("SABR requires a plugin presentation");
@@ -315,7 +327,7 @@ public final class SabrMediaSource extends BaseMediaSource {
             isCreateCalled = true;
             return new SabrMediaSource(manifest, chunkSourceFactory, compositeSequenceableLoaderFactory,
                     loadErrorHandlingPolicy, livePresentationDelayMs, livePresentationDelayOverridesManifest,
-                    tag, mediaItem, drmProvider.get(mediaItem));
+                    liveSeekable, tag, mediaItem, drmProvider.get(mediaItem));
         }
 
         /**
@@ -471,6 +483,7 @@ public final class SabrMediaSource extends BaseMediaSource {
         private final long windowDefaultStartPositionUs;
         private final SabrManifest manifest;
         private final MediaItem mediaItem;
+        private final boolean liveSeekable;
 
         public SabrTimeline(
                 long presentationStartTimeMs,
@@ -480,7 +493,8 @@ public final class SabrMediaSource extends BaseMediaSource {
                 long windowDurationUs,
                 long windowDefaultStartPositionUs,
                 SabrManifest manifest,
-                MediaItem mediaItem) {
+                MediaItem mediaItem,
+                boolean liveSeekable) {
             this.presentationStartTimeMs = presentationStartTimeMs;
             this.windowStartTimeMs = windowStartTimeMs;
             this.firstPeriodId = firstPeriodId;
@@ -489,6 +503,7 @@ public final class SabrMediaSource extends BaseMediaSource {
             this.windowDefaultStartPositionUs = windowDefaultStartPositionUs;
             this.manifest = manifest;
             this.mediaItem = mediaItem;
+            this.liveSeekable = liveSeekable;
         }
 
         @Override
@@ -523,7 +538,7 @@ public final class SabrMediaSource extends BaseMediaSource {
                     Window.SINGLE_WINDOW_UID, mediaItem, manifest,
                     presentationStartTimeMs,
                     windowStartTimeMs, C.TIME_UNSET,
-                    /* isSeekable= */ true,
+                    /* isSeekable= */ !manifest.dynamic || liveSeekable,
                     isDynamic,
                     manifest.dynamic ? mediaItem.liveConfiguration : null,
                     windowDefaultStartPositionUs,

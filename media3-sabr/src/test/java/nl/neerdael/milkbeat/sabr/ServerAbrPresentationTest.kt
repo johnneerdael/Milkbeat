@@ -549,6 +549,7 @@ class ServerAbrPresentationTest {
                         .Window(),
                 )
             assertEquals(live, window.isDynamic)
+            assertEquals("unknown live DVR capability must not expose seeking", !live, window.isSeekable)
             assertEquals(if (live) C.TIME_UNSET else duration, manifest.durationMs)
             if (live) {
                 val metadata =
@@ -579,6 +580,15 @@ class ServerAbrPresentationTest {
                     .shadowOf(android.os.Looper.getMainLooper())
                     .idle()
                 assertEquals(C.TIME_UNSET, manifest.durationMs)
+                assertFalse(
+                    timelines
+                        .last()
+                        .getWindow(
+                            0,
+                            androidx.media3.common.Timeline
+                                .Window(),
+                        ).isSeekable,
+                )
                 assertTrue(
                     timelines
                         .last()
@@ -591,6 +601,68 @@ class ServerAbrPresentationTest {
             } else {
                 assertEquals(60_000_000L, window.durationUs)
             }
+            source.releaseSource(caller)
+        }
+    }
+
+    @Test
+    fun `explicit live DVR capability remains stable across head updates`() {
+        for (dvr in listOf(false, true)) {
+            val manifest =
+                ServerAbrPresentation.create(
+                    ServerAbrPlayback(url, "fixture-video", "AQI", ServerAbrClientInfo(7, "fixture-tv"), listOf(audio, video), live = true),
+                )
+            val source = SabrMediaSource.Factory { ByteArrayDataSource(byteArrayOf(0)) }.setLiveSeekable(dvr).createMediaSource(manifest)
+            val timelines = mutableListOf<androidx.media3.common.Timeline>()
+            val caller =
+                androidx.media3.exoplayer.source.MediaSource
+                    .MediaSourceCaller { _, timeline -> timelines += timeline }
+            source.prepareSource(
+                caller,
+                androidx.media3.exoplayer.analytics.PlayerId.UNSET,
+                androidx.media3.exoplayer.upstream.BandwidthMeter.NO_OP,
+            )
+            assertEquals(
+                dvr,
+                timelines
+                    .last()
+                    .getWindow(
+                        0,
+                        androidx.media3.common.Timeline
+                            .Window(),
+                    ).isSeekable,
+            )
+            val body =
+                nl.neerdael.milkbeat.sabr.protos.videostreaming.LiveMetadata
+                    .newBuilder()
+                    .setHeadSequenceTimeMs(
+                        120000,
+                    ).setHeadSequenceNumber(24)
+                    .build()
+                    .toByteArray()
+            val packet =
+                byteArrayOf(
+                    nl.neerdael.milkbeat.sabr.parser.ump.UMPPartId.LIVE_METADATA
+                        .toByte(),
+                    body.size.toByte(),
+                ) + body
+            manifest
+                .getSabrStream(
+                    C.TRACK_TYPE_VIDEO,
+                ).parse(
+                    androidx.media3.extractor.DefaultExtractorInput(java.io.ByteArrayInputStream(packet)::read, 0, packet.size.toLong()),
+                )
+            org.robolectric.Shadows
+                .shadowOf(android.os.Looper.getMainLooper())
+                .idle()
+            val window =
+                timelines.last().getWindow(
+                    0,
+                    androidx.media3.common.Timeline
+                        .Window(),
+                )
+            assertTrue(window.isDynamic)
+            assertEquals(dvr, window.isSeekable)
             source.releaseSource(caller)
         }
     }

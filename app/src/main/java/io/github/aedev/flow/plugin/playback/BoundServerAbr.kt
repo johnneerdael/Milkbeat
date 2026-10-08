@@ -12,6 +12,7 @@ import nl.neerdael.milkbeat.sabr.SabrMediaSource
 class BoundServerAbr internal constructor(
     val playback: ServerAbrPlayback,
     private val transport: DataSource.Factory,
+    private val liveSeekable: Boolean = false,
     private val hold: (suspend () -> PluginPlaybackLease)? = null,
 ) {
     fun createMediaSource(
@@ -27,7 +28,7 @@ class BoundServerAbr internal constructor(
                 playback
             }
         require(presentation.formats.any { it.format.type == FormatType.AUDIO }) { "SABR presentation has no audio" }
-        val source = SabrMediaSource.Factory(transport).createMediaSource(item, presentation)
+        val source = SabrMediaSource.Factory(transport).setLiveSeekable(liveSeekable).createMediaSource(item, presentation)
         return hold?.let {
             io.github.aedev.flow.player.resolver
                 .RuntimeHeldMediaSource(source, it)
