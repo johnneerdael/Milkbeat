@@ -81,7 +81,7 @@ object ServerAbrPresentation {
         return Format
             .Builder()
             .setId(tuple.itag.toString())
-            .setContainerMimeType(source.mimeType.substringBefore(';'))
+            .setContainerMimeType(MimeTypes.normalizeMimeType(source.mimeType.substringBefore(';').trim()))
             .setSampleMimeType(mime)
             .setCodecs(source.codecs)
             .setWidth(source.width ?: Format.NO_VALUE)

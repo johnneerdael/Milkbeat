@@ -1,5 +1,8 @@
+@file:androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
+
 package io.github.aedev.flow.plugin.playback
 
+import androidx.media3.common.MimeTypes
 import nl.neerdael.milkbeat.plugin.FormatType
 import nl.neerdael.milkbeat.plugin.ServerAbrPlayback
 import java.io.IOException
@@ -32,6 +35,23 @@ internal fun validateServerAbr(
             !identities.add(Triple(tuple.itag, tuple.lastModified, tuple.xTags))
         ) {
             throw IOException("Invalid SABR format identity")
+        }
+        val container =
+            MimeTypes.normalizeMimeType(
+                tuple.format.mimeType
+                    .substringBefore(';')
+                    .trim(),
+            )
+        val sampleMime =
+            when (tuple.format.type) {
+                FormatType.AUDIO -> MimeTypes.getAudioMediaMimeType(tuple.format.codecs)
+                FormatType.VIDEO -> MimeTypes.getVideoMediaMimeType(tuple.format.codecs)
+            }
+        if (container !in
+            setOf(MimeTypes.AUDIO_MP4, MimeTypes.VIDEO_MP4, MimeTypes.APPLICATION_MP4, MimeTypes.AUDIO_WEBM, MimeTypes.VIDEO_WEBM) ||
+            sampleMime == null
+        ) {
+            throw IOException("Unsupported SABR codec or container")
         }
         // Empty direct URLs are expected: the native protocol owns every representation.
         if (tuple.format.url.isNotBlank()) checkedPluginMediaUrl(tuple.format.url, allowedHosts)

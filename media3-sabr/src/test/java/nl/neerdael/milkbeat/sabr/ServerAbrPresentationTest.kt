@@ -50,6 +50,21 @@ class ServerAbrPresentationTest {
         )
 
     @Test
+    fun `container MIME normalization matches provider validation and extractor selection`() {
+        val source = presentation(listOf(audio.copy(format = audio.format.copy(mimeType = " Audio/WebM ; codecs=opus"))))
+        assertEquals(
+            "audio/webm",
+            source
+                .getPeriod(0)
+                .adaptationSets
+                .single()
+                .representations
+                .single()
+                .format.containerMimeType,
+        )
+    }
+
+    @Test
     fun `first native chunk initializes before server omits metadata for selected audio`() {
         val media = javaClass.getResourceAsStream("/sabr/audio-fragmented.mp4")!!.use { it.readBytes() }
         var offset = 0

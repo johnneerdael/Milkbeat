@@ -80,4 +80,44 @@ class ServerAbrValidationTest {
         assertThat(error).isNotNull()
         assertThat(error!!.message).doesNotContain("secret")
     }
+
+    @Test
+    fun `unknown codecs and unsupported containers are rejected before native source creation`() {
+        val invalidAudio =
+            listOf(
+                audio.copy(format = audio.format.copy(codecs = "unrecognized-codec")),
+                audio.copy(format = audio.format.copy(codecs = "avc1")),
+                audio.copy(format = audio.format.copy(mimeType = "audio/ogg")),
+                audio.copy(format = audio.format.copy(mimeType = "audio/aac")),
+            )
+        for (tuple in invalidAudio) {
+            assertThat(
+                runCatching { validateServerAbr(presentation.copy(formats = listOf(tuple)), false, listOf("cdn.example")) }.isFailure,
+            ).isTrue()
+        }
+        for (tuple in listOf(
+            video.copy(format = video.format.copy(codecs = "unrecognized-codec")),
+            video.copy(format = video.format.copy(codecs = "opus")),
+            video.copy(format = video.format.copy(mimeType = "video/mp2t")),
+        )) {
+            assertThat(
+                runCatching {
+                    validateServerAbr(presentation.copy(formats = listOf(audio, tuple)), true, listOf("cdn.example"))
+                }.isFailure,
+            ).isTrue()
+        }
+    }
+
+    @Test
+    fun `supported audio and video MP4 and WebM codecs remain valid with MIME parameters`() {
+        val mp4 = audio.copy(format = audio.format.copy(mimeType = "audio/mp4; codecs=mp4a.40.2", codecs = "mp4a.40.2"))
+        val webmPicture = video.copy(format = video.format.copy(mimeType = " Video/WebM ; codecs=vp09.00.51.08", codecs = "vp09.00.51.08"))
+        validateServerAbr(presentation.copy(formats = listOf(mp4)), false, listOf("cdn.example"))
+        validateServerAbr(
+            presentation.copy(formats = listOf(mp4.copy(format = mp4.format.copy(mimeType = "application/mp4")))),
+            false,
+            listOf("cdn.example"),
+        )
+        validateServerAbr(presentation.copy(formats = listOf(audio, webmPicture)), true, listOf("cdn.example"))
+    }
 }

@@ -712,8 +712,10 @@ revision must pass the configured ktlint rules.
   unsigned last-modified values as strings on the JavaScript wire, then preserve the complete
   itag/last-modified/xTags tuple in Media3 format metadata. Do not interpret a SABR endpoint as
   a progressive URL. The provider's authentication and YouTube discovery stay in the private
-  plugin repository. SABR source/player integration remains in development on this branch;
-  parser tests alone do not establish playable streams or sustained 4K playback.
+  plugin repository. Native acceptance with the original-author signed provider verified sustained audio-only and
+  decoded 2160p playback, seeking, hidden-video request suppression and accepted thumbnail rendering.
+  Authenticated TV Music/Library also passed on Android 9 ARMv7. Preserve this device acceptance
+  requirement for transport changes; parser tests alone do not establish playable streams.
 - Plugin API 4 adds optional `AudioStream.drm` for platform Widevine playback. Keep DRM license
   transport separate from media caches and headers; validate initial, redirect and provisioning
   destinations against the installed plugin's current network grants. Share the bound stream's
