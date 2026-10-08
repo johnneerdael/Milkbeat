@@ -1,7 +1,7 @@
 package io.github.aedev.flow.ui.tv.screens.account
 
 import com.google.common.truth.Truth.assertThat
-import io.github.aedev.flow.plugin.catalog.PluginMetadataProvider
+import io.github.aedev.flow.plugin.catalog.ScopedPluginCatalog
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
@@ -36,7 +36,7 @@ class TvAccountLibraryViewModelTest {
     private val requests = mutableListOf<LibraryRequest>()
     private var sourceId = "first-provider"
     private val provider =
-        mockk<PluginMetadataProvider> {
+        mockk<ScopedPluginCatalog> {
             every { account } returns this@TvAccountLibraryViewModelTest.account
             every { id } answers { sourceId }
             coEvery { call(PluginOperations.library, any()) } answers {

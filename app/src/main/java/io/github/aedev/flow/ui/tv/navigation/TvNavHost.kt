@@ -45,7 +45,6 @@ fun TvNavHost(
     val openChannel: (String) -> Unit = { channelRef ->
         navController.navigate(TvRoutes.channel(channelRef))
     }
-    val openCatalog: (EntityRef) -> Unit = { navController.navigate(TvRoutes.catalog(it)) }
 
     NavHost(
         navController = navController,
@@ -111,6 +110,7 @@ fun TvNavHost(
         }
         composable(TvDestination.LIBRARY.route) {
             TvLibraryScreen(
+                musicTabs = musicTabs,
                 onVideoClick = onPlayVideo,
                 onOpenPlaylist = { navController.navigate(TvRoutes.playlist(it)) },
                 onPlayTrack = onPlayTrack,
@@ -118,7 +118,6 @@ fun TvNavHost(
                 onOpenMusicCollection = { navController.navigate(TvRoutes.musicCollection(it)) },
                 onPlayMix = onPlayMix,
                 onPlayCollection = onPlayCollection,
-                onOpenCatalog = openCatalog,
                 onOpenProviderCatalog = { plugin, entity -> navController.navigate(TvRoutes.catalog(entity, plugin)) },
                 modifier = Modifier.fillMaxSize(),
             )

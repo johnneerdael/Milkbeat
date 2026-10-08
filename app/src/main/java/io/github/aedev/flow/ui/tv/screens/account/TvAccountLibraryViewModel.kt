@@ -7,10 +7,14 @@ import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
+import dagger.assisted.Assisted
+import dagger.assisted.AssistedFactory
+import dagger.assisted.AssistedInject
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.aedev.flow.data.music.model.MusicTrack
 import io.github.aedev.flow.data.paging.PluginPagingSource
 import io.github.aedev.flow.plugin.catalog.PluginMetadataProvider
+import io.github.aedev.flow.plugin.catalog.ScopedPluginCatalog
 import io.github.aedev.flow.plugin.catalog.listenerMessage
 import io.github.aedev.flow.ui.screens.music.extendedBy
 import io.github.aedev.flow.ui.screens.music.withPage
@@ -33,18 +37,27 @@ import nl.neerdael.milkbeat.catalog.MetadataItem
 import nl.neerdael.milkbeat.catalog.PageBlock
 import nl.neerdael.milkbeat.catalog.ProviderAccount
 import nl.neerdael.milkbeat.plugin.PluginOperations
-import javax.inject.Inject
 
 /**
- * The signed-in account's library sections from the music plugin's `metadata.library`. A section is
- * read when it is first shown and kept for a while; another account reads everything afresh.
+ * One plugin's signed-in account library sections from its `metadata.library`. A section is read
+ * when it is first shown and kept for a while; another account reads everything afresh.
  */
-@HiltViewModel
+@HiltViewModel(assistedFactory = TvAccountLibraryViewModel.Factory::class)
 class TvAccountLibraryViewModel
-    @Inject
-    constructor(
-        private val provider: PluginMetadataProvider,
+    internal constructor(
+        private val provider: ScopedPluginCatalog,
     ) : ViewModel() {
+        @AssistedInject
+        constructor(
+            @Assisted pluginId: String,
+            plugins: PluginMetadataProvider,
+        ) : this(plugins.scoped(pluginId))
+
+        @AssistedFactory
+        interface Factory {
+            fun create(pluginId: String): TvAccountLibraryViewModel
+        }
+
         private val _sections = MutableStateFlow<Map<TvAccountLibrarySection, TvLibrarySectionState>>(emptyMap())
         val sections: StateFlow<Map<TvAccountLibrarySection, TvLibrarySectionState>> = _sections.asStateFlow()
 

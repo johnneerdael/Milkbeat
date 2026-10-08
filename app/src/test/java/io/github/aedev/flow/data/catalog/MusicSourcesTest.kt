@@ -51,6 +51,7 @@ class MusicSourcesTest {
             )
 
         assertEquals(listOf(MusicSource.Plugin(YOUTUBE)), tabs.tabs.map { it.source })
+        assertFalse(tabs.tabs.single().signedIn)
     }
 
     @Test
@@ -66,6 +67,7 @@ class MusicSourcesTest {
 
         assertEquals(MusicSource.Plugin(SOUNDCLOUD), tab.source)
         assertTrue(tab.expired)
+        assertFalse(tab.signedIn)
     }
 
     @Test
@@ -97,6 +99,7 @@ class MusicSourcesTest {
         val tab = musicTabs(registry(spotify), mapOf(SPOTIFY to signedIn), false, emptySet()).tabs.single()
 
         assertEquals("Spotify", tab.label)
+        assertTrue(tab.signedIn)
         assertEquals(R.drawable.ic_provider_spotify_mono, tab.iconRes)
         assertNull(musicTabs(registry(), emptyMap(), true, emptySet()).tabs.single().iconRes)
     }

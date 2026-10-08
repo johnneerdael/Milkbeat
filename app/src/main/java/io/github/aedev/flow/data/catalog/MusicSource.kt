@@ -42,6 +42,7 @@ data class MusicTab(
     val label: String?,
     @param:DrawableRes val iconRes: Int?,
     val expired: Boolean = false,
+    val signedIn: Boolean = false,
     val surfaces: Set<MetadataSurface> = emptySet(),
 )
 
