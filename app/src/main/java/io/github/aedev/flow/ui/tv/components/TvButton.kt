@@ -58,7 +58,7 @@ fun TvButton(
             icon?.let {
                 Icon(it, contentDescription = null, modifier = Modifier.size(22.dp))
             }
-            Text(text = text, style = MaterialTheme.typography.labelLarge)
+            Text(text = text, style = MaterialTheme.typography.labelLarge, maxLines = 1)
         }
     }
 }

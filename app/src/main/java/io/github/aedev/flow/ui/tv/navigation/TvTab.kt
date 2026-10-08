@@ -19,18 +19,44 @@ sealed interface TvTab {
 }
 
 /**
- * The tab the rail shows as current: a top-level route's own tab, Settings for the folders settings
- * detail, else the tab a detail page was opened from while the rail still has it, else [music].
+ * The top-level destination that owns the page on screen: the last tab route on the back stack [routes],
+ * so a detail page keeps the tab it was opened from, also after the shell is rebuilt.
  */
+internal fun ownerDestination(routes: List<String?>): TvDestination =
+    routes.asReversed().firstNotNullOfOrNull(::tabDestination) ?: TvDestination.start
+
+private fun tabDestination(route: String?): TvDestination? =
+    if (route == TvRoutes.MUSIC_FOLDERS_SETTINGS) {
+        TvDestination.SETTINGS
+    } else {
+        TvDestination.entries.firstOrNull { it.route == route }
+    }
+
+/** The tab the rail shows as current: the [owner]'s, with the music tabs shown as [music]. */
 internal fun shownRailTab(
-    routeTab: TvTab?,
-    settingsDetail: Boolean,
-    detailOwner: TvTab,
+    owner: TvDestination,
     railTabs: List<TvTab>,
     music: TvTab.Music,
-): TvTab =
-    routeTab
-        ?: if (settingsDetail) TvTab.Fixed(TvDestination.SETTINGS) else detailOwner.takeIf { it in railTabs } ?: music
+): TvTab = TvTab.Fixed(owner).takeIf { owner != TvDestination.MUSIC && it in railTabs } ?: music
+
+/** How a rail press or Back reaches a tab. */
+internal enum class TvTabNavigation {
+    /** Pop to the tab's root page, which is on the back stack already. */
+    POP_TO_ROOT,
+
+    /** Replace the shown tab with another, restoring the pages that tab had open. */
+    SWITCH,
+}
+
+/**
+ * Pressing the tab that owns the page on screen returns to its root, rather than restoring that same
+ * page again. The music tabs are the start destination and stay at the bottom of the back stack, so
+ * they are always popped to: their saved pages may belong to another provider or another tab.
+ */
+internal fun tabNavigation(
+    target: TvDestination,
+    owner: TvDestination,
+): TvTabNavigation = if (target == owner || target == TvDestination.start) TvTabNavigation.POP_TO_ROOT else TvTabNavigation.SWITCH
 
 /** The rail item focus enters on: the shown tab, or the first item while no item is the shown tab. */
 internal fun railFocusTab(

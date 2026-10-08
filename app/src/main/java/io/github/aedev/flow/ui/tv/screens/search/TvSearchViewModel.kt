@@ -126,6 +126,7 @@ class TvSearchViewModel internal constructor(
         source = target
         if (target is TvSearchSource.Music && target.source != lastMusic) {
             lastMusic = target.source
+            _state.update { it.copy(musicSuggestions = emptyList()) }
             // The typeahead shown is the last music chip's; another chip answers the query on screen itself. A
             // typeahead still pending asks the new chip when it runs, so it is restarted rather than doubled.
             _state.value.query

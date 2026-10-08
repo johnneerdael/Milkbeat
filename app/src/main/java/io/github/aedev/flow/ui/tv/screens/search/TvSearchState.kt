@@ -42,11 +42,11 @@ data class TvSearchUiState(
         update: (TvSearchResults) -> TvSearchResults,
     ): TvSearchUiState = copy(results = results + (source.key to update(results(source))))
 
-    /** The typeahead of the kind on screen first, then the other's. */
+    /** The typeahead of the chip on screen only: another provider's suggestions would search something else. */
     fun suggestions(source: TvSearchSource): List<String> =
         when (source) {
-            is TvSearchSource.Music -> musicSuggestions + videoSuggestions
-            TvSearchSource.Videos -> videoSuggestions + musicSuggestions
+            is TvSearchSource.Music -> musicSuggestions
+            TvSearchSource.Videos -> videoSuggestions
         }
 }
 

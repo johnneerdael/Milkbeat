@@ -1,6 +1,9 @@
 package io.github.aedev.flow.ui.tv.screens.settings
 
 import android.app.Application
+import androidx.activity.OnBackPressedDispatcher
+import androidx.activity.compose.BackHandler
+import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Button
@@ -65,6 +68,14 @@ class TvPluginsFocusTest {
         emptyList(),
     )
 
+    private var back: OnBackPressedDispatcher? = null
+    private var leftSettings = 0
+
+    private fun pressBack() {
+        compose.runOnIdle { back!!.onBackPressed() }
+        compose.waitForIdle()
+    }
+
     private fun show() {
         every { viewModel.state } returns state
         every { viewModel.playHistoryEnabled } returns MutableStateFlow(true)
@@ -77,6 +88,9 @@ class TvPluginsFocusTest {
         compose.setContent {
             val input = LocalInputModeManager.current
             LaunchedEffect(Unit) { input.requestInputMode(InputMode.Keyboard) }
+            back = LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
+            // Stands in for the shell's Back, which leaves Settings: composed first, as the shell's is.
+            BackHandler { leftSettings++ }
             TvTheme {
                 Row {
                     Button({}, Modifier.width(180.dp)) { Text("Left menu") }
@@ -155,5 +169,25 @@ class TvPluginsFocusTest {
         compose.onNodeWithText("Beatport").performClick()
         compose.waitForIdle()
         compose.onNodeWithText("Remove").assertIsFocused()
+    }
+
+    @Test
+    fun `Back closes audio priority and plugin details instead of leaving Settings`() {
+        show()
+        compose.onNodeWithText("Audio").performClick()
+        compose.waitForIdle()
+        pressBack()
+        compose.onNodeWithText("Move later").assertDoesNotExist()
+        compose.onNodeWithText("Audio").assertExists()
+
+        compose.onNodeWithText("Beatport").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithText("Remove").assertExists()
+        pressBack()
+        compose.onNodeWithText("Remove").assertDoesNotExist()
+        assertThat(leftSettings).isEqualTo(0)
+
+        pressBack()
+        assertThat(leftSettings).isEqualTo(1)
     }
 }

@@ -12,20 +12,43 @@ class TvTabTest {
 
     @Test
     fun `a detail page keeps the tab it was opened from`() {
-        assertThat(shownRailTab(routeTab = null, settingsDetail = false, detailOwner = search, railTabs = rail, music = local))
-            .isEqualTo(search)
+        val owner = ownerDestination(listOf("music", "search", "catalog/artist"))
+        assertThat(owner).isEqualTo(TvDestination.SEARCH)
+        assertThat(shownRailTab(owner, rail, local)).isEqualTo(search)
     }
 
     @Test
-    fun `a detail page whose owner is not on the rail shows the music tab`() {
-        // The shell is rebuilt after Now Playing closes, forgetting the owner it had.
-        assertThat(shownRailTab(null, false, TvTab.Music(null), rail, youtube)).isEqualTo(youtube)
+    fun `a music page shows the selected music tab, whatever the shell remembered`() {
+        // The album a music tab opened, restored under Settings' Back: the rail shows the music tab, not Settings.
+        assertThat(ownerDestination(listOf("music", "catalog/album"))).isEqualTo(TvDestination.MUSIC)
+        assertThat(shownRailTab(TvDestination.MUSIC, rail, youtube)).isEqualTo(youtube)
     }
 
     @Test
     fun `a top-level route is its own tab and the folders settings detail belongs to Settings`() {
-        assertThat(shownRailTab(search, false, local, rail, youtube)).isEqualTo(search)
-        assertThat(shownRailTab(null, true, local, rail, youtube)).isEqualTo(TvTab.Fixed(TvDestination.SETTINGS))
+        assertThat(ownerDestination(listOf("music", "search"))).isEqualTo(TvDestination.SEARCH)
+        assertThat(ownerDestination(listOf("music", TvRoutes.MUSIC_FOLDERS_SETTINGS))).isEqualTo(TvDestination.SETTINGS)
+        assertThat(ownerDestination(emptyList())).isEqualTo(TvDestination.MUSIC)
+        assertThat(shownRailTab(TvDestination.SETTINGS, rail + TvTab.Fixed(TvDestination.SETTINGS), youtube))
+            .isEqualTo(TvTab.Fixed(TvDestination.SETTINGS))
+    }
+
+    @Test
+    fun `an owner the rail does not have shows the music tab`() {
+        assertThat(shownRailTab(TvDestination.LIBRARY, rail, youtube)).isEqualTo(youtube)
+    }
+
+    @Test
+    fun `pressing the tab that owns the page returns to its root instead of restoring the page`() {
+        assertThat(tabNavigation(TvDestination.SEARCH, owner = TvDestination.SEARCH)).isEqualTo(TvTabNavigation.POP_TO_ROOT)
+        assertThat(tabNavigation(TvDestination.MUSIC, owner = TvDestination.MUSIC)).isEqualTo(TvTabNavigation.POP_TO_ROOT)
+    }
+
+    @Test
+    fun `the music tabs are popped to from any tab and other tabs are switched to`() {
+        assertThat(tabNavigation(TvDestination.MUSIC, owner = TvDestination.SETTINGS)).isEqualTo(TvTabNavigation.POP_TO_ROOT)
+        assertThat(tabNavigation(TvDestination.SETTINGS, owner = TvDestination.MUSIC)).isEqualTo(TvTabNavigation.SWITCH)
+        assertThat(tabNavigation(TvDestination.LIBRARY, owner = TvDestination.SEARCH)).isEqualTo(TvTabNavigation.SWITCH)
     }
 
     @Test

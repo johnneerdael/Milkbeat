@@ -109,7 +109,8 @@ class TvSearchViewModelTest {
             val state = vm.state.value
             assertThat(state.results(MUSIC).blocks).isEqualTo(page("cafe").blocks)
             assertThat(state.results(MUSIC).filters.map { it.id }).containsExactly("songs", "albums").inOrder()
-            assertThat(state.suggestions(TvSearchSource.Videos)).containsExactly("cafe set", "cafe live").inOrder()
+            assertThat(state.suggestions(TvSearchSource.Videos)).containsExactly("cafe set")
+            assertThat(state.suggestions(MUSIC)).containsExactly("cafe live")
         }
 
     @Test
@@ -267,7 +268,8 @@ class TvSearchViewModelTest {
             vm.onQueryChange("cafe")
             advanceUntilIdle()
 
-            assertThat(vm.state.value.suggestions(TvSearchSource.Videos)).containsExactly("cafe del mar")
+            assertThat(vm.state.value.suggestions(MUSIC)).containsExactly("cafe del mar")
+            assertThat(vm.state.value.suggestions(TvSearchSource.Videos)).isEmpty()
         }
 
     @Test
@@ -357,6 +359,25 @@ class TvSearchViewModelTest {
 
             assertThat(local.suggests).containsExactly("cafe")
             assertThat(vm.state.value.musicSuggestions).containsExactly("cafe local")
+        }
+
+    @Test
+    fun `a chip without typeahead shows no suggestions from the chip before it or from videos`() =
+        runTest(dispatcher) {
+            music.typeahead = { Result.success(Suggestions(listOf("$it sphere"))) }
+            videos.typeahead = { Result.success(Suggestions(listOf("$it live"))) }
+            val vm = viewModel()
+            vm.showSource(MUSIC)
+            vm.onQueryChange("anyma")
+            advanceUntilIdle()
+            assertThat(vm.state.value.suggestions(MUSIC)).containsExactly("anyma sphere")
+
+            vm.showSource(LOCAL)
+            assertThat(vm.state.value.suggestions(LOCAL)).isEmpty()
+            advanceUntilIdle()
+
+            assertThat(vm.state.value.suggestions(LOCAL)).isEmpty()
+            assertThat(vm.state.value.suggestions(TvSearchSource.Videos)).containsExactly("anyma live")
         }
 
     @Test
