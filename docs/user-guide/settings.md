@@ -1,6 +1,6 @@
 # Settings reference
 
-Settings has five categories on the left: **Plugins**, **Music folders**, **Playback**, **Visualizations** and **About**. Their controls are on the right. Select a category again to return to its first page; pickers open as a side panel that **Back** closes, with the default for your device marked.
+Settings has five categories on the left: **Plugins**, **Music folders**, **Playback**, **Visualizations** and **About**. Their controls are on the right. **Back** closes a page opened inside a category, such as audio priority, a plugin's details, an install review or a folder editor, and then leaves Settings; selecting the category again also returns to its first page. Pickers open as a side panel that **Back** closes, with the default for your device marked.
 
 ## Plugins
 

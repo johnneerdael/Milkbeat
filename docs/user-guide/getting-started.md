@@ -70,4 +70,4 @@ While music plays, a bar at the bottom shows the track with previous, play/pause
 | Hold Up or Down in the queue | Scroll repeatedly, accelerating through a long queue | |
 | Media keys | Play/pause, previous and next control the playing queue | |
 
-Settings has its categories on the left and their controls on the right. Selecting a category again returns to its first page; pickers open as a side panel that Back closes.
+Settings has its categories on the left and their controls on the right. Back closes a page opened inside a category, such as audio priority or a plugin's details, before it leaves Settings; pickers open as a side panel that Back closes.

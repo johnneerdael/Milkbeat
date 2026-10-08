@@ -94,9 +94,9 @@ The device needs OpenGL ES 3.0. For engine-level symptoms, see ProjectM TV's [tr
 
 App updates do not update plugins. With **Update plugins automatically** on, Milkbeat checks at start and every six hours; an update that asks for new permissions waits until you review it in Settings → Plugins. Select **Update all plugins** to check at once, or enter the plugin's code or link again. An update must keep its signing author and cannot be older than the installed version. Sign-ins are kept separately from the plugin code.
 
-## Back leaves Settings instead of closing a page
+## The sidebar highlights the wrong tab or ignores a press
 
-Inside Settings, sub-pages such as Audio priority, a plugin's details or a folder editor have their own **Done** or **Back** button. Use it, or select the category on the left again, to return to the category's first page. The remote's Back key leaves Settings for the previous screen.
+Milkbeat 0.9.55 and earlier could leave Settings on Back from a Plugins page, show a music page with Settings still highlighted, and then ignore sidebar presses until a restart. Update Milkbeat: the highlighted tab now always follows the page on screen, and pressing the tab that owns the page returns to its first page.
 
 ## Private playlist preparation fails
 

@@ -100,9 +100,10 @@ The YouTube Video plugin, offered only in the Preview app, shares the YouTube ta
 also installed, the tab shows YouTube Music's catalog; with only YouTube Video, it shows YouTube
 Video's. Each tab shows that provider's own feed through Milkbeat's TV components and keeps its place while
 you visit another. **Search** offers a chip per music tab, including Local library, plus Videos,
-each with its provider's filters and suggestions. **Library** starts with a chip per signed-in
+each with only its own provider's filters and suggestions (Local library has none). **Library** starts with a chip per signed-in
 account, then Folders, History, Watch later and Playlists (app and provider playlists together,
-including Liked songs). Pages opened from a tab, chip or page stay on their provider.
+including Liked songs). Pages opened from a tab, chip or page stay on their provider, the tab they
+came from stays highlighted, and pressing it again returns to its first page.
 [More in the guide](https://johnneerdael.github.io/Milkbeat/library/).
 
 ## Local and network folders
