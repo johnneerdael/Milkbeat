@@ -77,6 +77,21 @@ public class SabrDeferredResponseTest {
             input.init(raw(new byte[0]));assertEquals(SabrPlaybackException.Reason.NO_PROGRESS,assertThrows(SabrPlaybackException.class,()->input.read(new byte[1],0,1)).reason);
         }
     }
+    @Test public void meaningfulMetadataControlsContinueWithoutMediaAndResetAcknowledgement() throws Exception {
+        int[] types={nl.neerdael.milkbeat.sabr.parser.ump.UMPPartId.LIVE_METADATA,nl.neerdael.milkbeat.sabr.parser.ump.UMPPartId.STREAM_PROTECTION_STATUS,nl.neerdael.milkbeat.sabr.parser.ump.UMPPartId.FORMAT_INITIALIZATION_METADATA,nl.neerdael.milkbeat.sabr.parser.ump.UMPPartId.SABR_SEEK};
+        byte[][] bodies={LiveMetadata.newBuilder().setHeadSequenceTimeMs(15000).setHeadSequenceNumber(3).build().toByteArray(),
+                StreamProtectionStatus.newBuilder().setStatus(StreamProtectionStatus.Status.OK).build().toByteArray(),
+                FormatInitializationMetadata.newBuilder().setFormatId(nl.neerdael.milkbeat.sabr.protos.misc.FormatId.newBuilder().setItag(137)).setMimeType("video/mp4").build().toByteArray(),
+                SabrSeek.newBuilder().setSeekMediaTime(1000).setSeekMediaTimescale(1000).build().toByteArray()};
+        for(int n=0;n<types.length;n++) {
+            nl.neerdael.milkbeat.sabr.parser.SabrStream stream=new nl.neerdael.milkbeat.sabr.parser.SabrStream("https://fixture","",StreamerContext.ClientInfo.getDefaultInstance(),-1,-1,0,null,false,null,4500);
+            stream.setFormatSelector(new nl.neerdael.milkbeat.sabr.parser.models.FormatSelector("video",false,nl.neerdael.milkbeat.sabr.protos.misc.FormatId.newBuilder().setItag(137).build()));
+            nl.neerdael.milkbeat.sabr.parser.misc.SabrExtractorInput input=new nl.neerdael.milkbeat.sabr.parser.misc.SabrExtractorInput(stream);
+            input.init(raw(frame(types[n],bodies[n])));assertThrows(SabrRequestDeferredException.class,()->input.read(new byte[1],0,1));
+            if(types[n]==nl.neerdael.milkbeat.sabr.parser.ump.UMPPartId.LIVE_METADATA)assertEquals(15000,stream.getLiveWindowEndMs());
+            input.init(raw(new byte[0]));assertEquals(SabrPlaybackException.Reason.NO_PROGRESS,assertThrows(SabrPlaybackException.class,()->input.read(new byte[1],0,1)).reason);
+        }
+    }
     private static byte[] frame(int type,byte[] body) {
         assertTrue(body.length<128);byte[] bytes=new byte[body.length+2];bytes[0]=(byte)type;bytes[1]=(byte)body.length;System.arraycopy(body,0,bytes,2,body.length);return bytes;
     }

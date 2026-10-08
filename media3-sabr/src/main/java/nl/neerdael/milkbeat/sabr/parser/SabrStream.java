@@ -83,16 +83,16 @@ public class SabrStream {
     private boolean positiveBackoffInResponse;
     private boolean mediaHeaderInResponse;
     private boolean redirectInResponse;
-    private boolean contextInResponse;
+    private boolean controlInResponse;
 
     public void beginResponse() {
         positiveBackoffInResponse = false;
         mediaHeaderInResponse = false;
         redirectInResponse = false;
-        contextInResponse = false;
+        controlInResponse = false;
     }
     public boolean hasResponseBackoffAcknowledgement() { return positiveBackoffInResponse && !mediaHeaderInResponse; }
-    public boolean hasResponseContinuationAcknowledgement() { return (positiveBackoffInResponse || redirectInResponse || contextInResponse) && !mediaHeaderInResponse; }
+    public boolean hasResponseContinuationAcknowledgement() { return (positiveBackoffInResponse || redirectInResponse || controlInResponse) && !mediaHeaderInResponse; }
     private String url;
     private List<? extends SabrPart> multiResult = null;
     private volatile Runnable liveMetadataListener;
@@ -365,6 +365,7 @@ public class SabrStream {
         }
 
         ProcessStreamProtectionStatusResult result = processor.processStreamProtectionStatus(sps);
+        if (sps.hasStatus() && sps.getStatus() == StreamProtectionStatus.Status.OK) controlInResponse = true;
 
         return result.sabrPart;
     }
@@ -397,6 +398,7 @@ public class SabrStream {
         }
 
         ProcessFormatInitializationMetadataResult result = processor.processFormatInitializationMetadata(fmtInitMetadata);
+        if (fmtInitMetadata.hasFormatId() && fmtInitMetadata.hasMimeType() && !fmtInitMetadata.getMimeType().isEmpty()) controlInResponse = true;
 
         return result.sabrPart;
     }
@@ -436,7 +438,7 @@ public class SabrStream {
         }
 
         processor.processSabrContextUpdate(sabrCtxUpdate);
-        if (sabrCtxUpdate.hasType() && sabrCtxUpdate.hasValue() && sabrCtxUpdate.hasWritePolicy()) contextInResponse = true;
+        if (sabrCtxUpdate.hasType() && sabrCtxUpdate.hasValue() && sabrCtxUpdate.hasWritePolicy()) controlInResponse = true;
     }
 
     private void processSabrContextSendingPolicy(UMPPart part) {
@@ -449,7 +451,7 @@ public class SabrStream {
         }
 
         processor.processSabrContextSendingPolicy(sabrCtxSendingPolicy);
-        if (sabrCtxSendingPolicy.getStartPolicyCount() + sabrCtxSendingPolicy.getStopPolicyCount() + sabrCtxSendingPolicy.getDiscardPolicyCount() > 0) contextInResponse = true;
+        if (sabrCtxSendingPolicy.getStartPolicyCount() + sabrCtxSendingPolicy.getStopPolicyCount() + sabrCtxSendingPolicy.getDiscardPolicyCount() > 0) controlInResponse = true;
     }
 
     /**
@@ -491,6 +493,8 @@ public class SabrStream {
         }
 
         List<MediaSeekSabrPart> seeks = processor.processLiveMetadata(liveMetadata).seekSabrParts;
+        if (liveMetadata.hasHeadSequenceTimeMs() || liveMetadata.hasHeadSequenceNumber()
+                || (liveMetadata.hasMinSeekableTimeTicks() && liveMetadata.hasMinSeekableTimescale())) controlInResponse = true;
         Runnable listener = liveMetadataListener;
         if (listener != null) listener.run();
         return seeks;
@@ -505,7 +509,9 @@ public class SabrStream {
             throw new IllegalStateException(e);
         }
 
-        return processor.processSabrSeek(sabrSeek).seekSabrParts;
+        List<MediaSeekSabrPart> seeks = processor.processSabrSeek(sabrSeek).seekSabrParts;
+        controlInResponse = true;
+        return seeks;
     }
 
     private static boolean contains(int[] array, int value) {
