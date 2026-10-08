@@ -83,6 +83,50 @@ class PluginVideoProvider
             call(PluginOperations.reportView, request)
         }
 
+        internal suspend fun playbackLease(pluginId: String): io.github.aedev.flow.plugin.playback.PluginPlaybackLease =
+            host.playbackLease(pluginId)
+
+        internal suspend fun preparePlaybackContext(pluginId: String): Any {
+            if (accounts.accounts.value[pluginId] == null) accounts.refresh(pluginId)
+            if (selected != pluginId) throw java.io.IOException("The accepted playback provider changed")
+            return playbackContext()
+        }
+
+        internal fun playbackContext(): Any =
+            Triple(registry.state.value, accounts.playbackIdentitySnapshot(), accounts.playbackEpoch.value)
+
+        internal fun playbackGrants(pluginId: String): List<String> =
+            registry.state.value
+                .plugin(pluginId)
+                ?.takeIf { it.enabled }
+                ?.grantedNetwork
+                .orEmpty()
+
+        internal suspend fun resolveBound(
+            pluginId: String,
+            context: Any,
+            request: ResolveVideoRequest,
+        ): VideoPlayback {
+            if (context != playbackContext() ||
+                selected != pluginId
+            ) {
+                throw java.io.IOException("The accepted playback account or provider changed")
+            }
+            val response =
+                try {
+                    host.call(pluginId, PluginOperations.resolveVideo, request)
+                } catch (error: PluginCallException) {
+                    if (error.error.code == PluginErrorCode.SIGN_IN_EXPIRED) accounts.expired(pluginId)
+                    throw error
+                }
+            if (context != playbackContext() ||
+                selected != pluginId
+            ) {
+                throw java.io.IOException("The accepted playback account or provider changed")
+            }
+            return response
+        }
+
         private suspend fun <Request, Response> call(
             operation: PluginOperation<Request, Response>,
             request: Request,

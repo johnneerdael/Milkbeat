@@ -23,6 +23,7 @@ import nl.neerdael.milkbeat.catalog.MetadataItem
 import nl.neerdael.milkbeat.catalog.MetadataPage
 import nl.neerdael.milkbeat.plugin.ReportPlaybackRequest
 import nl.neerdael.milkbeat.plugin.ResolveVideoRequest
+import nl.neerdael.milkbeat.plugin.ServerAbrFailure
 import nl.neerdael.milkbeat.plugin.StreamFailure
 import nl.neerdael.milkbeat.plugin.VideoKind
 import org.junit.Test
@@ -39,13 +40,21 @@ class PluginVideoTest {
     private val requests = mutableListOf<ResolveVideoRequest>()
     private val pluginVideo = PluginVideo(provider, preferences, limits)
 
+    private var playbackContext: Any = "initial-account"
+    private val runtimeOwner = Any()
+
     init {
+        coEvery { provider.playbackLease(any()) } answers { PluginPlaybackLease(runtimeOwner, { 0L }, {}, {}) }
+        every { provider.selected } returns "fixture-provider"
+        every { provider.playbackContext() } answers { playbackContext }
+        coEvery { provider.preparePlaybackContext(any()) } answers { playbackContext }
+        every { provider.playbackGrants(any()) } returns listOf("media.example")
         every { limits.maxHeight } returns 2160
         every { limits.codecs("auto") } returns listOf("vp9", "h264")
         every { limits.hdr } returns true
         every { preferences.preferredAudioLanguage } returns flowOf("de")
         every { preferences.preferredSubtitleLanguage } returns flowOf("nl")
-        coEvery { provider.resolve(capture(requests)) } returns Result.success(playback().copy(expiresInMs = 6 * 3_600_000L))
+        coEvery { provider.resolveBound(any(), any(), capture(requests)) } returns playback().copy(expiresInMs = 6 * 3_600_000L)
     }
 
     @Test
@@ -102,7 +111,7 @@ class PluginVideoTest {
     @Test
     fun `a resolve about to expire is asked for again`() =
         runTest {
-            coEvery { provider.resolve(capture(requests)) } returns Result.success(playback().copy(expiresInMs = 30_000L))
+            coEvery { provider.resolveBound(any(), any(), capture(requests)) } returns playback().copy(expiresInMs = 30_000L)
 
             pluginVideo.resolve(VIDEO_ID)
             pluginVideo.resolve(VIDEO_ID)
@@ -139,8 +148,8 @@ class PluginVideoTest {
     @Test
     fun `a premiere is never kept, so its countdown is asked for again`() =
         runTest {
-            coEvery { provider.resolve(capture(requests)) } returns
-                Result.success(playback(kind = VideoKind.UPCOMING).copy(startsInMs = 60_000))
+            coEvery { provider.resolveBound(any(), any(), capture(requests)) } returns
+                playback(kind = VideoKind.UPCOMING).copy(startsInMs = 60_000)
 
             pluginVideo.resolve(VIDEO_ID)
             pluginVideo.resolve(VIDEO_ID)
@@ -151,7 +160,7 @@ class PluginVideoTest {
     @Test
     fun `a failing plugin is not kept either`() =
         runTest {
-            coEvery { provider.resolve(capture(requests)) } returns Result.failure(IllegalStateException("down"))
+            coEvery { provider.resolveBound(any(), any(), capture(requests)) } throws IllegalStateException("down")
 
             assertThat(pluginVideo.resolve(VIDEO_ID).isFailure).isTrue()
             pluginVideo.resolve(VIDEO_ID)
@@ -162,7 +171,7 @@ class PluginVideoTest {
     @Test
     fun `a view is reported with the tracking token its resolve handed out`() =
         runTest {
-            coEvery { provider.resolve(any()) } returns Result.success(playback().copy(trackingToken = "token-1"))
+            coEvery { provider.resolveBound(any(), any(), any()) } returns playback().copy(trackingToken = "token-1")
             val reported = slot<ReportPlaybackRequest>()
             coEvery { provider.reportView(capture(reported)) } returns Unit
 
@@ -172,6 +181,44 @@ class PluginVideoTest {
             assertThat(
                 reported.captured,
             ).isEqualTo(ReportPlaybackRequest(EntityRef(EntityKind.VIDEO, VIDEO_ID), "token-1", 45_000, 212_000))
+        }
+
+    @Test
+    fun `protocol refresh keeps the accepted request and opaque reload context without fake HTTP`() =
+        runTest {
+            pluginVideo.resolve(VIDEO_ID)
+            pluginVideo.failed(
+                VIDEO_ID,
+                "https://media.example/sabr",
+                null,
+                "opaque-reload",
+                ServerAbrFailure.PLAYBACK_CONTEXT_RELOAD,
+            )
+            pluginVideo.resolve(VIDEO_ID)
+            pluginVideo.resolve(VIDEO_ID)
+            assertThat(requests).hasSize(2)
+            assertThat(requests[1].entity).isEqualTo(requests[0].entity)
+            assertThat(requests[1].failure!!.status).isNull()
+            assertThat(requests[1].failure!!.reloadPlaybackContext).isEqualTo("opaque-reload")
+            assertThat(requests[1].failure!!.serverAbrFailure).isEqualTo(ServerAbrFailure.PLAYBACK_CONTEXT_RELOAD)
+        }
+
+    @Test
+    fun `a protocol refresh cannot reuse a former account context or leak its reload token`() =
+        runTest {
+            pluginVideo.resolve(VIDEO_ID)
+            pluginVideo.failed(
+                VIDEO_ID,
+                "https://media.example/sabr",
+                null,
+                "private-reload",
+                ServerAbrFailure.PLAYBACK_CONTEXT_RELOAD,
+            )
+            playbackContext = "other-account"
+            assertThat(pluginVideo.resolve(VIDEO_ID).isFailure).isTrue()
+            assertThat(requests).hasSize(1)
+            pluginVideo.resolve(VIDEO_ID)
+            assertThat(requests.last().failure).isNull()
         }
 
     @Test

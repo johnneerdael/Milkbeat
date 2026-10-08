@@ -49,12 +49,35 @@ class PluginAccounts internal constructor(
     private val _accounts = MutableStateFlow<Map<String, ProviderAccount>>(emptyMap())
     val accounts: StateFlow<Map<String, ProviderAccount>> = _accounts.asStateFlow()
 
+    // Account values can return to their old shape after sign-in/sign-out. Native transports
+    // retain this epoch as well, so an old visitor/token cannot survive that ABA transition.
+    private val playbackEpochState = MutableStateFlow(0L)
+    internal val playbackEpoch: StateFlow<Long> = playbackEpochState.asStateFlow()
+
+    private fun invalidatePlayback() {
+        playbackEpochState.update { it + 1 }
+    }
+
+    internal fun playbackIdentitySnapshot(): Map<String, String> = identitiesOf(_accounts.value)
+
+    internal fun identitiesOf(accounts: Map<String, ProviderAccount>): Map<String, String> =
+        accounts.mapValues { playbackIdentity(it.value) }
+
+    private fun playbackIdentity(account: ProviderAccount?): String =
+        when (account) {
+            is ProviderAccount.SignedIn -> "signed:${account.key}"
+            ProviderAccount.Anonymous -> "anonymous"
+            ProviderAccount.Expired -> "expired"
+            null -> "unknown"
+        }
+
     private val revalidations = mutableMapOf<String, Job>()
     private val lastRevalidationMs = mutableMapOf<String, Long>()
     private val expiredDuringCheck = mutableSetOf<String>()
 
     suspend fun refresh(pluginId: String): ProviderAccount {
         val account = ask(pluginId)
+        if (playbackIdentity(_accounts.value[pluginId]) != playbackIdentity(account)) invalidatePlayback()
         _accounts.update { it + (pluginId to account) }
         return account
     }
@@ -64,6 +87,7 @@ class PluginAccounts internal constructor(
         result: WebLoginResult,
     ): ProviderAccount {
         cancelRevalidation(pluginId)
+        invalidatePlayback()
         val account = host.call(pluginId, PluginOperations.completeSignIn, result)
         _accounts.update { it + (pluginId to account) }
         return account
@@ -106,6 +130,7 @@ class PluginAccounts internal constructor(
         pluginId: String,
         session: String,
     ): ProviderAccount.SignedIn {
+        invalidatePlayback()
         val account =
             host.call(pluginId, PluginOperations.confirmSignIn, DeviceCodeSession(session)) as? ProviderAccount.SignedIn
                 ?: error("Pairing confirmation did not return a signed-in account")
@@ -116,6 +141,7 @@ class PluginAccounts internal constructor(
     }
 
     suspend fun signOut(pluginId: String) {
+        invalidatePlayback()
         cancelRevalidation(pluginId)
         host.call(pluginId, PluginOperations.signOut, Unit)
         _accounts.update { it + (pluginId to ProviderAccount.Anonymous) }
@@ -123,6 +149,7 @@ class PluginAccounts internal constructor(
 
     /** A call said the plugin's sign-in expired; the plugin is asked again right away whether it still signs in. */
     fun expired(pluginId: String) {
+        invalidatePlayback()
         _accounts.update { it + (pluginId to ProviderAccount.Expired) }
         synchronized(revalidations) {
             if (revalidations[pluginId]?.isActive == true) {
@@ -166,6 +193,7 @@ class PluginAccounts internal constructor(
                     Log.w(TAG, "Re-checking the $pluginId account failed", e)
                     return
                 }
+            if (_accounts.value[pluginId] == ProviderAccount.Expired && account != ProviderAccount.Expired) invalidatePlayback()
             _accounts.update { if (it[pluginId] == ProviderAccount.Expired) it + (pluginId to account) else it }
             return
         }

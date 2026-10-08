@@ -68,6 +68,7 @@ internal class PlaybackPreparer(
         subtitles: List<SubtitlesStream>,
         isCurrent: () -> Boolean,
         requestHeaders: StreamRequestHeaders = StreamRequestHeaders.NONE,
+        serverAbr: io.github.aedev.flow.plugin.playback.BoundServerAbr? = null,
     ): Boolean =
         withContext(Dispatchers.Main) {
             if (!isCurrent()) return@withContext false
@@ -88,6 +89,7 @@ internal class PlaybackPreparer(
                 preferredVideoCodec = VideoCodecUtils.NO_PREFERENCE,
                 preferredLiveQualityHeight = VideoQuality.AUTO.height,
                 requestHeaders = requestHeaders,
+                serverAbr = serverAbr,
             )
             applyRememberedPlaybackSpeed(isLive = true)
 
@@ -111,7 +113,10 @@ internal class PlaybackPreparer(
         preferredLiveQualityHeight: Int,
         isCurrent: () -> Boolean,
         requestHeaders: StreamRequestHeaders = StreamRequestHeaders.NONE,
+        serverAbr: io.github.aedev.flow.plugin.playback.BoundServerAbr? = null,
         skipSegments: List<SponsorBlockSegment>? = null,
+        hlsUrl: String? = null,
+        dashManifestUrl: String? = null,
     ) = withContext(Dispatchers.Main) {
         if (!isCurrent()) return@withContext
         if (playerManager.isPreparedForPlayback(videoId)) return@withContext
@@ -131,13 +136,14 @@ internal class PlaybackPreparer(
             audioStreams = audioStreams,
             subtitles = subtitles,
             durationSeconds = durationSeconds,
-            dashManifestUrl = null,
-            hlsUrl = null,
+            dashManifestUrl = dashManifestUrl,
+            hlsUrl = hlsUrl,
             streamType = StreamType.VIDEO_STREAM,
             startPosition = resumePosition,
             preferredVideoCodec = preferredVideoCodec,
             preferredLiveQualityHeight = preferredLiveQualityHeight,
             requestHeaders = requestHeaders,
+            serverAbr = serverAbr,
             skipSegments = skipSegments,
         )
         applyRememberedPlaybackSpeed(isLive = false)

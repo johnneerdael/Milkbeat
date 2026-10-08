@@ -97,7 +97,13 @@ With **Change presets automatically** off, a preset stays until you press Left o
 
 ## Visualizer, music video or artwork
 
-The view button in the player steps through three views while audio continues: the visualizer (the default), the music video, and the track's cover filling the screen. Milkbeat remembers the view you leave it on for later tracks and later sessions.
+The view button in the player steps through three views while audio continues: the visualizer (the default), the music video, and playback artwork filling the screen. Milkbeat remembers the view you leave it on for later tracks and later sessions.
+
+Artwork view uses the best available thumbnail supplied by the accepted audio provider, even when
+SoundCloud or Spotify supplies the catalog entry. If the provider supplies no usable image or the
+image cannot load, the original catalog cover fills the screen. The title, artist, queue identity and
+playing recording stay the same. Local files and providers without playback artwork keep their cover.
+The thumbnail loads as an image; choosing Artwork does not start video playback.
 
 A confirmed YouTube audio source can offer Video even when the original SoundCloud or Spotify catalog entry did not advertise a video. Art Tracks with static album artwork are valid video choices. Discovering a match does not start picture loading: select Video with the view button to show it. A track without a usable video skips from the visualizer straight to the artwork, and with the video view chosen it shows the visualizer instead. With visualizations turned off, the button moves between the video and the artwork. Unsupported or unavailable video falls back to audio and visuals.
 

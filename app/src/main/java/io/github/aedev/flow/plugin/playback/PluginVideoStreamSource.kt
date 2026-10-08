@@ -30,7 +30,7 @@ class PluginVideoStreamSource
                     return null
                 }
             if (playback.kind == VideoKind.UPCOMING) return null
-            val playable = PluginVideoStreams.playable(playback, video, SystemClock.elapsedRealtime())
+            val playable = PluginVideoStreams.playable(playback, video, SystemClock.elapsedRealtime(), pluginVideo.bindServerAbr(playback))
             val (videoStream, audioStream) =
                 ServicePlaybackStreamSelector.selectStreams(
                     videoCandidates = playable.videoStreams,
@@ -53,6 +53,7 @@ class PluginVideoStreamSource
                 preferredCodec = VideoCodecUtils.NO_PREFERENCE,
                 hlsUrl = playable.hlsUrl,
                 requestHeaders = playable.requestHeaders,
+                serverAbr = playable.boundServerAbr,
                 skipSegments = playable.skipSegments,
             )
         }

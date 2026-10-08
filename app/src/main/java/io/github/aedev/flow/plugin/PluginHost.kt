@@ -70,6 +70,16 @@ class PluginHost
         /** Keeps [pluginId] started while something depends on it, such as its audio playing. */
         suspend fun hold(pluginId: String) = runtime(pluginId).hold()
 
+        internal suspend fun playbackLease(pluginId: String): io.github.aedev.flow.plugin.playback.PluginPlaybackLease {
+            val active = runtime(pluginId)
+            return io.github.aedev.flow.plugin.playback.PluginPlaybackLease(
+                active,
+                { active.contextGeneration },
+                active::hold,
+                active::release,
+            )
+        }
+
         suspend fun release(pluginId: String) {
             lock.withLock { runtimes[pluginId] }?.release()
         }

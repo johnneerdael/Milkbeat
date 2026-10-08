@@ -123,6 +123,9 @@ internal class PluginPlaybackApplier(
             isCurrent = { isLoadCurrent(load.token) },
             requestHeaders = playable.requestHeaders,
             skipSegments = playable.skipSegments,
+            serverAbr = playable.boundServerAbr,
+            hlsUrl = playable.hlsUrl,
+            dashManifestUrl = playable.dashUrl,
         )
     }
 
@@ -144,6 +147,7 @@ internal class PluginPlaybackApplier(
                 subtitles = playable.subtitles,
                 isCurrent = { isLoadCurrent(load.token) },
                 requestHeaders = playable.requestHeaders,
+                serverAbr = playable.boundServerAbr,
             )
         if (started) liveChat.start(load.videoId)
     }

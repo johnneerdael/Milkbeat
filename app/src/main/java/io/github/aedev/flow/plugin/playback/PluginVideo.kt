@@ -7,7 +7,10 @@ import android.view.Display
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.aedev.flow.data.local.PlayerPreferences
 import io.github.aedev.flow.data.model.Video
+import io.github.aedev.flow.network.AppProxyManager
+import io.github.aedev.flow.player.StreamRequestHeaders
 import io.github.aedev.flow.player.stream.VideoCodecUtils
+import io.github.aedev.flow.player.withRequestHeaders
 import io.github.aedev.flow.plugin.catalog.PluginVideoProvider
 import io.github.aedev.flow.utils.MusicVideoFormats
 import kotlinx.coroutines.flow.first
@@ -22,10 +25,14 @@ import nl.neerdael.milkbeat.catalog.LiveChatRequest
 import nl.neerdael.milkbeat.plugin.FormatType
 import nl.neerdael.milkbeat.plugin.ReportPlaybackRequest
 import nl.neerdael.milkbeat.plugin.ResolveVideoRequest
+import nl.neerdael.milkbeat.plugin.ServerAbrFailure
 import nl.neerdael.milkbeat.plugin.StreamFailure
 import nl.neerdael.milkbeat.plugin.VideoKind
 import nl.neerdael.milkbeat.plugin.VideoPlayback
+import okhttp3.OkHttpClient
+import java.io.IOException
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -86,9 +93,25 @@ internal fun withoutUnshownHdr(
     playback: VideoPlayback,
     displayHdr: Boolean,
 ): VideoPlayback {
-    if (displayHdr || playback.formats.none { it.hdr }) return playback
+    if (displayHdr || (playback.formats.none { it.hdr } && playback.serverAbr?.formats?.none { it.format.hdr } != false)) return playback
     val sdr = playback.formats.filterNot { it.type == FormatType.VIDEO && it.hdr }
-    return if (sdr.any { it.type == FormatType.VIDEO }) playback.copy(formats = sdr) else playback
+    val native = playback.serverAbr
+    val nativeSdr = native?.formats?.filterNot { it.format.type == FormatType.VIDEO && it.format.hdr }
+    val filteredNative =
+        if (native != null && nativeSdr != null &&
+            nativeSdr.any { it.format.type == FormatType.VIDEO }
+        ) {
+            native.copy(formats = nativeSdr)
+        } else {
+            native
+        }
+    return if (sdr.any { it.type == FormatType.VIDEO } ||
+        filteredNative != native
+    ) {
+        playback.copy(formats = sdr, serverAbr = filteredNative)
+    } else {
+        playback
+    }
 }
 
 /** A kept answer as it stands [elapsedMs] after it arrived: only what is left of its opening delay. */
@@ -113,36 +136,115 @@ class PluginVideo
             val playback: VideoPlayback,
             val validUntilMs: Long,
             val receivedAtElapsedMs: Long,
+            val pluginId: String,
+            val context: Any,
+            val request: ResolveVideoRequest,
+            val runtimeReceipt: PluginPlaybackReceipt?,
         )
 
         private val resolved = ConcurrentHashMap<String, Resolved>()
         private val failures = ConcurrentHashMap<String, StreamFailure>()
+        private val recovering = ConcurrentHashMap<String, Resolved>()
+        private val sabrClient by lazy {
+            AppProxyManager
+                .applyTo(OkHttpClient.Builder())
+                .connectTimeout(30, TimeUnit.SECONDS)
+                .readTimeout(60, TimeUnit.SECONDS)
+                .build()
+        }
         private val trackingTokens = ConcurrentHashMap<String, String>()
         private val locks = ConcurrentHashMap<String, Mutex>()
 
         /** The playback of [videoId]; one call at a time per video, reusing a still-valid answer. */
         suspend fun resolve(videoId: String): Result<VideoPlayback> =
             locks.getOrPut(videoId) { Mutex() }.withLock {
-                resolved[videoId]?.takeIf { it.validUntilMs > System.currentTimeMillis() }?.let {
-                    return@withLock Result.success(it.playback.agedBy(SystemClock.elapsedRealtime() - it.receivedAtElapsedMs))
+                resolved[videoId]
+                    ?.takeIf {
+                        it.context == provider.playbackContext() && it.runtimeReceipt?.isCurrent() != false &&
+                            it.validUntilMs > System.currentTimeMillis()
+                    }?.let {
+                        return@withLock Result.success(it.playback.agedBy(SystemClock.elapsedRealtime() - it.receivedAtElapsedMs))
+                    }
+                val accepted = recovering.remove(videoId)
+                if (accepted?.runtimeReceipt?.isCurrent() == false) {
+                    failures.remove(videoId)
+                    return@withLock Result.failure(PluginPlaybackSessionLost())
+                }
+                val pluginId =
+                    accepted?.pluginId ?: provider.selected
+                        ?: return@withLock Result.failure(
+                            io.github.aedev.flow.plugin.catalog
+                                .NoVideoPluginException(),
+                        )
+                val context =
+                    accepted?.context ?: try {
+                        provider.preparePlaybackContext(pluginId)
+                    } catch (
+                        cancelled: kotlinx.coroutines.CancellationException,
+                    ) {
+                        throw cancelled
+                    } catch (error: Exception) {
+                        return@withLock Result.failure(error)
+                    }
+                if (context !=
+                    provider.playbackContext()
+                ) {
+                    failures.remove(videoId)
+                    return@withLock Result.failure(IOException("The accepted playback account or provider changed"))
                 }
                 val request =
-                    videoRequest(
-                        videoId = videoId,
-                        maxHeight = limits.maxHeight,
-                        codecs = limits.codecs(VideoCodecUtils.NO_PREFERENCE),
-                        audioLanguage = preferences.preferredAudioLanguage.first(),
-                        captionLanguage = preferences.preferredSubtitleLanguage.first(),
-                        failure = failures.remove(videoId),
-                    )
-                provider.resolve(request).map { withoutUnshownHdr(it, limits.hdr) }.onSuccess { playback ->
-                    playback.trackingToken?.let { trackingTokens[videoId] = it }
-                    if (playback.kind != VideoKind.UPCOMING) {
-                        val lifetime = playback.expiresInMs ?: DEFAULT_LIFETIME_MS
-                        resolved[videoId] =
-                            Resolved(playback, System.currentTimeMillis() + lifetime - EXPIRY_MARGIN_MS, SystemClock.elapsedRealtime())
+                    accepted?.request?.copy(failure = failures.remove(videoId))
+                        ?: videoRequest(
+                            videoId = videoId,
+                            maxHeight = limits.maxHeight,
+                            codecs = limits.codecs(VideoCodecUtils.NO_PREFERENCE),
+                            audioLanguage = preferences.preferredAudioLanguage.first(),
+                            captionLanguage = preferences.preferredSubtitleLanguage.first(),
+                            failure = failures.remove(videoId),
+                        )
+                var runtimeReceipt: PluginPlaybackReceipt? = null
+                val result =
+                    try {
+                        val held = provider.playbackLease(pluginId)
+                        try {
+                            val response = provider.resolveBound(pluginId, context, request)
+                            if (response.serverAbr != null) runtimeReceipt = held.receipt()
+                            Result.success(response)
+                        } finally {
+                            held.close()
+                        }
+                    } catch (
+                        cancelled: kotlinx.coroutines.CancellationException,
+                    ) {
+                        throw cancelled
+                    } catch (error: Exception) {
+                        Result.failure(error)
                     }
-                }
+                result
+                    .mapCatching { response ->
+                        if (response.details.entity.providerId != request.entity.providerId ||
+                            (response.serverAbr != null && response.serverAbr?.videoId != response.details.entity.providerId)
+                        ) {
+                            throw IOException("The provider changed the accepted recording")
+                        }
+                        validateServerAbr(response.serverAbr, picture = true, provider.playbackGrants(pluginId))
+                        withoutUnshownHdr(response, limits.hdr)
+                    }.onSuccess { playback ->
+                        playback.trackingToken?.let { trackingTokens[videoId] = it }
+                        if (playback.kind != VideoKind.UPCOMING) {
+                            val lifetime = playback.expiresInMs ?: DEFAULT_LIFETIME_MS
+                            resolved[videoId] =
+                                Resolved(
+                                    playback,
+                                    System.currentTimeMillis() + lifetime - EXPIRY_MARGIN_MS,
+                                    SystemClock.elapsedRealtime(),
+                                    pluginId,
+                                    context,
+                                    request.copy(failure = null),
+                                    runtimeReceipt,
+                                )
+                        }
+                    }
             }
 
         /** Playback of [videoId] failed on [url] with [status]; the next resolve asks the plugin for another. */
@@ -150,9 +252,47 @@ class PluginVideo
             videoId: String,
             url: String,
             status: Int?,
+            reloadPlaybackContext: String? = null,
+            serverAbrFailure: ServerAbrFailure? = null,
         ) {
-            resolved.remove(videoId)
-            failures[videoId] = StreamFailure(url, status)
+            val accepted = resolved.remove(videoId)
+            if (accepted != null && (serverAbrFailure != null || accepted.playback.serverAbr != null)) recovering[videoId] = accepted
+            failures[videoId] = StreamFailure(url, status, reloadPlaybackContext, serverAbrFailure)
+        }
+
+        internal fun bindServerAbr(playback: VideoPlayback): BoundServerAbr? {
+            val presentation = playback.serverAbr ?: return null
+            val accepted = resolved[playback.details.entity.providerId] ?: throw IOException("The SABR presentation was not accepted")
+            if (accepted.playback.serverAbr != presentation) throw IOException("The accepted SABR presentation changed")
+            val transport =
+                pluginSabrDataSourceFactory(sabrClient, playback.headers, {
+                    if (accepted.runtimeReceipt?.isCurrent() == false) throw PluginPlaybackSessionLost()
+                    if (System.currentTimeMillis() - EXPIRY_MARGIN_MS >= accepted.validUntilMs) {
+                        throw nl.neerdael.milkbeat.sabr.SabrPlaybackException(
+                            nl.neerdael.milkbeat.sabr.SabrPlaybackException.Reason.URL_EXPIRED,
+                            presentation.url,
+                            null,
+                        )
+                    }
+                    if (accepted.context != provider.playbackContext() || provider.selected != accepted.pluginId) {
+                        throw IOException("The accepted playback account or provider changed")
+                    }
+                }) { provider.playbackGrants(accepted.pluginId) }
+            val opensAt =
+                accepted.playback.availableInMs
+                    ?.takeIf { it > 0 }
+                    ?.let { accepted.receivedAtElapsedMs + it } ?: 0L
+            return BoundServerAbr(presentation, transport.withRequestHeaders(StreamRequestHeaders(opensAtElapsedMs = opensAt))) {
+                val held = provider.playbackLease(accepted.pluginId)
+                try {
+                    accepted.runtimeReceipt?.let(held::verify)
+                    if (accepted.context != provider.playbackContext()) throw PluginPlaybackSessionLost()
+                    held
+                } catch (error: Throwable) {
+                    held.close()
+                    throw error
+                }
+            }
         }
 
         /** Drops what was resolved for [videoId], so the next resolve asks the plugin again. */

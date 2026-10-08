@@ -30,6 +30,26 @@ import org.schabi.newpipe.extractor.MediaFormat as ContainerFormat
  */
 class PluginVideoStreamsTest {
     @Test
+    fun `SABR-only playback retains native presentation with no invented progressive URLs`() {
+        val native =
+            nl.neerdael.milkbeat.plugin.ServerAbrPlayback(
+                "https://media.example/sabr",
+                VIDEO_ID,
+                "dXBzdHJlYW0=",
+                nl.neerdael.milkbeat.plugin
+                    .ServerAbrClientInfo(7, "fixture"),
+                listOf(
+                    nl.neerdael.milkbeat.plugin
+                        .ServerAbrFormat(audioOriginal.copy(url = ""), 251, "18446744073709551615"),
+                ),
+            )
+        val mapped = PluginVideoStreams.playable(playback(formats = emptyList()).copy(serverAbr = native), null)
+        assertThat(mapped.serverAbr).isSameInstanceAs(native)
+        assertThat(mapped.audioStreams).isEmpty()
+        assertThat(mapped.videoStreams).isEmpty()
+    }
+
+    @Test
     fun `video formats keep their size, codec and byte ranges for the generated manifest`() {
         val streams = PluginVideoStreams.videoStreams(listOf(video1080))
 

@@ -54,7 +54,10 @@ abstract class PluginAudioFixture {
             emptyList(),
         )
 
+    private val runtimeOwner = Any()
+
     init {
+        coEvery { host.playbackLease(any()) } answers { PluginPlaybackLease(runtimeOwner, { 0L }, {}, {}) }
         val state =
             PluginRegistryState(
                 listOf(plugin),

@@ -42,6 +42,40 @@ internal fun Media3MusicService.handlePlayerError(
     }
     val mediaId = failed.mediaId
 
+    if (io.github.aedev.flow.plugin.playback
+            .playbackSessionLost(error)
+    ) {
+        retryJobCancel()
+        player.stop()
+        notifyMusicWarning(getString(R.string.music_playback_warning_generic))
+        return
+    }
+    io.github.aedev.flow.player.error.serverAbrFailureOf(error)?.let { failure ->
+        handleServerAbrFailure(failed, failure)
+        return
+    }
+
+    val accepted = pluginAudio.current(mediaId)
+    if (accepted?.stream?.serverAbr != null && error.errorCode in
+        setOf(
+            PlaybackException.ERROR_CODE_IO_UNSPECIFIED,
+            PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
+            PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT,
+            PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS,
+            PlaybackException.ERROR_CODE_TIMEOUT,
+        )
+    ) {
+        val http =
+            io.github.aedev.flow.player.error.StreamHttpFailure
+                .of(error)
+        handleServerAbrFailure(
+            failed,
+            nl.neerdael.milkbeat.plugin
+                .StreamFailure(http?.first ?: accepted.stream.url, http?.second),
+        )
+        return
+    }
+
     if (fallBackToSong(failed)) {
         Log.w(TAG, "Music video of $mediaId failed (${error.errorCodeName}), playing its song instead", error)
         return
@@ -103,6 +137,40 @@ internal fun Media3MusicService.handlePlayerError(
             handleGenericError(failed, currentRetry)
         }
     }
+}
+
+/** Refresh the same accepted source/account after a native protocol instruction, bounded by the
+ * existing per-item retry counter. Releasing the old source cancels its outstanding POST loader. */
+internal fun Media3MusicService.handleServerAbrFailure(
+    failed: MusicPlaybackRecoveryPlanner.FailedItem,
+    failure: nl.neerdael.milkbeat.plugin.StreamFailure,
+) {
+    val attempt = retryCountMap.getOrDefault(failed.mediaId, 0)
+    if (attempt >= MAX_RETRY_PER_SONG || recentlyFailedSongs.contains(failed.mediaId)) {
+        handleFinalFailure(failed)
+        return
+    }
+    retryCountMap[failed.mediaId] = attempt + 1
+    retryJobCancel()
+    // Keep the accepted recording before expiring the URL cache; no matching/provider switch.
+    pluginAudio.failed(failed.mediaId, failure.url, failure.status, failure.reloadPlaybackContext, failure.serverAbrFailure)
+    pendingRetryJob =
+        lifecycleScope.launch {
+            delay(BASE_RETRY_DELAY_MS)
+            val index = playerIndexOf(failed)
+            if (index == MusicQueuePlanner.INDEX_UNSET) return@launch
+            downloadUtil.invalidateUrlCache(failed.mediaId)
+            if (player.currentMediaItem?.mediaId == failed.mediaId) {
+                val playing = player.playWhenReady
+                player.stop()
+                if (refreshStreamMediaItem(failed)) {
+                    player.prepare()
+                    player.playWhenReady = playing
+                }
+            } else {
+                refreshStreamMediaItemAt(index, failed.mediaId, failed.resumePositionMs)
+            }
+        }
 }
 
 /**

@@ -1,5 +1,6 @@
 package io.github.aedev.flow.player
 
+import android.net.Uri
 import androidx.annotation.OptIn
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
@@ -12,9 +13,11 @@ import androidx.media3.exoplayer.source.MergingMediaSource
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import io.github.aedev.flow.player.datasource.BoundPluginMusicDataSourceFactory
 import io.github.aedev.flow.player.datasource.PluginMusicDataSourceFactory
+import io.github.aedev.flow.player.resolver.AudioOnlyHlsPlaylistParserFactory
 import io.github.aedev.flow.player.resolver.ResolvingMusicMediaSource
 import io.github.aedev.flow.plugin.playback.ResolvedAudio
 import nl.neerdael.milkbeat.plugin.AudioDrmScheme
+import nl.neerdael.milkbeat.sabr.SabrMediaSource
 
 /**
  * The music player's sources. A queue item goes to [default] as ever, except a song whose audio plugin
@@ -53,9 +56,22 @@ class MusicMediaSourceFactory(
         sourceFactory: DataSource.Factory = dataSourceFallback,
         licenseFactory: DataSource.Factory? = (sourceFactory as? BoundPluginMusicDataSourceFactory)?.drm,
     ): MediaSource {
+        // Source metadata belongs to the accepted recording. Queue/catalog identity stays intact;
+        // a prefetched source cannot publish artwork until its timeline becomes the playing window.
+        val acceptedItem =
+            audio?.stream?.artwork?.url?.takeIf(String::isNotBlank)?.let { url ->
+                mediaItem
+                    .buildUpon()
+                    .setMediaMetadata(
+                        mediaItem.mediaMetadata
+                            .buildUpon()
+                            .setArtworkUri(Uri.parse(url))
+                            .build(),
+                    ).build()
+            } ?: mediaItem
         val soundItem =
             audio?.stream?.drm?.let { drm ->
-                mediaItem
+                acceptedItem
                     .buildUpon()
                     .setDrmConfiguration(
                         MediaItem.DrmConfiguration
@@ -67,7 +83,32 @@ class MusicMediaSourceFactory(
                             .setForceDefaultLicenseUri(true)
                             .build(),
                     ).build()
-            } ?: mediaItem
+            } ?: acceptedItem
+        audio?.stream?.let {
+            io.github.aedev.flow.plugin.playback
+                .requireNativeSabrMarker(it.mimeType, it.serverAbr)
+        }
+        audio?.stream?.serverAbr?.let { presentation ->
+            val transport = (sourceFactory as? BoundPluginMusicDataSourceFactory)?.serverAbr ?: sourceFactory
+            val native = SabrMediaSource.Factory(transport)
+            if (audio.stream.drm != null) {
+                val provider = DefaultDrmSessionManagerProvider()
+                provider.setDrmHttpDataSourceFactory(
+                    requireNotNull(licenseFactory) { "Plugin DRM requires a permission-checked license transport" },
+                )
+                native.setDrmSessionManagerProvider(provider)
+            }
+            // The presentation already contains either audio-only formats or audio + picture.
+            // Preserve the exact accepted item; never bolt progressive picture bytes onto SABR.
+            val source = native.createMediaSource(soundItem, presentation)
+            val hold = (sourceFactory as? BoundPluginMusicDataSourceFactory)?.runtimeHold
+            return if (hold == null) {
+                source
+            } else {
+                io.github.aedev.flow.player.resolver
+                    .RuntimeHeldMediaSource(source, hold)
+            }
+        }
         val progressive = ProgressiveMediaSource.Factory(sourceFactory)
         val hls = HlsMediaSource.Factory(sourceFactory)
         if (audio?.stream?.drm != null) {
@@ -79,6 +120,14 @@ class MusicMediaSourceFactory(
             hls.setDrmSessionManagerProvider(provider)
         }
         val withPicture = mediaItem.localConfiguration?.uri?.scheme == MusicVideoItems.SCHEME
+        if (!withPicture || audio?.stream?.requireAudioOnlyHls == true) {
+            hls.setPlaylistParserFactory(
+                AudioOnlyHlsPlaylistParserFactory(
+                    allowInitialMediaPlaylist =
+                        audio?.stream?.requireAudioOnlyHls != true,
+                ),
+            )
+        }
         val sound =
             if (audio
                     ?.stream
@@ -91,7 +140,7 @@ class MusicMediaSourceFactory(
             } else {
                 progressive.createMediaSource(soundItem)
             }
-        if (!withPicture) return sound
+        if (!withPicture || sound is HlsMediaSource) return sound
         val videoId = mediaItem.mediaId
         val picture =
             progressive.createMediaSource(

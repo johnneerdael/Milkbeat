@@ -224,6 +224,7 @@ dependencies {
         isChanging = projectmCoreVersion == "latest"
     }
     implementation(project(":plugin-api"))
+    implementation(project(":media3-sabr"))
     implementation(libs.quickjs.kt)
     implementation(libs.smbj)
     implementation(libs.sshj)

@@ -8,6 +8,9 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import nl.neerdael.milkbeat.plugin.BrowserEvaluateRequest
@@ -19,6 +22,7 @@ import java.io.File
 import java.net.URI
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 
 private const val BRIDGE = "__mbBridge"
@@ -36,41 +40,111 @@ internal class PluginBrowser(
     private val context: Context,
     private val allowedOrigins: List<String>,
     private val asset: (String) -> File,
+    private val pageFactory: (Context, String?) -> BrowserPage = { context, userAgent -> Session(context, userAgent) },
 ) {
-    private val sessions = ConcurrentHashMap<String, Session>()
+    internal class Owner {
+        private val ended = AtomicBoolean()
+        val closed: Boolean get() = ended.get()
 
-    suspend fun open(request: BrowserOpenRequest): BrowserSession {
+        fun retire() {
+            ended.set(true)
+        }
+    }
+
+    internal interface BrowserPage {
+        val id: String
+
+        suspend fun load(
+            baseUrl: String,
+            html: String,
+        )
+
+        suspend fun evaluate(script: String): String
+
+        fun destroy()
+    }
+
+    private class OwnedPage(
+        val owner: Owner,
+        val page: BrowserPage,
+    )
+
+    private val standaloneOwner = Owner()
+    private val gate = Mutex()
+    private val closed = AtomicBoolean()
+    private val sessions = ConcurrentHashMap<String, OwnedPage>()
+
+    suspend fun open(
+        request: BrowserOpenRequest,
+        owner: Owner = standaloneOwner,
+    ): BrowserSession {
         val html = request.html
         val baseUrl = request.baseUrl
         val host = runCatching { URI(baseUrl).host }.getOrNull()
         if (host == null || !URI(baseUrl).scheme.equals("https", ignoreCase = true) || !hostAllowed(host, allowedOrigins)) {
             throw HostCallException(PluginErrorCode.UNSUPPORTED, "$baseUrl is not in the plugin's browser permissions")
         }
-        if (sessions.size >= MAX_SESSIONS) throw HostCallException(PluginErrorCode.RATE_LIMITED, "Too many browser sessions")
         val page = withContext(Dispatchers.IO) { asset(html).readText() }
-        val session = withContext(Dispatchers.Main) { Session(context, request.userAgent) }
-        sessions[session.id] = session
+        var created: BrowserPage? = null
         try {
+            val session =
+                gate.withLock {
+                    if (owner.closed || closed.get()) throw HostCallException(PluginErrorCode.UNAVAILABLE, "The browser context ended")
+                    if (sessions.size >= MAX_SESSIONS) throw HostCallException(PluginErrorCode.RATE_LIMITED, "Too many browser sessions")
+                    withContext(NonCancellable + Dispatchers.Main) {
+                        val next = pageFactory(context, request.userAgent).also { created = it }
+                        if (owner.closed || closed.get()) {
+                            next.destroy()
+                            throw HostCallException(PluginErrorCode.UNAVAILABLE, "The browser context ended")
+                        }
+                        sessions[next.id] = OwnedPage(owner, next)
+                        next
+                    }
+                }
             withTimeout(timeout(request.timeoutMs)) { session.load(baseUrl, page) }
-        } catch (e: Exception) {
-            close(BrowserSession(session.id))
-            throw e
+            return BrowserSession(session.id)
+        } catch (error: Exception) {
+            created?.let { close(BrowserSession(it.id), owner) }
+            throw error
         }
-        return BrowserSession(session.id)
     }
 
-    suspend fun evaluate(request: BrowserEvaluateRequest): BrowserResult {
+    suspend fun evaluate(
+        request: BrowserEvaluateRequest,
+        owner: Owner = standaloneOwner,
+    ): BrowserResult {
         val session =
-            sessions[request.session] ?: throw HostCallException(PluginErrorCode.NOT_FOUND, "No browser session ${request.session}")
+            sessions[request.session]?.takeIf { it.owner === owner && !owner.closed }?.page
+                ?: throw HostCallException(PluginErrorCode.NOT_FOUND, "No browser session for this context")
         return BrowserResult(withTimeout(timeout(request.timeoutMs)) { session.evaluate(request.script) })
     }
 
-    suspend fun close(request: BrowserSession) {
-        sessions.remove(request.id)?.let { withContext(Dispatchers.Main) { it.destroy() } }
+    suspend fun close(
+        request: BrowserSession,
+        owner: Owner = standaloneOwner,
+    ) {
+        val existing = sessions[request.id]?.takeIf { it.owner === owner } ?: return
+        if (sessions.remove(request.id, existing)) withContext(NonCancellable + Dispatchers.Main) { existing.page.destroy() }
+    }
+
+    suspend fun closeOwner(owner: Owner) {
+        owner.retire()
+        val owned = gate.withLock { sessions.filterValues { it.owner === owner }.toMap() }
+        owned.forEach { (id, session) ->
+            if (sessions.remove(id, session)) withContext(NonCancellable + Dispatchers.Main) { session.page.destroy() }
+        }
     }
 
     suspend fun closeAll() {
-        sessions.keys.toList().forEach { close(BrowserSession(it)) }
+        closed.set(true)
+        val all =
+            gate.withLock {
+                sessions.toMap().also { snapshot ->
+                    snapshot.values.forEach { it.owner.retire() }
+                    sessions.clear()
+                }
+            }
+        all.values.forEach { withContext(NonCancellable + Dispatchers.Main) { it.page.destroy() } }
     }
 
     private fun timeout(requested: Long?) = (requested ?: DEFAULT_TIMEOUT_MS).coerceIn(1, MAX_TIMEOUT_MS)
@@ -79,8 +153,8 @@ internal class PluginBrowser(
     private class Session(
         context: Context,
         userAgent: String?,
-    ) {
-        val id: String = UUID.randomUUID().toString()
+    ) : BrowserPage {
+        override val id: String = UUID.randomUUID().toString()
         private val webView = WebView(context)
         private val nextCall = AtomicLong()
         private val pending = ConcurrentHashMap<Long, CompletableDeferred<String>>()
@@ -104,7 +178,7 @@ internal class PluginBrowser(
                 }
         }
 
-        suspend fun load(
+        override suspend fun load(
             baseUrl: String,
             html: String,
         ) {
@@ -112,7 +186,7 @@ internal class PluginBrowser(
             loaded.await()
         }
 
-        suspend fun evaluate(script: String): String {
+        override suspend fun evaluate(script: String): String {
             val call = nextCall.incrementAndGet()
             val result = CompletableDeferred<String>()
             pending[call] = result
@@ -133,7 +207,8 @@ internal class PluginBrowser(
             }
         }
 
-        fun destroy() {
+        override fun destroy() {
+            loaded.cancel()
             pending.values.forEach { it.cancel() }
             webView.destroy()
         }

@@ -40,7 +40,8 @@ services and play music videos. Everything is built for the TV remote.
 - **Optional private playlists:** prepare Spotify playlists in a signed-in YouTube Music account for
   native collection playback and autoplay. Recently verified copies reopen without another
   preparation pass. This is off by default.
-- **MilkDrop visuals:** projectM reacts to the audio from Milkbeat's player.
+- **MilkDrop visuals:** projectM reacts to the audio from Milkbeat's player. Artwork view uses the
+  accepted audio provider's best available thumbnail, with the original cover as a fallback.
 
 Behind the music runs [projectM](https://github.com/projectM-visualizer/projectm), the open-source
 MilkDrop. It reacts to the track you are playing, and a music video can take its place whenever you like.
@@ -55,6 +56,10 @@ providers, local and network folder music, every settings category and troublesh
 ## Install on Android TV
 
 For the video-matching test prerelease, see the [preview setup and checks](docs/user-guide/preview-testing.md). The separate Preview app resolves downloader codes from its bundled catalog to install the paired test providers.
+
+The **YouTube Video** provider is a separate SmartTube-based preview for host API 6. It offers
+SmartTube's Music feeds and TV-code sign-in alongside the existing YouTube Music provider.
+See [YouTube Video preview](docs/user-guide/providers.md#youtube-video-preview) for its setup and playback behavior.
 
 | Method | How |
 |---|---|
@@ -175,7 +180,8 @@ continuation. Your own
 playlists and Liked Songs prepare in advance; other playlists prepare when opened. A private copy
 is created with the source cover and fills as songs are matched, one at a time. Copies refresh
 one way from Spotify. Initial playback can wait for matching, then uses the complete
-prepared YouTube playlist while keeping Spotify's song metadata and artwork. Managed copies are
+prepared YouTube playlist while keeping Spotify's song metadata and catalog cover. Artwork view
+can instead show the accepted audio provider's playback thumbnail. Managed copies are
 reused after restarting Milkbeat and updated in place when Spotify changes. YouTube's radio
 suggestions stay in the playback queue; they are not added to the private copy. Albums are not mirrored.
 See the [preparation guide](docs/user-guide/providers.md#prepare-private-playlists) and

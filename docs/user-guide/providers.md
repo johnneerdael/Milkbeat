@@ -118,11 +118,40 @@ Managed copies are reused after restarting Milkbeat. When Spotify changes, Milkb
 
 Only the source playlist's matched songs belong in the private copy. YouTube's autoplay and radio suggestions are added to Milkbeat's playback queue, outside that copy. Changing a radio mode does not change either playlist.
 
-Prepared playback uses known YouTube IDs and native collection autoplay, while displaying Spotify's song metadata and artwork. Choosing a missing song starts at the next available match. Initial preparation can delay playback, especially for large playlists. Play shares any preparation already running on the page. Recently verified copies and their matches are reused across restarts. Previously unavailable songs are retried once when the matching rules change, so an old rejection does not hide a newly valid match. Interrupted work resumes from checkpoints.
+Prepared playback uses known YouTube IDs and native collection autoplay, while displaying Spotify's song metadata and catalog cover. [Artwork view](playback.md#visualizer-music-video-or-artwork)
+can show the accepted audio provider's playback thumbnail, falling back to that catalog cover. Choosing a missing song starts at the next available match. Initial preparation can delay playback, especially for large playlists. Play shares any preparation already running on the page. Recently verified copies and their matches are reused across restarts. Previously unavailable songs are retried once when the matching rules change, so an old rejection does not hide a newly valid match. Interrupted work resumes from checkpoints.
 
 Disable the option to return to normal matching and radio based on the first playing song. Existing private copies remain in your YouTube library. While Spotify is selected for metadata, Library hides managed copies that duplicate their source playlists.
 
 ## Sign in on your phone
+
+### YouTube Video preview
+
+**YouTube Video** is a separate provider for the API 6 Preview app. It keeps its own account and
+can be installed alongside **YouTube Music**. Select it for metadata to browse SmartTube's Music
+section: recommended music, charts, new videos and the other rows supplied for your region or
+account. TV-code sign-in adds Liked Music before those rows. Show More includes the full original
+row and its continuation; playlist and mix pages retain their track order.
+
+In the installed provider's details, choose **Sign in with a TV code**. Scan the QR link or open
+the displayed YouTube address, then approve the code in your Google account. Keep the TV screen
+open until pairing completes. Cancelled, declined or expired attempts need a fresh code. Guest
+browsing and playback do not require sign-in. After signing out or changing accounts, refresh
+open catalog pages; old account or guest-session page tokens are rejected.
+
+YouTube Video searches regular YouTube recordings for music playback, including uploads from
+unofficial channels. Audio starts without picture; choose Video in Now Playing to show the
+accepted recording's picture. Artwork view uses its highest available thumbnail, with the
+catalog cover as a fallback. Switching views retains the original catalog title, artist and
+recording identity. Resolution depends on the recording and the TV's supported codecs.
+
+The paired host handles SABR streaming through Media3. SABR streams are currently available
+for playback, not offline downloads. An audio-only live source needs an independent audio
+rendition; a stream with only combined audio/video cannot silently fetch picture bytes in
+audio-only mode. This preview's provider package is distributed separately from the app;
+use the paired test package supplied with the preview build.
+
+### Other provider sign-ins
 
 Open the installed plugin's details and choose its sign-in method.
 

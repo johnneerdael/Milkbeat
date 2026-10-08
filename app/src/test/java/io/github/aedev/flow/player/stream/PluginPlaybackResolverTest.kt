@@ -106,6 +106,34 @@ class PluginPlaybackResolverTest {
     }
 
     @Test
+    fun `SABR-only VOD is a playable native resolution without direct formats`() {
+        val native =
+            nl.neerdael.milkbeat.plugin.ServerAbrPlayback(
+                "https://media.example/sabr",
+                "fixture",
+                "dXBzdHJlYW0=",
+                nl.neerdael.milkbeat.plugin
+                    .ServerAbrClientInfo(7, "fixture"),
+                listOf(
+                    nl.neerdael.milkbeat.plugin.ServerAbrFormat(
+                        nl.neerdael.milkbeat.plugin.MediaFormat(
+                            "251",
+                            nl.neerdael.milkbeat.plugin.FormatType.AUDIO,
+                            "",
+                            "audio/webm",
+                            codecs = "opus",
+                        ),
+                        251,
+                        "123",
+                    ),
+                ),
+            )
+        val step = PluginPlaybackResolver.stepFor(playback(formats = emptyList()).copy(serverAbr = native), null, null)
+        assertThat(step).isInstanceOf(ResolvedPlayback.FromPlugin::class.java)
+        assertThat((step as ResolvedPlayback.FromPlugin).playable.serverAbr).isSameInstanceAs(native)
+    }
+
+    @Test
     fun `a VOD with nothing to play is an extraction failure`() {
         val step = PluginPlaybackResolver.stepFor(playback(formats = emptyList()), cached = null, resumePositionOverrideMs = null)
 

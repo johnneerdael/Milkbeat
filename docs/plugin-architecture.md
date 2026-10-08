@@ -53,6 +53,26 @@ files but no editorial content).
 - Video providers. Music videos are an optional stream of an audio track (section 7.3). General
   video browsing is out of scope.
 
+### Additive API 6 transport
+
+API 6 supports optional `ServerAbrPlayback` alongside progressive, HLS and DASH descriptors.
+The private YouTube Video plugin supplies the regular YouTube client context, format tuples,
+attestation and TV device-code account flow. The generic `media3-sabr` module performs adaptive
+requests and container extraction in the existing Media3 player; plugins do not produce audio
+or video bytes. Protobuf definitions are generated in `media3-sabr-protocol`.
+
+Keep unsigned last-modified values as strings on the JavaScript wire and preserve the complete
+itag/last-modified/xTags identity in Media3 metadata. Protocol failures carry typed renewal
+reasons and opaque reload context; they are not invented HTTP errors. SABR endpoints must never
+enter progressive playback or offline-download caches. A prepared source owns its exact
+runtime lease and account epoch through release, so idle cleanup cannot discard a live
+attestation context and old account state cannot authorize a replacement source.
+
+`BrowserOpenRequest.userAgent` lets a provider couple its browser generator to its attestation
+HTTP profile. Existing requests retain the default browser user agent. Playback artwork is
+accepted-source metadata: prefetch or late prior-item callbacks cannot replace the current
+wallpaper or rewrite catalog identity. The new provider remains independent of YouTube Music.
+
 ## 2. Architecture at a glance
 
 ```text
@@ -465,6 +485,7 @@ Play album (metadata M)
   listener has video on (today's Video/Visualizer switch).
 - **Any audio provider:** it asks for it by passing `video: true` to `resolve`.
 - **Where it applies:** accepted sources from providers declaring `musicVideo` offer a Video choice for the original playback ID, including static Art Tracks. Eligibility is event-driven from accepted resolution and current account/provider context; original catalog IDs and metadata remain intact. Discovery never reloads playback. Explicit view selection requests picture using the accepted recording and preserves position; unavailable picture uses the existing audio recovery. Providers without `musicVideo` keep the visualizer or artwork.
+- **Playback artwork:** optional `AudioStream.artwork` carries the best available playback thumbnail. The accepted source's Media3 timeline publishes it as artwork metadata while preserving the original media ID, title, artist and cache key. The music manager observes selected-source metadata events; queued preparation cannot publish wallpaper for another playing item. TV Artwork view requests this URL through Coil and uses the original catalog cover if it is missing, blank or fails to load. It makes no extra resolution or video-media request.
 
 ## 8. Sign-in
 

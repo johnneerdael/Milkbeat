@@ -302,6 +302,8 @@ class DownloadUtil
                     BoundPluginMusicDataSourceFactory(
                         resolvingFactory(binding),
                         audio.stream.drm?.let { pluginAudio.drmDataSourceFactory(binding, okHttpClient) },
+                        audio.stream.serverAbr?.let { pluginAudio.serverAbrDataSourceFactory(audio, okHttpClient) },
+                        audio.stream.serverAbr?.let { { pluginAudio.acquirePlaybackLease(audio) } },
                     )
                 },
             )

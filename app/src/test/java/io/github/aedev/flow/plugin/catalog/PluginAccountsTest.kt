@@ -15,6 +15,7 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import nl.neerdael.milkbeat.catalog.Artwork
 import nl.neerdael.milkbeat.catalog.ProviderAccount
 import nl.neerdael.milkbeat.plugin.DeviceCodeSession
 import nl.neerdael.milkbeat.plugin.PluginError
@@ -29,6 +30,39 @@ class PluginAccountsTest {
     private fun TestScope.accounts() = PluginAccounts(host, backgroundScope, { testScheduler.currentTime })
 
     private fun failure(code: PluginErrorCode) = PluginCallException("youtube", PluginError(code, code.name))
+
+    @Test
+    fun `guest and same-account resets change the playback epoch even when displayed identity repeats`() =
+        runTest {
+            coEvery { host.call("youtube", PluginOperations.account, Unit) } returns ProviderAccount.Anonymous
+            coEvery { host.call("youtube", PluginOperations.signOut, Unit) } returns Unit
+            val accounts = accounts()
+            accounts.refresh("youtube")
+            val guest = accounts.playbackEpoch.value
+            accounts.signOut("youtube")
+            assertThat(accounts.accounts.value["youtube"]).isEqualTo(ProviderAccount.Anonymous)
+            assertThat(accounts.playbackEpoch.value).isGreaterThan(guest)
+            val reset = accounts.playbackEpoch.value
+            accounts.refresh("youtube")
+            assertThat(accounts.playbackEpoch.value).isEqualTo(reset)
+        }
+
+    @Test
+    fun `same-account credential and profile refresh retain playback ownership`() =
+        runTest {
+            val initial = ProviderAccount.SignedIn("listener", name = "First name")
+            coEvery { host.call("youtube", PluginOperations.account, Unit) } returns initial
+            val accounts = accounts()
+            accounts.refresh("youtube")
+            val epoch = accounts.playbackEpoch.value
+            val ownership = accounts.playbackIdentitySnapshot()
+            accounts.refresh("youtube")
+            val updated = ProviderAccount.SignedIn("listener", name = "Updated name", avatar = Artwork("https://image.example/new-avatar"))
+            coEvery { host.call("youtube", PluginOperations.account, Unit) } returns updated
+            accounts.refresh("youtube")
+            assertThat(accounts.playbackEpoch.value).isEqualTo(epoch)
+            assertThat(accounts.playbackIdentitySnapshot()).isEqualTo(ownership)
+        }
 
     @Test
     fun `an expiry reported by a call is re-checked at once and heals a sign-in the plugin still has`() =

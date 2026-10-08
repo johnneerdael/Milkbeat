@@ -49,6 +49,7 @@ class VideoPlaybackResolver(
         hlsUrl: String?,
         durationSeconds: Long,
         isLiveStream: Boolean = false,
+        audioOnly: Boolean = false,
     ): MediaSource? {
         Log.d(
             TAG,
@@ -56,22 +57,27 @@ class VideoPlaybackResolver(
                 "dash=${!dashManifestUrl.isNullOrEmpty()}, hls=${!hlsUrl.isNullOrEmpty()}, duration=${durationSeconds}s",
         )
 
-        if (isLiveStream && !hlsUrl.isNullOrEmpty()) {
+        if (!hlsUrl.isNullOrEmpty()) {
             try {
                 Log.d(TAG, "Using YouTube HLS manifest for live playback: ${hlsUrl.take(80)}...")
 
                 val liveItem =
                     playbackItem(hlsUrl)
                         .setMimeType(androidx.media3.common.MimeTypes.APPLICATION_M3U8)
-                        .setLiveConfiguration(
-                            androidx.media3.common.MediaItem.LiveConfiguration
-                                .Builder()
-                                .setTargetOffsetMs(PlayerConfig.LIVE_EDGE_GAP_MS)
-                                .build(),
-                        ).build()
+                        .apply {
+                            if (isLiveStream) {
+                                setLiveConfiguration(
+                                    androidx.media3.common.MediaItem.LiveConfiguration
+                                        .Builder()
+                                        .setTargetOffsetMs(PlayerConfig.LIVE_EDGE_GAP_MS)
+                                        .build(),
+                                )
+                            }
+                        }.build()
 
                 return androidx.media3.exoplayer.hls.HlsMediaSource
                     .Factory(liveHlsDataSourceFactory)
+                    .apply { if (audioOnly) setPlaylistParserFactory(AudioOnlyHlsPlaylistParserFactory(allowInitialMediaPlaylist = false)) }
                     .setAllowChunklessPreparation(true)
                     .setPlaylistTrackerFactory {
                         dataSourceFactory,

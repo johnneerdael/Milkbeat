@@ -561,6 +561,7 @@ class Media3MusicService : MediaLibraryService() {
     override fun onDestroy() {
         EnhancedMusicPlayerManager.prefetcher = null
         EnhancedMusicPlayerManager.setVideoCapablePlaybackIds(emptySet())
+        EnhancedMusicPlayerManager.playbackArtworkState.value = null
         // Flush the in-flight listen session before the player goes away.
         finalizeListenSession()
 
