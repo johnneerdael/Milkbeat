@@ -37,6 +37,16 @@ class TvMusicTabsStateTest {
     }
 
     @Test
+    fun `a picked tab whose account is still being checked waits too`() {
+        val pending = MusicTabs(listOf(MusicTab(youtube, "YouTube Music", null, accountPending = true)), settled = false)
+
+        val state = resolveMusicTabs(pending, Remembered.Known(null), chosen = youtube)
+
+        assertThat(state.ready).isFalse()
+        assertThat(state.selected).isNull()
+    }
+
+    @Test
     fun `nothing opens before the remembered tab is read`() {
         val state = resolveMusicTabs(tabs(youtube, settled = true), Remembered.Unknown, chosen = null)
 

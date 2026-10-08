@@ -37,3 +37,9 @@ internal fun railFocusTab(
     railTabs: List<TvTab>,
     shown: TvTab?,
 ): TvTab? = shown?.takeIf { it in railTabs } ?: railTabs.firstOrNull()
+
+/** The tabs Back can return to: those the rail still has, so a provider gone since is skipped. */
+internal fun prunedTabHistory(
+    history: List<TvTab>,
+    railTabs: List<TvTab>,
+): List<TvTab> = history.filter { it in railTabs }

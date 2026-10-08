@@ -34,9 +34,10 @@ internal fun resolveMusicTabs(
     val available = tabs.tabs.map { it.source }
     val last = (remembered as? Remembered.Known)?.source
     val lastTab = tabs.tabs.firstOrNull { it.source == last }
+    val chosenTab = tabs.tabs.firstOrNull { it.source == chosen }
     val selected =
         when {
-            chosen != null && chosen in available -> chosen
+            chosenTab != null -> chosenTab.source.takeUnless { chosenTab.accountPending }
             remembered == Remembered.Unknown -> null
             lastTab != null -> lastTab.source.takeUnless { lastTab.accountPending }
             !tabs.settled -> null

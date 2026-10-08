@@ -29,6 +29,13 @@ class TvTabTest {
     }
 
     @Test
+    fun `Back history keeps only tabs the rail still has`() {
+        val spotify = TvTab.Music(MusicSource.Plugin("nl.neerdael.spotify"))
+
+        assertThat(prunedTabHistory(listOf(spotify, search, TvTab.Music(null), local), rail)).containsExactly(search, local).inOrder()
+    }
+
+    @Test
     fun `the rail focuses its first item when no item is the shown tab`() {
         assertThat(railFocusTab(rail, local)).isEqualTo(local)
         assertThat(railFocusTab(rail, TvTab.Music(null))).isEqualTo(youtube)

@@ -438,6 +438,23 @@ class TvSearchViewModelTest {
         }
 
     @Test
+    fun `the chip on screen keeps answering typeahead after its identity changes`() =
+        runTest(dispatcher) {
+            val vm = viewModel()
+            vm.retainSources(mapOf(MUSIC.key to "account-1", TvSearchSource.Videos.key to null))
+            vm.showSource(MUSIC)
+            vm.onQueryChange("cafe")
+            advanceUntilIdle()
+
+            vm.retainSources(mapOf(MUSIC.key to "anonymous", TvSearchSource.Videos.key to null))
+            advanceUntilIdle()
+            vm.onQueryChange("cafe del")
+            advanceUntilIdle()
+
+            assertThat(music.suggests).contains("cafe del")
+        }
+
+    @Test
     fun `typeahead asks the music chip shown last and the video plugin`() =
         runTest(dispatcher) {
             val vm = viewModel()

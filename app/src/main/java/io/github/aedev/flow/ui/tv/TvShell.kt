@@ -41,6 +41,7 @@ import io.github.aedev.flow.ui.tv.navigation.TvMusicTabsState
 import io.github.aedev.flow.ui.tv.navigation.TvNavHost
 import io.github.aedev.flow.ui.tv.navigation.TvRoutes
 import io.github.aedev.flow.ui.tv.navigation.TvTab
+import io.github.aedev.flow.ui.tv.navigation.prunedTabHistory
 import io.github.aedev.flow.ui.tv.navigation.shownRailTab
 import io.github.aedev.flow.ui.tv.theme.LocalTvDimens
 import kotlinx.coroutines.delay
@@ -86,12 +87,13 @@ fun TvShell(
     var detailOwner by remember { mutableStateOf<TvTab>(TvTab.Music(null)) }
     LaunchedEffect(routeTab) { routeTab?.let { detailOwner = it } }
     val railItems = tvRailItems(musicTabs, badged)
+    val railTabs = railItems.map { it.tab }
     val currentTab: TvTab =
         shownRailTab(
             routeTab = routeTab,
             settingsDetail = currentRoute == TvRoutes.MUSIC_FOLDERS_SETTINGS,
             detailOwner = detailOwner,
-            railTabs = railItems.map { it.tab },
+            railTabs = railTabs,
             music = TvTab.Music(musicTabs.selected),
         )
     var railHasFocus by remember { mutableStateOf(false) }
@@ -135,6 +137,14 @@ fun TvShell(
     val tabHistory = remember { mutableStateListOf<TvTab>() }
     // The rail keeps the selectTab reference of the composition that built it, so the tab shown is read
     // at the press rather than captured then.
+    // A provider signed out, disabled or removed leaves Back history, so Back never lands on a tab that is gone.
+    LaunchedEffect(railTabs) {
+        val kept = prunedTabHistory(tabHistory, railTabs)
+        if (kept.size != tabHistory.size) {
+            tabHistory.clear()
+            tabHistory.addAll(kept)
+        }
+    }
     val shownTab by rememberUpdatedState(currentTab)
     val onDetailRoute by rememberUpdatedState(isOnDetailRoute)
     val selectMusic by rememberUpdatedState(onSelectMusic)
