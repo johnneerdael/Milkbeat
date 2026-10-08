@@ -59,3 +59,10 @@ internal fun PluginVideoProvider.searchBackend(): TvSearchBackend =
 /** Whether [error] says no plugin is chosen for that half, rather than that the plugin failed. */
 internal val Throwable.isNoPlugin: Boolean
     get() = this is NoMetadataPluginException || this is NoVideoPluginException
+
+/** The chip shown: the one the listener picked while it is offered, else [start], which follows the tabs as they settle. */
+internal fun shownSearchSource(
+    picked: TvSearchSource?,
+    chips: List<TvSearchSource>,
+    start: TvSearchSource,
+): TvSearchSource = picked?.takeIf { it in chips } ?: start

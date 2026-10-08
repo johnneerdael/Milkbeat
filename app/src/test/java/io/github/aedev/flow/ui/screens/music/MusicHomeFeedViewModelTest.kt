@@ -364,6 +364,31 @@ class MusicHomeFeedViewModelTest {
         }
 
     @Test
+    fun `a load that finishes while its tab is hidden stays fresh for the next visit`() =
+        runTest(dispatcher) {
+            var fetches = 0
+            provider.pages = {
+                fetches++
+                delay(1_000)
+                Result.success(page("Home"))
+            }
+            val vm = viewModel()
+            val shown = show(vm)
+            vm.load()
+            runCurrent()
+            shown.cancelAndJoin()
+            advanceTimeBy(10_000)
+
+            show(vm)
+            runCurrent()
+            vm.load()
+            advanceUntilIdle()
+
+            assertThat(fetches).isEqualTo(1)
+            assertThat(vm.titles).containsExactly("Home")
+        }
+
+    @Test
     fun `the tab without a provider asks for one and fetches nothing`() =
         runTest(dispatcher) {
             var fetches = 0

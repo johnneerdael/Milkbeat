@@ -121,6 +121,8 @@ class MusicHomeFeedViewModel internal constructor(
                         // next visit loads again.
                         if (!wasShown || job?.isActive != true) return@collectLatest
                         delay(SUBSCRIPTION_TIMEOUT_MS)
+                        // A load that finished during the grace stays fresh for the next visit.
+                        if (job?.isActive != true) return@collectLatest
                         job?.cancel()
                         loadedKey = null
                         _state.update { it.copy(isLoading = false, isLoadingMore = false) }

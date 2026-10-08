@@ -71,9 +71,9 @@ fun TvSearchScreen(
         (musicChips.firstOrNull { it.source == musicTabs.selected } ?: musicChips.firstOrNull())
             ?.let { TvSearchSource.Music(it.source) } ?: TvSearchSource.Videos
     // Not saveable on purpose: every visit to Search starts on the music tab last shown.
-    var picked by remember { mutableStateOf(startSource) }
-    // A chip whose tab went away leaves Search on the start chip.
-    val source = picked.takeIf { it in chips } ?: startSource
+    // Unpicked, Search follows the start chip as the tabs settle; a picked chip that goes away gives way to it.
+    var picked by remember { mutableStateOf<TvSearchSource?>(null) }
+    val source = shownSearchSource(picked, chips, startSource)
     val chipIdentities = musicChips.associate { TvSearchSource.Music(it.source).key to it.identity } + (TvSearchSource.Videos.key to null)
     LaunchedEffect(chipIdentities) { viewModel.retainSources(chipIdentities) }
     LaunchedEffect(source) { viewModel.showSource(source) }
