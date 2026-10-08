@@ -8,9 +8,11 @@ import io.mockk.mockk
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
@@ -70,6 +72,37 @@ class TvAccountLibraryViewModelTest {
     fun tearDown() {
         Dispatchers.resetMain()
     }
+
+    @Test
+    fun `a hidden provider's library stops reading, and reads afresh when shown again`() =
+        runTest(dispatcher) {
+            var continuations = 0
+            val slow =
+                mockk<ScopedPluginCatalog> {
+                    every { account } returns this@TvAccountLibraryViewModelTest.account
+                    every { id } returns "slow-provider"
+                    coEvery { call(PluginOperations.library, any()) } coAnswers {
+                        val request = secondArg<LibraryRequest>()
+                        if (request.cursor == null) {
+                            Result.success(MetadataPage("liked", listOf(tracks("a")), nextCursor = "more"))
+                        } else {
+                            continuations++
+                            delay(10_000)
+                            Result.success(MetadataPage("liked", listOf(tracks("c$continuations")), nextCursor = "more$continuations"))
+                        }
+                    }
+                }
+            val vm = TvAccountLibraryViewModel(slow)
+            vm.open(TvAccountLibrarySection.LIKED_MUSIC)
+            runCurrent()
+            advanceTimeBy(100)
+
+            vm.hide()
+            advanceTimeBy(60_000)
+
+            assertThat(continuations).isEqualTo(1)
+            assertThat(vm.sections.value[TvAccountLibrarySection.LIKED_MUSIC]).isNull()
+        }
 
     @Test
     fun `an updated plugin is another library identity, though the account stays the same`() =

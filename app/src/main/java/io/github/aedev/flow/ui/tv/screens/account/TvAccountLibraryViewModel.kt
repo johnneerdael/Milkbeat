@@ -97,6 +97,17 @@ class TvAccountLibraryViewModel
 
         fun track(item: MetadataItem): MusicTrack? = provider.track(item)
 
+        /**
+         * The pane left the screen (another provider's chip, or another section of Library): what is still
+         * being read stops, and those sections are read afresh on the next visit.
+         */
+        fun hide() {
+            val reading = jobs.filterValues { it.isActive }.keys
+            jobs.values.forEach { it.cancel() }
+            jobs.clear()
+            if (reading.isNotEmpty()) _sections.update { it - reading }
+        }
+
         fun open(section: TvAccountLibrarySection) {
             if (section.isVideoGrid || jobs[section]?.isActive == true) return
             jobs[section] =

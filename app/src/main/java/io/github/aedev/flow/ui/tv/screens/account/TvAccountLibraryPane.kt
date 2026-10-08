@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -41,6 +42,7 @@ internal fun TvAccountLibraryPane(
             key = "account-library:$pluginId",
             creationCallback = { factory -> factory.create(pluginId) },
         )
+    DisposableEffect(viewModel) { onDispose { viewModel.hide() } }
     val identity by viewModel.accountIdentity.collectAsStateWithLifecycle(initialValue = "")
     val tabs by viewModel.tabs.collectAsStateWithLifecycle()
     var section by rememberSaveable(pluginId) { mutableStateOf<TvAccountLibrarySection?>(null) }
