@@ -55,7 +55,7 @@ files but no editorial content).
 
 ### Additive API 6 transport
 
-API 6 supports optional `ServerAbrPlayback` alongside progressive, HLS and DASH descriptors. Native presentations require MP4 or WebM containers and a Media3-recognized audio/video codec for each declared rendition; unsupported formats are rejected before caching or source creation.
+API 6 supports optional `ServerAbrPlayback` alongside progressive, HLS and DASH descriptors. Prepared native requests enforce the accepted buffered expiry deadline without adding its safety margin back. Native presentations require MP4 or WebM containers and a Media3-recognized audio/video codec for each declared rendition; unsupported formats are rejected before caching or source creation.
 The private YouTube Video plugin supplies the regular YouTube client context, format tuples,
 attestation and TV device-code account flow. The generic `media3-sabr` module performs adaptive
 requests and container extraction in the existing Media3 player; plugins do not produce audio

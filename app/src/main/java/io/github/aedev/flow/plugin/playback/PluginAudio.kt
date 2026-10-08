@@ -417,7 +417,7 @@ class PluginAudio
         ): DataSource.Factory =
             pluginSabrDataSourceFactory(base, audio.stream.headers, {
                 verifyBound(audio)
-                if (System.currentTimeMillis() - EXPIRY_MARGIN_MS >= audio.validUntilMs) {
+                if (System.currentTimeMillis() >= audio.validUntilMs) {
                     throw nl.neerdael.milkbeat.sabr.SabrPlaybackException(
                         nl.neerdael.milkbeat.sabr.SabrPlaybackException.Reason.URL_EXPIRED,
                         audio.stream.url,

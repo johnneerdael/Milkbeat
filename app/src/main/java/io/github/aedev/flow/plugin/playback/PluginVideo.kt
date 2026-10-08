@@ -272,7 +272,7 @@ class PluginVideo
             val transport =
                 pluginSabrDataSourceFactory(sabrClient, playback.headers, {
                     if (accepted.runtimeReceipt?.isCurrent() == false) throw PluginPlaybackSessionLost()
-                    if (System.currentTimeMillis() - EXPIRY_MARGIN_MS >= accepted.validUntilMs) {
+                    if (System.currentTimeMillis() >= accepted.validUntilMs) {
                         throw nl.neerdael.milkbeat.sabr.SabrPlaybackException(
                             nl.neerdael.milkbeat.sabr.SabrPlaybackException.Reason.URL_EXPIRED,
                             presentation.url,
