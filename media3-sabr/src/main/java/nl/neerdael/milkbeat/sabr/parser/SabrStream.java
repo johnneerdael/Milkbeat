@@ -86,6 +86,9 @@ public class SabrStream {
     private boolean controlInResponse;
     private boolean completedDiscardedMediaInResponse;
     private volatile boolean discardPartialOnNextResponse;
+    private long requestPositionMs = -1;
+    private long sequenceResyncOffsetMs;
+    private int sequenceResyncAttempts;
 
     public void abandonCurrentResponse() {
         discardPartialOnNextResponse = true;
@@ -167,7 +170,7 @@ public class SabrStream {
     }
 
 
-    public SabrPart parse(@NonNull ExtractorInput extractorInput) {
+    public SabrPart parse(@NonNull ExtractorInput extractorInput) throws IOException {
         SabrPart result = null;
 
         while (result == null && (multiResult == null || multiResult.isEmpty())) {
@@ -196,6 +199,9 @@ public class SabrStream {
     }
 
     public void reset(int iTag) {
+        sequenceResyncOffsetMs = 0;
+        sequenceResyncAttempts = 0;
+        requestPositionMs = -1;
         processor.reset(iTag);
     }
 
@@ -210,6 +216,18 @@ public class SabrStream {
     public void setLive(boolean live) { processor.setLive(live); }
 
     public void setPlayerTimeMs(long positionMs) { processor.setPlayerTimeMs(positionMs); }
+
+    /** Keep live resync adjustments across retries of the same media cursor, never across seeks. */
+    public long prepareRequestPositionMs(long positionMs) {
+        if (requestPositionMs != positionMs) {
+            sequenceResyncOffsetMs = 0;
+            sequenceResyncAttempts = 0;
+        }
+        requestPositionMs = positionMs;
+        long adjusted = Math.max(0, positionMs + sequenceResyncOffsetMs);
+        processor.setPlayerTimeMs(adjusted);
+        return adjusted;
+    }
 
     public long getSegmentStartTimeMs(int iTag) {
         return processor.getSegmentStartTimeMs(iTag);
@@ -246,7 +264,7 @@ public class SabrStream {
         return processor.createStreamerContext();
     }
 
-    private SabrPart parsePart(UMPPart part) {
+    private SabrPart parsePart(UMPPart part) throws IOException {
         switch (part.partId) {
             case UMPPartId.MEDIA_HEADER:
                 return processMediaHeader(part);
@@ -296,7 +314,7 @@ public class SabrStream {
         return null;
     }
 
-    private MediaSegmentInitSabrPart processMediaHeader(UMPPart part) {
+    private MediaSegmentInitSabrPart processMediaHeader(UMPPart part) throws IOException {
         mediaHeaderInResponse = true;
         MediaHeader mediaHeader;
 
@@ -315,21 +333,23 @@ public class SabrStream {
             // For segments near stream head, it estimates using segment duration, which can cause off-by-one segment mismatches.
             // If a segment is much longer or shorter than expected, the server may return a segment ahead or behind.
             // In such cases, retry with an adjusted player time to resync.
+            // A persistent mismatch must reach bounded whole-source renewal, not loop POSTs.
+            if (sequenceResyncAttempts >= 3) throw e;
             if (processor.isLive() && e.receivedSequenceNumber == e.expectedSequenceNumber - 1) {
-                // The segment before the previous segment was possibly longer than expected.
-                // Move the player time forward to try to adjust for this.;
-                processor.setPlayerTimeMs(processor.getPlayerTimeMs() + processor.getLiveSegmentTargetDurationToleranceMs());
+                sequenceResyncOffsetMs += processor.getLiveSegmentTargetDurationToleranceMs();
                 sqMismatchForwardCount += 1;
-                return null;
-            } else if (processor.isLive() && e.receivedSequenceNumber == e.expectedSequenceNumber + 2) {
-                // The previous segment was possibly shorter than expected
-                // Move the player time backwards to try to adjust for this.
-                processor.setPlayerTimeMs(Math.max(0, processor.getPlayerTimeMs() - processor.getLiveSegmentTargetDurationToleranceMs()));
+            } else if (processor.isLive() && (e.receivedSequenceNumber == e.expectedSequenceNumber + 1
+                    || e.receivedSequenceNumber == e.expectedSequenceNumber + 2)) {
+                sequenceResyncOffsetMs -= processor.getLiveSegmentTargetDurationToleranceMs();
                 sqMismatchBacktrackCount += 1;
-                return null;
+            } else {
+                throw e;
             }
-
-            throw e;
+            // Do not read MEDIA/MEDIA_END belonging to the rejected header. Media3 discards
+            // this load and issues a fresh whole POST at the adjusted request position.
+            sequenceResyncAttempts += 1;
+            abandonCurrentResponse();
+            throw new nl.neerdael.milkbeat.sabr.SabrRequestDeferredException();
         }
     }
 
@@ -360,6 +380,10 @@ public class SabrStream {
 
             if (result.isNewSegment) {
                 receivedNewSegments = true;
+            }
+            if (result.isNewSegment && result.sabrPart != null && !result.sabrPart.isInitSegment) {
+                sequenceResyncOffsetMs = 0;
+                sequenceResyncAttempts = 0;
             }
 
             return result.sabrPart;

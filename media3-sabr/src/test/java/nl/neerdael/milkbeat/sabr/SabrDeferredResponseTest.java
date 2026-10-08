@@ -107,6 +107,49 @@ public class SabrDeferredResponseTest {
             }
         }
     }
+    @Test public void liveSequenceResyncAbortsOldBodyAndKeepsAdjustedNextPost() throws Exception {
+        for(int received:new int[]{1,3,4}) {
+            SabrManifest manifest=manifest(false);
+            nl.neerdael.milkbeat.sabr.parser.SabrStream stream=manifest.getSabrStream(C.TRACK_TYPE_VIDEO);
+            stream.setLive(true);
+            nl.neerdael.milkbeat.sabr.protos.misc.FormatId id=nl.neerdael.milkbeat.sabr.protos.misc.FormatId.newBuilder().setItag(137).build();
+            stream.setFormatSelector(new nl.neerdael.milkbeat.sabr.parser.models.FormatSelector("video",false,id));
+            int metadata=nl.neerdael.milkbeat.sabr.parser.ump.UMPPartId.FORMAT_INITIALIZATION_METADATA;
+            int header=nl.neerdael.milkbeat.sabr.parser.ump.UMPPartId.MEDIA_HEADER;
+            int media=nl.neerdael.milkbeat.sabr.parser.ump.UMPPartId.MEDIA;
+            int end=nl.neerdael.milkbeat.sabr.parser.ump.UMPPartId.MEDIA_END;
+            stream.parse(raw(frame(metadata,FormatInitializationMetadata.newBuilder().setFormatId(id).setMimeType("video/mp4").build().toByteArray())));
+            MediaHeader first=MediaHeader.newBuilder().setHeaderId(1).setFormatId(id).setSequenceNumber(1).setStartMs(0).setDurationMs(2000).setContentLength(0).build();
+            stream.parse(raw(frame(header,first.toByteArray())));stream.parse(raw(frame(end,new byte[]{1})));
+            assertEquals(2000,manifest.createVideoPlaybackAbrRequest(C.TRACK_TYPE_VIDEO,false,2_000_000).getClientAbrState().getPlayerTimeMs());
+            MediaHeader rejected=first.toBuilder().setHeaderId(2).setSequenceNumber(received).setStartMs(2000).setContentLength(1).build();
+            java.io.ByteArrayOutputStream body=new java.io.ByteArrayOutputStream();
+            // Other-track and initialization completions must not reset this media cursor's retry budget.
+            nl.neerdael.milkbeat.sabr.protos.misc.FormatId ignored=id.toBuilder().setItag(140).build();
+            stream.parse(raw(frame(metadata,FormatInitializationMetadata.newBuilder().setFormatId(ignored).setMimeType("audio/mp4").build().toByteArray())));
+            body.write(frame(header,first.toBuilder().setFormatId(ignored).setHeaderId(3).build().toByteArray()));body.write(frame(end,new byte[]{3}));
+            body.write(frame(header,first.toBuilder().setHeaderId(4).setIsInitSeg(true).setDurationMs(0).build().toByteArray()));body.write(frame(end,new byte[]{4}));
+            body.write(frame(header,rejected.toByteArray()));body.write(frame(media,new byte[]{2,99}));body.write(frame(end,new byte[]{2}));
+            nl.neerdael.milkbeat.sabr.parser.misc.SabrExtractorInput input=new nl.neerdael.milkbeat.sabr.parser.misc.SabrExtractorInput(stream);
+            long step=received==1?100:-100;
+            for(int attempt=1;attempt<=3;attempt++) {
+                input.init(raw(body.toByteArray()));
+                assertThrows(SabrRequestDeferredException.class,()->input.read(new byte[1],0,1));
+                assertFalse(stream.hasPendingSegments());assertEquals(2000,stream.getSegmentStartTimeMs(137));
+                VideoPlaybackAbrRequest next=manifest.createVideoPlaybackAbrRequest(C.TRACK_TYPE_VIDEO,false,2_000_000);
+                assertEquals(2000+attempt*step,next.getClientAbrState().getPlayerTimeMs());
+            }
+            input.init(raw(body.toByteArray()));
+            assertEquals(SabrPlaybackException.Reason.NO_PROGRESS,assertThrows(SabrPlaybackException.class,()->input.read(new byte[1],0,1)).reason);
+            assertFalse(stream.hasPendingSegments());assertEquals(2000,stream.getSegmentStartTimeMs(137));
+            stream.beginResponse();stream.parse(raw(frame(header,rejected.toBuilder().setSequenceNumber(2).setContentLength(0).build().toByteArray())));
+            stream.parse(raw(frame(end,new byte[]{2})));
+            assertEquals(4000,manifest.createVideoPlaybackAbrRequest(C.TRACK_TYPE_VIDEO,false,4_000_000).getClientAbrState().getPlayerTimeMs());
+            stream.reset(137);
+            assertNotNull(stream.parse(raw(frame(header,first.toBuilder().setSequenceNumber(20).setStartMs(10000).build().toByteArray()))));
+            assertEquals(10000,manifest.createVideoPlaybackAbrRequest(C.TRACK_TYPE_VIDEO,false,10_000_000).getClientAbrState().getPlayerTimeMs());
+        }
+    }
     private static byte[] frame(int type,byte[] body) {
         assertTrue(body.length<128);byte[] bytes=new byte[body.length+2];bytes[0]=(byte)type;bytes[1]=(byte)body.length;System.arraycopy(body,0,bytes,2,body.length);return bytes;
     }

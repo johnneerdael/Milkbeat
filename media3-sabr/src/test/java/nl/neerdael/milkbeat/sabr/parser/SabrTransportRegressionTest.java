@@ -97,6 +97,17 @@ public class SabrTransportRegressionTest {
             catch (IOException actual) { assertSame(failure, actual); }
         }
     }
+    @Test public void liveSequenceMismatchIsRejectedBeforeRegisteringOrConsumingAnotherSegment() {
+        for(int received:new int[]{1,3}) {
+            SabrProcessor p=processor();p.setLive(true);p.setFormatSelector(new FormatSelector("audio",false,AUDIO));
+            p.processFormatInitializationMetadata(FormatInitializationMetadata.newBuilder().setFormatId(AUDIO).setMimeType("audio/webm").build());
+            MediaHeader first=header(AUDIO,1).toBuilder().setContentLength(0).build();p.processMediaHeader(first);p.processMediaEnd(1);
+            nl.neerdael.milkbeat.sabr.parser.exceptions.MediaSegmentMismatchError failure=assertThrows(nl.neerdael.milkbeat.sabr.parser.exceptions.MediaSegmentMismatchError.class,
+                    ()->p.processMediaHeader(header(AUDIO,2).toBuilder().setSequenceNumber(received).setStartMs(5000).setContentLength(0).build()));
+            assertEquals(2,failure.expectedSequenceNumber);assertEquals(received,failure.receivedSequenceNumber);
+            assertFalse(p.hasPendingSegments());assertEquals(5000,p.getSegmentStartTimeMs(251));
+        }
+    }
     private static MediaHeader header(FormatId id,int header) { return MediaHeader.newBuilder().setHeaderId(header).setFormatId(id).setSequenceNumber(header).setStartMs(0).setDurationMs(5000).build(); }
     private static SabrContextUpdate context(int type,boolean send,String value) { return SabrContextUpdate.newBuilder().setType(type).setValue(ByteString.copyFromUtf8(value)).setSendByDefault(send).setWritePolicy(SabrContextUpdate.SabrContextWritePolicy.SABR_CONTEXT_WRITE_POLICY_OVERWRITE).build(); }
     private static DefaultExtractorInput raw(byte[] bytes) { return new DefaultExtractorInput(new ByteArrayInputStream(bytes)::read,0,bytes.length); }

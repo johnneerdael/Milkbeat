@@ -192,6 +192,12 @@ public class SabrProcessor {
             throw new SabrStreamError(String.format("Sequence number not found in MediaHeader (media_header=%s)", mediaHeader));
         }
 
+        if (isLive() && !isInitSegment && !initializedFormat.discard && initializedFormat.currentSegment != null) {
+            long expectedSequence = initializedFormat.currentSegment.sequenceNumber + 1;
+            if (sequenceNumber != expectedSequence) throw new nl.neerdael.milkbeat.sabr.parser.exceptions.MediaSegmentMismatchError(
+                    mediaHeader.getFormatId(), expectedSequence, sequenceNumber);
+        }
+
         initializedFormat.sequenceLmt = mediaHeader.hasSequenceLmt() ? mediaHeader.getSequenceLmt() : NO_VALUE;
 
         TimeRange timeRange = mediaHeader.hasTimeRange() ? mediaHeader.getTimeRange() : null;
@@ -354,10 +360,6 @@ public class SabrProcessor {
             segment.initializedFormat.initSegment = segment;
             // Do not create a consumed range for init segments
             return result;
-        }
-
-        if (segment.initializedFormat.currentSegment != null && isLive()) {
-            Segment previousSegment = segment.initializedFormat.currentSegment;
         }
 
         segment.initializedFormat.currentSegment = segment;

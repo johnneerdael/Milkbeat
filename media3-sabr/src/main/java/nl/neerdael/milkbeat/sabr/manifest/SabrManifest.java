@@ -284,7 +284,7 @@ public class SabrManifest implements FilterableManifest<SabrManifest> {
         long startTimeMs = isInit ? 0 : seekTimeUs != C.TIME_UNSET
                 ? seekTimeUs / 1_000 : activeStream.getSegmentStartTimeMs(formatId != null ? formatId.getItag() : -1);
 
-        activeStream.setPlayerTimeMs(startTimeMs);
+        startTimeMs = activeStream.prepareRequestPositionMs(startTimeMs);
         ClientAbrState.Builder clientAbrStateBuilder = ClientAbrState.newBuilder()
                 .setSabrForceMaxNetworkInterruptionDurationMs(0)
                 .setPlaybackRate(1)

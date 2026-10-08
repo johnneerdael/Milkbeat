@@ -26,7 +26,7 @@ import org.junit.Test;
 public class SabrStreamTest {
     @Before public void disableDiagnosticLogging() { Log.setLogLevel(Log.LOG_LEVEL_OFF); }
 
-    @Test public void requiredAttestationDistinguishesMissingAndRejectedTokens() {
+    @Test public void requiredAttestationDistinguishesMissingAndRejectedTokens() throws Exception {
         byte[] body = StreamProtectionStatus.newBuilder()
                 .setStatus(StreamProtectionStatus.Status.ATTESTATION_REQUIRED).build().toByteArray();
         assertEquals(PoTokenStatusSabrPart.PoTokenStatus.MISSING,
@@ -35,7 +35,7 @@ public class SabrStreamTest {
                 ((PoTokenStatusSabrPart) stream("fixture-token").parse(input(UMPPartId.STREAM_PROTECTION_STATUS, body))).status);
     }
 
-    @Test public void reloadResponseKeepsOpaquePlaybackContext() {
+    @Test public void reloadResponseKeepsOpaquePlaybackContext() throws Exception {
         byte[] body = ReloadPlayerResponse.newBuilder().setReloadPlaybackParams(
                 ReloadPlaybackParams.newBuilder().setToken("opaque-fixture-context")).build().toByteArray();
         RefreshPlayerResponseSabrPart result = (RefreshPlayerResponseSabrPart) stream(null)
@@ -55,7 +55,7 @@ public class SabrStreamTest {
         assertEquals("lang=en", selected.getXtags());
     }
 
-    @Test public void audioSelectionIgnoresVideoInitializationAndKeepsTheSelectedAudio() {
+    @Test public void audioSelectionIgnoresVideoInitializationAndKeepsTheSelectedAudio() throws Exception {
         FormatId audio = FormatId.newBuilder().setItag(251).setLastModified(123).build();
         FormatId video = FormatId.newBuilder().setItag(337).setLastModified(456).build();
         SabrStream stream = stream(null);
