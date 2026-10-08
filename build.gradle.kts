@@ -36,6 +36,7 @@ spotless {
             "benchmark/src/**/*.kt",
             "plugin-api/src/**/*.kt",
             "spike-plugin-runtime/src/**/*.kt",
+            "media3-sabr/src/**/*.kt",
         )
         targetExclude(
             "**/build/**",
@@ -51,6 +52,8 @@ spotless {
             "benchmark/*.gradle.kts",
             "plugin-api/*.gradle.kts",
             "spike-plugin-runtime/*.gradle.kts",
+            "media3-sabr/*.gradle.kts",
+            "media3-sabr-protocol/*.gradle.kts",
         )
         targetExclude(
             "**/build/**",

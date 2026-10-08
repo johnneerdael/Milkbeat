@@ -69,6 +69,7 @@ data class VideoPlayerUiState(
             isSubscribed = false,
             likeState = null,
             hlsUrl = null,
+            isLive = false,
             localFilePath = null,
             localFileVideoId = null,
             isUpcoming = false,

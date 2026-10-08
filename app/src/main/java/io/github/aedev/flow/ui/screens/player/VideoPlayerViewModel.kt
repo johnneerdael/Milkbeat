@@ -127,7 +127,9 @@ class VideoPlayerViewModel
                 cancelLoad = { loads.cancel(invalidateToken = true) },
                 reloadStreams = { videoId, resumePositionMs ->
                     // The plugin is told which URL failed, so it hands back a different one.
-                    playerManager.lastStreamHttpFailure
+                    playerManager.lastServerAbrFailure?.let { failure ->
+                        pluginVideo.failed(videoId, failure.url, failure.status, failure.reloadPlaybackContext, failure.serverAbrFailure)
+                    } ?: playerManager.lastStreamHttpFailure
                         ?.let { (url, status) -> pluginVideo.failed(videoId, url, status) }
                         ?: pluginVideo.forget(videoId)
                     loadVideoInfo(videoId, forceRefresh = true, resumePositionOverrideMs = resumePositionMs)

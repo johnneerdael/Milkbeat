@@ -14,4 +14,6 @@ class PluginMusicDataSourceFactory(
 internal class BoundPluginMusicDataSourceFactory(
     delegate: DataSource.Factory,
     val drm: DataSource.Factory?,
+    val serverAbr: DataSource.Factory? = null,
+    val runtimeHold: (suspend () -> io.github.aedev.flow.plugin.playback.PluginPlaybackLease)? = null,
 ) : DataSource.Factory by delegate

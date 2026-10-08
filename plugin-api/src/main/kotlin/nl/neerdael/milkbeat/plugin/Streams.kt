@@ -65,6 +65,9 @@ data class AudioMatches(
 data class StreamFailure(
     val url: String,
     val status: Int? = null,
+    val reloadPlaybackContext: String? = null,
+    /** Protocol failures are independent of the transport HTTP status. */
+    val serverAbrFailure: ServerAbrFailure? = null,
 )
 
 @Serializable
@@ -100,6 +103,10 @@ data class AudioStream(
     val video: MediaFormat? = null,
     /** Platform DRM for this rendition; license credentials are distinct from media headers. */
     val drm: AudioDrm? = null,
+    val serverAbr: ServerAbrPlayback? = null,
+    val artwork: Artwork? = null,
+    /** Require the native HLS parser to select an independently advertised audio rendition. */
+    val requireAudioOnlyHls: Boolean = false,
 )
 
 /** License information consumed by the host's platform DRM implementation. */
@@ -170,6 +177,7 @@ data class VideoPlayback(
     /** A live stream the listener can seek back in. */
     val dvr: Boolean = false,
     val trackingToken: String? = null,
+    val serverAbr: ServerAbrPlayback? = null,
 )
 
 @Serializable

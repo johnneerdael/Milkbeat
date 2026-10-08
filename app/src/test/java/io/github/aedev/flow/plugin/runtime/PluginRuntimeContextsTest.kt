@@ -16,6 +16,24 @@ import org.junit.Test
 
 class PluginRuntimeContextsTest {
     @Test
+    fun `idle and tainted retirement invalidate playback receipts while ordinary calls keep generation`() =
+        runTest {
+            val created = mutableListOf<Context>()
+            val contexts = contexts(created)
+            contexts.call(1000) { it }
+            val generation = contexts.generation
+            contexts.call(1000) { it }
+            assertThat(contexts.generation).isEqualTo(generation)
+            contexts.closeIf { true }
+            assertThat(contexts.generation).isGreaterThan(generation)
+            contexts.call(1000) { it }
+            val recreated = contexts.generation
+            contexts.call(1000) { it.tainted = true }
+            assertThat(contexts.generation).isGreaterThan(recreated)
+            contexts.close()
+        }
+
+    @Test
     fun `active cancellation closes its context before the next caller selects one`() =
         runTest {
             val created = mutableListOf<Context>()

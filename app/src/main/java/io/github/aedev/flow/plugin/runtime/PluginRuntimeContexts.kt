@@ -10,6 +10,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import java.util.concurrent.atomic.AtomicLong
 
 internal class PluginRuntimeContexts<Context : Any>(
     private val create: suspend () -> Context,
@@ -20,7 +21,12 @@ internal class PluginRuntimeContexts<Context : Any>(
     // after the previous root has completed or its interrupted context has been closed.
     private val lock = Mutex()
     private val stateLock = Any()
+
+    @Volatile
     private var context: Context? = null
+    private val version = AtomicLong()
+    val generation: Long get() = version.get()
+    val liveGeneration: Long get() = if (context == null) -1L else version.get()
     private var currentCall: Job? = null
     private var closed = false
 
@@ -36,7 +42,11 @@ internal class PluginRuntimeContexts<Context : Any>(
                     currentCall = ownedJob
                 }
                 try {
-                    val active = context ?: create().also { context = it }
+                    val active =
+                        context ?: create().also {
+                            context = it
+                            version.incrementAndGet()
+                        }
                     try {
                         currentCoroutineContext().ensureActive()
                         block(active)
@@ -72,6 +82,7 @@ internal class PluginRuntimeContexts<Context : Any>(
 
     private suspend fun retire(active: Context) {
         context = null
+        version.incrementAndGet()
         withContext(NonCancellable) { close(active) }
     }
 }

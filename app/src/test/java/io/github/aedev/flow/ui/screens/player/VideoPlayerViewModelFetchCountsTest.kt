@@ -25,6 +25,8 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import nl.neerdael.milkbeat.catalog.CommentsPage
+import nl.neerdael.milkbeat.plugin.ServerAbrFailure
+import nl.neerdael.milkbeat.plugin.StreamFailure
 import nl.neerdael.milkbeat.plugin.VideoPlayback
 import org.junit.After
 import org.junit.Before
@@ -162,6 +164,39 @@ class VideoPlayerViewModelFetchCountsTest {
             coVerify(exactly = 1) { harness.pluginVideo.resolve("vid_a") }
             coVerify(exactly = 0) { harness.playerManager.clearCacheForCurrentVideo() }
             coVerify(exactly = 0) { harness.playerPreferences.markVideoUnplayable(any()) }
+        }
+
+    @Test
+    fun `SABR reload preserves its opaque context without reporting a stale HTTP denial`() =
+        runTest {
+            val viewModel = newViewModel()
+            viewModel.playVideo(video("vid_a"))
+            advanceUntilIdle()
+            forgetRecordedCalls()
+            every { harness.playerManager.lastStreamHttpFailure } returns ("https://cdn.invalid/stale" to 403)
+            every { harness.playerManager.lastServerAbrFailure } returns
+                StreamFailure(
+                    url = "https://cdn.invalid/abr",
+                    reloadPlaybackContext = "opaque-reload-context",
+                    serverAbrFailure = ServerAbrFailure.PLAYBACK_CONTEXT_RELOAD,
+                )
+
+            assertThat(harness.streamExpiredEvent.tryEmit(Unit)).isTrue()
+            advanceUntilIdle()
+
+            coVerifyOrder {
+                harness.pluginVideo.failed(
+                    "vid_a",
+                    "https://cdn.invalid/abr",
+                    null,
+                    "opaque-reload-context",
+                    ServerAbrFailure.PLAYBACK_CONTEXT_RELOAD,
+                )
+                harness.pluginVideo.resolve("vid_a")
+            }
+            coVerify(exactly = 1) { harness.pluginVideo.resolve("vid_a") }
+            verify(exactly = 0) { harness.pluginVideo.failed("vid_a", "https://cdn.invalid/stale", 403) }
+            verify(exactly = 0) { harness.pluginVideo.forget("vid_a") }
         }
 
     @Test

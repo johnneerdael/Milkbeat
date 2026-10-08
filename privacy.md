@@ -105,6 +105,8 @@ Window created at: `app/src/main/java/io/github/aedev/flow/player/PopupPlayerWin
 
 ## Google account sign-in
 
+### YouTube Music web session
+
 On Android TV, Settings > Plugins > YouTube Music > Sign in lets the user sign in to their own Google
 account so the YouTube Music tab and Library show that account's YouTube Music and YouTube feeds.
 Without it, the tab shows the regular signed-out YouTube Music home.
@@ -127,6 +129,23 @@ Without it, the tab shows the regular signed-out YouTube Music home.
   recommendations. **Report plays to YouTube Music** in that plugin's details (Settings > Plugins)
   switches the reporting off. The audio itself may come from YouTube's other clients, whichever answers fastest.
 - **Sign out** in that plugin's details deletes the stored session.
+
+### YouTube Video TV-code session
+
+The separate YouTube Video preview uses Google's TV device-code flow. Its QR opens YouTube's
+activation address, or the user enters the displayed code on Google's device page. Google handles
+the password and consent directly on the user's phone; neither passes through Milkbeat's phone
+viewer. The TV polls the short-lived challenge while its pairing screen is visible.
+
+After explicit confirmation, the plugin stores its access and refresh tokens in its own encrypted
+secret storage, sealed through the Android Keystore. These credentials serve Google/YouTube account,
+TV Music, Library and playback requests. The account remains separate from YouTube Music's web
+session, and signing out of YouTube Video removes its stored credentials. The plugin's installation
+review declares the exact Google and YouTube activation destinations.
+
+Artwork view can download the accepted playback provider's highest available thumbnail even when
+another catalog supplies the track. It preserves the original title, artist and queue identity;
+loading that image does not start video streaming.
 
 ## The remaining permissions
 

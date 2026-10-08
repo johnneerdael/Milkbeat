@@ -62,7 +62,14 @@ class PluginPlaybackResolver
             val step =
                 try {
                     withTimeout(LOAD_TIMEOUT_MS) { pluginVideo.resolve(videoId) }.fold(
-                        onSuccess = { playback -> stepFor(playback, cached, request.resumePositionOverrideMs) },
+                        onSuccess = { playback ->
+                            stepFor(
+                                playback,
+                                cached,
+                                request.resumePositionOverrideMs,
+                                boundServerAbr = pluginVideo.bindServerAbr(playback),
+                            )
+                        },
                         onFailure = { error -> ResolvedPlayback.PluginFailed(error) },
                     )
                 } catch (e: TimeoutCancellationException) {
@@ -104,6 +111,7 @@ class PluginPlaybackResolver
                 cached: Video?,
                 resumePositionOverrideMs: Long?,
                 nowMs: Long = System.currentTimeMillis(),
+                boundServerAbr: io.github.aedev.flow.plugin.playback.BoundServerAbr? = null,
             ): ResolvedPlayback {
                 if (playback.kind == VideoKind.UPCOMING) {
                     val details = playback.details
@@ -120,8 +128,10 @@ class PluginPlaybackResolver
                             ),
                     )
                 }
-                val playable = PluginVideoStreams.playable(playback, cached, SystemClock.elapsedRealtime())
-                val playableVod = playable.videoStreams.isNotEmpty() || playable.audioStreams.isNotEmpty()
+                val playable = PluginVideoStreams.playable(playback, cached, SystemClock.elapsedRealtime(), boundServerAbr)
+                val playableVod =
+                    playable.serverAbr != null || playable.hlsUrl != null || playable.dashUrl != null ||
+                        playable.videoStreams.isNotEmpty() || playable.audioStreams.isNotEmpty()
                 val playableLive = playable.isLive && (playable.hlsUrl != null || playable.dashUrl != null)
                 if (!playableVod && !playableLive) {
                     return ResolvedPlayback.Failed(PlaybackFailure.EXTRACTION, cause = null, relatedVideos = null)

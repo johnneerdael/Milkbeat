@@ -31,13 +31,13 @@ The view button steps through three views while the audio carries on. Milkbeat r
 
     ![The music-video view, with the video icon on the view button](images/view-video.jpg)
 
-    The matched YouTube video, picked for your TV: at most 1080p, in a codec the TV decodes in hardware. Art Tracks with static album artwork count as videos.
+    The matched YouTube video, capped at the TV's physical display resolution up to 2160p, in a codec the TV decodes in hardware. A 1080p or 720p display retains that lower limit; the recording, provider and bandwidth can offer lower quality. Art Tracks with static album artwork count as videos.
 
 === "Artwork"
 
     ![The artwork view: the cover filling the screen behind the controls](images/view-artwork.jpg)
 
-    The track's cover fills the screen.
+    The accepted audio provider's best available playback thumbnail fills the screen, even when Spotify or SoundCloud supplies the catalog entry. Missing or failed images use the original catalog cover. The title, artist, queue identity and playing recording stay the same. Local files and providers without playback artwork retain their cover. Loading the thumbnail does not start video playback.
 
 YouTube matching searches recorded videos for every track while you listen, whichever view you use, but the picture only loads when you select the video view. A confirmed YouTube match can offer video even for Spotify, SoundCloud or Beatport tracks. A track without a usable video skips from the visualizer straight to the artwork; with the video view chosen, such a track shows the visualizer instead. With visualizations turned off, the button moves between video and artwork. A video that cannot play falls back to audio with the visuals.
 
@@ -84,6 +84,6 @@ If normal decoded TV audio (PCM) stops advancing for about five seconds while th
 
 ## Encrypted provider audio
 
-Compatible plugins can supply Widevine-protected audio through the device's DRM implementation. Milkbeat fetches licenses separately from the audio and only from destinations the plugin is allowed to reach. Availability depends on the account, the recording and the device. SoundCloud previews are never treated as full tracks. The offline downloader supports clear progressive audio only; HLS and DRM audio cannot be downloaded.
+Compatible plugins can supply Widevine-protected audio through the device's DRM implementation. Milkbeat fetches licenses separately from the audio and only from destinations the plugin is allowed to reach. Availability depends on the account, the recording and the device. SoundCloud previews are never treated as full tracks. The offline downloader supports clear progressive audio only; HLS, DRM and native SABR streams cannot be downloaded.
 
 The [video-matching preview](preview-testing.md) runs beside the stable app for testing upcoming playback changes.

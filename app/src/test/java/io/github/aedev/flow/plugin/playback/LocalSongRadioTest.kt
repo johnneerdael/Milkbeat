@@ -73,6 +73,7 @@ class LocalSongRadioTest {
     private val state = MutableStateFlow(PluginRegistryState(listOf(youtube), ProviderSelection(audio = listOf("youtube"))))
 
     init {
+        coEvery { host.playbackLease(any()) } answers { PluginPlaybackLease(host, { 0L }, {}, {}) }
         every { registry.state } returns state
         coEvery { host.call("youtube", PluginOperations.matchAudio, any()) } returns AudioMatches(listOf(matched))
         coEvery { host.call("youtube", PluginOperations.audioRadio, any()) } returns TrackList(listOf(matched, suggestion))
