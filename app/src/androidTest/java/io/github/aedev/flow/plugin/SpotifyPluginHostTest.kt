@@ -141,7 +141,7 @@ class SpotifyPluginHostTest {
                             AppDatabase::class.java,
                         ).build()
                 try {
-                    registry.select(ProviderSelection(metadata = spotify, audio = listOf(youtube.id)))
+                    registry.select(ProviderSelection(audio = listOf(youtube.id)))
                     val tracks =
                         host.call(
                             spotify,

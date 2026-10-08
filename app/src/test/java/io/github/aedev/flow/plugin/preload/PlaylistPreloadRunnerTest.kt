@@ -74,7 +74,7 @@ class PlaylistPreloadRunnerTest {
                     plugin("youtube", Roles(audio = AudioRole(setOf("youtube"), match = true))),
                     plugin("beatport", Roles(audio = AudioRole(setOf("beatport"), match = true))),
                 ),
-                ProviderSelection(metadata = "spotify", audio = listOf("youtube", "beatport")),
+                ProviderSelection(audio = listOf("youtube", "beatport")),
             ),
         )
     private val matches = TestMatches()

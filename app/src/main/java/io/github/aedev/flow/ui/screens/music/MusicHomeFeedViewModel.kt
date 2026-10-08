@@ -14,6 +14,7 @@ import io.github.aedev.flow.data.library.catalog.LocalLibraryEmptyException
 import io.github.aedev.flow.data.music.model.MusicTrack
 import io.github.aedev.flow.plugin.catalog.NoMetadataPluginException
 import io.github.aedev.flow.plugin.catalog.PluginMetadataProvider
+import io.github.aedev.flow.plugin.catalog.ProviderEntityReference
 import io.github.aedev.flow.plugin.catalog.listenerMessage
 import io.github.aedev.flow.plugin.runtime.transientRetryDelayMs
 import kotlinx.coroutines.Job
@@ -30,6 +31,8 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import nl.neerdael.milkbeat.catalog.EntityKind
+import nl.neerdael.milkbeat.catalog.EntityRef
 import nl.neerdael.milkbeat.catalog.FilterOption
 import nl.neerdael.milkbeat.catalog.HomeRequest
 import nl.neerdael.milkbeat.catalog.MetadataItem
@@ -106,6 +109,16 @@ class MusicHomeFeedViewModel internal constructor(
     fun load(force: Boolean = false) = load(_state.value.selectedFilterId, force)
 
     fun track(item: MetadataItem): MusicTrack? = playback.track(item)
+
+    /**
+     * A station or playlist of this home seeds its radio as this tab's provider's, not another tab's.
+     * The local library has no playlist radio; its queues seed from their first song instead.
+     */
+    fun radioSeed(playlistId: String?): String? {
+        val id = playlistId ?: return null
+        val source = provider?.takeUnless { it.id == LocalCatalogProvider.ID } ?: return null
+        return ProviderEntityReference.encode(source.id, EntityRef(EntityKind.PLAYLIST, id))
+    }
 
     fun selectFilter(option: FilterOption) = load(option.id.takeUnless { it == _state.value.selectedFilterId }, force = true)
 

@@ -114,12 +114,7 @@ class PluginRadio
                             ?.idSpace,
                     ) == true
                 }
-            val metadataPlugin =
-                scoped?.pluginId ?: if (seedTrack == null) {
-                    state.selection.metadata
-                } else {
-                    compatible.firstOrNull { it.id == state.selection.metadata }?.id ?: compatible.firstOrNull()?.id
-                }
+            val metadataPlugin = scoped?.pluginId ?: compatible.firstOrNull()?.id
             val ownSeed =
                 scoped?.entity ?: seedTrack?.let { track ->
                     val space =

@@ -113,7 +113,9 @@ private fun TvMusicFeed(
             TvCatalogActions(
                 trackFor = viewModel::track,
                 onPlayMix = { playMix(it) },
-                onPlayList = { track, queue, source, radioPlaylistId -> playCollection(track, queue, source, radioPlaylistId) },
+                onPlayList = { track, queue, source, radioPlaylistId ->
+                    playCollection(track, queue, source, viewModel.radioSeed(radioPlaylistId))
+                },
                 onOpen = { open(it) },
             )
         }

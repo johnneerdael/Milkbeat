@@ -2,7 +2,9 @@ package io.github.aedev.flow.ui.screens.music
 
 import com.google.common.truth.Truth.assertThat
 import io.github.aedev.flow.data.catalog.CatalogPlayback
+import io.github.aedev.flow.data.library.catalog.LocalCatalogProvider
 import io.github.aedev.flow.data.library.catalog.LocalLibraryEmptyException
+import io.github.aedev.flow.plugin.catalog.ProviderEntityReference
 import io.github.aedev.flow.plugin.runtime.PluginCallException
 import io.github.aedev.flow.plugin.runtime.TransientRetryBackoffMs
 import kotlinx.coroutines.CompletableDeferred
@@ -25,6 +27,7 @@ import kotlinx.coroutines.withContext
 import nl.neerdael.milkbeat.catalog.CollectionBlock
 import nl.neerdael.milkbeat.catalog.CollectionHeader
 import nl.neerdael.milkbeat.catalog.CollectionLayout
+import nl.neerdael.milkbeat.catalog.EntityKind
 import nl.neerdael.milkbeat.catalog.EntityRef
 import nl.neerdael.milkbeat.catalog.FilterControl
 import nl.neerdael.milkbeat.catalog.FilterOption
@@ -241,6 +244,21 @@ class MusicHomeFeedViewModelTest {
             assertThat(vm.isAccountExpired.value).isTrue()
             assertThat(vm.titles).containsExactly("Anonymous")
         }
+
+    @Test
+    fun `a station of the home seeds its radio from this tab's provider`() {
+        provider.id = "nl.neerdael.spotify"
+        val vm = viewModel()
+
+        val seed = ProviderEntityReference.decode(checkNotNull(vm.radioSeed("station-1")))
+
+        assertThat(seed?.pluginId).isEqualTo("nl.neerdael.spotify")
+        assertThat(seed?.entity).isEqualTo(EntityRef(EntityKind.PLAYLIST, "station-1"))
+        assertThat(vm.radioSeed(null)).isNull()
+        assertThat(MusicHomeFeedViewModel(null, CatalogPlayback { null }).radioSeed("station-1")).isNull()
+        provider.id = LocalCatalogProvider.ID
+        assertThat(viewModel().radioSeed("local-playlist")).isNull()
+    }
 
     @Test
     fun `the tab without a provider asks for one and fetches nothing`() =

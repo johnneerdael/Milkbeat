@@ -11,12 +11,14 @@ import io.github.aedev.flow.data.library.catalog.LocalRef
 import io.github.aedev.flow.data.local.ChannelSubscription
 import io.github.aedev.flow.data.local.SubscriptionRepository
 import io.github.aedev.flow.data.music.model.MusicTrack
+import io.github.aedev.flow.plugin.catalog.NoMetadataPluginException
 import io.github.aedev.flow.plugin.catalog.PluginMetadataProvider
 import io.github.aedev.flow.plugin.catalog.ProviderEntityReference
 import io.github.aedev.flow.plugin.catalog.listenerMessage
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -24,6 +26,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -33,7 +36,9 @@ import nl.neerdael.milkbeat.catalog.CollectionLayout
 import nl.neerdael.milkbeat.catalog.EntityHeader
 import nl.neerdael.milkbeat.catalog.EntityKind
 import nl.neerdael.milkbeat.catalog.EntityRef
+import nl.neerdael.milkbeat.catalog.HomeRequest
 import nl.neerdael.milkbeat.catalog.MetadataItem
+import nl.neerdael.milkbeat.catalog.MetadataPage
 import nl.neerdael.milkbeat.catalog.MetadataProvider
 import nl.neerdael.milkbeat.catalog.PageBlock
 import nl.neerdael.milkbeat.catalog.ProviderAccount
@@ -49,8 +54,7 @@ data class CatalogPageState(
 /** One artist, album or playlist page of the music provider, with a long playlist's tracks followed to the end. */
 @HiltViewModel
 class CatalogPageViewModel
-    @Inject
-    constructor(
+    internal constructor(
         savedStateHandle: SavedStateHandle,
         defaultProvider: MetadataProvider,
         defaultPlayback: CatalogPlayback,
@@ -59,6 +63,16 @@ class CatalogPageViewModel
         private val mirrors: io.github.aedev.flow.plugin.mirror.PlaylistMirrorCoordinator? = null,
         localCatalog: LocalCatalogProvider? = null,
     ) : ViewModel() {
+        /** Every route names the provider whose page it is; one that does not shows the page's error. */
+        @Inject
+        constructor(
+            savedStateHandle: SavedStateHandle,
+            subscriptions: SubscriptionRepository,
+            pluginCatalog: PluginMetadataProvider,
+            mirrors: io.github.aedev.flow.plugin.mirror.PlaylistMirrorCoordinator,
+            localCatalog: LocalCatalogProvider,
+        ) : this(savedStateHandle, NoCatalog, NoCatalog, subscriptions, pluginCatalog, mirrors, localCatalog)
+
         val sourcePluginId: String? = savedStateHandle.get<String>(PROVIDER_ARG)
         private val local = localCatalog?.takeIf { sourcePluginId == LocalCatalogProvider.ID }
         private val scoped = sourcePluginId?.takeIf { local == null }?.let { checkNotNull(pluginCatalog).scoped(it) }
@@ -232,3 +246,17 @@ class CatalogPageViewModel
             private const val MAX_CONTINUATION_PAGES = 30
         }
     }
+
+private object NoCatalog : MetadataProvider, CatalogPlayback {
+    override val id: String = "none"
+    override val account: Flow<ProviderAccount> = flowOf(ProviderAccount.Anonymous)
+
+    override suspend fun home(request: HomeRequest): Result<MetadataPage> = Result.failure(NoMetadataPluginException())
+
+    override suspend fun page(
+        entity: EntityRef,
+        cursor: String?,
+    ): Result<MetadataPage> = Result.failure(NoMetadataPluginException())
+
+    override fun track(item: MetadataItem): MusicTrack? = null
+}
