@@ -114,11 +114,12 @@ class TvSearchViewModel internal constructor(
         source = target
         if (target is TvSearchSource.Music && target.source != lastMusic) {
             lastMusic = target.source
-            // The typeahead shown is the last music chip's; another chip answers the query on screen itself.
+            // The typeahead shown is the last music chip's; another chip answers the query on screen itself. A
+            // typeahead still pending asks the new chip when it runs, so it is restarted rather than doubled.
             _state.value.query
                 .trim()
                 .takeIf { it.isNotEmpty() }
-                ?.let(::suggestMusic)
+                ?.let { query -> if (suggestJob?.isActive == true) suggest(query) else suggestMusic(query) }
         }
         search(target, _state.value.results(target).filterId, delayMs = 0L)
     }
@@ -282,7 +283,7 @@ class TvSearchViewModel internal constructor(
                 currentCoroutineContext().ensureActive()
                 _state.update {
                     it.copy(
-                        musicSuggestions = musical.getOrNull()?.queries.orEmpty(),
+                        musicSuggestions = if (musicSource == lastMusic) musical.getOrNull()?.queries.orEmpty() else it.musicSuggestions,
                         videoSuggestions = visual.getOrNull()?.queries.orEmpty(),
                     )
                 }
@@ -296,7 +297,7 @@ class TvSearchViewModel internal constructor(
             viewModelScope.launch {
                 val musical = attempt { music(musicSource).suggest(query) }
                 currentCoroutineContext().ensureActive()
-                _state.update { it.copy(musicSuggestions = musical.getOrNull()?.queries.orEmpty()) }
+                if (musicSource == lastMusic) _state.update { it.copy(musicSuggestions = musical.getOrNull()?.queries.orEmpty()) }
             }
     }
 
