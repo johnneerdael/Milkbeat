@@ -103,7 +103,7 @@ internal fun withoutUnshownHdr(
         ) {
             native.copy(formats = nativeSdr)
         } else {
-            native
+            native.takeUnless { sdr.any { it.type == FormatType.VIDEO } }
         }
     return if (sdr.any { it.type == FormatType.VIDEO } ||
         filteredNative != native

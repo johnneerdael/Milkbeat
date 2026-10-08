@@ -75,6 +75,11 @@ Initialization and media SABR POSTs include the accepted presentation's visitor 
 with the protobuf/UMP protocol headers. Read the current manifest binding for each request;
 cookies are not taken from a shared browser or another provider's cookie jar.
 
+Accept a native picture presentation only when it contains video. A missing picture uses the
+existing song fallback at the same playback position; genuine SABR renewal preserves the
+listener's selected picture view and accepted recording. If an SDR TV has a conventional SDR
+alternative to an HDR-only native presentation, use that alternative.
+
 `BrowserOpenRequest.userAgent` lets a provider couple its browser generator to its attestation
 HTTP profile. Existing requests retain the default browser user agent. Playback artwork is
 accepted-source metadata: prefetch or late prior-item callbacks cannot replace the current

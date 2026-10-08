@@ -28,6 +28,12 @@ class ServerAbrValidationTest {
         )
 
     @Test
+    fun `accepted picture presentations require a native video tuple`() {
+        assertThat(runCatching { validateServerAbr(presentation, true, listOf("cdn.example")) }.isFailure).isTrue()
+        validateServerAbr(presentation, false, listOf("cdn.example"))
+    }
+
+    @Test
     fun `native formats accept empty direct URLs and exact unsigned format discriminator`() {
         validateServerAbr(presentation, false, listOf("cdn.example"))
         validateServerAbr(presentation.copy(formats = listOf(audio, video)), true, listOf("cdn.example"))

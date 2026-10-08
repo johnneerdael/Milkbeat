@@ -23,7 +23,10 @@ import nl.neerdael.milkbeat.catalog.MetadataItem
 import nl.neerdael.milkbeat.catalog.MetadataPage
 import nl.neerdael.milkbeat.plugin.ReportPlaybackRequest
 import nl.neerdael.milkbeat.plugin.ResolveVideoRequest
+import nl.neerdael.milkbeat.plugin.ServerAbrClientInfo
 import nl.neerdael.milkbeat.plugin.ServerAbrFailure
+import nl.neerdael.milkbeat.plugin.ServerAbrFormat
+import nl.neerdael.milkbeat.plugin.ServerAbrPlayback
 import nl.neerdael.milkbeat.plugin.StreamFailure
 import nl.neerdael.milkbeat.plugin.VideoKind
 import org.junit.Test
@@ -56,6 +59,33 @@ class PluginVideoTest {
         every { preferences.preferredSubtitleLanguage } returns flowOf("nl")
         coEvery { provider.resolveBound(any(), any(), capture(requests)) } returns playback().copy(expiresInMs = 6 * 3_600_000L)
     }
+
+    @Test
+    fun `SDR conventional picture takes precedence over a native presentation with only HDR picture`() =
+        runTest {
+            val hdr = PluginVideoStreamsTest.video1080.copy(id = "337", hdr = true)
+            val native =
+                ServerAbrPlayback(
+                    "https://media.example/sabr",
+                    VIDEO_ID,
+                    "fixture",
+                    ServerAbrClientInfo(7, "fixture"),
+                    listOf(
+                        ServerAbrFormat(PluginVideoStreamsTest.audioOriginal.copy(url = ""), 251, "100"),
+                        ServerAbrFormat(hdr.copy(url = ""), 337, "101"),
+                    ),
+                )
+            val mixed = playback().copy(serverAbr = native)
+            every { limits.hdr } returns false
+            coEvery { provider.resolveBound(any(), any(), any()) } returns mixed
+            val accepted = pluginVideo.resolve(VIDEO_ID).getOrThrow()
+            assertThat(accepted.serverAbr).isNull()
+            assertThat(accepted.formats).contains(PluginVideoStreamsTest.video1080)
+            assertThat(pluginVideo.bindServerAbr(accepted)).isNull()
+            // If no SDR picture exists anywhere, retain the provider's only usable picture.
+            val onlyHdr = mixed.copy(formats = listOf(PluginVideoStreamsTest.audioOriginal))
+            assertThat(withoutUnshownHdr(onlyHdr, false).serverAbr).isEqualTo(native)
+        }
 
     @Test
     fun `an SDR display gets the SDR pictures, unless the video has only HDR ones`() {

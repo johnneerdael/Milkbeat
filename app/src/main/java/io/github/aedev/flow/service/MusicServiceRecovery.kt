@@ -10,6 +10,7 @@ import io.github.aedev.flow.player.EnhancedMusicPlayerManager
 import io.github.aedev.flow.player.MusicPlaybackRecoveryPlanner
 import io.github.aedev.flow.player.MusicQueuePlanner
 import io.github.aedev.flow.player.MusicVideoItems
+import io.github.aedev.flow.plugin.playback.isSabrPictureUnavailable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.Locale
@@ -48,6 +49,10 @@ internal fun Media3MusicService.handlePlayerError(
         retryJobCancel()
         player.stop()
         notifyMusicWarning(getString(R.string.music_playback_warning_generic))
+        return
+    }
+    if (error.isSabrPictureUnavailable()) {
+        if (fallBackToSong(failed)) Log.w(TAG, "Native picture unavailable; continuing the accepted song")
         return
     }
     io.github.aedev.flow.player.error.serverAbrFailureOf(error)?.let { failure ->
@@ -163,12 +168,12 @@ internal fun Media3MusicService.handleServerAbrFailure(
             if (player.currentMediaItem?.mediaId == failed.mediaId) {
                 val playing = player.playWhenReady
                 player.stop()
-                if (refreshStreamMediaItem(failed)) {
+                if (refreshStreamMediaItem(failed, preservePicture = true)) {
                     player.prepare()
                     player.playWhenReady = playing
                 }
             } else {
-                refreshStreamMediaItemAt(index, failed.mediaId, failed.resumePositionMs)
+                refreshStreamMediaItemAt(index, failed.mediaId, failed.resumePositionMs, preservePicture = true)
             }
         }
 }
@@ -373,16 +378,20 @@ internal fun Media3MusicService.handleExpiredUrlError(
  * item is gone or plays from a local file, which has no url to refresh — rewriting one would
  * silently turn offline playback into a stream.
  */
-internal fun Media3MusicService.refreshStreamMediaItem(failed: MusicPlaybackRecoveryPlanner.FailedItem): Boolean {
+internal fun Media3MusicService.refreshStreamMediaItem(
+    failed: MusicPlaybackRecoveryPlanner.FailedItem,
+    preservePicture: Boolean = false,
+): Boolean {
     val index = playerIndexOf(failed)
     if (index == MusicQueuePlanner.INDEX_UNSET) return false
-    return refreshStreamMediaItemAt(index, failed.mediaId, failed.resumePositionMs)
+    return refreshStreamMediaItemAt(index, failed.mediaId, failed.resumePositionMs, preservePicture)
 }
 
 internal fun Media3MusicService.refreshStreamMediaItemAt(
     index: Int,
     mediaId: String,
     positionMs: Long,
+    preservePicture: Boolean = false,
 ): Boolean {
     val currentItem = player.getMediaItemAt(index)
     val uri = currentItem.localConfiguration?.uri ?: return false
@@ -391,7 +400,7 @@ internal fun Media3MusicService.refreshStreamMediaItemAt(
     val refreshedItem =
         currentItem
             .buildUpon()
-            .setUri(MusicVideoItems.songUri(uri, mediaId))
+            .setUri(if (preservePicture) uri else MusicVideoItems.songUri(uri, mediaId))
             .setMediaId(mediaId)
             .setCustomCacheKey(mediaId)
             .build()

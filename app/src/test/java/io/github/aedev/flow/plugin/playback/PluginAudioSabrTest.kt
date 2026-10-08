@@ -63,6 +63,22 @@ class PluginAudioSabrTest : PluginAudioFixture() {
     }
 
     @Test
+    fun `audio-only native answer cannot be accepted as picture but remains available as song fallback`() =
+        runTest {
+            val picture = runCatching { audio.resolve(original, PictureLimits(2160, listOf("av1"))) }
+            assertThat(picture.isFailure).isTrue()
+            val sound = audio.resolve(original, null)
+            assertThat(sound.track.ref).isEqualTo(candidate.ref)
+            assertThat(sound.withPicture).isFalse()
+            assertThat(sound.stream.video).isNull()
+            assertThat(
+                sound.stream.serverAbr!!
+                    .formats
+                    .all { it.format.type == FormatType.AUDIO },
+            ).isTrue()
+        }
+
+    @Test
     fun `protocol recovery keeps the accepted match and opaque context and coalesces resolution`() =
         runTest {
             val accepted = audio.resolve(original, null, playbackId = "catalog-id")
