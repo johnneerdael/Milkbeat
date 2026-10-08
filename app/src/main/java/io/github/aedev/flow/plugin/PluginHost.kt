@@ -76,10 +76,17 @@ class PluginHost
 
         private suspend fun runtime(pluginId: String): PluginRuntime =
             lock.withLock {
+                val plugin =
+                    registry.state.value.plugin(pluginId)
+                        ?: throw PluginCallException(pluginId, PluginError(PluginErrorCode.UNAVAILABLE, "$pluginId is not installed"))
+                // A call straight after a reinstall can run before the registry collector invalidates the old runtime.
+                runtimes[pluginId]
+                    ?.takeIf { it.plugin.installation != plugin.installation }
+                    ?.let { replaced ->
+                        runtimes.remove(pluginId)
+                        replaced.close()
+                    }
                 runtimes[pluginId] ?: run {
-                    val plugin =
-                        registry.state.value.plugin(pluginId)
-                            ?: throw PluginCallException(pluginId, PluginError(PluginErrorCode.UNAVAILABLE, "$pluginId is not installed"))
                     create(plugin).also { runtime ->
                         runtimes[pluginId] = runtime
                         scope.launch(Dispatchers.Default) { runtime.warmUp() }
