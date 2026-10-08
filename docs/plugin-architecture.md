@@ -93,6 +93,13 @@ even if a separate progressive video URL is present: the HLS source does not mer
 Treat this as picture unavailable and retain the recording and position through song fallback.
 An unused strict HLS backup does not restrict an accepted native SABR picture.
 
+Audio-only HLS parsing accepts omitted `CODECS` only for a trusted sound-only provider contract
+with no advertised video codecs, dimensions or video groups. A video-origin master still needs
+known audio-only codecs or independent `EXT-X-MEDIA:TYPE=AUDIO` URLs. Keep all eligible audio
+variants and independent renditions, including their groups, languages and default flags, so
+Media3 applies the listener's configured language selection. The playlist tracker uses an audio
+URL as its bootstrap anchor; filtered models contain no video playlist URLs.
+
 Prime each native rendition with Media3's initialization chunk before advertising it as
 selected. Subsequent media chunks reuse its initialization metadata and extractor. A server
 next-request backoff sets a monotonic deadline and resumes the existing period loader once;

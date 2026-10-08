@@ -26,6 +26,10 @@ internal class AudioOnlyHlsPlaylistParserFactory(
         previousMediaPlaylist: HlsMediaPlaylist?,
     ): ParsingLoadable.Parser<HlsPlaylist> = audioParser(delegate.createPlaylistParser(multivariantPlaylist, previousMediaPlaylist), true)
 
+    private fun advertisesVideo(variant: HlsMultivariantPlaylist.Variant): Boolean =
+        variant.videoGroupId != null || variant.format.width > 0 || variant.format.height > 0 ||
+            MimeTypes.getVideoMediaMimeType(variant.format.codecs) != null
+
     private fun audioParser(
         parser: ParsingLoadable.Parser<HlsPlaylist>,
         allowMedia: Boolean,
@@ -33,17 +37,47 @@ internal class AudioOnlyHlsPlaylistParserFactory(
         ParsingLoadable.Parser { uri, input ->
             when (val parsed = parser.parse(uri, input)) {
                 is HlsMultivariantPlaylist -> {
-                    val index =
-                        parsed.variants.indexOfFirst { variant ->
-                            MimeTypes.getVideoMediaMimeType(variant.format.codecs) == null &&
-                                MimeTypes.getAudioMediaMimeType(variant.format.codecs) != null
+                    val trustedUnknownAudio =
+                        allowInitialMediaPlaylist && parsed.videos.isEmpty() && parsed.variants.none(::advertisesVideo)
+                    val variants =
+                        parsed.variants.indices.filter { index ->
+                            val variant = parsed.variants[index]
+                            !advertisesVideo(variant) && (
+                                MimeTypes.getAudioMediaMimeType(variant.format.codecs) != null ||
+                                    (trustedUnknownAudio && variant.format.codecs.isNullOrBlank())
+                            )
                         }
-                    if (index >= 0) {
-                        parsed.copy(listOf(StreamKey(HlsMultivariantPlaylist.GROUP_INDEX_VARIANT, index)))
+                    val audioIndices = parsed.audios.indices.filter { parsed.audios[it].url != null }
+                    if (variants.isNotEmpty()) {
+                        parsed.copy(
+                            variants.map { StreamKey(HlsMultivariantPlaylist.GROUP_INDEX_VARIANT, it) } +
+                                audioIndices.map { StreamKey(HlsMultivariantPlaylist.GROUP_INDEX_AUDIO, it) },
+                        )
                     } else {
-                        parsed.audios.firstOrNull { it.url != null }?.url?.let { audio ->
-                            HlsMultivariantPlaylist.createSingleVariantMultivariantPlaylist(audio.toString())
-                        } ?: throw IOException("This HLS presentation has no independent audio rendition")
+                        val audios = audioIndices.map { parsed.audios[it] }
+                        val first = audios.firstOrNull() ?: throw IOException("This HLS presentation has no independent audio rendition")
+                        // Media3's tracker needs a primary variant to bootstrap a timeline. This
+                        // audio URI is only an anchor: all original renditions/flags remain available
+                        // for Media3's language/default selection, with no video URI in the model.
+                        val anchor =
+                            HlsMultivariantPlaylist.Variant
+                                .createMediaPlaylistVariantUrl(requireNotNull(first.url))
+                                .copyWithFormat(first.format)
+                        HlsMultivariantPlaylist(
+                            parsed.baseUri,
+                            parsed.tags,
+                            listOf(anchor),
+                            emptyList(),
+                            audios,
+                            emptyList(),
+                            emptyList(),
+                            null,
+                            emptyList(),
+                            parsed.hasIndependentSegments,
+                            parsed.variableDefinitions,
+                            parsed.sessionKeyDrmInitData,
+                            null,
+                        )
                     }
                 }
 
