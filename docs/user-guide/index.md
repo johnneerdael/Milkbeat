@@ -16,7 +16,7 @@ A music player for Android TV. Play your own files, network shares and streaming
 </div>
 
 <div class="mb-download" markdown>
-**Install on your TV with the Downloader app: code `7170062`**. Install *Downloader* by AFTVnews, enter the code and confirm. The code always points to the newest release. [More install options](getting-started.md#install-on-the-tv).
+**Install on your TV with the Downloader app: code `7170062`**. Install [*Downloader* by AFTVnews](https://play.google.com/store/apps/details?id=com.esaba.downloader&hl=en), enter the code and confirm. The code always points to the newest release. [More install options](getting-started.md#install-on-the-tv).
 </div>
 
 ## Use it
