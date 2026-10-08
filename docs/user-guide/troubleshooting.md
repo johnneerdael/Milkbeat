@@ -1,19 +1,17 @@
 # Troubleshooting
 
-[User guide](index.md)
-
-## Music Home is empty
+## A provider's tab is missing or empty
 
 A provider gets its own tab once its plugin is installed and enabled and you are signed in
 (YouTube Music needs no sign-in). If a provider's tab is missing, check Settings → Plugins. Local
 music is in the **Local library** tab once a music folder is linked, and in Library → Folders.
 When a provider's Home has nothing to show, select **Retry** to ask for it again.
 
-## Music Home says Couldn't load content
+## A music tab says Couldn't load content
 
 The message below the title is the provider's reason. A temporary failure, such as a dropped connection, a rate limit or a one-off server error, is retried automatically up to three times over about a minute, or later if the provider asks to wait. Select **Retry** to try again at once; the button reads **Trying again…** while it does. Other failures, such as a missing sign-in, are not retried automatically: press Left to reach the navigation rail and open Settings → Plugins.
 
-Automatic Home retries wait while you are on another screen or the app is in the background, then resume when you return to Music. This only pauses requests for the Home feed; music playback and queue preparation continue.
+Automatic retries wait while you are on another tab or screen, or the app is in the background, then resume when you return to that tab. This only pauses requests for the Home feed; music playback and queue preparation continue.
 
 ## An SMB test fails
 
@@ -52,11 +50,11 @@ Check that Android has mounted the drive, then select **Refresh** in Milkbeat's 
 
 ## Tags or covers are missing
 
-Give visible tracks time to load their embedded metadata. Check that the file actually contains readable tags/artwork and that the format is supported by the device. Refresh the source after changing files. The Folders browser caches metadata in memory; Local library maintains a persistent tag index.
+Give visible tracks time to load their embedded metadata. Check that the file actually contains readable tags/artwork and that the format is supported by the device. Refresh the source after changing files, and select **Rescan library** in Settings → Music folders so the Local library reads the new tags. The Folders browser caches metadata in memory; the Local library keeps a persistent tag index.
 
 ## A Spotify track cannot play
 
-Spotify is metadata-only. Enable at least one audio provider, check its account/subscription, and verify the priority order. Catalogs may not contain the same recording; an unavailable match can fall back to another provider. Temporary failures can be retried.
+Spotify has no audio of its own. Enable at least one audio provider, check its account/subscription, and verify the priority order. Catalogs may not contain the same recording; an unavailable match can fall back to another provider. Temporary failures can be retried.
 
 ## Music stops in the middle of a song
 
@@ -76,22 +74,29 @@ outside automatic stall detection.
 
 ## Provider sign-in needs verification
 
-Use the streamed phone sign-in viewer and complete the provider's verification there. The phone and TV must be on the same network. Do not expect a native Spotify password form in Milkbeat.
+Use the streamed phone sign-in viewer and complete the provider's verification there. The phone and TV must be on the same network for web sign-in; SoundCloud's TV code works from any network. Milkbeat has no native password form for these providers.
 
 ## Playlists or Liked songs are missing
 
-Check the provider is installed, enabled and signed in. Library merges eligible metadata providers; expired accounts need sign-in again. Refresh a failed section or retry its failed page. Liked videos are intentionally omitted.
+Check the provider is installed, enabled and signed in: Library shows a chip only for signed-in providers with a library, and **Playlists** combines every signed-in provider. Expired accounts need sign-in again. Refresh a failed section or retry its failed page. Liked videos are intentionally omitted.
 
-## Visuals are slow or black
+## Visuals are slow, black or do not react
 
-Enable diagnostics and note the preset, fps, target and render dimensions. Automatic resolution and preset skipping can adapt to load. Check the visualizer is enabled and the device supports OpenGL ES 3.0. Report persistent issues with the device model and app version; a screenshot alone cannot establish an fps improvement or regression.
+1. Check that **Enable visualizations** is on in Settings → Visualizations and that the now-playing view is the visualizer, not video or artwork.
+2. Show the controls and read the audio level above the seek bar. **No sound** while music plays means the visualizer is not receiving audio; pause and resume, or restart the track.
+3. Turn on **Show diagnostics** and note the preset, measured and target fps and the render size. Automatic resolution and preset skipping adapt to load; a still screenshot cannot show a frame-rate problem.
+4. To lighten the load, set **Detail** lower, **Transition style** to Lightweight or **Native trails** to Standard. Resolution and memory budgeting stay automatic.
+5. **Skip blank presets** and **Skip slow presets** leave presets that stay black or slow; **Reset skipped presets** brings them back if a skip was wrong.
 
-To lighten the load, set **Detail** lower, **Transition style** to Lightweight, or **Native trails** to Standard in Settings → Visualizations. Resolution and memory budgeting remain automatic. **Skip blank presets** and **Skip slow presets** leave presets that stay black or slow; **Reset skipped presets** brings them back if a skip was wrong.
+The device needs OpenGL ES 3.0. For engine-level symptoms, see ProjectM TV's [troubleshooting](https://johnneerdael.github.io/ProjectM-TV/troubleshooting/). Report persistent issues with the device model, the Milkbeat version and the diagnostics line.
 
-## A plugin update was not installed with an app update
+## A plugin did not update
 
-Enter the plugin's current download link again in Settings → Plugins and review the update. Plugin packages must retain their signing author. Sign-in data is managed separately from the plugin code.
+App updates do not update plugins. With **Update plugins automatically** on, Milkbeat checks at start and every six hours; an update that asks for new permissions waits until you review it in Settings → Plugins. Select **Update all plugins** to check at once, or enter the plugin's code or link again. An update must keep its signing author and cannot be older than the installed version. Sign-ins are kept separately from the plugin code.
 
+## Back leaves Settings instead of closing a page
+
+Inside Settings, sub-pages such as Audio priority, a plugin's details or a folder editor have their own **Done** or **Back** button. Use it, or select the category on the left again, to return to the category's first page. The remote's Back key leaves Settings for the previous screen.
 
 ## Private playlist preparation fails
 

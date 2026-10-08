@@ -1,6 +1,8 @@
 # Local and network folders
 
-[User guide](index.md)
+Milkbeat plays music from the TV's own storage, USB drives and network servers without any plugin or streaming account. Every source is read-only: Milkbeat never changes your files.
+
+![Settings → Music folders with the local, SMB, WebDAV, SFTP and NFS actions](images/settings-music-folders.png)
 
 ## Add a local or USB folder
 
@@ -16,11 +18,10 @@ If permission is denied, network folders and the rest of Milkbeat remain usable.
 
 A USB drive must be mounted by Android. Select **Refresh** after connecting a drive. Moving or disconnecting storage can make a saved source unavailable; reconnect it and refresh. Device firmware controls which mounts are accessible. Symbolic links that leave the selected folder or lead back to an ancestor are not followed. Multiple aliases of the same file or directory appear once.
 
-![Music folders settings with local folder, SMB, WebDAV, SFTP and NFS actions](images/settings-folders.png)
-
-![Milkbeat's native storage-device picker](images/local-folder-drives.png)
-
+<div class="mb-pair" markdown>
+![Milkbeat's own storage-device picker](images/local-folder-drives.png)
 ![The D-pad folder browser with Back, Refresh and Choose this folder](images/local-folder-selection.png)
+</div>
 
 ## Add an SMB share
 
@@ -37,11 +38,12 @@ Open Settings → Music folders → **Add SMB share**.
 | Username / Password | The account the server accepts when guest access is off |
 | Domain | Optional; use it only if your server requires one |
 
-![SMB source name, server, port, share and optional folder fields](images/smb-form.png)
+<div class="mb-pair" markdown>
+![SMB name, server, port, share and folder-within-share fields](images/smb-editor-server.png)
+![Guest access, username, domain, password, Test access, Save and Remove folder](images/smb-editor-access.png)
+</div>
 
-![Guest access, account fields, password visibility, Test access and Save](images/smb-access.png)
-
-Select **Test access**. When access is confirmed, select **Save**. Testing alone does not save the source. Milkbeat supports SMB 2/3 and reads files without modifying the share. The password field has a Show/Hide control; leaving an existing saved password unchanged keeps it.
+Select **Test access**. When access is confirmed, select **Save**. Testing alone does not save the source. Opening a saved source shows the same editor with **Back** at the top and **Remove folder** at the bottom. Milkbeat supports SMB 2/3 and reads files without modifying the share. The password field has a Show/Hide control; leaving an existing saved password unchanged keeps it.
 
 ## Add a WebDAV server
 
@@ -53,6 +55,8 @@ Open Settings → Music folders → **Add WebDAV server**. Nextcloud, ownCloud, 
 | Server URL | The full address of the music folder, such as `https://nas.local/webdav/Music` or `https://cloud.example.com/remote.php/dav/files/you/Music`. Do not put a username or password in the URL |
 | Anonymous access | Enable only when the server allows access without an account |
 | Username / Password | The account the server accepts when anonymous access is off |
+
+![The WebDAV editor: Name, Server URL, Anonymous access and Username](images/webdav-form.png)
 
 Milkbeat signs in with HTTP Basic authentication. With an `http://` address the username and password travel unencrypted, and the editor warns you; prefer `https://` unless the server is on a network you trust. Servers that require Digest authentication or use a self-signed certificate are not supported.
 
@@ -95,16 +99,26 @@ Network folders are read-only: Milkbeat never changes files on the server. Names
 
 ## Browse and play
 
-In Library → Folders, select a source, then a folder. **Parent folder** moves up within the source. Select a track to play it, or **Play folder** to queue music in the current folder. Playback does not require a metadata or audio plugin.
+There are two ways to play folder music:
 
-Embedded title, artist, album, duration and cover art load in the background for visible or playing tracks. MP3, FLAC and M4A have been tested; other formats depend on device codecs. Files without readable tags fall back to their filenames and source labels.
+- **Library → Folders** browses a source folder by folder. Select a source, then a folder; **Back to folders** returns to the list and **Refresh** reloads the listing. Select a track to play it, or **Play folder** to queue the music in the current folder.
+- The **[Local library](library.md#local-library)** tab organizes the same files by their tags into artists, releases, playlists, genres, labels and years.
+
+<div class="mb-pair" markdown>
+![Library → Folders listing an SMB source](images/library-folders.png)
+![A folder's tracks with Back to folders, Refresh and Play folder](images/folder-browse.png)
+</div>
+
+Embedded title, artist, album, duration and cover art load in the background for visible or playing tracks. MP3, FLAC and M4A have been tested, including seeking and embedded artwork; other formats depend on the device's codecs. Files without readable tags fall back to their filenames.
+
+Local audio always plays from its file. With an enabled YouTube Music plugin, Milkbeat matches the first queued song's title, artists and duration in the background only to seed [radio](playback.md#radio-and-its-presets); it never swaps the local file for a stream. Without the plugin, a connection or a match, the local queue still plays.
+
+## The local library index
+
+![Local library in Settings → Music folders with Rescan library and the saved DJ SMB share](images/settings-music-folders-library.png)
+
+The Local library keeps a persistent index of your folders' tags. A scan starts when you add, edit or remove a source, and when Milkbeat starts with an index more than six hours old; it reads only the files that changed. While it reads files, the tab shows **Indexing your music library** with a file count, and Android shows a **Scanning music folders** notification. **Rescan library** in Settings → Music folders starts a scan straight away, for example after retagging files on the server. The Folders browser itself uses a bounded in-memory cache.
 
 ## Refresh, edit or remove
 
-Use **Refresh** to reload a source's listing and metadata. Open the source in Settings → Music folders to edit or remove it. Removing the source removes Milkbeat's configuration and saved passwords or keys, not the music files on the storage device or server.
-
-The Folders browser uses a bounded metadata cache. The **Local library** tab also builds a persistent tag
-index for browsing artists, releases, playlists, genres, labels and years. Selecting a track there
-plays it alone; collection **Play** and **Shuffle** actions queue the collection. With an enabled
-YouTube Music plugin, [radio](playback.md#mixes) is seeded from the first queued song while local
-files keep playing from their original storage.
+Use **Refresh** in a folder to reload its listing and metadata. Open the source in Settings → Music folders to edit it, or select **Remove folder**. Removing a source deletes Milkbeat's configuration and its saved password or key, never the music on the device or server.

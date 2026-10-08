@@ -787,8 +787,14 @@ revision must pass the configured ktlint rules.
   `## Docs` reason, and **Validate release notes** (`release-notes.yml`) requires a factual
   `## Release notes` section. Both scripts live in `.github/scripts/` and can be run locally against
   a PR body before opening the PR.
-- Guide screenshots live in `docs/user-guide/images/`; all but one are 1920×1080, so downscale 4K
-  emulator captures to match (for example `sips -Z 1920 shot.png`).
+- The guide uses Material for MkDocs (`mkdocs-material` pinned with MkDocs in
+  `docs/site-requirements.txt`; palette and layout classes in `docs/user-guide/stylesheets/milkbeat.css`),
+  styled like the ProjectM TV guide. Visualizer pages give an overview and link to
+  <https://johnneerdael.github.io/ProjectM-TV/> for engine and setting depth. `docs/user-guide-site.md`
+  records the page conventions and screenshot provenance.
+- Guide screenshots live in `docs/user-guide/images/` at 1920×1080 (TV UI captures via
+  `adb exec-out screencap -p`); downscale 4K captures to match (for example `sips -Z 1920 shot.png`).
+  Blur account names, avatars and usernames before committing, and delete images no page references.
 
 ## Baseline profile — when to regenerate
 
