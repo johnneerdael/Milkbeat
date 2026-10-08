@@ -221,6 +221,10 @@ rendered through Milkbeat's TV interface, keeps its place while you visit anothe
 on that same provider. Milkbeat starts on the music tab you used last. Your audio providers handle
 playback independently.
 
+The YouTube Video plugin, offered in the Preview app, shares YouTube's tab. With YouTube Music also
+installed, that tab shows YouTube Music's catalog and YouTube Video's own catalog stays hidden; with
+only YouTube Video installed, the same YouTube tab shows YouTube Video's catalog.
+
 | YouTube Music | Spotify | Beatport |
 | --- | --- | --- |
 | ![YouTube Music Home](docs/user-guide/images/home-youtube.png) | ![Spotify Home](docs/user-guide/images/home-spotify.png) | ![Beatport Home](docs/user-guide/images/home-beatport.png) |
