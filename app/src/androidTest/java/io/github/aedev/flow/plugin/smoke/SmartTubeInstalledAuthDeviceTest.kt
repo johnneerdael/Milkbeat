@@ -77,10 +77,61 @@ class SmartTubeInstalledAuthDeviceTest {
                 val account = accounts.refresh(SmartTubeSmoke.PROVIDER)
                 assertTrue("Only the user's completed QR authorization permits signed-in proof", account is ProviderAccount.SignedIn)
                 val savedSelection = registry.state.value.selection
-                val home = host.call(SmartTubeSmoke.PROVIDER, PluginOperations.home, HomeRequest())
-                assertTrue("Signed-in Music home returned no catalog blocks", home.blocks.isNotEmpty())
-                catalogCounts("home", home, continuation = false)
-                for (section in listOf("liked", "playlists", "library")) {
+                if (SmartTubeSmoke.arguments.getString("smartTubeTvVersionAB") == "true") {
+                    SmartTubeTvVersionExperiment.attach(host).use { experiment ->
+                        for (pinned in listOf(false, true)) {
+                            experiment.pinned = pinned
+                            val profile = if (pinned) "PINNED" else "DYNAMIC"
+                            val seen = HashSet<nl.neerdael.milkbeat.catalog.EntityRef>()
+                            val page = host.call(SmartTubeSmoke.PROVIDER, PluginOperations.library, LibraryRequest("playlists"))
+                            catalogCounts(
+                                "playlists",
+                                page,
+                                false,
+                                experimentProfile = profile,
+                                newIdentityCount = newIdentities(page, seen),
+                            )
+                            var cursor = page.nextCursor
+                            repeat(2) {
+                                val requested = cursor ?: return@repeat
+                                val next =
+                                    host.call(
+                                        SmartTubeSmoke.PROVIDER,
+                                        PluginOperations.library,
+                                        LibraryRequest("playlists", requested),
+                                    )
+                                catalogCounts(
+                                    "playlists",
+                                    next,
+                                    true,
+                                    cursorChanged = next.nextCursor != requested,
+                                    experimentProfile = profile,
+                                    newIdentityCount = newIdentities(next, seen),
+                                )
+                                cursor = next.nextCursor
+                            }
+                        }
+                        assertTrue("Controlled comparison observed no actual native browse requests", experiment.requestCount > 0)
+                    }
+                    assertEquals("Profile experiment changed the accepted account", account, accounts.refresh(SmartTubeSmoke.PROVIDER))
+                    assertEquals("Profile experiment changed provider selection", savedSelection, registry.state.value.selection)
+                    SmartTubeSmoke.report(
+                        "SIGNED_TV_VERSION_AB_PASS",
+                        mapOf(
+                            "nativeProof" to true,
+                            "accountSignedIn" to true,
+                            "playbackProof" to false,
+                        ),
+                    )
+                    return@sanitized
+                }
+                val playlistsOnly = SmartTubeSmoke.arguments.getString("smartTubePlaylistPaginationOnly") == "true"
+                if (!playlistsOnly) {
+                    val home = host.call(SmartTubeSmoke.PROVIDER, PluginOperations.home, HomeRequest())
+                    assertTrue("Signed-in Music home returned no catalog blocks", home.blocks.isNotEmpty())
+                    catalogCounts("home", home, continuation = false)
+                }
+                for (section in if (playlistsOnly) listOf("playlists") else listOf("liked", "playlists", "library")) {
                     val page = host.call(SmartTubeSmoke.PROVIDER, PluginOperations.library, LibraryRequest(section))
                     assertEquals(
                         setOf("liked", "playlists", "library"),
@@ -90,15 +141,28 @@ class SmartTubeInstalledAuthDeviceTest {
                             ?.toSet(),
                     )
                     catalogCounts(section, page, continuation = false)
-                    page.nextCursor?.let { cursor ->
-                        val next = host.call(SmartTubeSmoke.PROVIDER, PluginOperations.library, LibraryRequest(section, cursor))
-                        catalogCounts(section, next, continuation = true)
+                    val requestedCursors = HashSet<String>()
+                    var cursor = page.nextCursor
+                    repeat(if (playlistsOnly) 4 else 1) {
+                        val requested = cursor ?: return@repeat
+                        assertTrue("Repeated playlist cursor refused before another request", requestedCursors.add(requested))
+                        val next = host.call(SmartTubeSmoke.PROVIDER, PluginOperations.library, LibraryRequest(section, requested))
+                        val duplicate = next.nextCursor?.let { it in requestedCursors } == true
+                        catalogCounts(
+                            section,
+                            next,
+                            continuation = true,
+                            cursorChanged = next.nextCursor != requested,
+                            duplicateCursor = duplicate,
+                        )
+                        assertTrue("Playlist continuation returned a repeated cursor", !duplicate)
+                        cursor = next.nextCursor
                     }
                     assertEquals("Signed-in catalog work changed the accepted account", account, accounts.refresh(SmartTubeSmoke.PROVIDER))
                 }
                 assertEquals("Read-only library proof changed the provider selection", savedSelection, registry.state.value.selection)
                 SmartTubeSmoke.report(
-                    "SIGNED_MUSIC_LIBRARY_PASS",
+                    if (playlistsOnly) "SIGNED_PLAYLIST_PAGINATION_PASS" else "SIGNED_MUSIC_LIBRARY_PASS",
                     mapOf("nativeProof" to true, "accountSignedIn" to true, "playbackProof" to false),
                 )
             }
@@ -108,6 +172,10 @@ class SmartTubeInstalledAuthDeviceTest {
         section: String,
         page: MetadataPage,
         continuation: Boolean,
+        cursorChanged: Boolean? = null,
+        duplicateCursor: Boolean? = null,
+        experimentProfile: String? = null,
+        newIdentityCount: Int? = null,
     ) = SmartTubeSmoke.report(
         "SIGNED_CATALOG_COUNTS",
         mapOf(
@@ -116,8 +184,17 @@ class SmartTubeInstalledAuthDeviceTest {
             "itemCount" to page.blocks.filterIsInstance<CollectionBlock>().sumOf { it.items.size },
             "continuation" to continuation,
             "hasContinuation" to (page.nextCursor != null),
+            "cursorChanged" to cursorChanged,
+            "duplicateCursor" to duplicateCursor,
+            "experimentProfile" to experimentProfile,
+            "newIdentityCount" to newIdentityCount,
         ),
     )
+
+    private fun newIdentities(
+        page: MetadataPage,
+        seen: MutableSet<nl.neerdael.milkbeat.catalog.EntityRef>,
+    ): Int = page.blocks.filterIsInstance<CollectionBlock>().sumOf { block -> block.items.count { seen.add(it.entity) } }
 
     @Test
     fun actualSignedChallengeDestinationsAreGrantedToTheProductionPairingUi(): Unit =
