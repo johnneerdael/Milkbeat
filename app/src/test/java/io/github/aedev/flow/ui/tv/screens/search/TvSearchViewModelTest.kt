@@ -379,6 +379,25 @@ class TvSearchViewModelTest {
         }
 
     @Test
+    fun `a music chip that goes away takes its typeahead with it`() =
+        runTest(dispatcher) {
+            music.typeahead = { Result.success(Suggestions(listOf("$it spotify"))) }
+            val vm = viewModel()
+            vm.showSource(MUSIC)
+            vm.showSource(TvSearchSource.Videos)
+            vm.onQueryChange("cafe")
+            advanceUntilIdle()
+            assertThat(vm.state.value.musicSuggestions).containsExactly("cafe spotify")
+
+            vm.retainSources(setOf(TvSearchSource.Videos.key))
+            vm.onQueryChange("cafe del")
+            advanceUntilIdle()
+
+            assertThat(vm.state.value.musicSuggestions).isEmpty()
+            assertThat(music.suggests).containsExactly("cafe")
+        }
+
+    @Test
     fun `typeahead asks the music chip shown last and the video plugin`() =
         runTest(dispatcher) {
             val vm = viewModel()

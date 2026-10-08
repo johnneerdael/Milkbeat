@@ -9,6 +9,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -69,6 +70,18 @@ class TvAccountLibraryViewModelTest {
     fun tearDown() {
         Dispatchers.resetMain()
     }
+
+    @Test
+    fun `an updated plugin is another library identity, though the account stays the same`() =
+        runTest(dispatcher) {
+            val installation = MutableStateFlow<Any?>(1L to 1)
+            val vm = TvAccountLibraryViewModel(provider, installation)
+            val before = vm.accountIdentity.first()
+
+            installation.value = 2L to 2
+
+            assertThat(vm.accountIdentity.first()).isNotEqualTo(before)
+        }
 
     @Test
     fun `a section asks the plugin for its library section and extends it with the pages that follow`() =

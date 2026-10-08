@@ -19,7 +19,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.MusicNote
@@ -201,19 +203,26 @@ fun TvNavRail(
             }
             Spacer(Modifier.height(8.dp))
             val focusTab = railFocusTab(items.map { it.tab }, selected)
-            items.forEach { item ->
-                TvRailEntry(
-                    item = item,
-                    selected = item.tab == selected,
-                    expanded = expanded,
-                    onClick = { onSelected(item.tab) },
-                    modifier =
-                        if (item.tab == focusTab && selectedFocusRequester != null) {
-                            Modifier.focusRequester(selectedFocusRequester)
-                        } else {
-                            Modifier
-                        },
-                )
+            // Up to five music tabs and the fixed ones overflow a 540dp screen; they scroll under the logo, and
+            // all stay composed so the selected entry can always take focus.
+            Column(
+                modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                items.forEach { item ->
+                    TvRailEntry(
+                        item = item,
+                        selected = item.tab == selected,
+                        expanded = expanded,
+                        onClick = { onSelected(item.tab) },
+                        modifier =
+                            if (item.tab == focusTab && selectedFocusRequester != null) {
+                                Modifier.focusRequester(selectedFocusRequester)
+                            } else {
+                                Modifier
+                            },
+                    )
+                }
             }
         }
     }

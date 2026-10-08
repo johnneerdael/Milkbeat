@@ -126,9 +126,15 @@ class TvSearchViewModel internal constructor(
 
     /**
      * Forgets the chips not among [keys]: a provider whose tab went away (sign-out, disabled, removed)
-     * may come back with another account, so its old answer must not satisfy the same query again.
+     * may come back with another account, so its old answer must not satisfy the same query again, and
+     * it no longer answers typeahead.
      */
     fun retainSources(keys: Set<String>) {
+        if (lastMusic?.key?.let { it !in keys } == true) {
+            lastMusic = null
+            musicSuggestJob?.cancel()
+            _state.update { it.copy(musicSuggestions = emptyList()) }
+        }
         val gone = _state.value.results.keys - keys
         if (gone.isEmpty()) return
         gone.forEach { key ->

@@ -26,9 +26,11 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -46,12 +48,13 @@ import nl.neerdael.milkbeat.plugin.PluginOperations
 class TvAccountLibraryViewModel
     internal constructor(
         private val provider: ScopedPluginCatalog,
+        installation: Flow<Any?> = flowOf(null),
     ) : ViewModel() {
         @AssistedInject
         constructor(
             @Assisted pluginId: String,
             plugins: PluginMetadataProvider,
-        ) : this(plugins.scoped(pluginId))
+        ) : this(plugins.scoped(pluginId), plugins.installationOf(pluginId))
 
         @AssistedFactory
         interface Factory {
@@ -66,7 +69,10 @@ class TvAccountLibraryViewModel
         private val tabState = MutableStateFlow(libraryTabs(null))
         internal val tabs: StateFlow<List<TvAccountLibraryTab>> = tabState.asStateFlow()
 
-        val accountIdentity: Flow<String> = provider.account.map { "${provider.id}:${it.key.orEmpty()}" }.distinctUntilChanged()
+        /** The account and the installation answering for it: an in-place plugin update reads the library afresh. */
+        val accountIdentity: Flow<String> =
+            combine(provider.account, installation) { account, installed -> "${provider.id}:${account.key.orEmpty()}:$installed" }
+                .distinctUntilChanged()
 
         fun accountChanged(identity: String) {
             if (activeIdentity == identity) return
