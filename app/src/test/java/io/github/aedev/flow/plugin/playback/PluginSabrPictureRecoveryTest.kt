@@ -194,7 +194,7 @@ class PluginSabrPictureRecoveryTest : PluginAudioFixture() {
             every { service.connectivityObserver.checkCurrentConnectivity() } returns false
             val error =
                 nl.neerdael.milkbeat.sabr.SabrPlaybackException
-                    .noProgress(native.url, java.net.UnknownHostException("fixture"))
+                    .noProgress(native.url, java.io.EOFException("truncated fixture"))
             service.handlePlayerError(PlaybackException("fixture", error, PlaybackException.ERROR_CODE_IO_UNSPECIFIED), 0)
             assertThat(service.waitingForNetwork).isTrue()
             assertThat(service.pendingNetworkRetry!!.mediaId).isEqualTo(mediaId)

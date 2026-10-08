@@ -49,6 +49,24 @@ public class SabrContainerExtractorTest {
         extract(extractor,packet,first);
         assertFalse(first.times.isEmpty()); assertEquals(6000,stream.getSegmentStartTimeMs(137));
     }
+    @Test public void bothContainersPreserveInterruptedTransportReads() throws Exception {
+        for (boolean webm : new boolean[]{false, true}) {
+            for (IOException failure : new IOException[]{new java.net.SocketTimeoutException("timeout"), new java.net.SocketException("reset")}) {
+                int itag=webm?251:137;SabrStream stream=stream(itag);
+                Extractor extractor=webm?new SabrMatroskaAdapter(SabrMatroskaAdapter.FLAG_DISABLE_SEEK_FOR_CUES,stream):new SabrFragmentedMp4Adapter(stream);
+                byte[] packet=framed(fixture(webm?"audio.webm":"fragmented.mp4"),itag,webm?"audio/webm":"video/mp4");
+                ByteArrayInputStream bytes=new ByteArrayInputStream(packet);int[] consumed={0};
+                DefaultExtractorInput input=new DefaultExtractorInput((target,offset,length)->{
+                    if(consumed[0]>=100)throw failure;
+                    int count=bytes.read(target,offset,Math.min(length,Math.min(7,100-consumed[0])));consumed[0]+=count;return count;
+                },0,packet.length);
+                extractor.init(new Samples());PositionHolder position=new PositionHolder();
+                try {for(int n=0;n<20000;n++)if(extractor.read(input,position)==Extractor.RESULT_END_OF_INPUT)break;fail("transport must fail");}
+                catch(IOException actual){assertSame(failure,actual);}
+                finally{extractor.release();}
+            }
+        }
+    }
     private static SabrStream stream(int itag) {
         SabrStream stream = new SabrStream("https://fixture", "", StreamerContext.ClientInfo.getDefaultInstance(),-1,-1,0,null,false,"fixture",6000);
         stream.setFormatSelector(new FormatSelector("fixture",false,FormatId.newBuilder().setItag(itag).build())); return stream;
