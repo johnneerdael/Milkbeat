@@ -1,6 +1,7 @@
 package nl.neerdael.milkbeat.sabr.parser.misc;
 
 import androidx.media3.common.C;
+import androidx.media3.extractor.DefaultExtractorInput;
 import androidx.media3.extractor.ExtractorInput;
 import nl.neerdael.milkbeat.sabr.parser.SabrStream;
 import nl.neerdael.milkbeat.sabr.parser.parts.MediaSegmentDataSabrPart;
@@ -8,337 +9,88 @@ import nl.neerdael.milkbeat.sabr.parser.parts.SabrPart;
 import nl.neerdael.milkbeat.sabr.SabrPlaybackException;
 import nl.neerdael.milkbeat.sabr.parser.parts.PoTokenStatusSabrPart;
 import nl.neerdael.milkbeat.sabr.parser.parts.RefreshPlayerResponseSabrPart;
-
 import java.io.EOFException;
 import java.io.IOException;
 
+/** Demultiplex UMP media bytes; Media3 owns buffering, peeking and exact-read semantics. */
 public final class SabrExtractorInput implements ExtractorInput {
-    @Override
-    public int peek(byte[] target, int offset, int length) {
-        throwShouldNotBeCalled();
-        return 0;
-    }
-    private static final String TAG = SabrExtractorInput.class.getSimpleName();
-    private static final boolean ALLOW_END_OF_INPUT = true;
     private final SabrStream sabrStream;
     private ExtractorInput input;
-    private long position;
-    private long startPosition;
-    private int remaining;
+    private DefaultExtractorInput mediaInput;
     private MediaSegmentDataSabrPart data;
+    private int remaining;
     private boolean receivedMedia;
 
-    public SabrExtractorInput(SabrStream sabrStream) {
-        this.sabrStream = sabrStream;
-    }
+    public SabrExtractorInput(SabrStream sabrStream) { this.sabrStream = sabrStream; }
 
-    /** Should be called before passing the extractor to a handler */
     public void init(ExtractorInput input) {
-        if (this.input == input) {
-            return;
-        }
-
-        if (this.input != null) {
-            //throw new IllegalStateException("The input should be disposed before initializing");
-        }
-
+        if (this.input == input) return;
         this.input = input;
+        data = null;
+        remaining = 0;
         receivedMedia = false;
-        position = input.getPosition();
-        startPosition = position;
-        remaining = C.LENGTH_UNSET;
+        // The container position is independent of protocol/control bytes and physical UMP offsets.
+        mediaInput = new DefaultExtractorInput(this::readMedia, 0, C.LENGTH_UNSET);
     }
 
     public void dispose() {
-        if (data != null) {
-            if (getAdvance() != data.contentLength) {
-                //throw new IllegalStateException("The SABR read isn't finished yet");
-            }
-        }
-
-        startPosition = 0;
         input = null;
+        mediaInput = null;
         data = null;
-        position = C.POSITION_UNSET;
-        remaining = C.LENGTH_UNSET;
+        remaining = 0;
     }
 
-    @Override
-    public int read(byte[] buffer, int offset, int length) throws IOException {
-        return forward(length, newLength -> data.data.read(buffer, offset, newLength));
-    }
-
-    @Override
-    public void readFully(byte[] buffer, int offset, int length) throws IOException {
-        readFully(buffer, offset, length, false);
-    }
-
-    @Override
-    public boolean readFully(
-            byte[] buffer,
-            int offset,
-            int length,
-            boolean allowEndOfInput) throws IOException {
-        return forwardFully(length,
-                (total, newLength) -> data.data.readFully(buffer, offset + total, newLength, ALLOW_END_OF_INPUT)
-        );
-    }
-
-    @Override
-    public int skip(int length) throws IOException {
-        return forward(length, newLength -> data.data.skip(newLength));
-    }
-
-    @Override
-    public void skipFully(int length) throws IOException {
-        skipFully(length, false);
-    }
-
-    @Override
-    public boolean skipFully(
-            int length,
-            boolean allowEndOfInput) throws IOException {
-        return forwardFully(length,
-                (total, newLength) -> data.data.skipFully(newLength, ALLOW_END_OF_INPUT));
-    }
-
-    @Override
-    public long getPosition() {
-        return getPositionInt();
-    }
-
-    @Override
-    public long getLength() {
-        return remaining;
-    }
-
-    @Override
-    public <E extends Throwable> void setRetryPosition(long p, E e) throws E {
-        throwShouldNotBeCalled();
-    }
-
-    @Override
-    public boolean peekFully(
-            byte[] target,
-            int offset,
-            int length,
-            boolean allowEndOfInput) {
-        throwShouldNotBeCalled();
-        return false;
-    }
-
-    @Override
-    public void peekFully(
-            byte[] target,
-            int offset,
-            int length) {
-        throwShouldNotBeCalled();
-    }
-
-    @Override
-    public boolean advancePeekPosition(
-            int length,
-            boolean allowEndOfInput) {
-        throwShouldNotBeCalled();
-        return false;
-    }
-
-    @Override
-    public void advancePeekPosition(int length) {
-        throwShouldNotBeCalled();
-    }
-
-    @Override
-    public void resetPeekPosition() {
-        throwShouldNotBeCalled();
-    }
-
-    @Override
-    public long getPeekPosition() {
-        throwShouldNotBeCalled();
-        return -1;
-    }
-
-    private void fetchData() throws IOException {
-        while (true) {
-            if (data != null) {
-                long advance = getAdvance();
-                int length = data.contentLength;
-                if (advance < length) {
-                    break;
-                } else if (advance == length) {
-                    data = null;
-                } else {
-                    throwChunkBoundaryExceeded();
+    private int readMedia(byte[] target, int offset, int length) throws IOException {
+        if (length == 0) return 0;
+        while (remaining == 0) {
+            data = null;
+            SabrPart part;
+            try { part = sabrStream.parse(input); }
+            catch (RuntimeException error) { throw SabrPlaybackException.noProgress(sabrStream.getUrl(), error); }
+            if (part == null) {
+                if (!receivedMedia || sabrStream.hasPendingSegments()) {
+                    throw new SabrPlaybackException(SabrPlaybackException.Reason.NO_PROGRESS, sabrStream.getUrl(), null);
                 }
+                return C.RESULT_END_OF_INPUT;
             }
-
-            SabrPart sabrPart;
-            try {
-                sabrPart = sabrStream.parse(input);
-            } catch (RuntimeException e) {
-                throw new IOException("Malformed SABR response", e);
-            }
-
-            if (sabrPart == null) {
-                if (!receivedMedia) throw new SabrPlaybackException(SabrPlaybackException.Reason.NO_PROGRESS, sabrStream.getUrl(), null);
-                break;
-            }
-
-            if (sabrPart instanceof PoTokenStatusSabrPart) {
-                PoTokenStatusSabrPart.PoTokenStatus status = ((PoTokenStatusSabrPart) sabrPart).status;
-                if (status == PoTokenStatusSabrPart.PoTokenStatus.MISSING || status == PoTokenStatusSabrPart.PoTokenStatus.INVALID) {
+            if (part instanceof PoTokenStatusSabrPart) {
+                PoTokenStatusSabrPart.PoTokenStatus status = ((PoTokenStatusSabrPart) part).status;
+                if (status == PoTokenStatusSabrPart.PoTokenStatus.MISSING || status == PoTokenStatusSabrPart.PoTokenStatus.INVALID)
                     throw new SabrPlaybackException(SabrPlaybackException.Reason.ATTESTATION_REQUIRED, sabrStream.getUrl(), null);
-                }
-            } else if (sabrPart instanceof RefreshPlayerResponseSabrPart) {
-                RefreshPlayerResponseSabrPart refresh = (RefreshPlayerResponseSabrPart) sabrPart;
+            } else if (part instanceof RefreshPlayerResponseSabrPart) {
+                RefreshPlayerResponseSabrPart refresh = (RefreshPlayerResponseSabrPart) part;
                 SabrPlaybackException.Reason reason = refresh.reason == RefreshPlayerResponseSabrPart.Reason.SABR_URL_EXPIRY
                         ? SabrPlaybackException.Reason.URL_EXPIRED : SabrPlaybackException.Reason.PLAYBACK_CONTEXT_RELOAD;
                 throw new SabrPlaybackException(reason, sabrStream.getUrl(), refresh.reloadPlaybackToken);
-            }
-
-            // Debug
-            //if (sabrPart instanceof MediaSegmentDataSabrPart) {
-            //    MediaSegmentDataSabrPart data = (MediaSegmentDataSabrPart) sabrPart;
-            //    Log.e(TAG, "Consumed contentLength: " + data.contentLength);
-            //    data.data.skipFully(data.contentLength);
-            //    continue;
-            //}
-
-            if (sabrPart instanceof MediaSegmentDataSabrPart) {
-                data = (MediaSegmentDataSabrPart) sabrPart;
-                if (data.contentLength == 0) { data = null; continue; }
-                receivedMedia = true;
-                startPosition = position;
-                break;
+            } else if (part instanceof MediaSegmentDataSabrPart) {
+                data = (MediaSegmentDataSabrPart) part;
+                remaining = data.contentLength;
+                if (remaining < 0) throw new IOException("Negative SABR media length");
+                if (remaining > 0) receivedMedia = true;
             }
         }
+        int count;
+        try { count = data.data.read(target, offset, Math.min(length, remaining)); }
+        catch (IOException error) { throw SabrPlaybackException.noProgress(sabrStream.getUrl(), error); }
+        if (count == C.RESULT_END_OF_INPUT) throw SabrPlaybackException.noProgress(sabrStream.getUrl(), new EOFException("Truncated SABR media payload"));
+        remaining -= count;
+        return count;
     }
 
-    private interface ForwardCallback {
-        int forward(int newLength) throws IOException;
-    }
-
-    private int forward(int length, ForwardCallback callback) throws IOException {
-        if (remaining == 0) {
-            return C.RESULT_END_OF_INPUT;
-        }
-
-        if (remaining != C.LENGTH_UNSET) {
-            length = Math.min(length, remaining);
-        }
-
-        int result = forwardReal(length, callback);
-
-        if (remaining != C.LENGTH_UNSET && result > 0) {
-            remaining -= result;
-        }
-
-        return result;
-    }
-
-    private int forwardReal(int length, ForwardCallback callback) throws IOException {
-        int result = C.RESULT_END_OF_INPUT;
-
-        fetchData();
-
-        if (data == null) {
-            return result;
-        }
-
-        int newLength = Math.min(getRemaining(), length);
-        result = callback.forward(newLength);
-
-        if (result > 0) {
-            position += result;
-        }
-
-        return result;
-    }
-
-    private interface ForwardFullyCallback {
-        boolean forwardFully(int total, int newLength) throws IOException;
-    }
-
-    private boolean forwardFully(int length, ForwardFullyCallback callback) throws IOException {
-        boolean exceeded = remaining != C.LENGTH_UNSET && length > remaining;
-
-        if (exceeded) {
-            throwChunkBoundaryExceeded();
-        }
-
-        if (remaining != C.LENGTH_UNSET) {
-            length = Math.min(length, remaining);
-        }
-
-        boolean result = forwardFullyReal(length, callback);
-
-        if (remaining != C.LENGTH_UNSET) {
-            remaining -= length;
-        }
-
-        return result;
-    }
-
-    private boolean forwardFullyReal(int length, ForwardFullyCallback callback) throws IOException {
-        boolean result = false;
-        int total = 0;
-
-        while (true) {
-            fetchData();
-
-            if (data == null) {
-                if (total > 0) {
-                    throwEOFException();
-                }
-
-                break;
-            }
-
-            int newLength = Math.min(getRemaining(), length - total);
-            result = callback.forwardFully(total, newLength);
-
-            if (!result) {
-                throwEOFException();
-            }
-
-            position += newLength;
-
-            if (newLength == length - total) {
-                break;
-            }
-
-            total += newLength;
-
-        }
-
-        return result;
-    }
-
-    private long getPositionInt() {
-        return position;
-    }
-
-    private int getRemaining() {
-        return data.contentLength - (int) getAdvance();
-    }
-
-    private long getAdvance() {
-        return position - startPosition;
-    }
-
-    private static void throwEOFException() throws EOFException {
-        String msg = "EOF should never happened when reading SABR part";
-        throw new EOFException(msg);
-    }
-
-    private static void throwShouldNotBeCalled() {
-        String msg = "The peek methods shouldn't be called in SABR extractor";
-        throw new UnsupportedOperationException(msg);
-    }
-
-    private static void throwChunkBoundaryExceeded() {
-        String msg = "SABR chunk boundary exceeded";
-        throw new IllegalStateException(msg);
-    }
+    @Override public int read(byte[] target, int offset, int length) throws IOException { return mediaInput.read(target, offset, length); }
+    @Override public boolean readFully(byte[] target, int offset, int length, boolean allowEnd) throws IOException { return mediaInput.readFully(target, offset, length, allowEnd); }
+    @Override public void readFully(byte[] target, int offset, int length) throws IOException { mediaInput.readFully(target, offset, length); }
+    @Override public int skip(int length) throws IOException { return mediaInput.skip(length); }
+    @Override public boolean skipFully(int length, boolean allowEnd) throws IOException { return mediaInput.skipFully(length, allowEnd); }
+    @Override public void skipFully(int length) throws IOException { mediaInput.skipFully(length); }
+    @Override public int peek(byte[] target, int offset, int length) throws IOException { return mediaInput.peek(target, offset, length); }
+    @Override public boolean peekFully(byte[] target, int offset, int length, boolean allowEnd) throws IOException { return mediaInput.peekFully(target, offset, length, allowEnd); }
+    @Override public void peekFully(byte[] target, int offset, int length) throws IOException { mediaInput.peekFully(target, offset, length); }
+    @Override public boolean advancePeekPosition(int length, boolean allowEnd) throws IOException { return mediaInput.advancePeekPosition(length, allowEnd); }
+    @Override public void advancePeekPosition(int length) throws IOException { mediaInput.advancePeekPosition(length); }
+    @Override public void resetPeekPosition() { mediaInput.resetPeekPosition(); }
+    @Override public long getPeekPosition() { return mediaInput.getPeekPosition(); }
+    @Override public long getPosition() { return mediaInput.getPosition(); }
+    @Override public long getLength() { return mediaInput.getLength(); }
+    @Override public <E extends Throwable> void setRetryPosition(long position, E error) throws E { mediaInput.setRetryPosition(position, error); }
 }

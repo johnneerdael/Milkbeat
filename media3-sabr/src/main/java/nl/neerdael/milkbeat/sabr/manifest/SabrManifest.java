@@ -90,6 +90,24 @@ public class SabrManifest implements FilterableManifest<SabrManifest> {
     private final ClientInfo clientInfo;
     private final Map<Integer, SabrStream> sabrStreams;
     private int sabrRequestNumber = -1;
+    private Runnable liveMetadataListener;
+
+    public synchronized void setLiveMetadataListener(Runnable listener) {
+        liveMetadataListener = listener;
+        for (SabrStream stream : sabrStreams.values()) stream.setLiveMetadataListener(listener);
+    }
+
+    public synchronized long getLiveWindowStartMs() {
+        long start = -1;
+        for (SabrStream stream : sabrStreams.values()) start = Math.max(start, stream.getLiveWindowStartMs());
+        return start;
+    }
+
+    public synchronized long getLiveWindowEndMs() {
+        long end = -1;
+        for (SabrStream stream : sabrStreams.values()) end = Math.max(end, stream.getLiveWindowEndMs());
+        return end;
+    }
     private final FormatSelector emptySelector;
 
     public SabrManifest(
@@ -172,6 +190,8 @@ public class SabrManifest implements FilterableManifest<SabrManifest> {
         return null;
     }
 
+    public final String getPlaybackUri() { return cdnSelector.getCurrentUrl(); }
+
     public final String getVideoId() {
         return videoId;
     }
@@ -196,6 +216,8 @@ public class SabrManifest implements FilterableManifest<SabrManifest> {
                 durationMs
         );
 
+        sabrStream.setLiveMetadataListener(liveMetadataListener);
+        sabrStream.setLive(dynamic);
         sabrStreams.put(trackType, sabrStream);
 
         return sabrStream;
@@ -256,6 +278,7 @@ public class SabrManifest implements FilterableManifest<SabrManifest> {
         long startTimeMs = isInit ? 0 : seekTimeUs != C.TIME_UNSET
                 ? seekTimeUs / 1_000 : activeStream.getSegmentStartTimeMs(formatId != null ? formatId.getItag() : -1);
 
+        activeStream.setPlayerTimeMs(startTimeMs);
         ClientAbrState.Builder clientAbrStateBuilder = ClientAbrState.newBuilder()
                 .setSabrForceMaxNetworkInterruptionDurationMs(0)
                 .setPlaybackRate(1)
@@ -355,6 +378,7 @@ public class SabrManifest implements FilterableManifest<SabrManifest> {
             int activeFormatKey = activeFormat.getItag();
             boolean shouldDiscard = currentFormatKey != activeFormatKey;
             MediaHeader initializedFormat = getInitializedFormat(activeFormatKey);
+            if (initializedFormat != null && !activeFormat.equals(initializedFormat.getFormatId())) initializedFormat = null;
 
             BufferedRange bufferedRange = shouldDiscard ? createFullBufferRange(activeFormat) : createPartialBufferRange(initializedFormat);
 
@@ -428,18 +452,19 @@ public class SabrManifest implements FilterableManifest<SabrManifest> {
 
         int sequenceNumber = initializedFormat.hasSequenceNumber() ? initializedFormat.getSequenceNumber() : 1;
         TimeRange timeRange = initializedFormat.hasTimeRange() ? initializedFormat.getTimeRange() : null;
-        int timeScale = timeRange != null && timeRange.hasTimescale() ? timeRange.getTimescale() : 1_000;
+        // Header start/duration are normalized to milliseconds by SabrProcessor.
+        int timeScale = 1_000;
         long startMs = initializedFormat.hasStartMs() ? initializedFormat.getStartMs() : 0;
         long durationMs = initializedFormat.hasDurationMs() ? initializedFormat.getDurationMs() : 0;
         return BufferedRange.newBuilder()
                 .setFormatId(initializedFormat.getFormatId())
                 .setStartSegmentIndex(sequenceNumber) // should be the real start position
                 .setEndSegmentIndex(sequenceNumber) // should be the real start position
-                .setStartTimeMs(0) // not used
+                .setStartTimeMs(startMs)
                 .setDurationMs(durationMs)
                 .setTimeRange(TimeRange.newBuilder()
                         .setTimescale(timeScale)
-                        .setStartTicks(0) // not used
+                        .setStartTicks(startMs)
                         .setDurationTicks(durationMs)
                         .build())
                 .build();

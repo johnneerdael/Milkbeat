@@ -45,6 +45,7 @@ import androidx.media3.common.MimeTypes;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -101,7 +102,6 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
 
     private static final String TAG = DefaultSabrChunkSource.class.getSimpleName();
     private static final long END_OF_STREAM_SEEK_TOLERANCE_US = 500_000L; // 0.5 seconds
-    private static final long NEAR_END_TOLERANCE_US = 700_000L; // 0.7 seconds
     private final LoaderErrorThrower manifestLoaderErrorThrower;
     private final int[] adaptationSetIndices;
     private final int trackType;
@@ -110,7 +110,10 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
     private final int maxSegmentsPerLoad;
     @Nullable private final PlayerTrackEmsgHandler playerTrackEmsgHandler;
 
-    protected final RepresentationHolder[] representationHolders;
+    protected RepresentationHolder[] representationHolders;
+    private final List<RepresentationHolder> retiredHolders = new ArrayList<>();
+    private final boolean enableEventMessageTrack;
+    private final List<Format> closedCaptionFormats;
 
     private ExoTrackSelection trackSelection;
     private FormatSelector formatSelector;
@@ -118,6 +121,7 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
     private int periodIndex;
     private IOException fatalError;
     private boolean missingLastSegment;
+    private boolean released;
     private long liveEdgeTimeUs;
 
     @Nullable private final SabrStream sabrStream;
@@ -167,6 +171,8 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
         this.elapsedRealtimeOffsetMs = elapsedRealtimeOffsetMs;
         this.maxSegmentsPerLoad = maxSegmentsPerLoad;
         this.playerTrackEmsgHandler = playerTrackEmsgHandler;
+        this.enableEventMessageTrack = enableEventMessageTrack;
+        this.closedCaptionFormats = closedCaptionFormats;
 
         long periodDurationUs = manifest.getPeriodDurationUs(periodIndex);
         liveEdgeTimeUs = C.TIME_UNSET;
@@ -217,11 +223,51 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
     @Override
     public void updateTrackSelection(ExoTrackSelection trackSelection) {
         this.trackSelection = trackSelection;
-        this.formatSelector = createFormatSelector(trackType, trackSelection);
+        List<Representation> representations = getRepresentations();
+        RepresentationHolder[] previous = representationHolders;
+        representationHolders = new RepresentationHolder[trackSelection.length()];
+        for (int i = 0; i < representationHolders.length; i++) {
+            Representation representation = representations.get(trackSelection.getIndexInTrackGroup(i));
+            for (RepresentationHolder holder : previous) {
+                if (holder.representation == representation) representationHolders[i] = holder;
+            }
+            if (representationHolders[i] == null) {
+                for (int retired = 0; retired < retiredHolders.size(); retired++) {
+                    RepresentationHolder holder = retiredHolders.get(retired);
+                    if (holder.representation == representation) {
+                        representationHolders[i] = holder;
+                        retiredHolders.remove(retired);
+                        break;
+                    }
+                }
+            }
+            if (representationHolders[i] == null) {
+                representationHolders[i] = new RepresentationHolder(manifest.getPeriodDurationUs(periodIndex),
+                        trackType, representation, enableEventMessageTrack, closedCaptionFormats,
+                        playerTrackEmsgHandler, sabrStream);
+            }
+        }
+        for (RepresentationHolder holder : previous) {
+            if (!Arrays.asList(representationHolders).contains(holder)) retiredHolders.add(holder);
+        }
+        synchronizeSelectedFormat();
+    }
+
+    private void synchronizeSelectedFormat() {
+        if (sabrStream == null || sabrStream.getFormatSelector() != formatSelector) return;
+        if (trackSelection.getSelectedFormat().equals(formatSelector.getSelectedFormat())) return;
+        formatSelector = createFormatSelector(trackType, trackSelection);
+        sabrStream.setFormatSelector(formatSelector);
     }
 
     @Override
     public long getAdjustedSeekPositionUs(long positionUs, SeekParameters seekParameters) {
+        if (manifest.dynamic && sabrStream != null) {
+            long startMs = sabrStream.getLiveWindowStartMs();
+            long endMs = sabrStream.getLiveWindowEndMs();
+            if (startMs >= 0) positionUs = Math.max(positionUs, startMs * 1_000L);
+            if (endMs >= 0) positionUs = Math.min(positionUs, Math.max(0, endMs * 1_000L - END_OF_STREAM_SEEK_TOLERANCE_US));
+        }
         for (RepresentationHolder representationHolder : representationHolders) {
             long periodDurationUs = representationHolder.periodDurationUs;
             if (periodDurationUs != C.TIME_UNSET && positionUs >= periodDurationUs) {
@@ -251,11 +297,20 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
     @Override
     public void getNextChunk(androidx.media3.exoplayer.LoadingInfo loadingInfo, long loadPositionUs, List<? extends MediaChunk> queue, ChunkHolder out) {
         long playbackPositionUs = loadingInfo.playbackPositionUs;
-        if (fatalError != null) {
+        if (fatalError != null || released || (sabrStream != null && sabrStream.getFormatSelector() != formatSelector)) {
             return;
         }
 
-        long bufferedDurationUs = loadPositionUs - playbackPositionUs;
+        // Container chunks are constructed before their SABR headers arrive. The completed
+        // header is authoritative for subsequent requests, including short final segments.
+        if (!queue.isEmpty() && sabrStream != null) {
+            MediaChunk completed = queue.get(queue.size() - 1);
+            FormatId completedId = new FormatSelector("completed", false, completed.trackFormat).getSelectedFormatId();
+            long completedEndMs = sabrStream.getSegmentStartTimeMs(completedId.getItag());
+            if (completedEndMs > 0) loadPositionUs = completedEndMs * 1_000L;
+        }
+        if (loadPositionUs == C.TIME_UNSET) loadPositionUs = Math.max(0, playbackPositionUs);
+        long bufferedDurationUs = Math.max(0, loadPositionUs - playbackPositionUs);
         long timeToLiveEdgeUs = resolveTimeToLiveEdgeUs(playbackPositionUs);
         long presentationPositionUs =
                 androidx.media3.common.util.Util.msToUs(manifest.availabilityStartTimeMs)
@@ -271,9 +326,11 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
         long nowUnixTimeUs = getNowUnixTimeUs();
         MediaChunk previous = queue.isEmpty() ? null : queue.get(queue.size() - 1);
         MediaChunkIterator[] chunkIterators = new MediaChunkIterator[trackSelection.length()];
+        Arrays.fill(chunkIterators, MediaChunkIterator.EMPTY);
 
         trackSelection.updateSelectedTrack(
                 playbackPositionUs, bufferedDurationUs, timeToLiveEdgeUs, queue, chunkIterators);
+        synchronizeSelectedFormat();
 
         RepresentationHolder representationHolder =
                 representationHolders[trackSelection.getSelectedIndex()];
@@ -299,7 +356,7 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
 
         long periodDurationUs = representationHolder.periodDurationUs;
         boolean periodEnded = periodDurationUs != C.TIME_UNSET;
-        if (periodEnded && (loadPositionUs + NEAR_END_TOLERANCE_US) >= periodDurationUs) {
+        if (periodEnded && loadPositionUs >= periodDurationUs) {
             out.endOfStream = true;
             return;
         }
@@ -313,8 +370,9 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
                         trackSelection.getSelectedFormat(),
                         trackSelection.getSelectionReason(),
                         trackSelection.getSelectionData(),
-                        C.INDEX_UNSET, // TODO: does sabr has segment num?
-                        seekTimeUs);
+                        nexChunkIdx + 1,
+                        seekTimeUs,
+                        loadPositionUs);
     }
 
     @Override
@@ -324,6 +382,7 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
 
     @Override
     public void release() {
+        released = true;
         // Deselection must stop requesting this track, even while another track keeps
         // the presentation warm. A late old release cannot clear a newer owner.
         if (sabrStream != null && sabrStream.getFormatSelector() == formatSelector) {
@@ -332,10 +391,21 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
         for (RepresentationHolder holder : representationHolders) {
             if (holder.extractorWrapper != null) holder.extractorWrapper.release();
         }
+        for (RepresentationHolder holder : retiredHolders) {
+            if (holder.extractorWrapper != null) holder.extractorWrapper.release();
+        }
+        retiredHolders.clear();
     }
 
     @Override
     public void onChunkLoadCompleted(Chunk chunk) {
+        if (chunk instanceof ContainerMediaChunk && sabrStream != null) {
+            FormatId loaded = new FormatSelector("completed", false, chunk.trackFormat).getSelectedFormatId();
+            long completedEndUs = sabrStream.getSegmentStartTimeMs(loaded.getItag()) * 1_000L;
+            if (completedEndUs <= chunk.startTimeUs) {
+                fatalError = new SabrPlaybackException(SabrPlaybackException.Reason.NO_PROGRESS, sabrStream.getUrl(), null);
+            }
+        }
         if (chunk instanceof InitializationChunk) {
             InitializationChunk initializationChunk = (InitializationChunk) chunk;
             int trackIndex = trackSelection.indexOf(initializationChunk.trackFormat);
@@ -349,6 +419,7 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
     @Override
     public boolean onChunkLoadError(Chunk chunk, boolean cancelable, androidx.media3.exoplayer.upstream.LoadErrorHandlingPolicy.LoadErrorInfo errorInfo, androidx.media3.exoplayer.upstream.LoadErrorHandlingPolicy policy) {
         Exception e = errorInfo.exception;
+        if (e instanceof SabrPlaybackException) return false;
         int excluded = 0;
         for (int i = 0; i < trackSelection.length(); i++) if (trackSelection.isTrackExcluded(i, SystemClock.elapsedRealtime())) excluded++;
         androidx.media3.exoplayer.upstream.LoadErrorHandlingPolicy.FallbackSelection fallback = policy.getFallbackSelectionFor(
@@ -422,7 +493,8 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
             int trackSelectionReason,
             Object trackSelectionData,
             long firstSegmentNum,
-            long seekTimeUs) {
+            long seekTimeUs,
+            long loadPositionUs) {
         Representation representation = representationHolder.representation;
         if (representationHolder.extractorWrapper == null) {
             DataSpec dataSpec = new DataSpec.Builder().setUri(Uri.parse(representation.baseUrl)).setHttpMethod(DataSpec.HTTP_METHOD_GET).setHttpBody(null)
@@ -436,7 +508,6 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
         }
 
         SabrStream sabrStream = Assertions.checkNotNull(this.sabrStream);
-        boolean isInit = nexChunkIdx == -1;
         FormatId formatId = formatSelector.getSelectedFormatId();
         int iTag = formatId != null ? formatId.getItag() : -1;
         boolean isSeek = seekTimeUs != C.TIME_UNSET; // same condition used for seekTimeUs
@@ -446,16 +517,17 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
         }
 
         nexChunkIdx++;
-        long startTimeMs = sabrStream.getSegmentStartTimeMs(iTag);
         long durationMs = sabrStream.getSegmentDurationMs(iTag);
-        boolean isSabrTimeSet = startTimeMs >= 0 && durationMs > 0;
-
-        long startTimeUs = isSabrTimeSet ? startTimeMs * 1_000L : C.TIME_UNSET;
-        long endTimeUs = isSabrTimeSet ? startTimeUs + (durationMs * 1_000L) : C.TIME_UNSET;
+        long startTimeUs = isSeek ? seekTimeUs : loadPositionUs;
+        long estimatedDurationUs = (durationMs > 0 ? durationMs : 5_000L) * 1_000L;
+        long endTimeUs = startTimeUs + estimatedDurationUs;
+        if (representationHolder.periodDurationUs != C.TIME_UNSET) {
+            endTimeUs = Math.min(endTimeUs, representationHolder.periodDurationUs);
+        }
         long clippedEndTimeUs = C.TIME_UNSET;
-        int segmentCount = C.INDEX_UNSET; // TODO: replace with SABR value?
+        int segmentCount = 1;
 
-        DataSpec dataSpec = new DataSpec.Builder().setUri(Uri.parse(manifest.getRequestUrl(trackType))).setHttpMethod(DataSpec.HTTP_METHOD_POST).setHttpBody(manifest.createVideoPlaybackAbrRequest(trackType, false, seekTimeUs).toByteArray())
+        DataSpec dataSpec = new DataSpec.Builder().setUri(Uri.parse(manifest.getRequestUrl(trackType))).setHttpMethod(DataSpec.HTTP_METHOD_POST).setHttpBody(manifest.createVideoPlaybackAbrRequest(trackType, false, loadPositionUs).toByteArray())
                 .setPosition(0).setLength(C.LENGTH_UNSET).setKey(representation.getCacheKey())
                 .setFlags(0).setHttpRequestHeaders(sabrHeaders).build();
         long sampleOffsetUs = -representation.presentationTimeOffsetUs;

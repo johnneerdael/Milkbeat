@@ -7,6 +7,7 @@ import androidx.media3.extractor.ExtractorInput;
 import java.io.ByteArrayInputStream;
 import java.io.EOFException;
 import java.io.IOException;
+import java.io.InputStream;
 
 public class UMPDecoder {
     public UMPPart decode(@NonNull ExtractorInput extractorInput) {
@@ -100,9 +101,18 @@ public class UMPDecoder {
     }
 
     public long readVarInt(ByteArrayInputStream inputStream) throws IOException, InterruptedException {
+        return readVarInt((InputStream) inputStream);
+    }
+
+    public long readVarInt(InputStream inputStream) throws IOException, InterruptedException {
         return readVarInt((target, offset, length, allowEndOfInput) -> {
             int numRead = inputStream.read(target, offset, length);
-            return numRead != -1;
+            if (numRead == -1) {
+                if (allowEndOfInput) return false;
+                throw new EOFException("Truncated UMP integer");
+            }
+            if (numRead != length) throw new EOFException("Truncated UMP integer");
+            return true;
         });
     }
 

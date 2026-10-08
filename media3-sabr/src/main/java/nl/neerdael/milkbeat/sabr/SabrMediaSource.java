@@ -68,6 +68,7 @@ public final class SabrMediaSource extends BaseMediaSource {
      * The default presentation delay for live streams. The presentation delay is the duration by
      * which the default start position precedes the end of the live window.
      */
+    @Nullable private volatile Handler liveRefreshHandler;
     private static final long DEFAULT_LIVE_PRESENTATION_DELAY_MS = 30000;
 
     private SabrMediaSource(
@@ -103,11 +104,19 @@ public final class SabrMediaSource extends BaseMediaSource {
         drmSessionManager.setPlayer(android.os.Looper.myLooper(), getPlayerId());
         drmSessionManager.prepare();
         loader = new Loader("Loader:SabrMediaSource");
+        liveRefreshHandler = new Handler(android.os.Looper.myLooper());
+        Handler liveHandler = liveRefreshHandler;
+        manifest.setLiveMetadataListener(() -> liveHandler.post(() -> {
+            if (liveRefreshHandler == liveHandler) processManifest();
+        }));
         processManifest();
     }
 
     @Override
     protected void releaseSourceInternal() {
+        manifest.setLiveMetadataListener(null);
+        if (liveRefreshHandler != null) liveRefreshHandler.removeCallbacksAndMessages(null);
+        liveRefreshHandler = null;
         if (loader != null) {
             loader.release();
             loader = null;
@@ -179,7 +188,9 @@ public final class SabrMediaSource extends BaseMediaSource {
             long liveStreamDurationUs = getNowUnixTimeUs() - androidx.media3.common.util.Util.msToUs(manifest.availabilityStartTimeMs);
             long liveStreamEndPositionInLastPeriodUs = liveStreamDurationUs
                     - androidx.media3.common.util.Util.msToUs(manifest.getPeriod(lastPeriodIndex).startMs);
-            currentEndTimeUs = Math.min(liveStreamEndPositionInLastPeriodUs, currentEndTimeUs);
+            currentEndTimeUs = currentEndTimeUs == C.TIME_UNSET
+                    ? Math.max(0, liveStreamEndPositionInLastPeriodUs)
+                    : Math.min(liveStreamEndPositionInLastPeriodUs, currentEndTimeUs);
             if (manifest.timeShiftBufferDepthMs != C.TIME_UNSET) {
                 long timeShiftBufferDepthUs = androidx.media3.common.util.Util.msToUs(manifest.timeShiftBufferDepthMs);
                 long offsetInPeriodUs = currentEndTimeUs - timeShiftBufferDepthUs;
@@ -197,12 +208,21 @@ public final class SabrMediaSource extends BaseMediaSource {
             }
             windowChangingImplicitly = true;
         }
-        long windowDurationUs = currentEndTimeUs - currentStartTimeUs;
+        if (manifest.dynamic) {
+            long liveStartMs = manifest.getLiveWindowStartMs();
+            long liveEndMs = manifest.getLiveWindowEndMs();
+            if (liveStartMs >= 0) currentStartTimeUs = liveStartMs * 1_000L;
+            if (liveEndMs >= 0) currentEndTimeUs = liveEndMs * 1_000L;
+        }
+        long windowDurationUs = currentEndTimeUs == C.TIME_UNSET
+                ? C.TIME_UNSET : Math.max(0, currentEndTimeUs - currentStartTimeUs);
         for (int i = 0; i < manifest.getPeriodCount() - 1; i++) {
-            windowDurationUs += manifest.getPeriodDurationUs(i);
+            long periodDurationUs = manifest.getPeriodDurationUs(i);
+            windowDurationUs = windowDurationUs == C.TIME_UNSET || periodDurationUs == C.TIME_UNSET
+                    ? C.TIME_UNSET : windowDurationUs + periodDurationUs;
         }
         long windowDefaultStartPositionUs = 0;
-        if (manifest.dynamic) {
+        if (manifest.dynamic && windowDurationUs != C.TIME_UNSET) {
             long presentationDelayForManifestMs = livePresentationDelayMs;
             if (!livePresentationDelayOverridesManifest
                     && manifest.suggestedPresentationDelayMs != C.TIME_UNSET) {
@@ -218,8 +238,9 @@ public final class SabrMediaSource extends BaseMediaSource {
                         windowDurationUs / 2);
             }
         }
-        long windowStartTimeMs = manifest.availabilityStartTimeMs
-                + manifest.getPeriod(0).startMs + androidx.media3.common.util.Util.usToMs(currentStartTimeUs);
+        long windowStartTimeMs = manifest.availabilityStartTimeMs == C.TIME_UNSET ? C.TIME_UNSET
+                : manifest.availabilityStartTimeMs + manifest.getPeriod(0).startMs
+                        + androidx.media3.common.util.Util.usToMs(currentStartTimeUs);
         SabrTimeline timeline =
                 new SabrTimeline(
                         manifest.availabilityStartTimeMs,
@@ -305,7 +326,7 @@ public final class SabrMediaSource extends BaseMediaSource {
          * @return The new {@link SabrMediaSource}.
          */
         public SabrMediaSource createMediaSource(SabrManifest manifest) {
-            return createMediaSource(new MediaItem.Builder().setMediaId(manifest.getVideoId()).build(), manifest);
+            return createMediaSource(new MediaItem.Builder().setMediaId(manifest.getVideoId()).setUri(manifest.getPlaybackUri()).build(), manifest);
         }
 
         /**
@@ -497,9 +518,7 @@ public final class SabrMediaSource extends BaseMediaSource {
             long windowDefaultStartPositionUs = getAdjustedWindowDefaultStartPositionUs(
                     defaultPositionProjectionUs);
             boolean isDynamic =
-                    manifest.dynamic
-                            && manifest.minUpdatePeriodMs != C.TIME_UNSET
-                            && manifest.durationMs == C.TIME_UNSET;
+                    manifest.dynamic && manifest.durationMs == C.TIME_UNSET;
             return window.set(
                     Window.SINGLE_WINDOW_UID, mediaItem, manifest,
                     presentationStartTimeMs,
@@ -531,7 +550,7 @@ public final class SabrMediaSource extends BaseMediaSource {
             }
             if (defaultPositionProjectionUs > 0) {
                 windowDefaultStartPositionUs += defaultPositionProjectionUs;
-                if (windowDefaultStartPositionUs > windowDurationUs) {
+                if (windowDurationUs != C.TIME_UNSET && windowDefaultStartPositionUs > windowDurationUs) {
                     // The projection takes us beyond the end of the live window.
                     return C.TIME_UNSET;
                 }
@@ -565,10 +584,8 @@ public final class SabrMediaSource extends BaseMediaSource {
             //return windowDefaultStartPositionUs + snapIndex.getTimeUs(segmentNum)
             //        - defaultStartPositionInPeriodUs;
 
-            long startTimeUs = 0; // TODO: calc SABR start time
-
-            return windowDefaultStartPositionUs + startTimeUs
-                    - defaultStartPositionInPeriodUs;
+            // SABR has no preloaded segment index to snap against.
+            return windowDefaultStartPositionUs;
         }
 
         @Override

@@ -15,7 +15,7 @@ public class Segment {
     public final long startMs;
     public final SelectedFormat initializedFormat;
     public final boolean durationEstimated;
-    public final boolean discard;
+    public boolean discard;
     public final boolean consumed;
     public final long sequenceLmt;
     public int receivedDataLength;

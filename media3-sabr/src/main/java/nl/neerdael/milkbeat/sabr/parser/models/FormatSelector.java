@@ -48,7 +48,9 @@ public class FormatSelector {
     public boolean match(FormatId formatId, String mimeType) {
         return formatIds.contains(formatId)
                 || (formatIds.isEmpty() && getMimePrefix() != null && mimeType != null && mimeType.toLowerCase().startsWith(getMimePrefix()))
-                || formatIds.stream().anyMatch(fmt -> fmt.hasItag() && formatId.hasItag() && fmt.getItag() == formatId.getItag());
+                || formatIds.stream().anyMatch(fmt -> fmt.hasItag() && formatId.hasItag() && fmt.getItag() == formatId.getItag()
+                    && (!fmt.hasLastModified() || (formatId.hasLastModified() && fmt.getLastModified() == formatId.getLastModified()))
+                    && (!fmt.hasXtags() || (formatId.hasXtags() && fmt.getXtags().equals(formatId.getXtags()))));
     }
 
     public boolean isDiscardMedia() {
@@ -75,10 +77,10 @@ public class FormatSelector {
                     SabrFormatMetadata tuple = (SabrFormatMetadata) entry;
                     // Media3 has no lastModified field on Format. Keep the full unsigned
                     // SABR tuple in metadata through track selection instead.
-                    if (tuple.lastModified != 0) builder.setLastModified(tuple.lastModified);
+                    builder.setLastModified(tuple.lastModified);
                     String xTags = tuple.xTags;
 
-                    if (xTags != null && !xTags.isEmpty()) {
+                    if (xTags != null) {
                         builder.setXtags(xTags);
                     }
                 }

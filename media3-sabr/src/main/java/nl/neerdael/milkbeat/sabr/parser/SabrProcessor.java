@@ -53,7 +53,7 @@ public class SabrProcessor {
     private static final int NO_VALUE = -1;
     private final String videoPlaybackUstreamerConfig;
     private final ClientInfo clientInfo;
-    private FormatSelector formatSelector;
+    private volatile FormatSelector formatSelector;
     private final int liveSegmentTargetDurationToleranceMs;
     private final int liveSegmentTargetDurationSec;
     private long playerTimeMs;
@@ -65,7 +65,7 @@ public class SabrProcessor {
     private final Map<String, SelectedFormat> selectedFormats;
     private Status streamProtectionStatus;
     private boolean isLive;
-    private LiveMetadata liveMetadata;
+    private volatile LiveMetadata liveMetadata;
     private long totalDurationMs;
     private NextRequestPolicy nextRequestPolicy;
     private final Map<Integer, SabrContextUpdate> sabrContextUpdates;
@@ -118,11 +118,15 @@ public class SabrProcessor {
         initializeFormatSelector();
     }
 
+    public synchronized boolean hasPendingSegments() {
+        return !partialSegments.isEmpty();
+    }
+
     public long getPlayerTimeMs() {
         return playerTimeMs;
     }
 
-    public void setPlayerTimeMs(long playerTimeMs) {
+    public synchronized void setPlayerTimeMs(long playerTimeMs) {
         this.playerTimeMs = playerTimeMs;
     }
 
@@ -150,7 +154,7 @@ public class SabrProcessor {
         //        .build();
     }
 
-    public ProcessMediaHeaderResult processMediaHeader(MediaHeader mediaHeader) {
+    public synchronized ProcessMediaHeaderResult processMediaHeader(MediaHeader mediaHeader) {
         if (mediaHeader.hasVideoId() && videoId != null && !java.util.Objects.equals(mediaHeader.getVideoId(), videoId)) {
             throw new SabrStreamError(
                     String.format("Received unexpected MediaHeader for video %s (expecting %s)", mediaHeader.getVideoId(), videoId));
@@ -222,6 +226,9 @@ public class SabrProcessor {
             estimatedContentLength = (long) Math.ceil(mediaHeader.getBitrateBps() * ((double) durationMs / 1_000));
         }
 
+        // Persist authoritative nested identity and normalized timing for buffering and progression.
+        mediaHeader = mediaHeader.toBuilder().setItag(mediaHeader.getFormatId().getItag())
+                .setStartMs(startMs).setDurationMs(durationMs).build();
         Segment segment = new Segment(
                 mediaHeader,
                 mediaHeader.getFormatId(),
@@ -264,7 +271,7 @@ public class SabrProcessor {
         return result;
     }
 
-    public ProcessMediaResult processMedia(long headerId, int contentLength, ExtractorInput data) throws IOException, InterruptedException {
+    public synchronized ProcessMediaResult processMedia(long headerId, int contentLength, ExtractorInput data) throws IOException, InterruptedException {
         Segment segment = partialSegments.get(headerId);
         if (segment == null) {
             throw new SabrStreamError(String.format("Header ID %s not found in partial segments", headerId));
@@ -294,29 +301,21 @@ public class SabrProcessor {
         return result;
     }
 
-    public ProcessMediaEndResult processMediaEnd(long headerId) {
+    public synchronized ProcessMediaEndResult processMediaEnd(long headerId) {
         Segment segment = partialSegments.remove(headerId);
         if (segment == null) {
             throw new SabrStreamError(String.format("Header ID %s not found in partial segments", headerId));
         }
 
-        if (!segment.mediaHeader.getIsInitSeg()) {
+        if (!segment.mediaHeader.getIsInitSeg() && !segment.discard) {
             initializedFormats.put(segment.mediaHeader.getItag(), segment.mediaHeader);
         }
 
 
-        // MOD: remove. receivedDataLength != segment.contentLength
-        //if (segment.contentLength != -1 && segment.receivedDataLength != segment.contentLength) {
-        //    if (segment.contentLengthEstimated) {
-        //        Log.d(TAG, "Content length for %s (sequence %s) was estimated, " +
-        //                "estimated %s bytes, got %s bytes",
-        //                segment.formatId, segment.sequenceNumber, segment.contentLength, segment.receivedDataLength);
-        //    } else {
-        //        throw new SabrStreamError(String.format("Content length mismatch for %s (sequence %s): " +
-        //                "expected %s bytes, got %s bytes",
-        //                segment.formatId, segment.sequenceNumber, segment.contentLength, segment.receivedDataLength));
-        //    }
-        //}
+        if (segment.contentLength >= 0 && !segment.contentLengthEstimated
+                && segment.receivedDataLength != segment.contentLength) {
+            throw new SabrStreamError("SABR segment content length mismatch");
+        }
 
         ProcessMediaEndResult result = new ProcessMediaEndResult();
 
@@ -343,6 +342,8 @@ public class SabrProcessor {
             );
         } else {
         }
+
+        if (segment.discard && !segment.initializedFormat.discard) return result;
 
         if (segment.isInitSegment) {
             segment.initializedFormat.initSegment = segment;
@@ -412,10 +413,12 @@ public class SabrProcessor {
         return result;
     }
 
-    public ProcessFormatInitializationMetadataResult processFormatInitializationMetadata(FormatInitializationMetadata formatInitMetadata) {
+    public synchronized ProcessFormatInitializationMetadataResult processFormatInitializationMetadata(FormatInitializationMetadata formatInitMetadata) {
         ProcessFormatInitializationMetadataResult result = new ProcessFormatInitializationMetadataResult();
 
         if (formatInitMetadata.hasFormatId() && selectedFormats.containsKey(formatInitMetadata.getFormatId().toString())) {
+            SelectedFormat cached = selectedFormats.get(formatInitMetadata.getFormatId().toString());
+            if (!cached.discard) result.sabrPart = new FormatInitializedSabrPart(cached.formatId, cached.formatSelector, cached.endTimeMs);
             return result;
         }
 
@@ -429,18 +432,6 @@ public class SabrProcessor {
         if (formatSelector == null) {
             // Should not happen. If we ignored the format the server may refuse to send us any more data
             throw new SabrStreamError(String.format("Received format %s but it does not match any format selector", formatInitMetadata.getFormatId()));
-        }
-
-        // Guard: Check if the format selector is already in use by another initialized format.
-        // This can happen when the server changes the format to use (e.g. changing quality).
-        //
-        // Changing a format will require adding some logic to handle inactive formats.
-        // Given we only provide one FormatId currently, and this should not occur in this case,
-        // we will mark this as not currently supported and bail.
-        for (SelectedFormat selectedFormat : selectedFormats.values()) {
-            if (selectedFormat.formatSelector == formatSelector && !formatSelector.isDiscardMedia()) {
-                throw new SabrStreamError("Server changed format. Changing formats is not currently supported");
-            }
         }
 
         long durationMs = Utils.ticksToMs(
@@ -502,7 +493,7 @@ public class SabrProcessor {
         this.nextRequestPolicy = nextRequestPolicy;
     }
 
-    public ProcessLiveMetadataResult processLiveMetadata(LiveMetadata liveMetadata) {
+    public synchronized ProcessLiveMetadataResult processLiveMetadata(LiveMetadata liveMetadata) {
         this.liveMetadata = liveMetadata;
 
         if (liveMetadata.hasHeadSequenceTimeMs()) {
@@ -524,8 +515,9 @@ public class SabrProcessor {
         // The server SHOULD NOT send us segments before the min dvr time, so we should assume that the player time is correct.
         long minSeekableTimeMs = Utils.ticksToMs(liveMetadata.hasMinSeekableTimeTicks() ? liveMetadata.getMinSeekableTimeTicks() : -1,
                 liveMetadata.hasMinSeekableTimescale() ? liveMetadata.getMinSeekableTimescale() : -1);
-        if (minSeekableTimeMs != -1 && playerTimeMs > 0 && playerTimeMs < minSeekableTimeMs) {
+        if (minSeekableTimeMs != -1 && playerTimeMs >= 0 && playerTimeMs < minSeekableTimeMs) {
             playerTimeMs = minSeekableTimeMs;
+            initializedFormats.clear();
             for (SelectedFormat izf : selectedFormats.values()) {
                 izf.currentSegment = null; // Clear the current segment as we expect segments to no longer be in order.
                 result.seekSabrParts.add(
@@ -541,12 +533,14 @@ public class SabrProcessor {
         return result;
     }
 
-    public ProcessSabrSeekResult processSabrSeek(SabrSeek sabrSeek) {
+    public synchronized ProcessSabrSeekResult processSabrSeek(SabrSeek sabrSeek) {
         long seekTo = Utils.ticksToMs(sabrSeek.hasSeekMediaTime() ? sabrSeek.getSeekMediaTime() : -1, sabrSeek.hasSeekMediaTimescale() ? sabrSeek.getSeekMediaTimescale() : -1);
         if (seekTo == -1) {
             throw new SabrStreamError(String.format("Server sent a SabrSeek part that is missing required seek data: %s", sabrSeek));
         }
         playerTimeMs = seekTo;
+        initializedFormats.clear();
+        partialSegments.clear();
 
         ProcessSabrSeekResult result = new ProcessSabrSeekResult();
 
@@ -565,7 +559,7 @@ public class SabrProcessor {
         return result;
     }
 
-    public void processSabrContextUpdate(SabrContextUpdate sabrCtxUpdate) {
+    public synchronized void processSabrContextUpdate(SabrContextUpdate sabrCtxUpdate) {
         if (!sabrCtxUpdate.hasType() || !sabrCtxUpdate.hasValue() || !sabrCtxUpdate.hasWritePolicy()) {
             return;
         }
@@ -577,12 +571,12 @@ public class SabrProcessor {
 
 
         sabrContextUpdates.put(sabrCtxUpdate.getType(), sabrCtxUpdate);
-        if (sabrCtxUpdate.hasSendByDefault()) {
+        if (sabrCtxUpdate.getSendByDefault()) {
             sabrContextsToSend.add(sabrCtxUpdate.getType());
         }
     }
 
-    public void processSabrContextSendingPolicy(SabrContextSendingPolicy sabrCtxSendingPolicy) {
+    public synchronized void processSabrContextSendingPolicy(SabrContextSendingPolicy sabrCtxSendingPolicy) {
         for (int startType : sabrCtxSendingPolicy.getStartPolicyList()) {
             if (!sabrContextsToSend.contains(startType)) {
                 sabrContextsToSend.add(startType);
@@ -590,16 +584,24 @@ public class SabrProcessor {
         }
 
         for (int stopType : sabrCtxSendingPolicy.getStopPolicyList()) {
-            if (!sabrContextsToSend.contains(stopType)) {
-                sabrContextsToSend.remove(stopType);
-            }
+            sabrContextsToSend.remove(stopType);
         }
 
         for (int discardType : sabrCtxSendingPolicy.getDiscardPolicyList()) {
-            if (!sabrContextsToSend.contains(discardType)) {
-                sabrContextUpdates.remove(discardType);
-            }
+            sabrContextsToSend.remove(discardType);
+            sabrContextUpdates.remove(discardType);
         }
+    }
+
+    public synchronized long getLiveWindowStartMs() {
+        return liveMetadata == null ? -1 : Utils.ticksToMs(
+                liveMetadata.hasMinSeekableTimeTicks() ? liveMetadata.getMinSeekableTimeTicks() : -1,
+                liveMetadata.hasMinSeekableTimescale() ? liveMetadata.getMinSeekableTimescale() : -1);
+    }
+
+    public synchronized long getLiveWindowEndMs() {
+        return liveMetadata != null && liveMetadata.hasHeadSequenceTimeMs()
+                ? liveMetadata.getHeadSequenceTimeMs() : -1;
     }
 
     public boolean isLive() {
@@ -618,7 +620,7 @@ public class SabrProcessor {
         return liveSegmentTargetDurationSec;
     }
 
-    public long getSegmentStartTimeMs(int iTag) {
+    public synchronized long getSegmentStartTimeMs(int iTag) {
         MediaHeader mediaHeader = initializedFormats.get(iTag);
 
         if (mediaHeader == null || mediaHeader.getStartMs() == -1) {
@@ -628,7 +630,7 @@ public class SabrProcessor {
         return mediaHeader.getStartMs() + mediaHeader.getDurationMs();
     }
 
-    public long getSegmentDurationMs(int iTag) {
+    public synchronized long getSegmentDurationMs(int iTag) {
         MediaHeader mediaHeader = initializedFormats.get(iTag);
 
         if (mediaHeader == null) {
@@ -652,7 +654,7 @@ public class SabrProcessor {
     //    return result;
     //}
 
-    public StreamerContext createStreamerContext() {
+    public synchronized StreamerContext createStreamerContext() {
         StreamerContext.Builder builder = StreamerContext.newBuilder()
                 .setPlaybackCookie(
                         nextRequestPolicy != null ?
@@ -718,24 +720,40 @@ public class SabrProcessor {
         return formatSelector;
     }
 
-    public void setFormatSelector(FormatSelector formatSelector) {
+    public synchronized void setFormatSelector(FormatSelector formatSelector) {
         this.formatSelector = formatSelector;
         initializeFormatSelector();
-    }
-
-    public @NonNull Map<Integer, MediaHeader> getInitializedFormats() {
-        return initializedFormats;
-    }
-
-    public void reset(int iTag) {
-        MediaHeader mediaHeader = initializedFormats.get(iTag);
-
-        if (mediaHeader != null) {
-            MediaHeader newHeader = mediaHeader.toBuilder()
-                    .setStartMs(-1)
-                    .setSequenceNumber(0)
-                    .build();
-            initializedFormats.put(iTag, newHeader);
+        for (SelectedFormat cached : selectedFormats.values()) {
+            FormatSelector selector = this.formatSelector.match(cached.formatId, cached.mimeType) ? this.formatSelector : emptySelector;
+            boolean wasDiscarded = cached.discard;
+            cached.formatSelector = selector;
+            cached.discard = selector.isDiscardMedia();
+            if (wasDiscarded != cached.discard) {
+                cached.currentSegment = null;
+                cached.consumedRanges.clear();
+                MediaHeader completed = initializedFormats.get(cached.formatId.getItag());
+                if (completed != null && completed.getFormatId().equals(cached.formatId)) initializedFormats.remove(cached.formatId.getItag());
+                if (cached.discard) cached.consumedRanges.add(new ConsumedRange(0, Integer.MAX_VALUE, 0, Integer.MAX_VALUE));
+            }
         }
+        // Bytes from an in-flight old selection must never leak into the new extractor.
+        for (Segment segment : partialSegments.values()) {
+            segment.discard = segment.discard || segment.initializedFormat.discard;
+        }
+    }
+
+    public synchronized @NonNull Map<Integer, MediaHeader> getInitializedFormats() {
+        return new HashMap<>(initializedFormats);
+    }
+
+    public synchronized void reset(int iTag) {
+        initializedFormats.remove(iTag);
+        for (SelectedFormat selected : selectedFormats.values()) {
+            if (selected.formatId.getItag() == iTag) {
+                selected.currentSegment = null;
+                selected.consumedRanges.clear();
+            }
+        }
+        partialSegments.entrySet().removeIf(entry -> entry.getValue().formatId.getItag() == iTag);
     }
 }

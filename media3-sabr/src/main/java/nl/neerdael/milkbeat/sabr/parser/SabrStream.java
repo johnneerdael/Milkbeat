@@ -21,6 +21,7 @@ import nl.neerdael.milkbeat.sabr.parser.results.ProcessMediaResult;
 import nl.neerdael.milkbeat.sabr.parser.results.ProcessStreamProtectionStatusResult;
 import nl.neerdael.milkbeat.sabr.parser.ump.UMPDecoder;
 import nl.neerdael.milkbeat.sabr.parser.ump.UMPPart;
+import nl.neerdael.milkbeat.sabr.parser.ump.UMPInputStream;
 import nl.neerdael.milkbeat.sabr.parser.ump.UMPPartId;
 import nl.neerdael.milkbeat.sabr.protos.videostreaming.FormatInitializationMetadata;
 import nl.neerdael.milkbeat.sabr.protos.videostreaming.LiveMetadata;
@@ -53,8 +54,8 @@ public class SabrStream {
             UMPPartId.SABR_REDIRECT,
             UMPPartId.FORMAT_INITIALIZATION_METADATA,
             UMPPartId.NEXT_REQUEST_POLICY,
-            //UMPPartId.LIVE_METADATA,
-            //UMPPartId.SABR_SEEK,
+            UMPPartId.LIVE_METADATA,
+            UMPPartId.SABR_SEEK,
             UMPPartId.SABR_ERROR,
             UMPPartId.SABR_CONTEXT_UPDATE,
             UMPPartId.SABR_CONTEXT_SENDING_POLICY,
@@ -80,7 +81,12 @@ public class SabrStream {
     private int sqMismatchBacktrackCount;
     private boolean receivedNewSegments;
     private String url;
-    private List<? extends  SabrPart> multiResult = null;
+    private List<? extends SabrPart> multiResult = null;
+    private volatile Runnable liveMetadataListener;
+
+    public void setLiveMetadataListener(Runnable listener) { liveMetadataListener = listener; }
+    public long getLiveWindowStartMs() { return processor.getLiveWindowStartMs(); }
+    public long getLiveWindowEndMs() { return processor.getLiveWindowEndMs(); }
 
     private static class NoSegmentsTracker {
         public int consecutiveRequests = 0;
@@ -160,6 +166,10 @@ public class SabrStream {
         noNewSegmentsTracker.reset();
     }
 
+    public boolean hasPendingSegments() {
+        return processor.hasPendingSegments();
+    }
+
     public void reset(int iTag) {
         processor.reset(iTag);
     }
@@ -171,6 +181,10 @@ public class SabrStream {
     public void setFormatSelector(FormatSelector formatSelector) {
         processor.setFormatSelector(formatSelector);
     }
+
+    public void setLive(boolean live) { processor.setLive(live); }
+
+    public void setPlayerTimeMs(long positionMs) { processor.setPlayerTimeMs(positionMs); }
 
     public long getSegmentStartTimeMs(int iTag) {
         return processor.getSegmentStartTimeMs(iTag);
@@ -293,10 +307,10 @@ public class SabrStream {
 
     private MediaSegmentDataSabrPart processMedia(UMPPart part) {
         try {
-            long position = part.data.getPosition();
-            long headerId = decoder.readVarInt(part.data);
-            long offset = part.data.getPosition() - position;
-            int contentLength = part.size - (int) offset;
+            UMPInputStream bounded = part.toStream();
+            long headerId = decoder.readVarInt(bounded);
+            if (headerId < 0) throw new IOException("Missing SABR media header id");
+            int contentLength = bounded.available();
 
             ProcessMediaResult result = processor.processMedia(headerId, contentLength, part.data);
 
@@ -308,7 +322,10 @@ public class SabrStream {
 
     private MediaSegmentEndSabrPart processMediaEnd(UMPPart part) {
         try {
-            long headerId = decoder.readVarInt(part.data);
+            UMPInputStream bounded = part.toStream();
+            long headerId = decoder.readVarInt(bounded);
+            if (headerId < 0) throw new IOException("Missing SABR media end id");
+            bounded.skip(bounded.available());
 
             ProcessMediaEndResult result = processor.processMediaEnd(headerId);
 
@@ -453,7 +470,10 @@ public class SabrStream {
             throw new IllegalStateException(e);
         }
 
-        return processor.processLiveMetadata(liveMetadata).seekSabrParts;
+        List<MediaSeekSabrPart> seeks = processor.processLiveMetadata(liveMetadata).seekSabrParts;
+        Runnable listener = liveMetadataListener;
+        if (listener != null) listener.run();
+        return seeks;
     }
 
     private List<MediaSeekSabrPart> processSabrSeek(UMPPart part) {
