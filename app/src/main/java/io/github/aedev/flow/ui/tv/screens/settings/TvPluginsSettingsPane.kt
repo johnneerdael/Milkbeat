@@ -1,5 +1,6 @@
 package io.github.aedev.flow.ui.tv.screens.settings
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
@@ -74,6 +75,15 @@ fun TvPluginsSettingsPane(
             openPlugin = null
             choosing = null
             url = ""
+        }
+    }
+
+    // Back closes the page open inside Plugins before it may leave Settings, as a picker panel does.
+    BackHandler(enabled = consent != null || choosing != null || openPlugin != null) {
+        when {
+            consent != null -> viewModel.cancelAdd()
+            choosing != null -> choosing = null
+            else -> openPlugin = null
         }
     }
 
@@ -299,7 +309,11 @@ private fun LazyListScope.consentItems(
     item(key = "consent-title") {
         TvSectionHeader(
             stringResource(
-                if (pending.isUpdate) R.string.tv_plugins_update_title else R.string.tv_plugins_install_title,
+                when {
+                    pending.isReinstall -> R.string.tv_plugins_reinstall_title
+                    pending.isUpdate -> R.string.tv_plugins_update_title
+                    else -> R.string.tv_plugins_install_title
+                },
                 manifest.name,
                 manifest.version,
             ),
@@ -329,7 +343,14 @@ private fun LazyListScope.consentItems(
         }
         Row(modifier = Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             TvButton(
-                text = stringResource(if (pending.isUpdate) R.string.tv_plugins_update else R.string.tv_plugins_install),
+                text =
+                    stringResource(
+                        when {
+                            pending.isReinstall -> R.string.tv_plugins_reinstall
+                            pending.isUpdate -> R.string.tv_plugins_update
+                            else -> R.string.tv_plugins_install
+                        },
+                    ),
                 onClick = onInstall,
                 modifier = Modifier.focusRequester(installFocus),
             )

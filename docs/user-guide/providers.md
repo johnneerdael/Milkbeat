@@ -57,7 +57,7 @@ your compatible Preview build; app and plugin packages are distributed separatel
 1. Open **Settings → Plugins** and scroll to **Add a plugin**.
 2. Enter a registered three-digit code, or a plugin download URL (a `.mbplugin` file or a supported Buzzheavier file page; an address without a scheme defaults to HTTPS).
 3. Select **Add a plugin**.
-4. Review the plugin's author, description, capabilities and requested access, then select **Install** (or **Update** when that plugin is already installed). **Cancel** leaves everything as it was.
+4. Review the plugin's author, description, capabilities and requested access, then select **Install**, **Update** for a newer version of an installed plugin, or **Reinstall** when the code or link fetches the version already installed. **Cancel** leaves everything as it was.
 
 ![Add a plugin: the code field and the Add a plugin action](images/settings-plugins-updates.png)
 

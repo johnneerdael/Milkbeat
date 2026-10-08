@@ -3,6 +3,7 @@ package io.github.aedev.flow.ui.tv.catalog
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.aspectRatio
@@ -54,9 +55,11 @@ internal fun TvCatalogPortraitHeader(
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(text = header.title, style = MaterialTheme.typography.displaySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
             HeaderDetails(header)
-            Row(
+            // Buttons keep their full labels: one that no longer fits beside the others moves to a new line.
+            FlowRow(
                 modifier = actionsModifier.padding(top = 8.dp).focusGroup(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
                 content = actions,
             )
         }

@@ -50,6 +50,7 @@ import io.github.aedev.flow.ui.tv.screens.account.TvAccountLibraryPane
 import io.github.aedev.flow.ui.tv.screens.folders.TvMusicFoldersContent
 import io.github.aedev.flow.ui.tv.screens.library.TvLibraryMixedContent
 import io.github.aedev.flow.ui.tv.screens.library.TvMergedPlaylistsPane
+import io.github.aedev.flow.ui.tv.screens.library.selectLibraryProvider
 import io.github.aedev.flow.ui.tv.theme.LocalTvDimens
 import io.github.aedev.flow.ui.tv.toTvMusicTrack
 import io.github.aedev.flow.ui.tv.toTvVideo
@@ -103,10 +104,7 @@ fun TvLibraryScreen(
         musicTabs.tabs.filter { tab ->
             tab.source is MusicSource.Plugin && MetadataSurface.LIBRARY in tab.surfaces && (tab.signedIn || tab.expired)
         }
-    // Signed-in listeners land on their first provider's library, as they did with a single provider.
-    val shownProvider =
-        accountTabs.firstOrNull { it.source.providerId == chosenProvider }
-            ?: accountTabs.firstOrNull()?.takeIf { !localPaneSelected }
+    val shownProvider = selectLibraryProvider(accountTabs, { it.source.providerId }, chosenProvider, localPaneSelected)
 
     TvScreenScaffold(
         title = null,
@@ -147,6 +145,7 @@ fun TvLibraryScreen(
                                 ),
                         onClick = {
                             localPaneSelected = true
+                            chosenProvider = null
                             selectedSection = section
                         },
                     )

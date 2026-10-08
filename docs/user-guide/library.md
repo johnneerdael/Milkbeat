@@ -14,7 +14,7 @@ Milkbeat has no "metadata provider" setting any more. Instead, every music catal
 | **Local library** | Once at least one music folder is linked |
 | **Music** | Only while none of the above exists; it offers to add a plugin or a music folder |
 
-Each tab is marked with the service's logo and shows that provider's own feed, laid out with Milkbeat's TV components; the provider decides which shelves appear. A tab keeps its scroll position and filters while you visit another, and Milkbeat starts on the music tab you used last. Signing out of a provider or disabling its plugin removes its tab. Your [audio providers](providers.md#set-audio-priority) handle playback independently of the tab you browse.
+Each tab is marked with the service's logo and shows that provider's own feed, laid out with Milkbeat's TV components; the provider decides which shelves appear. A tab keeps its scroll position and filters while you visit another, and Milkbeat starts on the music tab you used last. A page opened from a tab keeps that tab highlighted; pressing the highlighted tab returns to its first page. Search and Library keep a page you opened while you visit another tab, while the music tabs always return to their own feed. Signing out of a provider or disabling its plugin removes its tab. Your [audio providers](providers.md#set-audio-priority) handle playback independently of the tab you browse.
 
 === "YouTube Music"
 
@@ -55,18 +55,18 @@ Artist, release, label, year and genre pages list their tracks with tagged BPM w
 
 ## Search
 
-![Search with Beatport, Spotify, YouTube Music, Local library and Videos chips](images/search-chips.png)
+![Search with Beatport, Spotify, YouTube Music and Local library chips](images/search-chips.png)
 
-Search shows a chip for each music tab that can search, including **Local library**, followed by **Videos**. It starts on the chip of the music tab you used last. Only the chip on screen searches, so switching chips searches that provider for the same text.
+Search shows a chip for each music tab that can search, including **Local library**. There is no separate video search: install the [YouTube Video plugin](preview-testing.md#youtube-video-plugin), which brings its own chip, to search videos. It is currently offered in the Preview app. It starts on the chip of the music tab you used last. Only the chip on screen searches, so switching chips searches that provider for the same text.
 
-Each provider brings its own filter chips and suggestions:
+Each provider brings its own filter chips and suggestions, and a chip only ever shows its own provider's suggestions:
 
 <div class="mb-pair" markdown>
 ![YouTube Music search with filters, suggestions and the top result](images/search-youtube-music.png)
 ![Beatport search with Tracks, Releases, Artists, Labels, Charts and Playlists filters](images/search-beatport.png)
 </div>
 
-YouTube Music offers Songs, Videos, Albums, Artists, Featured and Community playlists; Beatport offers Tracks, Releases, Artists, Labels, Charts and Playlists. **Local library** searches song titles, artists, albums and artist names in your folders. Opening a result uses the page for its type, on the provider of its chip.
+YouTube Music offers Songs, Videos, Albums, Artists, Featured and Community playlists; Beatport offers Tracks, Releases, Artists, Labels, Charts and Playlists. **Local library** searches song titles, artists, albums and artist names in your folders; while you type it suggests only matching recent searches, with no provider suggestions. Opening a result uses the page for its type, on the provider of its chip.
 
 ## Library
 

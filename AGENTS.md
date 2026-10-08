@@ -758,7 +758,16 @@ revision must pass the configured ktlint rules.
   the remembered tab instead of opening another. All music tabs share the `music` nav route; each
   source gets an assisted `MusicHomeFeedViewModel` keyed by `MusicSource.key` plus its own saveable
   state. Every catalog route, search chip and Library account chip passes its provider explicitly;
-  never reintroduce a global "current provider". Focused regressions: `./gradlew
+  never reintroduce a global "current provider".
+  The rail's highlighted tab is derived from the back stack (`ownerDestination` in `ui/tv/navigation/TvTab.kt`),
+  never from remembered shell state, so it survives the shell rebuild when now playing closes.
+  `NavController.navigateToTab` (`TvTabNavigator.kt`) pops to the music start destination and to the
+  tab that owns the page on screen, and only switches to (and restores) a different fixed tab. Never
+  navigate to the music route with `restoreState`: Navigation maps a non-inclusive `popUpTo(start)`
+  save onto the start destination, so it would restore another tab's or provider's pages and swallow
+  later rail presses. A Settings pane with pages of its own must register its own `BackHandler`;
+  the shell composes its handler before the pages so theirs take precedence. Regressions:
+  `--tests '*TvTabTest' --tests '*TvTabNavigatorTest' --tests '*TvPluginsFocusTest'`. Focused regressions: `./gradlew
   :app:testGithubDebugUnitTest --tests '*MusicSourcesTest' --tests '*TvMusicTabsStateTest'
   --tests '*TvSearchViewModelTest' --tests '*MusicHomeFeedViewModelTest'`.
 - `MusicHomeFeedViewModel` owns Home catalog requests, separately from playback. Its state is

@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
@@ -27,7 +28,6 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.media3.common.util.UnstableApi
 import androidx.navigation.NavHostController
-import androidx.navigation.compose.currentBackStackEntryAsState
 import io.github.aedev.flow.data.catalog.MusicSource
 import io.github.aedev.flow.data.model.Video
 import io.github.aedev.flow.data.music.model.MusicTrack
@@ -41,6 +41,8 @@ import io.github.aedev.flow.ui.tv.navigation.TvMusicTabsState
 import io.github.aedev.flow.ui.tv.navigation.TvNavHost
 import io.github.aedev.flow.ui.tv.navigation.TvRoutes
 import io.github.aedev.flow.ui.tv.navigation.TvTab
+import io.github.aedev.flow.ui.tv.navigation.navigateToTab
+import io.github.aedev.flow.ui.tv.navigation.ownerDestination
 import io.github.aedev.flow.ui.tv.navigation.prunedTabHistory
 import io.github.aedev.flow.ui.tv.navigation.shownRailTab
 import io.github.aedev.flow.ui.tv.theme.LocalTvDimens
@@ -74,28 +76,14 @@ fun TvShell(
     onSelectMusic: (MusicSource) -> Unit = {},
 ) {
     val dimens = LocalTvDimens.current
-    val backStackEntry by navController.currentBackStackEntryAsState()
-    val currentRoute = backStackEntry?.destination?.route
+    val backStack by navController.currentBackStack.collectAsState()
+    val currentRoute = backStack.lastOrNull()?.destination?.route
     val isOnDetailRoute = currentRoute != null && TvDestination.entries.none { it.route == currentRoute }
-    val routeTab: TvTab? =
-        when {
-            currentRoute == null || currentRoute == TvDestination.MUSIC.route -> TvTab.Music(musicTabs.selected)
-            isOnDetailRoute -> null
-            else -> TvTab.Fixed(TvDestination.fromRoute(currentRoute))
-        }
     // A detail page keeps the tab it was opened from highlighted.
-    var detailOwner by remember { mutableStateOf<TvTab>(TvTab.Music(null)) }
-    LaunchedEffect(routeTab) { routeTab?.let { detailOwner = it } }
+    val owner = ownerDestination(backStack.map { it.destination.route })
     val railItems = tvRailItems(musicTabs, badged)
     val railTabs = railItems.map { it.tab }
-    val currentTab: TvTab =
-        shownRailTab(
-            routeTab = routeTab,
-            settingsDetail = currentRoute == TvRoutes.MUSIC_FOLDERS_SETTINGS,
-            detailOwner = detailOwner,
-            railTabs = railTabs,
-            music = TvTab.Music(musicTabs.selected),
-        )
+    val currentTab: TvTab = shownRailTab(owner, railTabs, TvTab.Music(musicTabs.selected))
     var railHasFocus by remember { mutableStateOf(false) }
     val railFocusRequester = remember { FocusRequester() }
     val musicStripFocusRequester = remember { FocusRequester() }
@@ -146,16 +134,13 @@ fun TvShell(
         }
     }
     val shownTab by rememberUpdatedState(currentTab)
+    val shownOwner by rememberUpdatedState(owner)
     val onDetailRoute by rememberUpdatedState(isOnDetailRoute)
     val selectMusic by rememberUpdatedState(onSelectMusic)
 
     fun navigateToTab(tab: TvTab) {
         if (tab is TvTab.Music) tab.source?.let(selectMusic)
-        navController.navigate(tab.destination.route) {
-            popUpTo(TvDestination.start.route) { saveState = true }
-            launchSingleTop = true
-            restoreState = true
-        }
+        navController.navigateToTab(tab.destination, shownOwner)
     }
 
     fun selectTab(tab: TvTab) {
@@ -169,6 +154,24 @@ fun TvShell(
         }
         navigateToTab(tab)
         contentFocusRequests++
+    }
+
+    // Composed before the pages, so a page's own Back handler, registered after it, takes precedence.
+    val backAction =
+        TvBackModel.resolve(
+            isOnDetailRoute = isOnDetailRoute,
+            hasTabHistory = tabHistory.isNotEmpty(),
+            onStartTab = currentTab is TvTab.Music,
+            railHasFocus = railHasFocus,
+        )
+    BackHandler(enabled = backAction != TvBackAction.EXIT) {
+        when (backAction) {
+            TvBackAction.POP_DETAIL -> navController.popBackStack()
+            TvBackAction.POP_TAB -> navigateToTab(tabHistory.removeAt(tabHistory.lastIndex))
+            TvBackAction.GO_START -> navigateToTab(TvTab.Music(musicTabs.selected))
+            TvBackAction.FOCUS_RAIL -> runCatching { railFocusRequester.requestFocus() }
+            TvBackAction.EXIT -> Unit
+        }
     }
 
     Box(modifier = modifier.fillMaxSize()) {
@@ -224,22 +227,5 @@ fun TvShell(
                     .align(Alignment.CenterStart)
                     .fillMaxHeight(),
         )
-
-        val backAction =
-            TvBackModel.resolve(
-                isOnDetailRoute = isOnDetailRoute,
-                hasTabHistory = tabHistory.isNotEmpty(),
-                onStartTab = currentTab is TvTab.Music,
-                railHasFocus = railHasFocus,
-            )
-        BackHandler(enabled = backAction != TvBackAction.EXIT) {
-            when (backAction) {
-                TvBackAction.POP_DETAIL -> navController.popBackStack()
-                TvBackAction.POP_TAB -> navigateToTab(tabHistory.removeAt(tabHistory.lastIndex))
-                TvBackAction.GO_START -> navigateToTab(TvTab.Music(musicTabs.selected))
-                TvBackAction.FOCUS_RAIL -> runCatching { railFocusRequester.requestFocus() }
-                TvBackAction.EXIT -> Unit
-            }
-        }
     }
 }
