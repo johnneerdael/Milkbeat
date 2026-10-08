@@ -112,6 +112,17 @@ class TvSearchViewModel internal constructor(
 
     /** The chip on screen; it searches the current query now unless it already answers it. */
     fun showSource(target: TvSearchSource) {
+        val previous = source
+        if (previous != target) {
+            // Only the chip on screen searches; the one left stops, and searches again when shown again.
+            val stopped = listOfNotNull(searchJobs.remove(previous.key), moreJobs.remove(previous.key)).filter { it.isActive }
+            stopped.forEach(Job::cancel)
+            if (stopped.isNotEmpty()) {
+                _state.update { state ->
+                    state.withResults(previous) { it.copy(isLoading = false, isLoadingMore = false) }
+                }
+            }
+        }
         source = target
         if (target is TvSearchSource.Music && target.source != lastMusic) {
             lastMusic = target.source

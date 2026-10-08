@@ -495,6 +495,25 @@ class TvSearchViewModelTest {
         }
 
     @Test
+    fun `leaving a chip during its typing pause stops its search, and coming back searches it`() =
+        runTest(dispatcher) {
+            val vm = viewModel()
+            vm.showSource(MUSIC)
+            vm.onQueryChange("cafe")
+            advanceTimeBy(100)
+
+            vm.showSource(LOCAL)
+            advanceUntilIdle()
+
+            assertThat(music.searches).isEmpty()
+            assertThat(local.searches).containsExactly(SearchRequest("cafe"))
+
+            vm.showSource(MUSIC)
+            advanceUntilIdle()
+            assertThat(music.searches).containsExactly(SearchRequest("cafe"))
+        }
+
+    @Test
     fun `typeahead asks the music chip shown last and the video plugin`() =
         runTest(dispatcher) {
             val vm = viewModel()

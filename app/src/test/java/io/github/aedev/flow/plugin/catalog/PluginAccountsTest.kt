@@ -54,6 +54,22 @@ class PluginAccountsTest {
         }
 
     @Test
+    fun `an expiry re-check of a replaced plugin does not answer for the new installation`() =
+        runTest {
+            val old = CompletableDeferred<ProviderAccount>()
+            coEvery { host.call("youtube", PluginOperations.account, Unit) } coAnswers { old.await() }
+            val accounts = accounts()
+
+            accounts.expired("youtube")
+            runCurrent()
+            accounts.replaced("youtube")
+            old.complete(ProviderAccount.SignedIn("old-installation"))
+            runCurrent()
+
+            assertThat(accounts.accounts.value["youtube"]).isNotEqualTo(ProviderAccount.SignedIn("old-installation"))
+        }
+
+    @Test
     fun `a check answering after a sign-out does not bring the old account back`() =
         runTest {
             val answer = CompletableDeferred<ProviderAccount>()

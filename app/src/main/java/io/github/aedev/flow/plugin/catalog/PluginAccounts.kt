@@ -64,7 +64,10 @@ class PluginAccounts internal constructor(
     private fun generation(pluginId: String): Int = synchronized(generations) { generations[pluginId] ?: 0 }
 
     /** A new installation of [pluginId] answers from now on; a check still running asks the one it replaced. */
-    fun replaced(pluginId: String) = supersedeChecks(pluginId)
+    fun replaced(pluginId: String) {
+        supersedeChecks(pluginId)
+        cancelRevalidation(pluginId)
+    }
 
     /** The listener acted on the account; a check still running answers for the account before that. */
     private fun supersedeChecks(pluginId: String) = synchronized(generations) { generations[pluginId] = generation(pluginId) + 1 }
@@ -211,6 +214,7 @@ class PluginAccounts internal constructor(
         if (last != null) delay((last + REVALIDATION_COOLDOWN_MS - nowMs()).coerceAtLeast(0))
         for (attempt in 0..RETRY_BACKOFF_MS.size) {
             synchronized(revalidations) { lastRevalidationMs[pluginId] = nowMs() }
+            val asked = generation(pluginId)
             val account =
                 try {
                     ask(pluginId)
@@ -225,7 +229,15 @@ class PluginAccounts internal constructor(
                     Log.w(TAG, "Re-checking the $pluginId account failed", e)
                     return
                 }
-            _accounts.update { if (it[pluginId] == ProviderAccount.Expired) it + (pluginId to account) else it }
+            _accounts.update {
+                if (it[pluginId] == ProviderAccount.Expired &&
+                    generation(pluginId) == asked
+                ) {
+                    it + (pluginId to account)
+                } else {
+                    it
+                }
+            }
             return
         }
     }
