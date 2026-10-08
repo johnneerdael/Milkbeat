@@ -6,11 +6,13 @@ import io.github.aedev.flow.plugin.PluginHost
 import io.github.aedev.flow.plugin.runtime.PluginCallException
 import io.github.aedev.flow.utils.PerformanceDispatcher
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -50,13 +52,34 @@ class PluginAccounts internal constructor(
     val accounts: StateFlow<Map<String, ProviderAccount>> = _accounts.asStateFlow()
 
     private val revalidations = mutableMapOf<String, Job>()
+    private val checks = mutableMapOf<String, CompletableDeferred<ProviderAccount>>()
     private val lastRevalidationMs = mutableMapOf<String, Long>()
     private val expiredDuringCheck = mutableSetOf<String>()
 
+    /** Asks [pluginId] for its account; callers asking while a check runs share it rather than repeat it. */
     suspend fun refresh(pluginId: String): ProviderAccount {
-        val account = ask(pluginId)
-        _accounts.update { it + (pluginId to account) }
-        return account
+        val check = CompletableDeferred<ProviderAccount>()
+        val running = synchronized(checks) { checks.putIfAbsent(pluginId, check) }
+        if (running != null) {
+            return try {
+                running.await()
+            } catch (e: CancellationException) {
+                // The caller running the check was cancelled; one still waiting asks for itself.
+                currentCoroutineContext().ensureActive()
+                refresh(pluginId)
+            }
+        }
+        try {
+            val account = ask(pluginId)
+            _accounts.update { it + (pluginId to account) }
+            check.complete(account)
+            return account
+        } catch (e: Throwable) {
+            check.completeExceptionally(e)
+            throw e
+        } finally {
+            synchronized(checks) { checks.remove(pluginId, check) }
+        }
     }
 
     suspend fun complete(

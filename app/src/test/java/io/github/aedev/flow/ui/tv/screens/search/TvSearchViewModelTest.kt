@@ -49,7 +49,7 @@ class TvSearchViewModelTest {
 
     private class FakeBackend(
         var pages: suspend (SearchRequest) -> Result<MetadataPage> = { Result.success(page(it.query)) },
-        var typeahead: (String) -> Result<Suggestions> = { Result.success(Suggestions(emptyList())) },
+        var typeahead: suspend (String) -> Result<Suggestions> = { Result.success(Suggestions(emptyList())) },
     ) : TvSearchBackend {
         val searches = mutableListOf<SearchRequest>()
         val suggests = mutableListOf<String>()
@@ -452,6 +452,28 @@ class TvSearchViewModelTest {
             advanceUntilIdle()
 
             assertThat(music.suggests).contains("cafe del")
+        }
+
+    @Test
+    fun `a typeahead from before an identity change never replaces the new account's`() =
+        runTest(dispatcher) {
+            var account = "account-1"
+            music.typeahead = { query ->
+                val asked = account
+                delay(if (asked == "account-1") 2_000 else 100)
+                Result.success(Suggestions(listOf("$query $asked")))
+            }
+            val vm = viewModel()
+            vm.retainSources(mapOf(MUSIC.key to "account-1", TvSearchSource.Videos.key to null))
+            vm.showSource(MUSIC)
+            vm.onQueryChange("cafe")
+            advanceTimeBy(500)
+
+            account = "account-2"
+            vm.retainSources(mapOf(MUSIC.key to "account-2", TvSearchSource.Videos.key to null))
+            advanceUntilIdle()
+
+            assertThat(vm.state.value.musicSuggestions).containsExactly("cafe account-2")
         }
 
     @Test

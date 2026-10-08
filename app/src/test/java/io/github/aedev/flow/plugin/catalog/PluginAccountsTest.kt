@@ -31,6 +31,23 @@ class PluginAccountsTest {
     private fun failure(code: PluginErrorCode) = PluginCallException("youtube", PluginError(code, code.name))
 
     @Test
+    fun `concurrent account checks of one plugin share a single call`() =
+        runTest {
+            val answer = CompletableDeferred<ProviderAccount>()
+            coEvery { host.call("youtube", PluginOperations.account, Unit) } coAnswers { answer.await() }
+            val accounts = accounts()
+
+            val first = async { accounts.refresh("youtube") }
+            val second = async { accounts.refresh("youtube") }
+            runCurrent()
+            answer.complete(ProviderAccount.SignedIn("listener"))
+
+            assertThat(first.await()).isEqualTo(ProviderAccount.SignedIn("listener"))
+            assertThat(second.await()).isEqualTo(ProviderAccount.SignedIn("listener"))
+            coVerify(exactly = 1) { host.call("youtube", PluginOperations.account, Unit) }
+        }
+
+    @Test
     fun `an expiry reported by a call is re-checked at once and heals a sign-in the plugin still has`() =
         runTest {
             coEvery { host.call("youtube", PluginOperations.account, Unit) } returns ProviderAccount.SignedIn("listener")

@@ -135,17 +135,23 @@ class TvSearchViewModel internal constructor(
         identities.clear()
         identities.putAll(sources)
         if (lastMusic?.key?.let { it !in sources || it in changed } == true) {
+            // A typeahead already asking the old account or installation must not answer for the new one.
+            val combinedPending = suggestJob?.isActive == true
+            suggestJob?.cancel()
             lastMusic = null
             musicSuggestJob?.cancel()
             _state.update { it.copy(musicSuggestions = emptyList()) }
             // The chip on screen, still offered under its new identity, answers typeahead again at once.
-            (source as? TvSearchSource.Music)?.takeIf { it.key in sources }?.let { shown ->
-                lastMusic = shown.source
-                _state.value.query
-                    .trim()
-                    .takeIf { it.isNotEmpty() }
-                    ?.let(::suggestMusic)
-            }
+            (source as? TvSearchSource.Music)?.takeIf { it.key in sources }?.let { lastMusic = it.source }
+            _state.value.query
+                .trim()
+                .takeIf { it.isNotEmpty() }
+                ?.let { query ->
+                    when {
+                        combinedPending -> suggest(query)
+                        lastMusic != null -> suggestMusic(query)
+                    }
+                }
         }
         // A search still in its typing pause has a job but no results yet.
         val gone = (_state.value.results.keys + searchJobs.keys + moreJobs.keys).filter { it !in sources || it in changed }
