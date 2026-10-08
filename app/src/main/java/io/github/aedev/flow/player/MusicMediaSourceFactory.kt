@@ -11,6 +11,7 @@ import androidx.media3.exoplayer.hls.HlsMediaSource
 import androidx.media3.exoplayer.source.MediaSource
 import androidx.media3.exoplayer.source.MergingMediaSource
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
+import io.github.aedev.flow.player.config.PlayerConfig
 import io.github.aedev.flow.player.datasource.BoundPluginMusicDataSourceFactory
 import io.github.aedev.flow.player.datasource.PluginMusicDataSourceFactory
 import io.github.aedev.flow.player.resolver.AudioOnlyHlsPlaylistParserFactory
@@ -90,7 +91,10 @@ class MusicMediaSourceFactory(
         }
         audio?.stream?.serverAbr?.let { presentation ->
             val transport = (sourceFactory as? BoundPluginMusicDataSourceFactory)?.serverAbr ?: sourceFactory
-            val native = SabrMediaSource.Factory(transport)
+            val native =
+                SabrMediaSource
+                    .Factory(transport)
+                    .setLivePresentationDelayMs(PlayerConfig.LIVE_EDGE_GAP_MS, true)
             if (audio.stream.drm != null) {
                 val provider = DefaultDrmSessionManagerProvider()
                 provider.setDrmHttpDataSourceFactory(

@@ -3,6 +3,7 @@ package io.github.aedev.flow.plugin.playback
 import androidx.media3.common.MediaItem
 import androidx.media3.datasource.DataSource
 import androidx.media3.exoplayer.source.MediaSource
+import io.github.aedev.flow.player.config.PlayerConfig
 import nl.neerdael.milkbeat.plugin.FormatType
 import nl.neerdael.milkbeat.plugin.ServerAbrPlayback
 import nl.neerdael.milkbeat.sabr.SabrMediaSource
@@ -28,7 +29,12 @@ class BoundServerAbr internal constructor(
                 playback
             }
         require(presentation.formats.any { it.format.type == FormatType.AUDIO }) { "SABR presentation has no audio" }
-        val source = SabrMediaSource.Factory(transport).setLiveSeekable(liveSeekable).createMediaSource(item, presentation)
+        val source =
+            SabrMediaSource
+                .Factory(transport)
+                .setLiveSeekable(liveSeekable)
+                .setLivePresentationDelayMs(PlayerConfig.LIVE_EDGE_GAP_MS, true)
+                .createMediaSource(item, presentation)
         return hold?.let {
             io.github.aedev.flow.player.resolver
                 .RuntimeHeldMediaSource(source, it)
