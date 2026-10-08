@@ -231,6 +231,7 @@ class EnhancedPlayerManager private constructor() {
                             .toMedia3Metadata(),
                     requestHeaders = resolved.requestHeaders,
                     serverAbr = resolved.serverAbr,
+                    hlsUrl = resolved.hlsUrl,
                 )
             },
             log = { autoNextLog(it) },
@@ -1727,7 +1728,7 @@ class EnhancedPlayerManager private constructor() {
         lastServerAbrFailure = null
         currentDurationSeconds = data.durationSeconds
         currentDashManifestUrl = data.dashManifestUrl
-        currentHlsUrl = null
+        currentHlsUrl = data.hlsUrl
         currentIsLiveStream = false
         pendingInitialLiveEdgeSeek = false
         currentVideoId = data.enrichedVideo.id

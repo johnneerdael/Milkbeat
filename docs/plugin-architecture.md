@@ -65,8 +65,11 @@ Keep unsigned last-modified values as strings on the JavaScript wire and preserv
 itag/last-modified/xTags identity in Media3 metadata. Protocol failures carry typed renewal
 reasons and opaque reload context; they are not invented HTTP errors. SABR endpoints must never
 enter progressive playback or offline-download caches. A prepared source owns its exact
-runtime lease and account epoch through release, so idle cleanup cannot discard a live
-attestation context and old account state cannot authorize a replacement source.
+runtime lease and its provider's account epoch, installed version and network grants through
+release, so idle cleanup cannot discard a live attestation context and old account state cannot
+authorize a replacement source. Refreshing an unrelated provider does not retire that source;
+catalog and preparation caches still observe the broader provider revision. HLS-only VOD
+preloads preserve their accepted manifest during promotion and cleared-media recovery.
 
 `BrowserOpenRequest.userAgent` lets a provider couple its browser generator to its attestation
 HTTP profile. Existing requests retain the default browser user agent. Playback artwork is

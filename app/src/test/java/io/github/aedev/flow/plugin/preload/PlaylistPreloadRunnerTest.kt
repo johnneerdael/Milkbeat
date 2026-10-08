@@ -191,6 +191,7 @@ class PlaylistPreloadRunnerTest {
             }
             every { accounts.playbackIdentitySnapshot() } returns emptyMap()
             every { accounts.playbackEpoch } returns MutableStateFlow(0L)
+            every { accounts.providerPlaybackContext(any()) } returns ("anonymous" to 0L)
             val audio = PluginAudio(host, registry, matcher, accounts)
             assertThat(audio.resolve(b, null).pluginId).isEqualTo("beatport")
             runner.run("spotify", "listener", listOf("youtube", "beatport")) { }

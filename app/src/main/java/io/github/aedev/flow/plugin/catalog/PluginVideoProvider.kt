@@ -93,7 +93,7 @@ class PluginVideoProvider
         }
 
         internal fun playbackContext(): Any =
-            Triple(registry.state.value, accounts.playbackIdentitySnapshot(), accounts.playbackEpoch.value)
+            Triple(registry.state.value.plugin(selected.orEmpty()), accounts.providerPlaybackContext(selected.orEmpty()), selected)
 
         internal fun playbackGrants(pluginId: String): List<String> =
             registry.state.value

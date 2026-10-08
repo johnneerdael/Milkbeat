@@ -198,6 +198,7 @@ class MediaLoader(
         mediaMetadata: MediaMetadata = MediaMetadata.EMPTY,
         requestHeaders: StreamRequestHeaders = StreamRequestHeaders.NONE,
         serverAbr: io.github.aedev.flow.plugin.playback.BoundServerAbr? = null,
+        hlsUrl: String? = null,
     ): MediaSource? {
         val ctx = context ?: return null
         val dataSourceFactory = (cacheManager?.getDataSourceFactory() ?: DefaultDataSource.Factory(ctx)).withRequestHeaders(requestHeaders)
@@ -210,7 +211,7 @@ class MediaLoader(
                 availableVideoStreams = availableVideoStreams,
                 currentVideoStream = videoStream,
                 dashManifestUrl = dashManifestUrl,
-                hlsUrl = null,
+                hlsUrl = hlsUrl,
                 isLiveStream = false,
                 finalDuration = durationSeconds,
                 localFilePath = null,

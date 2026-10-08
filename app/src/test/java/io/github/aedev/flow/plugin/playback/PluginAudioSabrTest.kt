@@ -94,6 +94,32 @@ class PluginAudioSabrTest : PluginAudioFixture() {
         }
 
     @Test
+    fun `refreshing an unrelated provider keeps the accepted native source and renewal bound`() =
+        runTest {
+            val accepted = audio.resolve(original, null, playbackId = "catalog-id")
+            coEvery { host.call("soundcloud", PluginOperations.account, Unit) } returns
+                nl.neerdael.milkbeat.catalog.ProviderAccount.Anonymous
+            accounts.refresh("soundcloud")
+            audio.verifyBound(accepted)
+            audio.failed("catalog-id", accepted.stream.url, null, serverAbrFailure = ServerAbrFailure.URL_EXPIRED)
+            val renewed = audio.resolve(original, null, playbackId = "catalog-id")
+            assertThat(renewed.track.ref).isEqualTo(accepted.track.ref)
+            assertThat(renewed.pluginId).isEqualTo(accepted.pluginId)
+        }
+
+    @Test
+    fun `same-provider anonymous sign-out invalidates an accepted native source`() =
+        runTest {
+            coEvery { host.call("youtube", PluginOperations.account, Unit) } returns
+                nl.neerdael.milkbeat.catalog.ProviderAccount.Anonymous
+            accounts.refresh("youtube")
+            val accepted = audio.resolve(original, null)
+            coEvery { host.call("youtube", PluginOperations.signOut, Unit) } returns Unit
+            accounts.signOut("youtube")
+            assertThat(runCatching { audio.verifyBound(accepted) }.isFailure).isTrue()
+        }
+
+    @Test
     fun `ordinary same-account and profile refresh leave the accepted source bound`() =
         runTest {
             coEvery { host.call("youtube", PluginOperations.account, Unit) } returns

@@ -56,6 +56,7 @@ class ResolvedAudio(
     internal val request: ResolveAudioRequest? = null,
     internal val preparationContext: Any? = null,
     internal val runtimeReceipt: PluginPlaybackReceipt? = null,
+    internal val nativeBinding: Any? = null,
 )
 
 /** What the picture of a music video is resolved against: what this TV decodes, best first. */
@@ -104,6 +105,12 @@ class PluginAudio
                 }.distinctUntilChanged()
 
         private fun streamContext(): Any = Triple(registry.state.value, accounts.playbackIdentitySnapshot(), accounts.playbackEpoch.value)
+
+        private fun nativeContext(pluginId: String): Any =
+            registry.state.value.plugin(pluginId) to accounts.providerPlaybackContext(pluginId)
+
+        private fun ownsNativeSource(audio: ResolvedAudio): Boolean =
+            audio.nativeBinding != null && audio.nativeBinding == nativeContext(audio.pluginId)
 
         internal fun needsQueueMatching(
             track: TrackDescriptor,
@@ -166,18 +173,20 @@ class PluginAudio
             preferredProviderId: String?,
         ): ResolvedAudio {
             val context = streamContext()
-            val version = context to cacheGeneration.get()
+            val generation = cacheGeneration.get()
+            val version = context to generation
             val key = track.audioIdentity()
+            val failedAudio = resolved[key]
             val acceptedSabrFailure = failures[key] != null && resolved[key]?.stream?.serverAbr != null
             if ((failures[key]?.serverAbrFailure != null || acceptedSabrFailure) && failureContexts[key] != null &&
-                failureContexts[key] != context
+                failureContexts[key] != (failedAudio?.nativeBinding?.let { nativeContext(failedAudio.pluginId) } ?: context)
             ) {
                 failures.remove(key)
                 failureContexts.remove(key)
                 throw IOException("The accepted playback account or provider changed")
             }
             val state = registry.state.value
-            val previous = resolved[key]?.takeIf { it.preparationContext == context }
+            val previous = resolved[key]?.takeIf { it.preparationContext == context || ownsNativeSource(it) }
             val providers = audioProviderAttempts(state, track, withPicture = picture != null, preferredProviderId = preferredProviderId)
             val pinned =
                 previous
@@ -223,6 +232,7 @@ class PluginAudio
                             failure = failures.remove(key),
                         )
                     try {
+                        val acceptedContext = nativeContext(plugin.id)
                         val (stream, receipt) =
                             host.withPlaybackReceipt(
                                 plugin.id,
@@ -248,7 +258,9 @@ class PluginAudio
                                 ?.grantedNetwork
                                 .orEmpty(),
                         )
-                        if (stream.serverAbr != null && version != preparationVersion()) {
+                        if (stream.serverAbr != null &&
+                            (acceptedContext != nativeContext(plugin.id) || generation != cacheGeneration.get())
+                        ) {
                             throw IOException("The accepted playback account or provider changed")
                         }
                         val lifetime = stream.expiresInMs ?: DEFAULT_LIFETIME_MS
@@ -262,9 +274,12 @@ class PluginAudio
                             request,
                             context,
                             if (stream.serverAbr != null) receipt else null,
+                            if (stream.serverAbr != null) acceptedContext else null,
                         ).also {
                             synchronized(resolved) {
-                                if (version == preparationVersion()) {
+                                if (generation == cacheGeneration.get() &&
+                                    (version == preparationVersion() || (stream.serverAbr != null && ownsNativeSource(it)))
+                                ) {
                                     resolved[key] = it
                                     resolvedRevision.update { revision -> revision + 1 }
                                 }
@@ -358,12 +373,15 @@ class PluginAudio
                 request,
                 audio.preparationContext,
                 if (stream.serverAbr != null) receipt else null,
+                audio.nativeBinding,
             )
         }
 
         internal fun verifyBound(audio: ResolvedAudio) {
             if (audio.runtimeReceipt?.isCurrent() == false) throw PluginPlaybackSessionLost()
-            if (audio.preparationContext != null && audio.preparationContext != streamContext()) {
+            if (audio.nativeBinding?.let { it != nativeContext(audio.pluginId) }
+                ?: (audio.preparationContext != null && audio.preparationContext != streamContext())
+            ) {
                 throw IOException("The accepted playback account or provider changed")
             }
         }
@@ -459,7 +477,7 @@ class PluginAudio
         /** The current-context stream for [id], excluding a URL invalidated during recovery. */
         fun current(id: String): ResolvedAudio? =
             playbackIds[id]?.let(resolved::get)?.takeIf {
-                it.validUntilMs != 0L && it.preparationContext == streamContext()
+                it.validUntilMs != 0L && (it.preparationContext == streamContext() || ownsNativeSource(it))
             }
 
         /** Playback of [id] failed on [url] with [status]; the next resolve asks the plugin for another. */
@@ -471,7 +489,9 @@ class PluginAudio
             serverAbrFailure: ServerAbrFailure? = null,
         ) {
             val key = playbackIds[id] ?: return
-            resolved[key]?.preparationContext?.let { failureContexts[key] = it }
+            resolved[key]?.let { audio ->
+                (audio.nativeBinding ?: audio.preparationContext)?.let { failureContexts[key] = it }
+            }
             failures[key] = StreamFailure(url, status, reloadPlaybackContext, serverAbrFailure)
             if (status == 403 || serverAbrFailure != null || resolved[key]?.stream?.serverAbr != null) {
                 forget(id)
@@ -513,6 +533,7 @@ class PluginAudio
                             audio.request,
                             audio.preparationContext,
                             audio.runtimeReceipt,
+                            audio.nativeBinding,
                         )
                     }
                 }
