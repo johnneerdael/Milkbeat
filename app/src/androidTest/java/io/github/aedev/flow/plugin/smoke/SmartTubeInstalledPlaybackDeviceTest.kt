@@ -419,6 +419,16 @@ class SmartTubeInstalledPlaybackDeviceTest {
                     val dimensions = withContext(Dispatchers.Main) { engine.videoSize.width to engine.videoSize.height }
                     step("picture.hide")
                     compose.runOnIdle { visible.value = false }
+                    compose.waitForIdle()
+                    withContext(Dispatchers.Main) {
+                        SmartTubeSmoke.report(
+                            "HIDDEN_PICTURE_STATE",
+                            mapOf(
+                                "videoSurfaceCount" to manager.videoSurfaces,
+                                "videoTrackDisabled" to (C.TRACK_TYPE_VIDEO in engine.trackSelectionParameters.disabledTrackTypes),
+                            ),
+                        )
+                    }
                     SmartTubeSmoke.await { C.TRACK_TYPE_VIDEO in engine.trackSelectionParameters.disabledTrackTypes }
                     delay(1500) // Permit cancellation of one in-flight picture chunk before checking sustained hidden work.
                     val hiddenVideoRequests = evidence.abr.count { it.videoOnly }
