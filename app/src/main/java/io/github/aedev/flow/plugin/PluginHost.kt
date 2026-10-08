@@ -48,11 +48,11 @@ class PluginHost
         init {
             scope.launch {
                 registry.state
-                    .map { state -> state.plugins.associate { it.id to (it.manifest.versionCode to it.enabled) } }
+                    .map { state -> state.plugins.associate { it.id to (it.installation to it.enabled) } }
                     .distinctUntilChanged()
                     .collect { installed ->
                         lock.withLock {
-                            val stale = runtimes.filter { (id, runtime) -> installed[id] != (runtime.plugin.manifest.versionCode to true) }
+                            val stale = runtimes.filter { (id, runtime) -> installed[id] != (runtime.plugin.installation to true) }
                             stale.keys.forEach(runtimes::remove)
                             stale.values.forEach { it.close() }
                         }
@@ -83,9 +83,21 @@ class PluginHost
                     create(plugin).also { runtime ->
                         runtimes[pluginId] = runtime
                         scope.launch(Dispatchers.Default) { runtime.warmUp() }
+                        scope.launch(Dispatchers.IO) { removeOtherCodeCaches(plugin) }
                     }
                 }
             }
+
+        private fun codeCacheDirectory(plugin: InstalledPlugin): File = File(context.cacheDir, pluginCodeCachePath(plugin))
+
+        /** The code compiled for earlier installations of [plugin], which no runtime loads again. */
+        private fun removeOtherCodeCaches(plugin: InstalledPlugin) {
+            val current = codeCacheDirectory(plugin)
+            current.parentFile
+                ?.listFiles()
+                ?.filter { it != current }
+                ?.forEach { it.deleteRecursively() }
+        }
 
         private fun create(plugin: InstalledPlugin): PluginRuntime {
             val directory = registry.directory(plugin)
@@ -103,8 +115,18 @@ class PluginHost
                 directory = directory,
                 hostApi = hostApi,
                 browser = PluginBrowser(context, plugin.grantedBrowser, hostApi::asset),
-                codeCache = CodeCache(File(context.cacheDir, "plugin-code/${plugin.id}/${plugin.manifest.versionCode}")),
+                codeCache = CodeCache(codeCacheDirectory(plugin)),
                 scope = scope,
             )
         }
     }
+
+/**
+ * One installation of a plugin: its version and when it was installed. Reinstalling the same version
+ * is a new installation, so its runtime and compiled code are not reused from the one it replaced.
+ */
+internal val InstalledPlugin.installation: Pair<Int, Long> get() = manifest.versionCode to installedAtMs
+
+/** Where an installation's compiled scripts are cached, relative to the app's cache directory. */
+internal fun pluginCodeCachePath(plugin: InstalledPlugin): String =
+    "plugin-code/${plugin.id}/${plugin.manifest.versionCode}-${plugin.installedAtMs}"

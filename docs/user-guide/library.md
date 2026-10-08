@@ -66,7 +66,7 @@ Each provider brings its own filter chips and suggestions, and a chip only ever 
 ![Beatport search with Tracks, Releases, Artists, Labels, Charts and Playlists filters](images/search-beatport.png)
 </div>
 
-YouTube Music offers Songs, Videos, Albums, Artists, Featured and Community playlists; Beatport offers Tracks, Releases, Artists, Labels, Charts and Playlists. **Local library** searches song titles, artists, albums and artist names in your folders and offers no suggestions while you type. Opening a result uses the page for its type, on the provider of its chip.
+YouTube Music offers Songs, Videos, Albums, Artists, Featured and Community playlists; Beatport offers Tracks, Releases, Artists, Labels, Charts and Playlists. **Local library** searches song titles, artists, albums and artist names in your folders; while you type it suggests only matching recent searches, with no provider suggestions. Opening a result uses the page for its type, on the provider of its chip.
 
 ## Library
 
