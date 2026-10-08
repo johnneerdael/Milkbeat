@@ -105,6 +105,8 @@ data class AudioStream(
     val drm: AudioDrm? = null,
     val serverAbr: ServerAbrPlayback? = null,
     val artwork: Artwork? = null,
+    /** Require the native HLS parser to select an independently advertised audio rendition. */
+    val requireAudioOnlyHls: Boolean = false,
 )
 
 /** License information consumed by the host's platform DRM implementation. */

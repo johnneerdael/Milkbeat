@@ -535,6 +535,7 @@ export interface AudioStream {
   drm?: null | AudioDrm;
   serverAbr?: null | ServerAbrPlayback;
   artwork?: null | Artwork;
+  requireAudioOnlyHls?: boolean;
 }
 export interface MediaFormat {
   id: string;

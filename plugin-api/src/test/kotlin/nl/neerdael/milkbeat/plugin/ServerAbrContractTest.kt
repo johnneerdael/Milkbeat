@@ -22,7 +22,8 @@ class ServerAbrContractTest {
           "durationMs":120000,
           "client":{"clientName":7,"clientVersion":"TV.TEST","deviceMake":"TCL","deviceModel":"G17","osName":"Android","osVersion":"14"},
           "formats":[{
-            "format":{"id":"251:18446744073709551615","type":"AUDIO","url":"https://media.example/video","mimeType":"audio/webm","codecs":"opus"},
+            "format":{"id":"251:18446744073709551615","type":"AUDIO","url":"https://media.example/video",
+              "mimeType":"audio/webm","codecs":"opus"},
             "itag":251,"lastModified":"18446744073709551615","xTags":"lang=en"}
           ]
         }
@@ -79,6 +80,20 @@ class ServerAbrContractTest {
             assertEquals(PluginJson.parseToJsonElement(raw).jsonObject["serverAbrFailure"], encoded["serverAbrFailure"])
             assertNull(failure.status)
         }
+    }
+
+    @Test
+    fun strictAudioOnlyHlsIsAdditiveAndFalseForLegacySources() {
+        val raw =
+            """
+            {"url":"https://media.example/master.m3u8","cacheKey":"fixture","renditionId":"hls",
+              "mimeType":"application/x-mpegURL","requireAudioOnlyHls":true}
+            """.trimIndent()
+        val stream = PluginJson.decodeFromString(AudioStream.serializer(), raw)
+        assertEquals(true, stream.requireAudioOnlyHls)
+        val encoded = PluginJson.encodeToJsonElement(AudioStream.serializer(), stream).jsonObject
+        assertEquals(PluginJson.parseToJsonElement(raw).jsonObject["requireAudioOnlyHls"], encoded["requireAudioOnlyHls"])
+        assertEquals(false, stream.copy(requireAudioOnlyHls = false).requireAudioOnlyHls)
     }
 
     @Test
