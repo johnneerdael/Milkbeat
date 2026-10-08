@@ -1,5 +1,6 @@
 package io.github.aedev.flow.plugin.playback
 
+import android.os.SystemClock
 import androidx.media3.datasource.DataSource
 import io.github.aedev.flow.plugin.PluginHost
 import io.github.aedev.flow.plugin.catalog.PluginAccounts
@@ -62,7 +63,13 @@ class ResolvedAudio(
     internal val preparationContext: Any? = null,
     internal val runtimeReceipt: PluginPlaybackReceipt? = null,
     internal val nativeBinding: Any? = null,
-)
+    internal val nativeValidUntilElapsedMs: Long? = null,
+) {
+    internal fun isValidAt(
+        wallTimeMs: Long,
+        elapsedTimeMs: Long,
+    ): Boolean = nativeValidUntilElapsedMs?.let { it > elapsedTimeMs } ?: (validUntilMs > wallTimeMs)
+}
 
 /** What the picture of a music video is resolved against: what this TV decodes, best first. */
 class PictureLimits(
@@ -196,7 +203,7 @@ class PluginAudio
             val pinned =
                 previous
                     ?.takeIf {
-                        picture != null || it.validUntilMs <= System.currentTimeMillis() ||
+                        picture != null || !it.isValidAt(System.currentTimeMillis(), SystemClock.elapsedRealtime()) ||
                             it.runtimeReceipt?.isCurrent() == false
                     }?.let { audio ->
                         providers.firstOrNull { it.plugin.id == audio.pluginId }?.let { AudioProviderAttempt(it.plugin, audio.track) }
@@ -212,7 +219,8 @@ class PluginAudio
             val order = (if (picture != null) attempts else providers).map { "${it.plugin.id}:${it.plugin.manifest.versionCode}" }
             resolved[key]
                 ?.takeIf {
-                    it.preparationContext == context && it.providerOrder == order && it.validUntilMs > System.currentTimeMillis() &&
+                    it.preparationContext == context && it.providerOrder == order &&
+                        it.isValidAt(System.currentTimeMillis(), SystemClock.elapsedRealtime()) &&
                         it.runtimeReceipt?.isCurrent() != false && it.request?.quality == quality && (
                             picture == null || (
                                 it.withPicture &&
@@ -282,6 +290,7 @@ class PluginAudio
                             context,
                             if (stream.serverAbr != null) receipt else null,
                             if (stream.serverAbr != null) acceptedContext else null,
+                            if (stream.serverAbr != null) SystemClock.elapsedRealtime() + lifetime - EXPIRY_MARGIN_MS else null,
                         ).also {
                             request.failure?.let { failure -> failures.remove(key, failure) }
                             synchronized(resolved) {
@@ -387,6 +396,13 @@ class PluginAudio
                 audio.preparationContext,
                 if (stream.serverAbr != null) receipt else null,
                 audio.nativeBinding,
+                if (stream.serverAbr !=
+                    null
+                ) {
+                    SystemClock.elapsedRealtime() + (stream.expiresInMs ?: DEFAULT_LIFETIME_MS) - EXPIRY_MARGIN_MS
+                } else {
+                    null
+                },
             )
         }
 
@@ -418,7 +434,7 @@ class PluginAudio
         ): DataSource.Factory =
             pluginSabrDataSourceFactory(base, audio.stream.headers, {
                 verifyBound(audio)
-                if (System.currentTimeMillis() >= audio.validUntilMs) {
+                if (!audio.isValidAt(System.currentTimeMillis(), SystemClock.elapsedRealtime())) {
                     throw nl.neerdael.milkbeat.sabr.SabrPlaybackException(
                         nl.neerdael.milkbeat.sabr.SabrPlaybackException.Reason.URL_EXPIRED,
                         audio.stream.url,
@@ -556,6 +572,7 @@ class PluginAudio
                             audio.preparationContext,
                             audio.runtimeReceipt,
                             audio.nativeBinding,
+                            audio.nativeValidUntilElapsedMs?.let { 0L },
                         )
                     }
                 }

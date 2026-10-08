@@ -77,7 +77,21 @@ class PluginSabrExpiryTest : PluginAudioFixture() {
                     )
                 audio.failed(original.ref.providerId, "https://media.example/sabr", null)
                 val accepted = audio.resolve(original, null)
+                if (lifetime == 120000L) {
+                    assertThat(accepted.isValidAt(Long.MAX_VALUE, android.os.SystemClock.elapsedRealtime())).isTrue()
+                    assertThat(accepted.isValidAt(Long.MIN_VALUE, android.os.SystemClock.elapsedRealtime() + 60001L)).isFalse()
+                }
                 inspectGuard(lifetime < 60000L) { audio.serverAbrDataSourceFactory(accepted, okhttp3.OkHttpClient()) }
+                if (lifetime == 120000L) {
+                    val elapsedAfterDeadline = android.os.SystemClock.elapsedRealtime() + 60001L
+                    mockkStatic(android.os.SystemClock::class)
+                    try {
+                        every { android.os.SystemClock.elapsedRealtime() } returns elapsedAfterDeadline
+                        inspectGuard(true) { audio.serverAbrDataSourceFactory(accepted, okhttp3.OkHttpClient()) }
+                    } finally {
+                        unmockkStatic(android.os.SystemClock::class)
+                    }
+                }
             }
         }
 
@@ -113,6 +127,16 @@ class PluginSabrExpiryTest : PluginAudioFixture() {
                 val video = PluginVideo(provider, preferences, limits)
                 val accepted = video.resolve(PluginVideoStreamsTest.VIDEO_ID).getOrThrow()
                 inspectGuard(lifetime < 60000L) { requireNotNull(video.bindServerAbr(accepted)) }
+                if (lifetime == 120000L) {
+                    val elapsedAfterDeadline = android.os.SystemClock.elapsedRealtime() + 60001L
+                    mockkStatic(android.os.SystemClock::class)
+                    try {
+                        every { android.os.SystemClock.elapsedRealtime() } returns elapsedAfterDeadline
+                        inspectGuard(true) { requireNotNull(video.bindServerAbr(accepted)) }
+                    } finally {
+                        unmockkStatic(android.os.SystemClock::class)
+                    }
+                }
             }
         }
 }

@@ -134,7 +134,7 @@ class PluginVideo
     ) {
         private class Resolved(
             val playback: VideoPlayback,
-            val validUntilMs: Long,
+            val validUntilElapsedMs: Long,
             val receivedAtElapsedMs: Long,
             val pluginId: String,
             val context: Any,
@@ -161,7 +161,7 @@ class PluginVideo
                 resolved[videoId]
                     ?.takeIf {
                         it.context == provider.playbackContext() && it.runtimeReceipt?.isCurrent() != false &&
-                            it.validUntilMs > System.currentTimeMillis()
+                            it.validUntilElapsedMs > SystemClock.elapsedRealtime()
                     }?.let {
                         return@withLock Result.success(it.playback.agedBy(SystemClock.elapsedRealtime() - it.receivedAtElapsedMs))
                     }
@@ -245,7 +245,7 @@ class PluginVideo
                             resolved[videoId] =
                                 Resolved(
                                     playback,
-                                    System.currentTimeMillis() + lifetime - EXPIRY_MARGIN_MS,
+                                    SystemClock.elapsedRealtime() + lifetime - EXPIRY_MARGIN_MS,
                                     SystemClock.elapsedRealtime(),
                                     pluginId,
                                     context,
@@ -276,7 +276,7 @@ class PluginVideo
             val transport =
                 pluginSabrDataSourceFactory(sabrClient, playback.headers, {
                     if (accepted.runtimeReceipt?.isCurrent() == false) throw PluginPlaybackSessionLost()
-                    if (System.currentTimeMillis() >= accepted.validUntilMs) {
+                    if (SystemClock.elapsedRealtime() >= accepted.validUntilElapsedMs) {
                         throw nl.neerdael.milkbeat.sabr.SabrPlaybackException(
                             nl.neerdael.milkbeat.sabr.SabrPlaybackException.Reason.URL_EXPIRED,
                             presentation.url,
@@ -311,6 +311,8 @@ class PluginVideo
         /** Drops what was resolved for [videoId], so the next resolve asks the plugin again. */
         fun forget(videoId: String) {
             resolved.remove(videoId)
+            recovering.remove(videoId)
+            failures.remove(videoId)
         }
 
         /** The videos the plugin plays next after [videoId]; empty when it has none or fails. */

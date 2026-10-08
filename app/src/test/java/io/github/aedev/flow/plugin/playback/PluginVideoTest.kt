@@ -61,6 +61,32 @@ class PluginVideoTest {
     }
 
     @Test
+    fun `explicit retry forgets pinned native recovery and uses the current provider and account`() =
+        runTest {
+            val native =
+                ServerAbrPlayback(
+                    "https://media.example/sabr",
+                    VIDEO_ID,
+                    "AQI",
+                    ServerAbrClientInfo(7, "fixture"),
+                    listOf(
+                        ServerAbrFormat(PluginVideoStreamsTest.audioOriginal.copy(url = ""), 251, "100"),
+                        ServerAbrFormat(PluginVideoStreamsTest.video1080.copy(url = ""), 137, "101"),
+                    ),
+                    durationMs = 212000,
+                )
+            coEvery { provider.resolveBound(any(), any(), capture(requests)) } returns playback().copy(serverAbr = native)
+            pluginVideo.resolve(VIDEO_ID).getOrThrow()
+            pluginVideo.failed(VIDEO_ID, native.url, null, "old-context", ServerAbrFailure.PLAYBACK_CONTEXT_RELOAD)
+            pluginVideo.forget(VIDEO_ID)
+            playbackContext = "new-account"
+            every { provider.selected } returns "new-provider"
+            pluginVideo.resolve(VIDEO_ID).getOrThrow()
+            assertThat(requests.last().failure).isNull()
+            coVerify { provider.resolveBound("new-provider", "new-account", any()) }
+        }
+
+    @Test
     fun `SDR conventional picture takes precedence over a native presentation with only HDR picture`() =
         runTest {
             val hdr = PluginVideoStreamsTest.video1080.copy(id = "337", hdr = true)

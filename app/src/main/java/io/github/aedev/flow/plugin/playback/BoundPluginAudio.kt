@@ -15,7 +15,7 @@ internal class BoundPluginAudio(
 
     suspend fun current(): ResolvedAudio =
         renewal.withLock {
-            if (resolved.validUntilMs > clock()) return@withLock resolved
+            if (resolved.isValidAt(clock(), android.os.SystemClock.elapsedRealtime())) return@withLock resolved
             val next = refresh(resolved)
             if (initial.stream.drm != null) {
                 val previous = initial.stream
