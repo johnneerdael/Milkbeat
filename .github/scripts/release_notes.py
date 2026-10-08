@@ -161,6 +161,7 @@ def nested_markdown(text: str) -> str:
 
 
 DOWNLOADER_CODE = "7170062"
+DOWNLOADER_URL = "https://play.google.com/store/apps/details?id=com.esaba.downloader&hl=en"
 
 # What each plugin provides; names, versions and downloader codes come from plugins/published.json,
 # which the plugin publisher updates on main whenever it publishes a release.
@@ -202,7 +203,7 @@ def standard_footer(repo: str, version: str, previous_tag: str | None, core_vers
 
 ## Install on Android TV
 
-- **Downloader app:** enter code `{DOWNLOADER_CODE}`
+- **Downloader app:** install [Downloader by AFTVnews]({DOWNLOADER_URL}) and enter code `{DOWNLOADER_CODE}`
 - **Direct link (always the latest):** {latest}/milkbeat-universal.apk
 
 Per-ABI APKs (`milkbeat-arm64-v8a.apk`, `milkbeat-armeabi-v7a.apk`) and `checksums.txt` are attached below.

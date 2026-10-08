@@ -27,7 +27,7 @@ a MilkDrop visualizer up to 4K, or the music video, or the cover. Everything is 
 
 > **Install on your TV with the Downloader app: code `7170062`**
 >
-> Install *Downloader* by AFTVnews, enter **7170062** and install the APK. The code always points to
+> Install [*Downloader* by AFTVnews](https://play.google.com/store/apps/details?id=com.esaba.downloader&hl=en), enter **7170062** and install the APK. The code always points to
 > the newest release. Details under [Install](#install).
 
 <p align="center">
@@ -214,7 +214,7 @@ overview; [ProjectM TV's guide](https://johnneerdael.github.io/ProjectM-TV/) cov
 
 | Method | How |
 | --- | --- |
-| **Downloader app** (Google TV, Fire TV, NVIDIA SHIELD) | Install [Downloader](https://www.aftvnews.com/downloader/) and enter code **`7170062`** |
+| **Downloader app** (Google TV, Fire TV, NVIDIA SHIELD) | Install [Downloader by AFTVnews](https://play.google.com/store/apps/details?id=com.esaba.downloader&hl=en) and enter code **`7170062`** |
 | **Direct link** (always the latest build) | https://github.com/johnneerdael/Milkbeat/releases/latest/download/milkbeat-universal.apk |
 | **All builds** | [Releases](https://github.com/johnneerdael/Milkbeat/releases): every successful `main` build is published with release notes |
 
