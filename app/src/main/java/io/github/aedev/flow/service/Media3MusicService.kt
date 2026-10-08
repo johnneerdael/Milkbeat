@@ -16,8 +16,6 @@ import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.analytics.AnalyticsListener
-import androidx.media3.exoplayer.audio.AudioSink
-import androidx.media3.exoplayer.audio.DefaultAudioSink
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.session.MediaLibraryService
 import androidx.media3.session.MediaNotification
@@ -37,6 +35,8 @@ import io.github.aedev.flow.player.MusicMediaSourceFactory
 import io.github.aedev.flow.player.MusicPlaybackRecoveryPlanner
 import io.github.aedev.flow.player.MusicVideoItems
 import io.github.aedev.flow.player.audio.AudioSessionRegistry
+import io.github.aedev.flow.player.audio.MusicAudioTrackProbe
+import io.github.aedev.flow.player.audio.MusicOutputRecovery
 import io.github.aedev.flow.player.audio.eq.EqualizerAudioProcessor
 import io.github.aedev.flow.player.audio.shouldHandleAudioFocus
 import io.github.aedev.flow.player.audio.shouldOffloadAudio
@@ -87,6 +87,11 @@ class Media3MusicService : MediaLibraryService() {
 
     internal lateinit var mediaLibrarySession: MediaLibrarySession
     internal lateinit var player: ExoPlayer
+    internal val audioOutputProbe = MusicAudioTrackProbe()
+    internal lateinit var outputRecovery: MusicOutputRecovery
+    internal val sessionPlayer: Player get() = if (::outputRecovery.isInitialized) outputRecovery.reportedPlayer else player
+    internal val outputRecoveryActive: Boolean get() = ::outputRecovery.isInitialized && outputRecovery.isRecovering
+    internal val outputFailureHeld: Boolean get() = ::outputRecovery.isInitialized && outputRecovery.hasOutputFailure
     internal val playerInitialized: Boolean get() = ::player.isInitialized
     internal val sessionInitialized: Boolean get() = ::mediaLibrarySession.isInitialized
     private val musicSession by lazy { MusicServiceSession(this) }
@@ -348,6 +353,7 @@ class Media3MusicService : MediaLibraryService() {
 
         val renderersFactory =
             object : androidx.media3.exoplayer.DefaultRenderersFactory(this) {
+                @Suppress("DEPRECATION")
                 override fun buildAudioSink(
                     context: android.content.Context,
                     enableFloatOutput: Boolean,
@@ -355,6 +361,7 @@ class Media3MusicService : MediaLibraryService() {
                 ): androidx.media3.exoplayer.audio.AudioSink? =
                     androidx.media3.exoplayer.audio.DefaultAudioSink
                         .Builder(context)
+                        .setAudioTrackProvider(audioOutputProbe)
                         .setAudioProcessors(
                             arrayOf<androidx.media3.common.audio.AudioProcessor>(equalizer, VisualizerTapProcessor(visualizerTap)),
                         ).build()
@@ -381,12 +388,13 @@ class Media3MusicService : MediaLibraryService() {
         audioSessions.open(player.audioSessionId, AudioEffect.CONTENT_TYPE_MUSIC)
 
         player.setOffloadEnabled(shouldOffloadAudio(isTv, equalizerRepository.needsProcessing.value))
-        player.addListener(VisualizerClockListener(visualizerTap))
-        lifecycleScope.launch { followPlayerClock(visualizerTap, player) }
+        initializeOutputRecovery()
+        sessionPlayer.addListener(VisualizerClockListener(visualizerTap))
+        lifecycleScope.launch { followPlayerClock(visualizerTap, sessionPlayer) }
         // Stream URLs belong to the identity that requested them; a sign-in or sign-out starts fresh.
         lifecycleScope.launch { pluginAccounts.accounts.drop(1).collect { downloadUtil.clearUrlCache() } }
 
-        player.addListener(
+        sessionPlayer.addListener(
             object : Player.Listener {
                 override fun onShuffleModeEnabledChanged(shuffleModeEnabled: Boolean) {
                     musicSession.updateNotification()
@@ -544,7 +552,7 @@ class Media3MusicService : MediaLibraryService() {
      * Overriding without calling super keeps the service alive.
      */
     override fun onTaskRemoved(rootIntent: Intent?) {
-        if (::player.isInitialized && player.isPlaying) {
+        if (::player.isInitialized && (player.isPlaying || outputRecoveryActive || outputFailureHeld)) {
             return
         }
         stopSelf()
@@ -569,12 +577,13 @@ class Media3MusicService : MediaLibraryService() {
         }
 
         pendingRetryJob?.cancel()
+        if (::outputRecovery.isInitialized) outputRecovery.close()
 
         if (::mediaLibrarySession.isInitialized) {
             mediaLibrarySession.release()
         }
         if (::player.isInitialized) {
-            player.release()
+            sessionPlayer.release()
         }
         releaseLocks()
         super.onDestroy()

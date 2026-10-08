@@ -62,6 +62,18 @@ Spotify is metadata-only. Enable at least one audio provider, check its account/
 
 Milkbeat buffers up to about 16 MB of a streamed song ahead (usually all of it) and, when a stream link fails, requests a fresh one for the same recording and resumes at the same position. Playback can still stop if the song is not yet buffered far enough when the link fails, for example right after it starts, while a music video's picture shares the buffer, or on a slow network, and the audio provider then cannot supply a new stream in time. Retry later, or check whether YouTube is limiting your network.
 
+## Music becomes silent while the player keeps advancing
+
+Milkbeat checks actual audio-frame progress for normal decoded TV audio (PCM). After about five seconds
+without output progress while the player still reports playback, it freezes the displayed position
+and attempts to reconnect the same track, preserving the queue.
+The player reports recovery until frames advance again. After two unsuccessful attempts, it leaves
+the track paused and shows **Audio output stopped. Press Play to retry.** Press Play for another attempt,
+or choose another track. Pause, seeking, choosing another track or Stop cancels recovery. This check
+uses output progress rather than volume, so a quiet passage alone does not restart the song. Recovery
+may repeat a short stretch of the song. Hardware-offloaded audio and encoded HDMI passthrough are
+outside automatic stall detection.
+
 ## Provider sign-in needs verification
 
 Use the streamed phone sign-in viewer and complete the provider's verification there. The phone and TV must be on the same network. Do not expect a native Spotify password form in Milkbeat.

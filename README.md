@@ -32,6 +32,10 @@ services and play music videos. Everything is built for the TV remote.
 - **Ordered audio providers:** try one provider first, then fall back to the next.
 - **Playback preparation:** index provider playlists in advance and resolve upcoming queue tracks
   one at a time across the remaining queue.
+- **Output recovery:** if normal decoded TV audio (PCM) stops advancing while the player still
+  reports playback, freeze progress and reconnect the same track; after two unsuccessful attempts,
+  leave it paused for a manual retry. Hardware-offloaded audio and encoded HDMI passthrough are
+  outside automatic stall detection.
 - **Radio discovery:** every queue continues as a radio, steered by every preset YouTube Music offers for it (All, Popular, Discover, Deep cuts, moods and decades).
 - **Optional private playlists:** prepare Spotify playlists in a signed-in YouTube Music account for
   native collection playback and autoplay. Recently verified copies reopen without another

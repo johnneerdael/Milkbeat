@@ -688,6 +688,9 @@ revision must pass the configured ktlint rules.
 - `:app` is the Android app. Kotlin sources live in `app/src/main/java/io/github/aedev/flow/`;
   the TV shell and navigation are in `ui/tv/`, and route ViewModels are in `ui/screens/`.
   Unit tests live in `app/src/test/`, with device tests in `app/src/androidTest/`.
+  `app/src/test/resources/robolectric.properties` defaults unit tests to `android.app.Application`;
+  override it with `@Config(application = …)` when testing application-owned startup. AGP-backed
+  Robolectric ignores `Config.NONE`, so it does not isolate tests from `FlowApplication` startup.
 - `:plugin-api` defines the plain Kotlin catalog/plugin contract; `:spike-plugin-runtime` contains
   runtime experiments. `:benchmark` is the Android baseline-profile and benchmark module
   configured in `settings.gradle.kts` (there is no `:baselineprofile` module).
@@ -728,6 +731,18 @@ revision must pass the configured ktlint rules.
   gate when adding consumers. Never tie playback or queue preparation to Home visibility.
 - `Media3MusicService` retains the sole music player and media-session ownership. Its existing
   radio, recovery, listening, locks and session callbacks live in `service/MusicService*.kt`.
+  `player/audio/MusicOutputRecovery` checks actual PCM output frames at 1 Hz only while the
+  engine plays, including background playback. `OutputReportingPlayer` uses Media3's
+  `ForwardingSimpleBasePlayer` to freeze progress and report buffering during output recovery;
+  bind the music session and playback observers to `sessionPlayer`, while retaining the one
+  ExoPlayer engine. Five seconds without frame progress starts at most two output restarts from
+  the last verified position. Only actual frame progress clears recovery; thirty seconds of
+  continuous progress rearms the automatic budget. Pause, seek, Stop, focus loss and changed
+  window identity invalidate pending recovery. Steady offloaded output is not polled. Keep
+  `MusicAudioTrackProbe` delegated to Media3's default AudioTrack factory; its deprecated hook
+  supplies the raw counter that the replacement estimated-position API does not expose.
+  Focused regressions: `./gradlew :app:testGithubDebugUnitTest --tests '*AudioOutputProgressTest'
+  --tests '*OutputReportingPlayerTest' --tests '*MusicOutputRecoveryTest'`.
   Local library IDs stay local throughout playback; `MusicVideoItems.descriptor` supplies
   title, artist credits and duration to `PluginRadio` for metadata-only YouTube Music matching.
   Local queues seed radio once from their first song, never through `resolveAudio`. Track-row
