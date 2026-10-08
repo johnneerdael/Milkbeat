@@ -5,7 +5,6 @@ import android.content.Intent
 import android.speech.RecognizerIntent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -29,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.aedev.flow.R
+import io.github.aedev.flow.data.catalog.MusicSource
 import io.github.aedev.flow.data.local.SearchType
 import io.github.aedev.flow.data.local.matching
 import io.github.aedev.flow.data.model.Video
@@ -37,31 +37,27 @@ import io.github.aedev.flow.ui.tv.components.TvFilterChip
 import io.github.aedev.flow.ui.tv.components.TvSearchField
 import io.github.aedev.flow.ui.tv.focus.tvRowFocus
 import io.github.aedev.flow.ui.tv.screens.TvRecentSearches
+import io.github.aedev.flow.ui.tv.screens.music.TvMusicTabsState
 import io.github.aedev.flow.ui.tv.theme.LocalTvDimens
 import nl.neerdael.milkbeat.catalog.EntityRef
+import nl.neerdael.milkbeat.plugin.MetadataSurface
 
 private const val SUGGESTION_CHIPS = 8
 private const val RECENT_SUGGESTIONS = 3
 
-private val TvSearchSource.labelRes: Int
-    @StringRes get() =
-        when (this) {
-            TvSearchSource.MUSIC -> R.string.nav_music
-            TvSearchSource.VIDEOS -> R.string.tv_filter_videos
-        }
-
 /**
- * D-pad-first search: the query field, Music (always the starting point) or Videos, the filters the
- * chosen half's plugin offers, and suggestion chips while typing; below them the recent searches, or
- * the plugin's result page rendered as any catalog page is.
+ * D-pad-first search: the query field, one chip per music tab that can search plus Videos, the
+ * filters the chosen chip's plugin offers, and suggestion chips while typing; below them the recent
+ * searches, or the plugin's result page rendered as any catalog page is.
  */
 @Composable
 fun TvSearchScreen(
+    musicTabs: TvMusicTabsState,
     onVideoClick: (Video) -> Unit,
     onChannelClick: (String) -> Unit,
     onOpenPlaylist: (String) -> Unit,
     onPlayMix: (MusicTrack) -> Unit,
-    onOpenCatalog: (EntityRef) -> Unit,
+    onOpenCatalog: (EntityRef, String) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: TvSearchViewModel = hiltViewModel(),
 ) {
@@ -69,9 +65,28 @@ fun TvSearchScreen(
     val dimens = LocalTvDimens.current
     val state by viewModel.state.collectAsStateWithLifecycle()
     val recentSearches by viewModel.recentSearches.collectAsStateWithLifecycle()
-    // Not saveable on purpose: every visit to Search starts on Music.
-    var source by remember { mutableStateOf(TvSearchSource.MUSIC) }
+    val musicChips = musicTabs.tabs.filter { it.source == MusicSource.Local || MetadataSurface.SEARCH in it.surfaces }
+    val chips = musicChips.map { TvSearchSource.Music(it.source) } + TvSearchSource.Videos
+    val startSource =
+        (musicChips.firstOrNull { it.source == musicTabs.selected } ?: musicChips.firstOrNull())
+            ?.let { TvSearchSource.Music(it.source) } ?: TvSearchSource.Videos
+    // Not saveable on purpose: every visit to Search starts on the music tab last shown.
+    var picked by remember { mutableStateOf(startSource) }
+    // A chip whose tab went away leaves Search on the start chip.
+    val source = picked.takeIf { it in chips } ?: startSource
     LaunchedEffect(source) { viewModel.showSource(source) }
+    val localLabel = stringResource(R.string.local_library_title)
+    val videosLabel = stringResource(R.string.tv_filter_videos)
+    val chipLabel: (TvSearchSource) -> String = { chip ->
+        when (chip) {
+            is TvSearchSource.Music -> musicChips.firstOrNull { it.source == chip.source }?.label ?: localLabel
+            TvSearchSource.Videos -> videosLabel
+        }
+    }
+    val shownSource by rememberUpdatedState(source)
+    val openCatalog: (EntityRef) -> Unit = { entity ->
+        (shownSource as? TvSearchSource.Music)?.let { onOpenCatalog(entity, it.source.providerId) }
+    }
 
     val voiceLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
@@ -111,7 +126,7 @@ fun TvSearchScreen(
             onChannelClick = onChannelClick,
             onOpenPlaylist = onOpenPlaylist,
             onPlayMix = onPlayMix,
-            onOpenCatalog = onOpenCatalog,
+            onOpenCatalog = openCatalog,
         )
     val chipPadding = PaddingValues(horizontal = dimens.overscanHorizontal)
 
@@ -127,11 +142,11 @@ fun TvSearchScreen(
             modifier = Modifier.fillMaxWidth().padding(chipPadding),
         )
         TvSearchChipRow(
-            chips = TvSearchSource.entries,
-            key = { it.name },
-            label = { stringResource(it.labelRes) },
+            chips = chips,
+            key = { it.key },
+            label = { chipLabel(it) },
             selected = { it == source },
-            onClick = { source = it },
+            onClick = { picked = it },
             contentPadding = chipPadding,
         )
         if (results.filters.isNotEmpty()) {
@@ -164,7 +179,7 @@ fun TvSearchScreen(
                 modifier = Modifier.weight(1f).padding(chipPadding),
             )
         } else {
-            // Each half, query and filter scrolls from the top of its own list.
+            // Each chip, query and filter scrolls from the top of its own list.
             key(source, results.query, results.filterId) {
                 TvSearchResultsPane(
                     query = query,

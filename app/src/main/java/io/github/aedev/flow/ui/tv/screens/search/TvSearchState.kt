@@ -28,33 +28,25 @@ data class TvSearchResults(
     val noPlugin: Boolean = false,
 )
 
+/** [results] holds each chip's answer by [TvSearchSource.key]. */
 data class TvSearchUiState(
     val query: String = "",
-    val music: TvSearchResults = TvSearchResults(),
-    val videos: TvSearchResults = TvSearchResults(),
+    val results: Map<String, TvSearchResults> = emptyMap(),
     val musicSuggestions: List<String> = emptyList(),
     val videoSuggestions: List<String> = emptyList(),
 ) {
-    fun results(source: TvSearchSource): TvSearchResults =
-        when (source) {
-            TvSearchSource.MUSIC -> music
-            TvSearchSource.VIDEOS -> videos
-        }
+    fun results(source: TvSearchSource): TvSearchResults = results[source.key] ?: TvSearchResults()
 
     fun withResults(
         source: TvSearchSource,
         update: (TvSearchResults) -> TvSearchResults,
-    ): TvSearchUiState =
-        when (source) {
-            TvSearchSource.MUSIC -> copy(music = update(music))
-            TvSearchSource.VIDEOS -> copy(videos = update(videos))
-        }
+    ): TvSearchUiState = copy(results = results + (source.key to update(results(source))))
 
-    /** The typeahead of the half on screen first, then the other half's. */
+    /** The typeahead of the kind on screen first, then the other's. */
     fun suggestions(source: TvSearchSource): List<String> =
         when (source) {
-            TvSearchSource.MUSIC -> musicSuggestions + videoSuggestions
-            TvSearchSource.VIDEOS -> videoSuggestions + musicSuggestions
+            is TvSearchSource.Music -> musicSuggestions + videoSuggestions
+            TvSearchSource.Videos -> videoSuggestions + musicSuggestions
         }
 }
 

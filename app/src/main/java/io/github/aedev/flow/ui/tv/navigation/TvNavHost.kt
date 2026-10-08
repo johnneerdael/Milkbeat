@@ -100,11 +100,12 @@ fun TvNavHost(
         }
         composable(TvDestination.SEARCH.route) {
             TvSearchScreen(
+                musicTabs = musicTabs,
                 onVideoClick = onPlayVideo,
                 onChannelClick = openChannel,
                 onOpenPlaylist = { navController.navigate(TvRoutes.playlist(it)) },
                 onPlayMix = onPlayMix,
-                onOpenCatalog = openCatalog,
+                onOpenCatalog = { entity, provider -> navController.navigate(TvRoutes.catalog(entity, provider)) },
                 modifier = Modifier.fillMaxSize(),
             )
         }
