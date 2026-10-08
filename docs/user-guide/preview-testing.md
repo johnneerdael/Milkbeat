@@ -20,7 +20,7 @@ Earlier code **744** remains pinned to preview 4. New Preview builds include cod
 2. Optionally select YouTube Video and choose **Sign in with a TV code** for personalized Home and Library; it also works signed out.
 3. Under **Audio** and **Video**, choose it where you want it to supply playback.
 
-YouTube Video shares the YouTube tab in the sidebar with YouTube Music. With both installed, the tab shows YouTube Music's catalog and YouTube Video's catalog stays hidden, also in Search and Library. To test YouTube Video's catalog, disable or remove YouTube Music; the same tab then shows YouTube Video.
+YouTube Video shares the **YouTube** tab in the sidebar with YouTube Music; the tab carries that name whichever plugin provides it. With both installed, the tab shows YouTube Music's catalog and YouTube Video's catalog stays hidden, also in Search and Library. To test YouTube Video's catalog, disable or remove YouTube Music; the same tab then shows YouTube Video.
 
 ## Check playback
 

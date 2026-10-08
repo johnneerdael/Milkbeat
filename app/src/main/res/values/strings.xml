@@ -313,6 +313,7 @@
     <string name="tv_library_playlists">Playlists</string>
     <string name="library_liked_songs">Liked songs</string>
     <string name="library_all_providers">All providers</string>
+    <string name="provider_youtube">YouTube</string>
     <string name="library_provider_unavailable">%1$s is unavailable. Refresh to try again.</string>
     <string name="tv_library_empty">Your library is empty</string>
     <string name="tv_player_close">Close player</string>

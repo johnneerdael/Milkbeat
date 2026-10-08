@@ -43,7 +43,7 @@ and sign-in method, playback and radio, the visualizer, every Settings page and 
 ## Highlights
 
 - **A tab per music service.** Every catalog you can use gets its own sidebar tab with its logo:
-  YouTube Music as soon as it is installed, the others once you are signed in. There is no
+  YouTube as soon as YouTube Music is installed, the others once you are signed in. There is no
   metadata provider to choose any more, and Milkbeat opens on the tab you used last.
 - **Your own music first.** Local folders, USB drives and SMB 2/3, WebDAV, SFTP and NFS (v3, 4.0,
   4.1) servers, read-only. Their tags build a **Local library** tab of genres, artists, releases,
@@ -93,13 +93,13 @@ and sign-in method, playback and radio, the visualizer, every Settings page and 
 
 | Tab | Appears |
 | --- | --- |
-| **YouTube Music** | As soon as the plugin is installed and enabled; sign-in is optional |
+| **YouTube** | As soon as the YouTube Music plugin is installed and enabled; sign-in is optional |
 | **Spotify**, **Beatport**, **SoundCloud** | Once installed, enabled and signed in |
 | **Local library** | Once a music folder is linked |
 
-The YouTube Video plugin, offered only in the Preview app, shares the YouTube tab: with YouTube Music
-also installed, the tab shows YouTube Music's catalog; with only YouTube Video, it shows YouTube
-Video's. Each tab shows that provider's own feed through Milkbeat's TV components and keeps its place while
+The YouTube Video plugin, offered only in the Preview app, shares the YouTube tab, which is named
+YouTube whichever plugin provides it: with YouTube Music also installed, the tab shows YouTube Music's
+catalog; with only YouTube Video, it shows YouTube Video's. Each tab shows that provider's own feed through Milkbeat's TV components and keeps its place while
 you visit another. **Search** offers a chip per music tab, including Local library (video search comes with the
 YouTube Video plugin's own chip, currently in the Preview app), each with only its own provider's filters and suggestions (Local library suggests only your recent searches). **Library** starts with a chip per signed-in
 account, then Folders, History, Watch later and Playlists (app and provider playlists together,

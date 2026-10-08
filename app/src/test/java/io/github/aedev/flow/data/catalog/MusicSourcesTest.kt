@@ -135,6 +135,7 @@ class MusicSourcesTest {
             )
 
         assertEquals(listOf(MusicSource.Plugin(YOUTUBE)), tabs.tabs.map { it.source })
+        assertEquals(R.string.provider_youtube, tabs.tabs.single().labelRes)
     }
 
     @Test
@@ -143,6 +144,15 @@ class MusicSourcesTest {
 
         assertEquals(MusicSource.Plugin(YOUTUBE_VIDEO), tab.source)
         assertEquals(R.drawable.ic_provider_youtube_music_mono, tab.iconRes)
+        assertEquals(R.string.provider_youtube, tab.labelRes)
+    }
+
+    @Test
+    fun aProviderOfNoSharedServiceKeepsItsOwnName() {
+        val tab = musicTabs(registry(spotify), mapOf(SPOTIFY to signedIn), false, emptySet()).tabs.single()
+
+        assertNull(tab.labelRes)
+        assertEquals("Spotify", tab.label)
     }
 
     @Test
