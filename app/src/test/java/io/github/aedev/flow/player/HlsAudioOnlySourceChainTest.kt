@@ -5,15 +5,20 @@ import android.net.Uri
 import android.os.Looper
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MimeTypes
 import androidx.media3.datasource.ByteArrayDataSource
 import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.ResolvingDataSource
 import androidx.media3.datasource.TransferListener
+import androidx.media3.decoder.DecoderInputBuffer
+import androidx.media3.exoplayer.FormatHolder
 import androidx.media3.exoplayer.LoadingInfo
 import androidx.media3.exoplayer.analytics.PlayerId
 import androidx.media3.exoplayer.source.MediaPeriod
 import androidx.media3.exoplayer.source.MediaSource
+import androidx.media3.exoplayer.source.SampleStream
+import androidx.media3.exoplayer.trackselection.FixedTrackSelection
 import androidx.media3.exoplayer.upstream.DefaultAllocator
 import com.google.common.truth.Truth.assertThat
 import io.github.aedev.flow.plugin.playback.ResolvedAudio
@@ -131,6 +136,41 @@ sound.aac
                 period?.maybeThrowPrepareError()
             }
             assertThat(prepared.get()).isTrue()
+            // Known rendition CODECS permit chunkless preparation. A real player then
+            // selects an audio track before it asks Media3 to load and emit segment samples.
+            val readyPeriod = requireNotNull(period)
+            val audioGroup =
+                (0 until readyPeriod.trackGroups.length)
+                    .map { readyPeriod.trackGroups[it] }
+                    .first { MimeTypes.isAudio(it.getFormat(0).sampleMimeType) }
+            val streams = arrayOfNulls<SampleStream>(1)
+            readyPeriod.selectTracks(arrayOf(FixedTrackSelection(audioGroup, 0)), booleanArrayOf(false), streams, booleanArrayOf(false), 0)
+            readyPeriod.continueLoading(LoadingInfo.Builder().setPlaybackPositionUs(0).build())
+            val holder = FormatHolder()
+            val buffer = DecoderInputBuffer(DecoderInputBuffer.BUFFER_REPLACEMENT_MODE_NORMAL)
+            val timestamps = mutableListOf<Long>()
+            val sampleDeadline = System.nanoTime() + 5_000_000_000L
+            while (timestamps.size < 3 && System.nanoTime() < sampleDeadline) {
+                Shadows.shadowOf(Looper.getMainLooper()).idle()
+                readyPeriod.maybeThrowPrepareError()
+                requireNotNull(streams[0]).maybeThrowError()
+                buffer.clear()
+                when (streams[0]!!.readData(holder, buffer, 0)) {
+                    C.RESULT_FORMAT_READ -> {
+                        assertThat(holder.format!!.sampleMimeType).isEqualTo("audio/mp4a-latm")
+                    }
+
+                    C.RESULT_BUFFER_READ -> {
+                        if (!buffer.isEndOfStream) {
+                            assertThat(buffer.data!!.position()).isGreaterThan(0)
+                            timestamps += buffer.timeUs
+                        }
+                    }
+                }
+                if (timestamps.size < 3) Thread.sleep(5)
+            }
+            assertThat(timestamps).hasSize(3)
+            assertThat(timestamps.zipWithNext().all { (first, second) -> second > first }).isTrue()
             assertThat(requests).containsAtLeast("/master.m3u8", "/audio.m3u8", "/sound.aac")
             assertThat(requests.any { "video" in it }).isFalse()
         } finally {
