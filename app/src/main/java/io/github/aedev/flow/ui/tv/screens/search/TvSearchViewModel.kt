@@ -135,7 +135,8 @@ class TvSearchViewModel internal constructor(
             musicSuggestJob?.cancel()
             _state.update { it.copy(musicSuggestions = emptyList()) }
         }
-        val gone = _state.value.results.keys - keys
+        // A search still in its typing pause has a job but no results yet.
+        val gone = (_state.value.results.keys + searchJobs.keys + moreJobs.keys) - keys
         if (gone.isEmpty()) return
         gone.forEach { key ->
             searchJobs.remove(key)?.cancel()
