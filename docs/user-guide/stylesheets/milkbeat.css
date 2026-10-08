@@ -1,34 +1,44 @@
-/* Milkbeat palette on Material for MkDocs (slate scheme), matching the app's dark TV theme. */
+/* Milkbeat palette on Material for MkDocs (slate scheme), matching the app's dark TV theme.
+   The palette: every colour on the site is defined here once and used through var(). */
 :root > * {
-  --md-primary-fg-color: #b39dff;
-  --md-primary-fg-color--light: #d4c6ff;
-  --md-primary-fg-color--dark: #8b6cf6;
-  --md-primary-bg-color: #0b0b0f;
-  --md-accent-fg-color: #7fd8d0;
+  --mb-background: #0b0b0f;
+  --mb-on-background: #f2f2f5;
+  --mb-primary: #b39dff;
+  --mb-primary-light: #d4c6ff;
+  --mb-primary-dark: #8b6cf6;
+  --mb-accent: #7fd8d0;
+  --mb-surface: #141419;
+  --mb-surface-raised: #1c1c23;
+  --mb-code: #17171d;
+  --mb-outline: #2c2c35;
+  --mb-outline-strong: #5a5a68;
+
+  --md-primary-fg-color: var(--mb-primary);
+  --md-primary-fg-color--light: var(--mb-primary-light);
+  --md-primary-fg-color--dark: var(--mb-primary-dark);
+  --md-primary-bg-color: var(--mb-background);
+  --md-accent-fg-color: var(--mb-accent);
 }
 
 [data-md-color-scheme="slate"] {
   --md-hue: 255;
-  --md-default-bg-color: #0b0b0f;
-  --md-default-bg-color--light: #141419;
-  --md-code-bg-color: #17171d;
-  --md-typeset-a-color: #b39dff;
-  --mb-surface: #141419;
-  --mb-surface-raised: #1c1c23;
-  --mb-outline: #2c2c35;
+  --md-default-bg-color: var(--mb-background);
+  --md-default-bg-color--light: var(--mb-surface);
+  --md-code-bg-color: var(--mb-code);
+  --md-typeset-a-color: var(--mb-primary);
 }
 
 .md-header,
 .md-tabs {
-  background-color: #0b0b0f;
-  color: #f2f2f5;
+  background-color: var(--mb-background);
+  color: var(--mb-on-background);
 }
 
 .md-header { border-bottom: 1px solid var(--mb-outline); }
 .md-tabs { border-bottom: 1px solid var(--mb-outline); }
 .md-tabs__link { opacity: 0.75; }
 .md-tabs__link--active,
-.md-tabs__link:hover { opacity: 1; color: #b39dff; }
+.md-tabs__link:hover { opacity: 1; color: var(--mb-primary); }
 
 .md-header__button.md-logo img { height: 1.6rem; border-radius: 6px; }
 
@@ -78,7 +88,7 @@
   background-color: var(--mb-surface);
   transition: border-color 0.2s;
 }
-.md-typeset .grid.cards > ul > li:hover { border-color: #5a5a68; }
+.md-typeset .grid.cards > ul > li:hover { border-color: var(--mb-outline-strong); }
 
 .md-typeset .grid.mb-two {
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));

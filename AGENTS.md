@@ -794,7 +794,8 @@ revision must pass the configured ktlint rules.
   styled like the ProjectM TV guide. Visualizer pages give an overview and link to
   <https://johnneerdael.github.io/ProjectM-TV/> for engine and setting depth. `docs/user-guide-site.md`
   records the page conventions and screenshot provenance.
-- Guide screenshots live in `docs/user-guide/images/` at 1920×1080 (TV UI captures via
+- Guide screenshots live in `docs/user-guide/images/`; all are 1920×1080 except the site's `logo.png`
+  and `favicon.png` (TV UI captures via
   `adb exec-out screencap -p`); downscale 4K captures to match (for example `sips -Z 1920 shot.png`).
   Blur account names, avatars and usernames before committing, and delete images no page references.
 
