@@ -8,13 +8,12 @@ Milkbeat has no "metadata provider" setting any more. Instead, every music catal
 
 | Tab | When it appears |
 | --- | --- |
-| **YouTube Music** | As soon as the plugin is installed and enabled. Sign-in is optional |
+| **YouTube** | As soon as the YouTube Music or YouTube Video plugin is installed and enabled. Sign-in is optional. With both installed, the one tab shows YouTube Music's catalog; with only YouTube Video, it shows YouTube Video's catalog, also signed out |
 | **Spotify**, **Beatport**, **SoundCloud** | Once the plugin is installed, enabled and signed in |
-| **YouTube Video** | Shares the YouTube tab: it shows YouTube Music's catalog when both are installed, and YouTube Video's catalog, also signed out, when it is the only one |
 | **Local library** | Once at least one music folder is linked |
 | **Music** | Only while none of the above exists; it offers to add a plugin or a music folder |
 
-Each tab is marked with the service's logo and shows that provider's own feed, laid out with Milkbeat's TV components; the provider decides which shelves appear. A tab keeps its scroll position and filters while you visit another, and Milkbeat starts on the music tab you used last. A page opened from a tab keeps that tab highlighted; pressing the highlighted tab returns to its first page. Search and Library keep a page you opened while you visit another tab, while the music tabs always return to their own feed. Signing out of a provider or disabling its plugin removes its tab. Your [audio providers](providers.md#set-audio-priority) handle playback independently of the tab you browse.
+Each tab is marked with the service's logo and named after the service, so the YouTube tab and its Search and Library chips read **YouTube** whichever YouTube plugin provides them. It shows that provider's own feed, laid out with Milkbeat's TV components; the provider decides which shelves appear. A tab keeps its scroll position and filters while you visit another, and Milkbeat starts on the music tab you used last. A page opened from a tab keeps that tab highlighted; pressing the highlighted tab returns to its first page. Search and Library keep a page you opened while you visit another tab, while the music tabs always return to their own feed. Signing out of a provider or disabling its plugin removes its tab. Your [audio providers](providers.md#set-audio-priority) handle playback independently of the tab you browse.
 
 === "YouTube Music"
 

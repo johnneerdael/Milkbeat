@@ -117,7 +117,7 @@ A music player for Android TV. Play your own files, network shares and streaming
 | --- | --- |
 | Files on the TV or a USB drive | Settings → Music folders → **Choose local folder** |
 | Files on a NAS or computer | Settings → Music folders → **Add SMB share**, **WebDAV server**, **SFTP server** or **NFS export** |
-| YouTube Music | Install the YouTube Music plugin (code **494**); its tab appears at once, sign-in optional |
+| YouTube Music | Install the YouTube Music plugin (code **494**); its **YouTube** tab appears at once, sign-in optional |
 | Spotify catalog with YouTube audio | Install Spotify (**981**) and YouTube Music, sign in to Spotify, keep YouTube Music under Audio |
 | Beatport catalog and streaming | Install Beatport (**393**) and sign in; full streams need a Beatport streaming subscription |
 | SoundCloud | Install SoundCloud (**089**) and pair it with a TV code |

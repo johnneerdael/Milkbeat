@@ -36,6 +36,7 @@ import io.github.aedev.flow.ui.tv.components.TvFilterChip
 import io.github.aedev.flow.ui.tv.components.TvLoadingState
 import io.github.aedev.flow.ui.tv.components.TvMessageState
 import io.github.aedev.flow.ui.tv.components.TvSearchField
+import io.github.aedev.flow.ui.tv.components.displayLabel
 import io.github.aedev.flow.ui.tv.focus.tvRowFocus
 import io.github.aedev.flow.ui.tv.navigation.TvMusicTabsState
 import io.github.aedev.flow.ui.tv.screens.TvRecentSearches
@@ -86,8 +87,9 @@ fun TvSearchScreen(
         }
         return
     }
+    val labels = searchable.associate { it.source to it.displayLabel() }
     val localLabel = stringResource(R.string.local_library_title)
-    val chipLabel: (MusicSource) -> String = { chip -> searchable.firstOrNull { it.source == chip }?.label ?: localLabel }
+    val chipLabel: (MusicSource) -> String = { chip -> labels[chip] ?: localLabel }
     val shownSource by rememberUpdatedState(source)
     val openCatalog: (EntityRef) -> Unit = { entity -> onOpenCatalog(entity, shownSource.providerId) }
 
