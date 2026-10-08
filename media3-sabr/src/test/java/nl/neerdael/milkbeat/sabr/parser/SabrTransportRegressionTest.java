@@ -84,6 +84,19 @@ public class SabrTransportRegressionTest {
         UMPInputStream input = new UMPInputStream(new UMPPart(1,bytes.length+7,raw(bytes)));
         try { FormatInitializationMetadata.parseFrom(input); fail("truncated protobuf"); } catch (IOException expected) {}
     }
+    @Test public void interruptedMediaBodyPreservesItsNetworkFailure() throws Exception {
+        for (IOException failure : new IOException[]{new java.net.SocketTimeoutException("timeout"), new java.net.SocketException("reset")}) {
+            DefaultExtractorInput broken = new DefaultExtractorInput((target, offset, length) -> { throw failure; }, 0, C.LENGTH_UNSET);
+            SabrStream stream = new SabrStream("https://fixture", "", StreamerContext.ClientInfo.getDefaultInstance(), -1, -1, 0, null, false, "fixture", 60000) {
+                @Override public SabrPart parse(androidx.media3.extractor.ExtractorInput unused) {
+                    return new MediaSegmentDataSabrPart(new FormatSelector("audio", false), AUDIO, 0, false, 1, 0, broken, 4, 0);
+                }
+            };
+            SabrExtractorInput input = new SabrExtractorInput(stream); input.init(raw(new byte[0]));
+            try { input.read(new byte[1], 0, 1); fail("network read must fail"); }
+            catch (IOException actual) { assertSame(failure, actual); }
+        }
+    }
     private static MediaHeader header(FormatId id,int header) { return MediaHeader.newBuilder().setHeaderId(header).setFormatId(id).setSequenceNumber(header).setStartMs(0).setDurationMs(5000).build(); }
     private static SabrContextUpdate context(int type,boolean send,String value) { return SabrContextUpdate.newBuilder().setType(type).setValue(ByteString.copyFromUtf8(value)).setSendByDefault(send).setWritePolicy(SabrContextUpdate.SabrContextWritePolicy.SABR_CONTEXT_WRITE_POLICY_OVERWRITE).build(); }
     private static DefaultExtractorInput raw(byte[] bytes) { return new DefaultExtractorInput(new ByteArrayInputStream(bytes)::read,0,bytes.length); }

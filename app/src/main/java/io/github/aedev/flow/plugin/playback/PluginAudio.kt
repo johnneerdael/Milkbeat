@@ -235,7 +235,7 @@ class PluginAudio
                             video = picture != null,
                             maxVideoHeight = picture?.maxHeight,
                             videoCodecs = picture?.codecs.orEmpty(),
-                            failure = failures.remove(key),
+                            failure = failures[key],
                         )
                     try {
                         val acceptedContext = nativeContext(plugin.id)
@@ -283,6 +283,7 @@ class PluginAudio
                             if (stream.serverAbr != null) receipt else null,
                             if (stream.serverAbr != null) acceptedContext else null,
                         ).also {
+                            request.failure?.let { failure -> failures.remove(key, failure) }
                             synchronized(resolved) {
                                 if (generation == cacheGeneration.get() &&
                                     (version == preparationVersion() || (stream.serverAbr != null && ownsNativeSource(it)))

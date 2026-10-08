@@ -165,9 +165,10 @@ class PluginVideo
                     }?.let {
                         return@withLock Result.success(it.playback.agedBy(SystemClock.elapsedRealtime() - it.receivedAtElapsedMs))
                     }
-                val accepted = recovering.remove(videoId)
+                val accepted = recovering[videoId]
                 if (accepted?.runtimeReceipt?.isCurrent() == false) {
                     failures.remove(videoId)
+                    accepted?.let { recovering.remove(videoId, it) }
                     return@withLock Result.failure(PluginPlaybackSessionLost())
                 }
                 val pluginId =
@@ -190,17 +191,18 @@ class PluginVideo
                     provider.playbackContext()
                 ) {
                     failures.remove(videoId)
+                    accepted?.let { recovering.remove(videoId, it) }
                     return@withLock Result.failure(IOException("The accepted playback account or provider changed"))
                 }
                 val request =
-                    accepted?.request?.copy(failure = failures.remove(videoId))
+                    accepted?.request?.copy(failure = failures[videoId])
                         ?: videoRequest(
                             videoId = videoId,
                             maxHeight = limits.maxHeight,
                             codecs = limits.codecs(VideoCodecUtils.NO_PREFERENCE),
                             audioLanguage = preferences.preferredAudioLanguage.first(),
                             captionLanguage = preferences.preferredSubtitleLanguage.first(),
-                            failure = failures.remove(videoId),
+                            failure = failures[videoId],
                         )
                 var runtimeReceipt: PluginPlaybackReceipt? = null
                 val result =
@@ -235,6 +237,8 @@ class PluginVideo
                         validateServerAbr(response.serverAbr, picture = true, provider.playbackGrants(pluginId))
                         withoutUnshownHdr(response, limits.hdr)
                     }.onSuccess { playback ->
+                        request.failure?.let { failures.remove(videoId, it) }
+                        accepted?.let { recovering.remove(videoId, it) }
                         playback.trackingToken?.let { trackingTokens[videoId] = it }
                         if (playback.kind != VideoKind.UPCOMING) {
                             val lifetime = playback.expiresInMs ?: DEFAULT_LIFETIME_MS

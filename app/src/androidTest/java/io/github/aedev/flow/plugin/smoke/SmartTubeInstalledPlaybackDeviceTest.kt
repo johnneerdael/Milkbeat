@@ -551,8 +551,9 @@ class SmartTubeInstalledPlaybackDeviceTest {
         val before =
             withContext(Dispatchers.Main) {
                 player.volume = 0f
-                player.currentPosition to
-                    (if (picture) player.videoDecoderCounters else player.audioDecoderCounters)?.renderedOutputBufferCount
+                val counters = if (picture) player.videoDecoderCounters else player.audioDecoderCounters
+                counters?.ensureUpdated()
+                Triple(player.currentPosition, counters?.renderedOutputBufferCount, counters?.droppedBufferCount)
             }
         val until = android.os.SystemClock.elapsedRealtime() + durationMs
         val started = android.os.SystemClock.elapsedRealtime()
@@ -605,6 +606,8 @@ class SmartTubeInstalledPlaybackDeviceTest {
         }
         withContext(Dispatchers.Main) {
             safePlayer(player)
+            val counters = if (picture) player.videoDecoderCounters else player.audioDecoderCounters
+            counters?.ensureUpdated()
             SmartTubeSmoke.report(
                 "SUSTAIN_STATS",
                 mapOf(
@@ -621,7 +624,9 @@ class SmartTubeInstalledPlaybackDeviceTest {
                     "playWhenReady" to player.playWhenReady,
                     "suppressionReason" to player.playbackSuppressionReason,
                     "audioUnderruns" to underruns?.get(),
-                    "droppedBuffers" to (if (picture) player.videoDecoderCounters else player.audioDecoderCounters)?.droppedBufferCount,
+                    "droppedBuffers" to counters?.droppedBufferCount,
+                    "initialDroppedBuffers" to before.third,
+                    "droppedBufferDelta" to ((counters?.droppedBufferCount ?: 0) - (before.third ?: 0)),
                     "playbackSpeed" to player.playbackParameters.speed,
                     "playbackPitch" to player.playbackParameters.pitch,
                     "sampleRate" to player.audioFormat?.sampleRate,

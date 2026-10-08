@@ -75,8 +75,7 @@ public final class SabrExtractorInput implements ExtractorInput {
             }
         }
         int count;
-        try { count = data.data.read(target, offset, Math.min(length, remaining)); }
-        catch (IOException error) { throw SabrPlaybackException.noProgress(sabrStream.getUrl(), error); }
+        count = data.data.read(target, offset, Math.min(length, remaining));
         if (count == C.RESULT_END_OF_INPUT) throw SabrPlaybackException.noProgress(sabrStream.getUrl(), new EOFException("Truncated SABR media payload"));
         remaining -= count;
         return count;

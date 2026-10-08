@@ -70,6 +70,28 @@ class PluginAudioSabrTest : PluginAudioFixture() {
     }
 
     @Test
+    fun `transient native renewal failure retains reload token until a replacement is accepted`() =
+        runTest {
+            coEvery { host.call("youtube", PluginOperations.resolveAudio, any()) } returns native(true)
+            val limits = PictureLimits(2160, listOf("av1"))
+            val accepted = audio.resolve(original, limits, playbackId = "catalog-id")
+            audio.failed("catalog-id", accepted.stream.url, null, "opaque-reload", ServerAbrFailure.PLAYBACK_CONTEXT_RELOAD)
+            val requests = mutableListOf<ResolveAudioRequest>()
+            coEvery { host.call("youtube", PluginOperations.resolveAudio, any()) } answers {
+                requests += thirdArg<ResolveAudioRequest>()
+                if (requests.size == 1) throw java.io.IOException("temporary network failure")
+                native(true)
+            }
+            assertThat(runCatching { audio.resolve(original, limits, playbackId = "catalog-id") }.isFailure).isTrue()
+            val renewed = audio.resolve(original, limits, playbackId = "catalog-id")
+            assertThat(renewed.track.ref).isEqualTo(accepted.track.ref)
+            assertThat(requests[1].failure).isEqualTo(requests[0].failure)
+            assertThat(requests[1].failure!!.reloadPlaybackContext).isEqualTo("opaque-reload")
+            audio.resolve(original, limits, quality = AudioQuality.LOW, playbackId = "catalog-id")
+            assertThat(requests.last().failure).isNull()
+        }
+
+    @Test
     fun `accepted native picture capability survives unrelated account refresh without resolving again`() =
         runTest {
             coEvery { host.call("youtube", PluginOperations.resolveAudio, match { it.track.ref == candidate.ref }) } returns native(true)
