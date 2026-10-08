@@ -31,9 +31,10 @@ import io.github.aedev.flow.R
 import io.github.aedev.flow.data.catalog.MusicSource
 import io.github.aedev.flow.data.local.SearchType
 import io.github.aedev.flow.data.local.matching
-import io.github.aedev.flow.data.model.Video
 import io.github.aedev.flow.data.music.model.MusicTrack
 import io.github.aedev.flow.ui.tv.components.TvFilterChip
+import io.github.aedev.flow.ui.tv.components.TvLoadingState
+import io.github.aedev.flow.ui.tv.components.TvMessageState
 import io.github.aedev.flow.ui.tv.components.TvSearchField
 import io.github.aedev.flow.ui.tv.focus.tvRowFocus
 import io.github.aedev.flow.ui.tv.navigation.TvMusicTabsState
@@ -46,16 +47,14 @@ private const val SUGGESTION_CHIPS = 8
 private const val RECENT_SUGGESTIONS = 3
 
 /**
- * D-pad-first search: the query field, one chip per music tab that can search plus Videos, the
- * filters the chosen chip's plugin offers, and suggestion chips while typing; below them the recent
- * searches, or the plugin's result page rendered as any catalog page is.
+ * D-pad-first search: the query field, one chip per music tab that can search, the filters the
+ * chosen chip's plugin offers, and suggestion chips while typing; below them the recent searches, or
+ * the plugin's result page rendered as any catalog page is. Without a tab that can search, it says
+ * how to add a plugin.
  */
 @Composable
 fun TvSearchScreen(
     musicTabs: TvMusicTabsState,
-    onVideoClick: (Video) -> Unit,
-    onChannelClick: (String) -> Unit,
-    onOpenPlaylist: (String) -> Unit,
     onPlayMix: (MusicTrack) -> Unit,
     onOpenCatalog: (EntityRef, String) -> Unit,
     modifier: Modifier = Modifier,
@@ -65,30 +64,32 @@ fun TvSearchScreen(
     val dimens = LocalTvDimens.current
     val state by viewModel.state.collectAsStateWithLifecycle()
     val recentSearches by viewModel.recentSearches.collectAsStateWithLifecycle()
-    val musicChips = musicTabs.tabs.filter { it.source == MusicSource.Local || MetadataSurface.SEARCH in it.surfaces }
-    val chips = musicChips.map { TvSearchSource.Music(it.source) } + TvSearchSource.Videos
-    val startSource =
-        (musicChips.firstOrNull { it.source == musicTabs.selected } ?: musicChips.firstOrNull())
-            ?.let { TvSearchSource.Music(it.source) } ?: TvSearchSource.Videos
+    val searchable = musicTabs.tabs.filter { it.source == MusicSource.Local || MetadataSurface.SEARCH in it.surfaces }
+    val chips = searchable.map { it.source }
+    val startSource = musicTabs.selected?.takeIf { it in chips } ?: chips.firstOrNull()
     // Not saveable on purpose: every visit to Search starts on the music tab last shown.
     // Unpicked, Search follows the start chip as the tabs settle; a picked chip that goes away gives way to it.
-    var picked by remember { mutableStateOf<TvSearchSource?>(null) }
+    var picked by remember { mutableStateOf<MusicSource?>(null) }
     val source = shownSearchSource(picked, chips, startSource)
-    val chipIdentities = musicChips.associate { TvSearchSource.Music(it.source).key to it.identity } + (TvSearchSource.Videos.key to null)
+    val chipIdentities = searchable.associate { it.source.key to it.identity }
     LaunchedEffect(chipIdentities) { viewModel.retainSources(chipIdentities) }
-    LaunchedEffect(source) { viewModel.showSource(source) }
-    val localLabel = stringResource(R.string.local_library_title)
-    val videosLabel = stringResource(R.string.tv_filter_videos)
-    val chipLabel: (TvSearchSource) -> String = { chip ->
-        when (chip) {
-            is TvSearchSource.Music -> musicChips.firstOrNull { it.source == chip.source }?.label ?: localLabel
-            TvSearchSource.Videos -> videosLabel
+    LaunchedEffect(source) { source?.let(viewModel::showSource) }
+    if (source == null) {
+        if (musicTabs.ready) {
+            TvMessageState(
+                title = stringResource(R.string.tv_search_no_music_plugin),
+                message = stringResource(R.string.tv_search_no_plugin_message),
+                modifier = modifier,
+            )
+        } else {
+            TvLoadingState(modifier = modifier)
         }
+        return
     }
+    val localLabel = stringResource(R.string.local_library_title)
+    val chipLabel: (MusicSource) -> String = { chip -> searchable.firstOrNull { it.source == chip }?.label ?: localLabel }
     val shownSource by rememberUpdatedState(source)
-    val openCatalog: (EntityRef) -> Unit = { entity ->
-        (shownSource as? TvSearchSource.Music)?.let { onOpenCatalog(entity, it.source.providerId) }
-    }
+    val openCatalog: (EntityRef) -> Unit = { entity -> onOpenCatalog(entity, shownSource.providerId) }
 
     val voiceLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
@@ -113,7 +114,7 @@ fun TvSearchScreen(
     val suggestions =
         mergeSuggestions(
             recent = recentSearches.matching(query.trim(), RECENT_SUGGESTIONS).map { it.query },
-            live = state.suggestions(source),
+            live = state.suggestions,
             limit = SUGGESTION_CHIPS,
         )
     // A live search runs on every pause in typing; only acting on a result saves the query.
@@ -122,11 +123,7 @@ fun TvSearchScreen(
     val actions =
         rememberTvSearchActions(
             viewModel = viewModel,
-            blocks = results.blocks,
             beforeOpen = remembered,
-            onVideoClick = onVideoClick,
-            onChannelClick = onChannelClick,
-            onOpenPlaylist = onOpenPlaylist,
             onPlayMix = onPlayMix,
             onOpenCatalog = openCatalog,
         )
@@ -185,9 +182,8 @@ fun TvSearchScreen(
             key(source, results.query, results.filterId) {
                 TvSearchResultsPane(
                     query = query,
-                    source = source,
                     results = results,
-                    actions = actions.of(source),
+                    actions = actions,
                     onLoadMore = { viewModel.loadMore(source) },
                     modifier = Modifier.weight(1f),
                 )

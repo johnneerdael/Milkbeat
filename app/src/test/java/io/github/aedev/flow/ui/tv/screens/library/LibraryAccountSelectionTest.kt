@@ -12,4 +12,18 @@ class LibraryAccountSelectionTest {
         assertThat(selectLibraryAccountSection(TvAccountLibrarySection.RECENTLY_PLAYED, "spotify:a", "spotify:b"))
             .isEqualTo(TvAccountLibrarySection.OVERVIEW)
     }
+
+    @Test fun aPickedSectionWinsOverAProviderChosenEarlier() {
+        val accounts = listOf("beatport", "spotify")
+        assertThat(selectLibraryProvider(accounts, { it }, chosenProvider = "spotify", sectionSelected = true)).isNull()
+        assertThat(selectLibraryProvider(accounts, { it }, chosenProvider = null, sectionSelected = true)).isNull()
+    }
+
+    @Test fun withoutASectionTheChosenProviderShowsAndOtherwiseTheFirst() {
+        val accounts = listOf("beatport", "spotify")
+        assertThat(selectLibraryProvider(accounts, { it }, chosenProvider = "spotify", sectionSelected = false)).isEqualTo("spotify")
+        assertThat(selectLibraryProvider(accounts, { it }, chosenProvider = null, sectionSelected = false)).isEqualTo("beatport")
+        assertThat(selectLibraryProvider(accounts, { it }, chosenProvider = "soundcloud", sectionSelected = false)).isEqualTo("beatport")
+        assertThat(selectLibraryProvider(emptyList<String>(), { it }, chosenProvider = null, sectionSelected = false)).isNull()
+    }
 }

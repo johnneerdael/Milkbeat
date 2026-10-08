@@ -1,17 +1,16 @@
 package io.github.aedev.flow.ui.tv.screens.search
 
+import io.github.aedev.flow.data.catalog.MusicSource
 import io.github.aedev.flow.ui.screens.music.extendedBy
 import io.github.aedev.flow.ui.screens.music.withPage
 import nl.neerdael.milkbeat.catalog.CollectionBlock
 import nl.neerdael.milkbeat.catalog.CollectionLayout
-import nl.neerdael.milkbeat.catalog.EntityRef
 import nl.neerdael.milkbeat.catalog.FilterOption
-import nl.neerdael.milkbeat.catalog.MetadataItem
 import nl.neerdael.milkbeat.catalog.MetadataPage
 import nl.neerdael.milkbeat.catalog.PageBlock
 
 /**
- * One half's answer to a search: the page for [query] under [filterId], grown by each continuation
+ * One chip's answer to a search: the page for [query] under [filterId], grown by each continuation
  * page, and the filters its plugin offers. [filters] outlive the query, so the chips stay put while
  * the next search runs.
  */
@@ -28,26 +27,21 @@ data class TvSearchResults(
     val noPlugin: Boolean = false,
 )
 
-/** [results] holds each chip's answer by [TvSearchSource.key]. */
+/**
+ * [results] holds each chip's answer by [MusicSource.key]. [suggestions] are the typeahead of the chip
+ * on screen only: another provider's suggestions would search something else.
+ */
 data class TvSearchUiState(
     val query: String = "",
     val results: Map<String, TvSearchResults> = emptyMap(),
-    val musicSuggestions: List<String> = emptyList(),
-    val videoSuggestions: List<String> = emptyList(),
+    val suggestions: List<String> = emptyList(),
 ) {
-    fun results(source: TvSearchSource): TvSearchResults = results[source.key] ?: TvSearchResults()
+    fun results(source: MusicSource): TvSearchResults = results[source.key] ?: TvSearchResults()
 
     fun withResults(
-        source: TvSearchSource,
+        source: MusicSource,
         update: (TvSearchResults) -> TvSearchResults,
     ): TvSearchUiState = copy(results = results + (source.key to update(results(source))))
-
-    /** The typeahead of the kind on screen first, then the other's. */
-    fun suggestions(source: TvSearchSource): List<String> =
-        when (source) {
-            is TvSearchSource.Music -> musicSuggestions + videoSuggestions
-            TvSearchSource.Videos -> videoSuggestions + musicSuggestions
-        }
 }
 
 /** Whether these results are, or are becoming, the answer to [query] under [filterId]. */
@@ -128,10 +122,3 @@ internal fun List<PageBlock>.resultsGridId(): String? =
     (firstOrNull() as? CollectionBlock)
         ?.takeIf { it.header == null && it.layout == CollectionLayout.HORIZONTAL_SHELF }
         ?.id
-
-/** The first item on the page that points at [entity]. */
-internal fun List<PageBlock>.itemFor(entity: EntityRef): MetadataItem? =
-    asSequence()
-        .filterIsInstance<CollectionBlock>()
-        .flatMap { it.items }
-        .firstOrNull { it.entity == entity }

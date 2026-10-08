@@ -13,12 +13,9 @@ import io.github.aedev.flow.data.local.SearchType
 import io.github.aedev.flow.data.music.model.MusicTrack
 import io.github.aedev.flow.data.stats.VideoStatsRecorder
 import io.github.aedev.flow.plugin.catalog.PluginMetadataProvider
-import io.github.aedev.flow.plugin.catalog.PluginVideoProvider
 import io.github.aedev.flow.plugin.catalog.listenerMessage
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
@@ -31,20 +28,18 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import nl.neerdael.milkbeat.catalog.MetadataItem
 import nl.neerdael.milkbeat.catalog.SearchRequest
-import nl.neerdael.milkbeat.catalog.Suggestions
 import javax.inject.Inject
 
 /**
- * TV search through every music tab's provider and the video plugin. Typing searches the chip on
- * screen once the typing pauses, and asks the music chip shown last and the video plugin for
- * typeahead; another chip searches when it is shown, so every fetch follows one cause. A newer query
- * cancels the older one's fetches, and each chip keeps its own filter and results.
+ * TV search through every music tab's provider that can search. Typing searches the chip on screen
+ * and asks it for typeahead once the typing pauses; another chip searches and suggests when it is
+ * shown, so every fetch follows one cause. A newer query cancels the older one's fetches, and each
+ * chip keeps its own filter and results. Nothing searches until a chip is shown.
  */
 @HiltViewModel
 class TvSearchViewModel internal constructor(
     private val savedStateHandle: SavedStateHandle,
     private val music: (MusicSource) -> TvSearchBackend,
-    private val videos: TvSearchBackend,
     private val trackFor: (MusicSource, MetadataItem) -> MusicTrack?,
     private val history: SearchHistoryRepository,
     private val stats: VideoStatsRecorder,
@@ -54,7 +49,6 @@ class TvSearchViewModel internal constructor(
         savedStateHandle: SavedStateHandle,
         metadata: PluginMetadataProvider,
         local: dagger.Lazy<LocalCatalogProvider>,
-        video: PluginVideoProvider,
         history: SearchHistoryRepository,
         stats: VideoStatsRecorder,
     ) : this(
@@ -65,7 +59,6 @@ class TvSearchViewModel internal constructor(
                 MusicSource.Local -> local.get().searchBackend()
             }
         },
-        video.searchBackend(),
         { source, item ->
             when (source) {
                 is MusicSource.Plugin -> metadata.scoped(source.id).track(item)
@@ -83,17 +76,16 @@ class TvSearchViewModel internal constructor(
     val recentSearches: StateFlow<List<SearchHistoryItem>> =
         history.getSearchHistoryFlow().stateIn(viewModelScope, SharingStarted.WhileSubscribed(SUBSCRIPTION_TIMEOUT_MS), emptyList())
 
-    private var source: TvSearchSource = TvSearchSource.Videos
-    private var lastMusic: MusicSource? = null
+    private var source: MusicSource? = null
     private val searchJobs = HashMap<String, Job>()
     private val identities = HashMap<String, String?>()
     private val moreJobs = HashMap<String, Job>()
     private var suggestJob: Job? = null
-    private var musicSuggestJob: Job? = null
+    private var suggestAfterPause = false
     private var lastRecordedQuery: String? = null
 
     /** A music result of the chip on screen as a playable track. */
-    fun track(item: MetadataItem): MusicTrack? = (source as? TvSearchSource.Music)?.let { trackFor(it.source, item) }
+    fun track(item: MetadataItem): MusicTrack? = source?.let { trackFor(it, item) }
 
     /** Typed on the keyboard: searches once typing pauses. */
     fun onQueryChange(query: String) = setQuery(query, searchDelayMs = DEBOUNCE_MS)
@@ -111,27 +103,21 @@ class TvSearchViewModel internal constructor(
     fun pick(query: String) = setQuery(query, searchDelayMs = 0L)
 
     /** The chip on screen; it searches the current query now unless it already answers it. */
-    fun showSource(target: TvSearchSource) {
+    fun showSource(target: MusicSource) {
         val previous = source
+        source = target
         if (previous != target) {
-            // Only the chip on screen searches; the one left stops, and searches again when shown again.
-            val stopped = listOfNotNull(searchJobs.remove(previous.key), moreJobs.remove(previous.key)).filter { it.isActive }
-            stopped.forEach(Job::cancel)
-            if (stopped.isNotEmpty()) {
-                _state.update { state ->
-                    state.withResults(previous) { it.copy(isLoading = false, isLoadingMore = false) }
+            if (previous != null) {
+                // Only the chip on screen searches; the one left stops, and searches again when shown again.
+                val stopped = listOfNotNull(searchJobs.remove(previous.key), moreJobs.remove(previous.key)).filter { it.isActive }
+                stopped.forEach(Job::cancel)
+                if (stopped.isNotEmpty()) {
+                    _state.update { state ->
+                        state.withResults(previous) { it.copy(isLoading = false, isLoadingMore = false) }
+                    }
                 }
             }
-        }
-        source = target
-        if (target is TvSearchSource.Music && target.source != lastMusic) {
-            lastMusic = target.source
-            // The typeahead shown is the last music chip's; another chip answers the query on screen itself. A
-            // typeahead still pending asks the new chip when it runs, so it is restarted rather than doubled.
-            _state.value.query
-                .trim()
-                .takeIf { it.isNotEmpty() }
-                ?.let { query -> if (suggestJob?.isActive == true) suggest(query) else suggestMusic(query) }
+            restartSuggestions()
         }
         search(target, _state.value.results(target).filterId, delayMs = 0L)
     }
@@ -145,24 +131,11 @@ class TvSearchViewModel internal constructor(
         val changed = identities.filter { (key, identity) -> key in sources && sources[key] != identity }.keys
         identities.clear()
         identities.putAll(sources)
-        val lastKey = lastMusic?.key
-        if (lastKey != null && (lastKey !in sources || lastKey in changed)) {
+        val shown = source
+        if (shown != null && (shown.key !in sources || shown.key in changed)) {
             // A typeahead already asking the old account or installation must not answer for the new one.
-            val combinedPending = suggestJob?.isActive == true
-            suggestJob?.cancel()
-            musicSuggestJob?.cancel()
-            _state.update { it.copy(musicSuggestions = emptyList()) }
-            // A chip still offered under its new identity stays the music typeahead, whichever chip shows.
-            if (lastKey !in sources) lastMusic = null
-            _state.value.query
-                .trim()
-                .takeIf { it.isNotEmpty() }
-                ?.let { query ->
-                    when {
-                        combinedPending -> suggest(query)
-                        lastMusic != null -> suggestMusic(query)
-                    }
-                }
+            if (shown.key !in sources) source = null
+            restartSuggestions()
         }
         // A search still in its typing pause has a job but no results yet.
         val gone = (_state.value.results.keys + searchJobs.keys + moreJobs.keys).filter { it !in sources || it in changed }
@@ -173,12 +146,12 @@ class TvSearchViewModel internal constructor(
         }
         _state.update { it.copy(results = it.results - gone.toSet()) }
         // The chip on screen asks its provider again at once rather than waiting on an answer that was dropped.
-        if (source.key in gone && source.key in sources) search(source, filterId = null, delayMs = 0L)
+        if (shown != null && shown.key in gone && shown.key in sources) search(shown, filterId = null, delayMs = 0L)
     }
 
-    /** Selects a filter of the half on screen, or drops it when picked again; "Show all" selects its section's. */
+    /** Selects a filter of the chip on screen, or drops it when picked again; "Show all" selects its section's. */
     fun selectFilter(filterId: String) {
-        val target = source
+        val target = source ?: return
         val next = _state.value.results(target).toggled(filterId)
         if (_state.value.query.isBlank()) {
             _state.update { state -> state.withResults(target) { it.copy(filterId = next) } }
@@ -188,11 +161,12 @@ class TvSearchViewModel internal constructor(
     }
 
     fun showAll(filterId: String) {
-        if (_state.value.results(source).filterId != filterId) selectFilter(filterId)
+        val target = source ?: return
+        if (_state.value.results(target).filterId != filterId) selectFilter(filterId)
     }
 
     /** The end of [target]'s results came into view: fetches the next page once. */
-    fun loadMore(target: TvSearchSource) {
+    fun loadMore(target: MusicSource) {
         val results = _state.value.results(target)
         val cursor = results.nextCursor ?: return
         if (!results.loaded || results.isLoading || results.isLoadingMore) return
@@ -200,7 +174,7 @@ class TvSearchViewModel internal constructor(
         val request = SearchRequest(results.query, results.filterId, cursor)
         moreJobs[target.key] =
             viewModelScope.launch {
-                val page = attempt { backend(target).search(request) }
+                val page = attempt { music(target).search(request) }
                 currentCoroutineContext().ensureActive()
                 _state.update { state ->
                     state.withResults(target) { current ->
@@ -248,27 +222,25 @@ class TvSearchViewModel internal constructor(
             clear()
             return
         }
-        suggest(trimmed)
-        search(source, _state.value.results(source).filterId, searchDelayMs)
+        suggest(trimmed, afterPause = true)
+        source?.let { search(it, _state.value.results(it).filterId, searchDelayMs) }
     }
 
     private fun clear() {
         suggestJob?.cancel()
-        musicSuggestJob?.cancel()
         (searchJobs.values + moreJobs.values).forEach(Job::cancel)
         searchJobs.clear()
         moreJobs.clear()
         _state.update {
             it.copy(
                 results = it.results.mapValues { (_, results) -> results.cleared() },
-                musicSuggestions = emptyList(),
-                videoSuggestions = emptyList(),
+                suggestions = emptyList(),
             )
         }
     }
 
     private fun search(
-        target: TvSearchSource,
+        target: MusicSource,
         filterId: String?,
         delayMs: Long,
     ) {
@@ -286,7 +258,7 @@ class TvSearchViewModel internal constructor(
                     start()
                 }
                 record(query)
-                val page = attempt { backend(target).search(SearchRequest(query, filterId)) }
+                val page = attempt { music(target).search(SearchRequest(query, filterId)) }
                 currentCoroutineContext().ensureActive()
                 _state.update { state ->
                     state.withResults(target) { current ->
@@ -302,40 +274,33 @@ class TvSearchViewModel internal constructor(
             }
     }
 
-    private fun suggest(query: String) {
+    /**
+     * Drops the typeahead shown and asks the chip on screen afresh. One still waiting out the typing
+     * pause keeps waiting for it, so a chip switch or account change never asks twice for one pause.
+     */
+    private fun restartSuggestions() {
+        val afterPause = suggestJob?.isActive == true && suggestAfterPause
         suggestJob?.cancel()
-        musicSuggestJob?.cancel()
-        suggestJob =
-            viewModelScope.launch {
-                delay(DEBOUNCE_MS)
-                val musicSource = lastMusic
-                val (musical, visual) =
-                    coroutineScope {
-                        val musical =
-                            async {
-                                musicSource?.let { attempt { music(it).suggest(query) } } ?: Result.success(Suggestions(emptyList()))
-                            }
-                        val visual = async { attempt { videos.suggest(query) } }
-                        musical.await() to visual.await()
-                    }
-                currentCoroutineContext().ensureActive()
-                _state.update {
-                    it.copy(
-                        musicSuggestions = if (musicSource == lastMusic) musical.getOrNull()?.queries.orEmpty() else it.musicSuggestions,
-                        videoSuggestions = visual.getOrNull()?.queries.orEmpty(),
-                    )
-                }
-            }
+        _state.update { it.copy(suggestions = emptyList()) }
+        _state.value.query
+            .trim()
+            .takeIf { it.isNotEmpty() }
+            ?.let { suggest(it, afterPause) }
     }
 
-    private fun suggestMusic(query: String) {
-        musicSuggestJob?.cancel()
-        val musicSource = lastMusic ?: return
-        musicSuggestJob =
+    private fun suggest(
+        query: String,
+        afterPause: Boolean,
+    ) {
+        suggestJob?.cancel()
+        val target = source ?: return
+        suggestAfterPause = afterPause
+        suggestJob =
             viewModelScope.launch {
-                val musical = attempt { music(musicSource).suggest(query) }
+                if (afterPause) delay(DEBOUNCE_MS)
+                val answer = attempt { music(target).suggest(query) }
                 currentCoroutineContext().ensureActive()
-                if (musicSource == lastMusic) _state.update { it.copy(musicSuggestions = musical.getOrNull()?.queries.orEmpty()) }
+                if (target == source) _state.update { it.copy(suggestions = answer.getOrNull()?.queries.orEmpty()) }
             }
     }
 
@@ -345,12 +310,6 @@ class TvSearchViewModel internal constructor(
         lastRecordedQuery = normalized
         stats.onSearch(query.takeIf { history.isSearchHistoryEnabled() })
     }
-
-    private fun backend(target: TvSearchSource): TvSearchBackend =
-        when (target) {
-            is TvSearchSource.Music -> music(target.source)
-            TvSearchSource.Videos -> videos
-        }
 
     /** A plugin call that fails in any way other than being cancelled comes back as a failure. */
     private suspend fun <T> attempt(call: suspend () -> Result<T>): Result<T> =

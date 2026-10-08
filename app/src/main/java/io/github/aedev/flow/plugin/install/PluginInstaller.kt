@@ -22,6 +22,9 @@ class PendingInstall(
 ) {
     val isUpdate: Boolean get() = installed != null
 
+    /** The installed version again, for example from re-entering its download code: offered as a reinstall, not an update. */
+    val isReinstall: Boolean get() = installed != null && pack.manifest.versionCode == installed.manifest.versionCode
+
     /** Hosts the plugin wants that the listener has not granted yet: what the consent screen asks about. */
     val newNetwork: List<String> get() = pack.manifest.permissions.network - installed?.grantedNetwork.orEmpty().toSet()
     val newBrowser: List<String> get() = pack.manifest.permissions.browser - installed?.grantedBrowser.orEmpty().toSet()

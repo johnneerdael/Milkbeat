@@ -21,7 +21,6 @@ import io.github.aedev.flow.ui.tv.screens.TvMusicCollectionScreen
 import io.github.aedev.flow.ui.tv.screens.TvMusicScreen
 import io.github.aedev.flow.ui.tv.screens.TvSettingsScreen
 import io.github.aedev.flow.ui.tv.screens.account.TvAccountSignInScreen
-import io.github.aedev.flow.ui.tv.screens.channel.TvChannelScreen
 import io.github.aedev.flow.ui.tv.screens.playlist.TvPlaylistDetailScreen
 import io.github.aedev.flow.ui.tv.screens.search.TvSearchScreen
 import io.github.aedev.flow.ui.tv.screens.settings.TvSettingsCategory
@@ -41,10 +40,6 @@ fun TvNavHost(
     musicTabs: TvMusicTabsState,
     modifier: Modifier = Modifier,
 ) {
-    val openChannel: (String) -> Unit = { channelRef ->
-        navController.navigate(TvRoutes.channel(channelRef))
-    }
-
     NavHost(
         navController = navController,
         startDestination = TvDestination.start.route,
@@ -99,9 +94,6 @@ fun TvNavHost(
         composable(TvDestination.SEARCH.route) {
             TvSearchScreen(
                 musicTabs = musicTabs,
-                onVideoClick = onPlayVideo,
-                onChannelClick = openChannel,
-                onOpenPlaylist = { navController.navigate(TvRoutes.playlist(it)) },
                 onPlayMix = onPlayMix,
                 onOpenCatalog = { entity, provider -> navController.navigate(TvRoutes.catalog(entity, provider)) },
                 modifier = Modifier.fillMaxSize(),
@@ -144,22 +136,6 @@ fun TvNavHost(
                 ),
         ) {
             TvAccountSignInScreen(onNavigateBack = { navController.popBackStack() })
-        }
-        composable(
-            route = TvRoutes.CHANNEL,
-            arguments =
-                listOf(
-                    navArgument(TvRoutes.CHANNEL_ARG) {
-                        type = NavType.StringType
-                        defaultValue = ""
-                    },
-                ),
-        ) {
-            TvChannelScreen(
-                onVideoClick = onPlayVideo,
-                onOpenPlaylist = { navController.navigate(TvRoutes.playlist(it)) },
-                modifier = Modifier.fillMaxSize(),
-            )
         }
         composable(
             route = TvRoutes.PLAYLIST,
