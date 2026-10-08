@@ -41,6 +41,7 @@ Capabilities depend on the installed plugin version, the account and its subscri
 | **981** | Spotify |
 | **494** | YouTube Music |
 | **089** | SoundCloud |
+| **932** | YouTube Video |
 <!-- /plugin-codes -->
 
 Stable builds prefer the publisher's live catalog and fall back to the bundled one offline, so newly published codes work without an app update. The separate [Preview app](preview-testing.md) pins its codes to its own test catalog. The original codes **102** (Beatport), **772** (Spotify) and **416** (YouTube Music) still work. An unknown code reports an error; try the plugin's full URL or update Milkbeat.

@@ -134,6 +134,7 @@ Add **third-party plugins** in **Settings → Plugins** with their downloader co
 | Spotify | **981** | 772 |
 | YouTube Music | **494** | 416 |
 | SoundCloud | **089** | — |
+| YouTube Video | **932** | — |
 <!-- /plugin-codes -->
 
 A plugin download URL also works, including a supported Buzzheavier file page. Plugins are
