@@ -8,7 +8,7 @@ enum class TvBackAction {
     /** A previously visited tab exists — return to it, restoring its state. */
     POP_TAB,
 
-    /** On a tab other than [TvDestination.start] with no history — return to the start tab, keeping the tab's saved state. */
+    /** On a tab other than the music start tab with no history — return to the start tab, keeping the tab's saved state. */
     GO_START,
 
     /** On the start tab with content focused — move focus to the navigation rail. */
@@ -27,13 +27,13 @@ object TvBackModel {
     fun resolve(
         isOnDetailRoute: Boolean,
         hasTabHistory: Boolean,
-        currentTab: TvDestination,
+        onStartTab: Boolean,
         railHasFocus: Boolean,
     ): TvBackAction =
         when {
             isOnDetailRoute -> TvBackAction.POP_DETAIL
             hasTabHistory -> TvBackAction.POP_TAB
-            currentTab != TvDestination.start -> TvBackAction.GO_START
+            !onStartTab -> TvBackAction.GO_START
             railHasFocus -> TvBackAction.EXIT
             else -> TvBackAction.FOCUS_RAIL
         }

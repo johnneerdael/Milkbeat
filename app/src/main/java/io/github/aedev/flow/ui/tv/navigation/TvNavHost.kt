@@ -22,6 +22,7 @@ import io.github.aedev.flow.ui.tv.screens.TvMusicScreen
 import io.github.aedev.flow.ui.tv.screens.TvSettingsScreen
 import io.github.aedev.flow.ui.tv.screens.account.TvAccountSignInScreen
 import io.github.aedev.flow.ui.tv.screens.channel.TvChannelScreen
+import io.github.aedev.flow.ui.tv.screens.music.TvMusicTabsState
 import io.github.aedev.flow.ui.tv.screens.playlist.TvPlaylistDetailScreen
 import io.github.aedev.flow.ui.tv.screens.search.TvSearchScreen
 import io.github.aedev.flow.ui.tv.screens.settings.TvSettingsCategory
@@ -38,6 +39,7 @@ fun TvNavHost(
     onPlayVideo: (Video) -> Unit,
     onPlayPlaylist: (List<Video>, String) -> Unit,
     onOpenPlugins: () -> Unit,
+    musicTabs: TvMusicTabsState,
     modifier: Modifier = Modifier,
 ) {
     val openChannel: (String) -> Unit = { channelRef ->
@@ -52,10 +54,13 @@ fun TvNavHost(
     ) {
         composable(TvDestination.MUSIC.route) {
             TvMusicScreen(
+                source = musicTabs.selected,
+                ready = musicTabs.ready,
                 onPlayCollection = onPlayCollection,
                 onPlayMix = onPlayMix,
-                onOpen = openCatalog,
+                onOpen = { entity, source -> navController.navigate(TvRoutes.catalog(entity, source.providerId)) },
                 onOpenPlugins = onOpenPlugins,
+                onOpenMusicFolders = { navController.navigate(TvRoutes.MUSIC_FOLDERS_SETTINGS) },
                 modifier = Modifier.fillMaxSize(),
             )
         }

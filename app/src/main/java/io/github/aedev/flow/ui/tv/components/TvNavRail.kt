@@ -1,5 +1,6 @@
 package io.github.aedev.flow.ui.tv.components
 
+import androidx.annotation.DrawableRes
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.expandHorizontally
@@ -19,6 +20,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Folder
+import androidx.compose.material.icons.outlined.MusicNote
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Icon
@@ -26,6 +30,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -39,29 +44,84 @@ import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.aedev.flow.R
+import io.github.aedev.flow.data.catalog.MusicSource
 import io.github.aedev.flow.ui.tv.navigation.TvDestination
+import io.github.aedev.flow.ui.tv.navigation.TvTab
+import io.github.aedev.flow.ui.tv.screens.music.TvMusicTabsState
 import io.github.aedev.flow.ui.tv.theme.LocalTvDimens
+
+/** A rail entry's icon: a Material symbol, or a provider's monochrome logo, both tinted as rail content. */
+@Immutable
+sealed interface TvRailIcon {
+    data class Symbol(
+        val image: ImageVector,
+    ) : TvRailIcon
+
+    data class Logo(
+        @param:DrawableRes val res: Int,
+    ) : TvRailIcon
+}
+
+/** One rail entry; a [badged] entry carries a dot for something there that wants attention. */
+@Immutable
+data class TvRailItem(
+    val tab: TvTab,
+    val label: String,
+    val icon: TvRailIcon,
+    val badged: Boolean = false,
+)
+
+/** The music tabs (or the single Music tab while there are none), then the fixed destinations. */
+@Composable
+fun tvRailItems(
+    music: TvMusicTabsState,
+    badged: TvDestination?,
+): List<TvRailItem> {
+    val musicItems =
+        if (music.tabs.isEmpty()) {
+            listOf(TvRailItem(TvTab.Music(null), stringResource(R.string.nav_music), TvRailIcon.Symbol(Icons.Outlined.MusicNote)))
+        } else {
+            music.tabs.map { tab ->
+                TvRailItem(
+                    tab = TvTab.Music(tab.source),
+                    label = tab.label ?: stringResource(R.string.local_library_title),
+                    icon =
+                        tab.iconRes?.let { TvRailIcon.Logo(it) }
+                            ?: TvRailIcon.Symbol(if (tab.source == MusicSource.Local) Icons.Outlined.Folder else Icons.Outlined.MusicNote),
+                )
+            }
+        }
+    return musicItems +
+        TvDestination.fixed.map { destination ->
+            TvRailItem(
+                tab = TvTab.Fixed(destination),
+                label = stringResource(destination.labelRes),
+                icon = TvRailIcon.Symbol(destination.icon),
+                badged = destination == badged,
+            )
+        }
+}
 
 /**
  * Collapsible navigation rail: 72dp icon-only strip that expands with labels
  * while any rail item holds focus. It overlays the content (which is laid out
- * against the collapsed width) so expansion never reflows the screen. The
- * [badged] destination carries a dot for something there that wants attention.
+ * against the collapsed width) so expansion never reflows the screen.
  */
 @Composable
 fun TvNavRail(
-    selected: TvDestination,
-    onSelected: (TvDestination) -> Unit,
+    items: List<TvRailItem>,
+    selected: TvTab?,
+    onSelected: (TvTab) -> Unit,
     onFocusChanged: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
     selectedFocusRequester: FocusRequester? = null,
     acceptsEnteringFocus: Boolean = true,
-    badged: TvDestination? = null,
 ) {
     val dimens = LocalTvDimens.current
     var expanded by remember { mutableStateOf(false) }
@@ -139,15 +199,14 @@ fun TvNavRail(
                 }
             }
             Spacer(Modifier.height(8.dp))
-            TvDestination.primary.forEach { destination ->
-                TvRailItem(
-                    destination = destination,
-                    selected = destination == selected,
+            items.forEach { item ->
+                TvRailEntry(
+                    item = item,
+                    selected = item.tab == selected,
                     expanded = expanded,
-                    badged = destination == badged,
-                    onClick = { onSelected(destination) },
+                    onClick = { onSelected(item.tab) },
                     modifier =
-                        if (destination == selected && selectedFocusRequester != null) {
+                        if (item.tab == selected && selectedFocusRequester != null) {
                             Modifier.focusRequester(selectedFocusRequester)
                         } else {
                             Modifier
@@ -159,11 +218,10 @@ fun TvNavRail(
 }
 
 @Composable
-private fun TvRailItem(
-    destination: TvDestination,
+private fun TvRailEntry(
+    item: TvRailItem,
     selected: Boolean,
     expanded: Boolean,
-    badged: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -194,12 +252,11 @@ private fun TvRailItem(
             horizontalArrangement = Arrangement.spacedBy(14.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            BadgedBox(badge = { if (badged) Badge() }) {
-                Icon(
-                    imageVector = destination.icon,
-                    contentDescription = stringResource(destination.labelRes),
-                    modifier = Modifier.size(26.dp),
-                )
+            BadgedBox(badge = { if (item.badged) Badge() }) {
+                when (val icon = item.icon) {
+                    is TvRailIcon.Symbol -> Icon(icon.image, contentDescription = item.label, modifier = Modifier.size(26.dp))
+                    is TvRailIcon.Logo -> Icon(painterResource(icon.res), contentDescription = item.label, modifier = Modifier.size(26.dp))
+                }
             }
             AnimatedVisibility(
                 visible = expanded,
@@ -207,7 +264,7 @@ private fun TvRailItem(
                 exit = fadeOut() + shrinkHorizontally(),
             ) {
                 Text(
-                    text = stringResource(destination.labelRes),
+                    text = item.label,
                     style = MaterialTheme.typography.titleMedium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,

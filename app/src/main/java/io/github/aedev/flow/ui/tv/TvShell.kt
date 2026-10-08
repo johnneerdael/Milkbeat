@@ -27,14 +27,19 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.media3.common.util.UnstableApi
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.currentBackStackEntryAsState
+import io.github.aedev.flow.data.catalog.MusicSource
 import io.github.aedev.flow.data.model.Video
 import io.github.aedev.flow.data.music.model.MusicTrack
 import io.github.aedev.flow.ui.tv.components.TvNavRail
 import io.github.aedev.flow.ui.tv.components.TvNowPlayingStrip
+import io.github.aedev.flow.ui.tv.components.tvRailItems
 import io.github.aedev.flow.ui.tv.navigation.TvBackAction
 import io.github.aedev.flow.ui.tv.navigation.TvBackModel
 import io.github.aedev.flow.ui.tv.navigation.TvDestination
 import io.github.aedev.flow.ui.tv.navigation.TvNavHost
+import io.github.aedev.flow.ui.tv.navigation.TvRoutes
+import io.github.aedev.flow.ui.tv.navigation.TvTab
+import io.github.aedev.flow.ui.tv.screens.music.TvMusicTabsState
 import io.github.aedev.flow.ui.tv.theme.LocalTvDimens
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
@@ -62,12 +67,24 @@ fun TvShell(
     focusMusicStrip: Boolean = false,
     onMusicStripFocused: () -> Unit = {},
     badged: TvDestination? = null,
+    musicTabs: TvMusicTabsState = TvMusicTabsState(),
+    onSelectMusic: (MusicSource) -> Unit = {},
 ) {
     val dimens = LocalTvDimens.current
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
-    val currentTab = TvDestination.fromRoute(currentRoute)
     val isOnDetailRoute = currentRoute != null && TvDestination.entries.none { it.route == currentRoute }
+    val routeTab: TvTab? =
+        when {
+            currentRoute == null || currentRoute == TvDestination.MUSIC.route -> TvTab.Music(musicTabs.selected)
+            isOnDetailRoute -> null
+            else -> TvTab.Fixed(TvDestination.fromRoute(currentRoute))
+        }
+    // A detail page keeps the tab it was opened from highlighted.
+    var detailOwner by remember { mutableStateOf<TvTab>(TvTab.Music(null)) }
+    LaunchedEffect(routeTab) { routeTab?.let { detailOwner = it } }
+    val currentTab: TvTab =
+        routeTab ?: if (currentRoute == TvRoutes.MUSIC_FOLDERS_SETTINGS) TvTab.Fixed(TvDestination.SETTINGS) else detailOwner
     var railHasFocus by remember { mutableStateOf(false) }
     val railFocusRequester = remember { FocusRequester() }
     val musicStripFocusRequester = remember { FocusRequester() }
@@ -106,25 +123,26 @@ fun TvShell(
         railAcceptsFocus = true
     }
 
-    val tabHistory = remember { mutableStateListOf<TvDestination>() }
+    val tabHistory = remember { mutableStateListOf<TvTab>() }
 
-    fun navigateToTab(destination: TvDestination) {
-        navController.navigate(destination.route) {
+    fun navigateToTab(tab: TvTab) {
+        if (tab is TvTab.Music) tab.source?.let(onSelectMusic)
+        navController.navigate(tab.destination.route) {
             popUpTo(TvDestination.start.route) { saveState = true }
             launchSingleTop = true
             restoreState = true
         }
     }
 
-    fun selectTab(destination: TvDestination) {
-        if (destination != currentTab) {
-            tabHistory.remove(destination)
+    fun selectTab(tab: TvTab) {
+        if (tab != currentTab) {
+            tabHistory.remove(tab)
             if (!isOnDetailRoute) {
                 tabHistory.remove(currentTab)
                 tabHistory.add(currentTab)
             }
         }
-        navigateToTab(destination)
+        navigateToTab(tab)
         contentFocusRequests++
     }
 
@@ -155,7 +173,8 @@ fun TvShell(
                     onPlayCollection = onPlayCollection,
                     onPlayVideo = onPlayVideo,
                     onPlayPlaylist = onPlayPlaylist,
-                    onOpenPlugins = { selectTab(TvDestination.SETTINGS) },
+                    onOpenPlugins = { selectTab(TvTab.Fixed(TvDestination.SETTINGS)) },
+                    musicTabs = musicTabs,
                     modifier = Modifier.fillMaxSize(),
                 )
             }
@@ -169,12 +188,12 @@ fun TvShell(
             }
         }
         TvNavRail(
+            items = tvRailItems(musicTabs, badged),
             selected = currentTab,
             onSelected = ::selectTab,
             onFocusChanged = { railHasFocus = it },
             selectedFocusRequester = railFocusRequester,
             acceptsEnteringFocus = railAcceptsFocus,
-            badged = badged,
             modifier =
                 Modifier
                     .align(Alignment.CenterStart)
@@ -185,14 +204,14 @@ fun TvShell(
             TvBackModel.resolve(
                 isOnDetailRoute = isOnDetailRoute,
                 hasTabHistory = tabHistory.isNotEmpty(),
-                currentTab = currentTab,
+                onStartTab = currentTab is TvTab.Music,
                 railHasFocus = railHasFocus,
             )
         BackHandler(enabled = backAction != TvBackAction.EXIT) {
             when (backAction) {
                 TvBackAction.POP_DETAIL -> navController.popBackStack()
                 TvBackAction.POP_TAB -> navigateToTab(tabHistory.removeAt(tabHistory.lastIndex))
-                TvBackAction.GO_START -> navigateToTab(TvDestination.start)
+                TvBackAction.GO_START -> navigateToTab(TvTab.Music(musicTabs.selected))
                 TvBackAction.FOCUS_RAIL -> runCatching { railFocusRequester.requestFocus() }
                 TvBackAction.EXIT -> Unit
             }

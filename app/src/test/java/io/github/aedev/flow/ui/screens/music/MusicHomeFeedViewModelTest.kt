@@ -3,7 +3,6 @@ package io.github.aedev.flow.ui.screens.music
 import com.google.common.truth.Truth.assertThat
 import io.github.aedev.flow.data.catalog.CatalogPlayback
 import io.github.aedev.flow.data.library.catalog.LocalLibraryEmptyException
-import io.github.aedev.flow.plugin.catalog.NoMetadataPluginException
 import io.github.aedev.flow.plugin.runtime.PluginCallException
 import io.github.aedev.flow.plugin.runtime.TransientRetryBackoffMs
 import kotlinx.coroutines.CompletableDeferred
@@ -244,21 +243,20 @@ class MusicHomeFeedViewModelTest {
         }
 
     @Test
-    fun `without a music plugin the page asks for one, and choosing one loads its home`() =
+    fun `the tab without a provider asks for one and fetches nothing`() =
         runTest(dispatcher) {
-            provider.id = "none"
-            provider.pages = { if (provider.id == "none") Result.failure(NoMetadataPluginException()) else Result.success(page("Home")) }
-            val vm = viewModel()
+            var fetches = 0
+            provider.pages = {
+                fetches++
+                Result.success(page("Home"))
+            }
+            val vm = MusicHomeFeedViewModel(null, CatalogPlayback { null })
             vm.load()
             advanceUntilIdle()
+
             assertThat(vm.state.value.needsPlugin).isTrue()
-
-            provider.id = "dev.example.music"
-            provider.current = ProviderAccount.Anonymous
-            advanceUntilIdle()
-
-            assertThat(vm.state.value.needsPlugin).isFalse()
-            assertThat(vm.titles).containsExactly("Home")
+            assertThat(vm.state.value.isLoading).isFalse()
+            assertThat(fetches).isEqualTo(0)
         }
 
     @Test
