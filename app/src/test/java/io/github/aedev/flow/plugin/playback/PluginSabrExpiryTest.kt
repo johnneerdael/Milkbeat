@@ -34,6 +34,7 @@ class PluginSabrExpiryTest : PluginAudioFixture() {
     // Capture the real factory's pre-request guard without making an external HTTP request.
     private fun inspectGuard(
         expired: Boolean,
+        expectedUrl: String? = null,
         prepare: () -> Unit,
     ) {
         val guards = mutableListOf<() -> Unit>()
@@ -49,6 +50,7 @@ class PluginSabrExpiryTest : PluginAudioFixture() {
             if (expired) {
                 assertThat(failure).isInstanceOf(SabrPlaybackException::class.java)
                 assertThat((failure as SabrPlaybackException).reason).isEqualTo(SabrPlaybackException.Reason.URL_EXPIRED)
+                if (expectedUrl != null) assertThat(failure.url).isEqualTo(expectedUrl)
             } else {
                 assertThat(failure).isNull()
             }
@@ -93,6 +95,29 @@ class PluginSabrExpiryTest : PluginAudioFixture() {
                     }
                 }
             }
+        }
+
+    @Test
+    fun `expired native audio reports the accepted SABR endpoint instead of its placeholder`() =
+        runTest {
+            every { registry.state } returns
+                MutableStateFlow(
+                    PluginRegistryState(
+                        listOf(plugin.copy(grantedNetwork = listOf("media.example"))),
+                        ProviderSelection(audio = listOf("youtube")),
+                    ),
+                )
+            val native = native(candidate.ref.providerId)
+            coEvery { host.call("youtube", PluginOperations.resolveAudio, any()) } returns
+                stream.copy(
+                    url = "native://placeholder",
+                    mimeType = "application/x-server-abr",
+                    serverAbr = native,
+                    expiresInMs = 30000L,
+                )
+            val accepted = audio.resolve(original, null)
+            assertThat(accepted.stream.url).isNotEqualTo(native.url)
+            inspectGuard(true, native.url) { audio.serverAbrDataSourceFactory(accepted, okhttp3.OkHttpClient()) }
         }
 
     @Test

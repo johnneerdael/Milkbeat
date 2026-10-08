@@ -437,7 +437,7 @@ class PluginAudio
                 if (!audio.isValidAt(System.currentTimeMillis(), SystemClock.elapsedRealtime())) {
                     throw nl.neerdael.milkbeat.sabr.SabrPlaybackException(
                         nl.neerdael.milkbeat.sabr.SabrPlaybackException.Reason.URL_EXPIRED,
-                        audio.stream.url,
+                        audio.stream.serverAbr?.url ?: audio.stream.url,
                         null,
                     )
                 }
