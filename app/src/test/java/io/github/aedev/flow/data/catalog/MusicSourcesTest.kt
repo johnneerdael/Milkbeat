@@ -22,6 +22,7 @@ class MusicSourcesTest {
     private val youtube = plugin(YOUTUBE, "YouTube Music")
     private val soundcloud = plugin(SOUNDCLOUD, "SoundCloud")
     private val beatport = plugin(BEATPORT, "Beatport")
+    private val youtubeVideo = plugin(YOUTUBE_VIDEO, "YouTube Video")
 
     @Test
     fun signedInProvidersGetTabsInNameOrderWithLocalLast() {
@@ -124,6 +125,34 @@ class MusicSourcesTest {
     }
 
     @Test
+    fun withBothYouTubePluginsTheYouTubeTabIsYouTubeMusics() {
+        val tabs =
+            musicTabs(
+                registry(youtubeVideo, youtube),
+                mapOf(YOUTUBE to ProviderAccount.Anonymous, YOUTUBE_VIDEO to signedIn),
+                false,
+                emptySet(),
+            )
+
+        assertEquals(listOf(MusicSource.Plugin(YOUTUBE)), tabs.tabs.map { it.source })
+    }
+
+    @Test
+    fun withOnlyYouTubeVideoTheSameYouTubeTabShowsItsCatalog() {
+        val tab = musicTabs(registry(youtubeVideo), emptyMap(), false, emptySet()).tabs.single()
+
+        assertEquals(MusicSource.Plugin(YOUTUBE_VIDEO), tab.source)
+        assertEquals(R.drawable.ic_provider_youtube_music_mono, tab.iconRes)
+    }
+
+    @Test
+    fun aDisabledYouTubeMusicLeavesTheYouTubeTabToYouTubeVideo() {
+        val tabs = musicTabs(registry(youtube.copy(enabled = false), youtubeVideo), emptyMap(), false, emptySet())
+
+        assertEquals(listOf(MusicSource.Plugin(YOUTUBE_VIDEO)), tabs.tabs.map { it.source })
+    }
+
+    @Test
     fun sourceKeysRoundTrip() {
         listOf(MusicSource.Local, MusicSource.Plugin(SPOTIFY)).forEach { source ->
             assertEquals(source, MusicSource.fromKey(source.key))
@@ -161,6 +190,7 @@ class MusicSourcesTest {
         const val YOUTUBE = "nl.neerdael.youtube-music"
         const val SOUNDCLOUD = "nl.neerdael.soundcloud"
         const val BEATPORT = "nl.neerdael.beatport"
+        const val YOUTUBE_VIDEO = "nl.neerdael.youtube-video"
         val signedIn = ProviderAccount.SignedIn(key = "k")
     }
 }

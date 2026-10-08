@@ -8,7 +8,17 @@ Preview packages are published only for the separate Preview installation.
 1. Install the Preview APK from the linked GitHub prerelease.
 2. In **Milkbeat Preview**, install the preview YouTube Music plugin using downloader code **494**. This feature requires YouTube Music **0.2.9-preview.1** together with the preview app. Preview downloader codes use its bundled catalog, so code 494 installs this test version even while stable publishes another version.
 3. Install SoundCloud using **089** and sign in with its TV code if you want personalized Home and Library. YouTube sign-in is optional for matching and playback.
-4. Select SoundCloud for metadata and put YouTube Music first under Audio in **Settings > Plugins**.
+4. Put YouTube Music first under Audio in **Settings > Plugins**. There is no metadata provider to select: SoundCloud and YouTube Music each get their own tab in the sidebar.
+
+## YouTube Video plugin
+
+The Preview app also offers **YouTube Video** (**0.1.0-preview.4**), installed with downloader code **744**. This code exists only in the Preview app's bundled catalog; stable Milkbeat does not offer it. Like YouTube Music it provides metadata, audio and video, and it browses YouTube's TV Music feeds.
+
+1. In **Milkbeat Preview**, open **Settings > Plugins**, enter **744** and confirm the install.
+2. Optionally select YouTube Video and choose **Sign in with a TV code** for personalized Home and Library; it also works signed out.
+3. Under **Audio** and **Video**, choose it where you want it to supply playback.
+
+YouTube Video shares the YouTube tab in the sidebar with YouTube Music. With both installed, the tab shows YouTube Music's catalog and YouTube Video's catalog stays hidden, also in Search and Library. To test YouTube Video's catalog, disable or remove YouTube Music; the same tab then shows YouTube Video.
 
 ## Check playback
 

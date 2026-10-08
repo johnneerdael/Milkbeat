@@ -4,7 +4,7 @@
 
 ## A tab per provider
 
-Every catalog you can use has its own tab in the sidebar, marked with the service's logo: YouTube Music as soon as it is installed, the others once you are signed in. Each tab renders that provider's feed using Milkbeat's TV components; the provider chooses its content and sections. Linked music folders add a **Local library** tab. Each tab keeps its place while you visit another, pages opened from it stay on its provider, and Milkbeat starts on the music tab you used last.
+Every catalog you can use has its own tab in the sidebar, marked with the service's logo: YouTube Music as soon as it is installed, the others once you are signed in. YouTube Music and YouTube Video share the YouTube tab, which shows YouTube Music when both are installed. Each tab renders that provider's feed using Milkbeat's TV components; the provider chooses its content and sections. Linked music folders add a **Local library** tab. Each tab keeps its place while you visit another, pages opened from it stay on its provider, and Milkbeat starts on the music tab you used last.
 
 ![The sidebar with a YouTube Music tab and a Local library tab above Search, Library and Settings](images/rail-music-tabs.png)
 
