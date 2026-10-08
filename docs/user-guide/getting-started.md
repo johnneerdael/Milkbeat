@@ -6,7 +6,7 @@ Milkbeat runs on Android TV, Google TV and Fire TV with Android 8.0 or later. It
 
 === "Downloader app"
 
-    1. Install *Downloader* by AFTVnews from the TV's app store and allow it to install apps.
+    1. Install [*Downloader* by AFTVnews](https://play.google.com/store/apps/details?id=com.esaba.downloader&hl=en) from the TV's app store and allow it to install apps.
     2. Open it and enter code **`7170062`**.
     3. Install the APK it downloads, then start **Milkbeat** from the launcher.
 
