@@ -2,7 +2,6 @@ package io.github.aedev.flow.ui.tv.catalog
 
 import io.github.aedev.flow.data.model.Playlist
 import io.github.aedev.flow.data.model.Video
-import nl.neerdael.milkbeat.catalog.EntityRef
 import nl.neerdael.milkbeat.catalog.MetadataItem
 import nl.neerdael.milkbeat.catalog.TrackDescriptor
 
@@ -25,19 +24,6 @@ fun MetadataItem.toTvVideo(): Video {
         isUpcoming = upcoming,
     )
 }
-
-/** The video [this] names, from its [item] when the page has it; the player looks the rest up from the id. */
-fun EntityRef.toTvVideo(item: MetadataItem?): Video =
-    item?.toTvVideo() ?: Video(
-        id = providerId,
-        title = "",
-        channelName = "",
-        channelId = "",
-        thumbnailUrl = "",
-        duration = 0,
-        viewCount = 0,
-        uploadDate = "",
-    )
 
 /** A queued track of a video plugin as the player's [Video]. */
 fun TrackDescriptor.toTvVideo(): Video {

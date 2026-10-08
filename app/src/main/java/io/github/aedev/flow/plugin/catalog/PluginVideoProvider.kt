@@ -13,9 +13,6 @@ import nl.neerdael.milkbeat.catalog.LiveChatBatch
 import nl.neerdael.milkbeat.catalog.LiveChatRequest
 import nl.neerdael.milkbeat.catalog.MetadataPage
 import nl.neerdael.milkbeat.catalog.PageRequest
-import nl.neerdael.milkbeat.catalog.SearchRequest
-import nl.neerdael.milkbeat.catalog.SuggestRequest
-import nl.neerdael.milkbeat.catalog.Suggestions
 import nl.neerdael.milkbeat.catalog.TrackList
 import nl.neerdael.milkbeat.catalog.TracksRequest
 import nl.neerdael.milkbeat.plugin.PluginErrorCode
@@ -31,9 +28,9 @@ import javax.inject.Singleton
 class NoVideoPluginException : Exception("No video plugin is selected")
 
 /**
- * The listener's chosen video plugin: video search, channel and playlist pages, the related rail,
- * playback, comments and live chat. Every call names the plugin that answered, since a page's
- * items and a playback's tracking token only make sense to the plugin that produced them.
+ * The listener's chosen video plugin: channel and playlist pages, the related rail, playback,
+ * comments and live chat. Every call names the plugin that answered, since a page's items and a
+ * playback's tracking token only make sense to the plugin that produced them.
  */
 @Singleton
 class PluginVideoProvider
@@ -48,10 +45,6 @@ class PluginVideoProvider
 
         /** Whether a video plugin is chosen; the Videos surfaces offer to add one when it is not. */
         val available: Flow<Boolean> = registry.state.map { it.selection.video != null }.distinctUntilChanged()
-
-        suspend fun search(request: SearchRequest): Result<MetadataPage> = call(PluginOperations.videoSearch, request)
-
-        suspend fun suggest(query: String): Result<Suggestions> = call(PluginOperations.videoSuggest, SuggestRequest(query))
 
         suspend fun page(
             entity: EntityRef,

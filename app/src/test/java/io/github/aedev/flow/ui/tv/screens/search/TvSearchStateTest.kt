@@ -1,7 +1,6 @@
 package io.github.aedev.flow.ui.tv.screens.search
 
 import com.google.common.truth.Truth.assertThat
-import io.github.aedev.flow.data.catalog.MusicSource
 import nl.neerdael.milkbeat.catalog.CollectionBlock
 import nl.neerdael.milkbeat.catalog.CollectionHeader
 import nl.neerdael.milkbeat.catalog.CollectionLayout
@@ -40,14 +39,6 @@ class TvSearchStateTest {
             )
 
         assertThat(merged).containsExactly("Cafe del Mar", "cafe", "cafe music").inOrder()
-    }
-
-    @Test
-    fun `each kind shows only its own typeahead`() {
-        val state = TvSearchUiState(musicSuggestions = listOf("m"), videoSuggestions = listOf("v"))
-
-        assertThat(state.suggestions(TvSearchSource.Music(MusicSource.Local))).containsExactly("m")
-        assertThat(state.suggestions(TvSearchSource.Videos)).containsExactly("v")
     }
 
     @Test
@@ -112,13 +103,5 @@ class TvSearchStateTest {
         assertThat(listOf(collection("results", "a"), collection("s", "b", title = "More")).resultsGridId()).isEqualTo("results")
         assertThat(listOf(collection("top", "a", title = "Top result")).resultsGridId()).isNull()
         assertThat(listOf(collection("results", "a", layout = CollectionLayout.TRACK_TABLE)).resultsGridId()).isNull()
-    }
-
-    @Test
-    fun `an entity is found among the page's items`() {
-        val blocks = listOf(collection("results", "a"), collection("s", "b", title = "More"))
-
-        assertThat(blocks.itemFor(EntityRef(EntityKind.VIDEO, "b"))?.id).isEqualTo("b")
-        assertThat(blocks.itemFor(EntityRef(EntityKind.CHANNEL, "b"))).isNull()
     }
 }
