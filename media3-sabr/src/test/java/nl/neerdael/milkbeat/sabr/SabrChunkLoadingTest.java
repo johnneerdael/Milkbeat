@@ -24,6 +24,62 @@ import org.robolectric.annotation.Config;
 @RunWith(RobolectricTestRunner.class)
 @Config(sdk = 35)
 public class SabrChunkLoadingTest {
+    @Test public void serverBackoffBlocksNextPostUntilOriginalMonotonicDeadline() throws Exception {
+        SabrManifest manifest=manifest(4500,false);
+        SabrChunkSource source=source(manifest,()->new ByteArrayDataSource(new byte[]{0}));
+        java.util.concurrent.atomic.AtomicInteger resumed=new java.util.concurrent.atomic.AtomicInteger();
+        source.setOnContinueLoadingRequested(resumed::incrementAndGet);
+        manifest.getSabrStream(C.TRACK_TYPE_VIDEO).parse(packet(nl.neerdael.milkbeat.sabr.parser.ump.UMPPartId.NEXT_REQUEST_POLICY,
+                NextRequestPolicy.newBuilder().setBackoffTimeMs(100).build().toByteArray()));
+        LoadingInfo loading=new LoadingInfo.Builder().setPlaybackPositionUs(0).build();
+        ChunkHolder first=new ChunkHolder();source.getNextChunk(loading,0,Collections.emptyList(),first);assertNull(first.chunk);
+        org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(99));
+        manifest.getSabrStream(C.TRACK_TYPE_VIDEO).reset(137);
+        ChunkHolder repeated=new ChunkHolder();source.getNextChunk(loading,1_000_000,Collections.emptyList(),repeated);assertNull(repeated.chunk);
+        assertEquals(0,resumed.get());
+        org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(1));
+        assertEquals(1,resumed.get());
+        ChunkHolder ready=new ChunkHolder();source.getNextChunk(loading,1_000_000,Collections.emptyList(),ready);assertNotNull(ready.chunk);
+        assertEquals(1_000_000,ready.chunk.startTimeUs);
+        org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(100));
+        assertEquals(1,resumed.get());
+        source.release();
+    }
+    @Test public void sourceReleaseCancelsDeferredLoadingCallback() throws Exception {
+        SabrManifest manifest=manifest(4500,false);
+        SabrChunkSource source=source(manifest,()->new ByteArrayDataSource(new byte[]{0}));
+        java.util.concurrent.atomic.AtomicInteger resumed=new java.util.concurrent.atomic.AtomicInteger();source.setOnContinueLoadingRequested(resumed::incrementAndGet);
+        manifest.getSabrStream(C.TRACK_TYPE_VIDEO).parse(packet(nl.neerdael.milkbeat.sabr.parser.ump.UMPPartId.NEXT_REQUEST_POLICY,
+                NextRequestPolicy.newBuilder().setBackoffTimeMs(100).build().toByteArray()));
+        ChunkHolder waiting=new ChunkHolder();source.getNextChunk(new LoadingInfo.Builder().setPlaybackPositionUs(0).build(),0,Collections.emptyList(),waiting);assertNull(waiting.chunk);
+        // Media3 invokes ChunkSource.release from its loader release callback.
+        Thread release = new Thread(source::release);release.start();release.join(1000);assertFalse(release.isAlive());
+        org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(100));
+        assertEquals(0,resumed.get());
+    }
+    @Test public void newerPolicyReceiptReplacesOneTimerAndTrackPoliciesRemainIndependent() throws Exception {
+        SabrManifest manifest=manifest(4500,false);
+        SabrChunkSource source=source(manifest,()->new ByteArrayDataSource(new byte[]{0}));
+        java.util.concurrent.atomic.AtomicInteger resumed=new java.util.concurrent.atomic.AtomicInteger();source.setOnContinueLoadingRequested(resumed::incrementAndGet);
+        LoadingInfo loading=new LoadingInfo.Builder().setPlaybackPositionUs(0).build();
+        // An audio response's policy belongs to that request's processor/context.
+        manifest.getSabrStream(C.TRACK_TYPE_AUDIO).parse(packet(nl.neerdael.milkbeat.sabr.parser.ump.UMPPartId.NEXT_REQUEST_POLICY,
+                NextRequestPolicy.newBuilder().setBackoffTimeMs(1000).build().toByteArray()));
+        ChunkHolder video=new ChunkHolder();source.getNextChunk(loading,0,Collections.emptyList(),video);assertNotNull(video.chunk);
+        manifest.getSabrStream(C.TRACK_TYPE_VIDEO).parse(packet(nl.neerdael.milkbeat.sabr.parser.ump.UMPPartId.NEXT_REQUEST_POLICY,
+                NextRequestPolicy.newBuilder().setBackoffTimeMs(100).build().toByteArray()));
+        source.getNextChunk(loading,0,Collections.emptyList(),new ChunkHolder());
+        org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(20));
+        manifest.getSabrStream(C.TRACK_TYPE_VIDEO).parse(packet(nl.neerdael.milkbeat.sabr.parser.ump.UMPPartId.NEXT_REQUEST_POLICY,
+                NextRequestPolicy.newBuilder().setBackoffTimeMs(30).build().toByteArray()));
+        source.getNextChunk(loading,0,Collections.emptyList(),new ChunkHolder());
+        org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(29));assertEquals(0,resumed.get());
+        source.getNextChunk(loading,0,Collections.emptyList(),new ChunkHolder());
+        org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(1));assertEquals(1,resumed.get());
+        org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(50));assertEquals(1,resumed.get());
+        ChunkHolder ready=new ChunkHolder();source.getNextChunk(loading,0,Collections.emptyList(),ready);assertNotNull(ready.chunk);
+        source.release();
+    }
     @Test public void completedFirstSegmentCannotHideMissingEndOrDanglingSecondHeader() throws Exception {
         List<byte[]> media = segments(SabrContainerExtractorTest.fixture("fragmented-short.mp4"));
         byte[] first = SabrContainerExtractorTest.framed(media.get(0),137,"video/mp4",0,2000,true);

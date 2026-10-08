@@ -50,6 +50,87 @@ class ServerAbrPresentationTest {
         )
 
     @Test
+    fun `first native chunk initializes before server omits metadata for selected audio`() {
+        val media = javaClass.getResourceAsStream("/sabr/audio-fragmented.mp4")!!.use { it.readBytes() }
+        var offset = 0
+        while (String(media, offset + 4, 4, Charsets.US_ASCII) != "moof") {
+            offset += java.nio.ByteBuffer.wrap(media, offset, 4).int
+        }
+        val initializationBytes = media.copyOfRange(0, offset)
+        val segmentBytes = media.copyOfRange(offset, media.size)
+        val tuple = nl.neerdael.milkbeat.sabr.protos.misc.FormatId.newBuilder().setItag(140).setLastModified(-2L).build()
+        fun packet(initialization: Boolean): ByteArray {
+            val payload = if (initialization) initializationBytes else segmentBytes
+            val out = java.io.ByteArrayOutputStream()
+            fun part(type: Int, body: ByteArray) {
+                require(body.size < 128)
+                out.write(type); out.write(body.size); out.write(body)
+            }
+            if (initialization) {
+                part(42, nl.neerdael.milkbeat.sabr.protos.videostreaming.FormatInitializationMetadata.newBuilder()
+                    .setFormatId(tuple).setMimeType("audio/mp4").setEndTimeMs(2000).build().toByteArray())
+            }
+            part(20, nl.neerdael.milkbeat.sabr.protos.videostreaming.MediaHeader.newBuilder()
+                .setHeaderId(1).setFormatId(tuple).setIsInitSeg(initialization).setSequenceNumber(1)
+                .setStartMs(0).setDurationMs(if (initialization) 0 else 2000).setContentLength(payload.size.toLong()).build().toByteArray())
+            for (start in payload.indices step 93) {
+                part(21, byteArrayOf(1) + payload.copyOfRange(start, minOf(start + 93, payload.size)))
+            }
+            part(22, byteArrayOf(1))
+            return out.toByteArray()
+        }
+        val playback = ServerAbrPlayback(url, "fixture-video", "AQI", ServerAbrClientInfo(7, "fixture-tv"),
+            listOf(ServerAbrFormat(nl.neerdael.milkbeat.plugin.MediaFormat("140", FormatType.AUDIO, url, "audio/mp4", codecs = "mp4a.40.2", bitrate = 128000),
+                140, "18446744073709551614")), durationMs = 2000)
+        val manifest = ServerAbrPresentation.create(playback)
+        val chosen = manifest.getPeriod(0).adaptationSets.single().representations.single().format
+        val requests = mutableListOf<nl.neerdael.milkbeat.sabr.protos.videostreaming.VideoPlaybackAbrRequest>()
+        val factory = androidx.media3.datasource.DataSource.Factory {
+            object : androidx.media3.datasource.BaseDataSource(false) {
+                lateinit var delegate: ByteArrayDataSource
+                override fun open(spec: androidx.media3.datasource.DataSpec): Long {
+                    assertEquals(androidx.media3.datasource.DataSpec.HTTP_METHOD_POST, spec.httpMethod)
+                    assertEquals(0L, spec.position)
+                    assertFalse(spec.httpRequestHeaders.containsKey("Range"))
+                    val request = nl.neerdael.milkbeat.sabr.protos.videostreaming.VideoPlaybackAbrRequest.parseFrom(spec.httpBody)
+                    requests += request
+                    // Model the observed server: selected formats receive headers/media without type 42.
+                    delegate = ByteArrayDataSource(packet(request.selectedFormatIdsCount == 0))
+                    return delegate.open(spec)
+                }
+                override fun read(target: ByteArray, offset: Int, length: Int): Int = delegate.read(target, offset, minOf(length, 7))
+                override fun getUri() = delegate.uri
+                override fun close() = delegate.close()
+            }
+        }
+        val source = DefaultSabrChunkSource.Factory(factory).createSabrChunkSource(object : LoaderErrorThrower {
+            override fun maybeThrowError() {}
+            override fun maybeThrowError(minRetryCount: Int) {}
+        }, manifest, 0, intArrayOf(0), FixedTrackSelection(TrackGroup("audio", chosen), 0), C.TRACK_TYPE_AUDIO, 0, false, emptyList(), null, null)
+        val samples = androidx.media3.exoplayer.source.SampleQueue.createWithoutDrm(androidx.media3.exoplayer.upstream.DefaultAllocator(true, 4096))
+        val output = androidx.media3.exoplayer.source.chunk.BaseMediaChunkOutput(intArrayOf(C.TRACK_TYPE_AUDIO), arrayOf(samples))
+        val loading = androidx.media3.exoplayer.LoadingInfo.Builder().setPlaybackPositionUs(0).build()
+        val first = androidx.media3.exoplayer.source.chunk.ChunkHolder()
+        source.getNextChunk(loading, 0, emptyList(), first)
+        assertTrue(first.chunk is androidx.media3.exoplayer.source.chunk.InitializationChunk)
+        val initialization = first.chunk as androidx.media3.exoplayer.source.chunk.InitializationChunk
+        initialization.init(output); initialization.load(); source.onChunkLoadCompleted(initialization)
+        assertEquals(0, requests.single().selectedFormatIdsCount)
+        assertEquals(1, requests.single().preferredAudioFormatIdsCount)
+        val next = androidx.media3.exoplayer.source.chunk.ChunkHolder()
+        source.getNextChunk(loading, 0, emptyList(), next)
+        assertTrue(next.chunk is androidx.media3.exoplayer.source.chunk.ContainerMediaChunk)
+        val segment = next.chunk as androidx.media3.exoplayer.source.chunk.ContainerMediaChunk
+        segment.init(output); segment.load(); source.onChunkLoadCompleted(segment)
+        assertEquals(1, requests.last().selectedFormatIdsCount)
+        assertEquals(tuple, requests.last().selectedFormatIdsList.single())
+        assertTrue(samples.writeIndex > 80)
+        assertEquals("audio/mp4a-latm", samples.upstreamFormat!!.sampleMimeType)
+        assertTrue(samples.largestQueuedTimestampUs > 1_900_000)
+        source.maybeThrowError(); source.release(); samples.release()
+    }
+
+    @Test
     fun `audio request excludes video and subtitles and uses the bound client context`() {
         val manifest = presentation()
         val groups = manifest.getPeriod(0).adaptationSets
@@ -168,8 +249,7 @@ class ServerAbrPresentationTest {
                 .ChunkHolder()
         source.getNextChunk(loading, 0, emptyList(), holder)
         assertEquals(720, selection.selectedFormat.height)
-        assertTrue(holder.chunk!!.startTimeUs >= 0)
-        assertTrue(holder.chunk!!.endTimeUs > holder.chunk!!.startTimeUs)
+        assertTrue(holder.chunk is androidx.media3.exoplayer.source.chunk.InitializationChunk)
         assertEquals(
             136,
             manifest
@@ -183,7 +263,9 @@ class ServerAbrPresentationTest {
         val request =
             nl.neerdael.milkbeat.sabr.protos.videostreaming.VideoPlaybackAbrRequest
                 .parseFrom(holder.chunk!!.dataSpec.httpBody)
-        assertEquals(30_000L, request.clientAbrState.playerTimeMs)
+        assertTrue(holder.chunk is androidx.media3.exoplayer.source.chunk.InitializationChunk)
+        assertEquals(0L, request.clientAbrState.playerTimeMs)
+        assertTrue(request.selectedFormatIdsList.isEmpty())
         assertEquals(2160, selection.selectedFormat.height)
         assertEquals(2160, request.clientAbrState.stickyResolution)
         assertEquals(high.lastModified, java.lang.Long.toUnsignedString(request.preferredVideoFormatIdsList.single().lastModified))
@@ -197,7 +279,7 @@ class ServerAbrPresentationTest {
     }
 
     @Test
-    fun `actual adaptive audio selection changes full tuple at current position`() {
+    fun `actual adaptive audio selection initializes the changed full tuple`() {
         val low = audio.copy(format = audio.format.copy(id = "249", bitrate = 64_000), itag = 249, lastModified = "55", xTags = "lang=en")
         val high = audio.copy(format = audio.format.copy(bitrate = 256_000), lastModified = "18446744073709551614", xTags = "lang=en")
         val manifest = presentation(listOf(low, high))
@@ -262,7 +344,9 @@ class ServerAbrPresentationTest {
             nl.neerdael.milkbeat.sabr.protos.videostreaming.VideoPlaybackAbrRequest
                 .parseFrom(holder.chunk!!.dataSpec.httpBody)
         assertEquals("251", selection.selectedFormat.id)
-        assertEquals(30_000L, request.clientAbrState.playerTimeMs)
+        assertTrue(holder.chunk is androidx.media3.exoplayer.source.chunk.InitializationChunk)
+        assertEquals(0L, request.clientAbrState.playerTimeMs)
+        assertTrue(request.selectedFormatIdsList.isEmpty())
         assertEquals(high.lastModified, java.lang.Long.toUnsignedString(request.preferredAudioFormatIdsList.single().lastModified))
         assertEquals(1, request.clientAbrState.enabledTrackTypesBitfield)
         assertTrue(request.preferredVideoFormatIdsList.isEmpty())

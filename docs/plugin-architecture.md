@@ -80,6 +80,11 @@ existing song fallback at the same playback position; genuine SABR renewal prese
 listener's selected picture view and accepted recording. If an SDR TV has a conventional SDR
 alternative to an HDR-only native presentation, use that alternative.
 
+Prime each native rendition with Media3's initialization chunk before advertising it as
+selected. Subsequent media chunks reuse its initialization metadata and extractor. A server
+next-request backoff sets a monotonic deadline and resumes the existing period loader once;
+repeated load evaluation does not extend the delay, and source release cancels that callback.
+
 `BrowserOpenRequest.userAgent` lets a provider couple its browser generator to its attestation
 HTTP profile. Existing requests retain the default browser user agent. Playback artwork is
 accepted-source metadata: prefetch or late prior-item callbacks cannot replace the current

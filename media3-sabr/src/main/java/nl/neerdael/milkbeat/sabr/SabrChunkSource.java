@@ -79,4 +79,7 @@ public interface SabrChunkSource extends ChunkSource {
    * @param trackSelection The new track selection instance. Must be equivalent to the previous one.
    */
   void updateTrackSelection(ExoTrackSelection trackSelection);
+
+  /** Request loading again when a server-directed deferment expires. */
+  default void setOnContinueLoadingRequested(Runnable callback) {}
 }

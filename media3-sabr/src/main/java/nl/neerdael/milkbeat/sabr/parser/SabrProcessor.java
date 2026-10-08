@@ -5,6 +5,7 @@ import android.util.Base64;
 import androidx.annotation.NonNull;
 
 import androidx.media3.extractor.ExtractorInput;
+import androidx.media3.common.util.Clock;
 import nl.neerdael.milkbeat.sabr.parser.exceptions.SabrStreamError;
 import nl.neerdael.milkbeat.sabr.parser.misc.Utils;
 import nl.neerdael.milkbeat.sabr.parser.models.ConsumedRange;
@@ -68,6 +69,7 @@ public class SabrProcessor {
     private volatile LiveMetadata liveMetadata;
     private long totalDurationMs;
     private NextRequestPolicy nextRequestPolicy;
+    private volatile long nextRequestNotBeforeRealtimeMs;
     private final Map<Integer, SabrContextUpdate> sabrContextUpdates;
     private final Set<Integer> sabrContextsToSend;
     private final Map<Integer, MediaHeader> initializedFormats;
@@ -491,7 +493,10 @@ public class SabrProcessor {
 
     public void processNextRequestPolicy(NextRequestPolicy nextRequestPolicy) {
         this.nextRequestPolicy = nextRequestPolicy;
+        nextRequestNotBeforeRealtimeMs = Clock.DEFAULT.elapsedRealtime() + Math.max(0, nextRequestPolicy.getBackoffTimeMs());
     }
+
+    public long getNextRequestNotBeforeRealtimeMs() { return nextRequestNotBeforeRealtimeMs; }
 
     public synchronized ProcessLiveMetadataResult processLiveMetadata(LiveMetadata liveMetadata) {
         this.liveMetadata = liveMetadata;

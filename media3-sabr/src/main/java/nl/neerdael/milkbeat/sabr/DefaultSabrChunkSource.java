@@ -2,6 +2,9 @@ package nl.neerdael.milkbeat.sabr;
 
 import android.net.Uri;
 import android.os.SystemClock;
+import android.os.Looper;
+import androidx.media3.common.util.Clock;
+import androidx.media3.common.util.HandlerWrapper;
 
 import androidx.annotation.CheckResult;
 import androidx.annotation.Nullable;
@@ -121,7 +124,42 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
     private int periodIndex;
     private IOException fatalError;
     private boolean missingLastSegment;
-    private boolean released;
+    private volatile boolean released;
+    @Nullable private Runnable continueLoadingCallback;
+    @Nullable private HandlerWrapper backoffHandler;
+    private long scheduledBackoffDeadlineMs;
+    private final Runnable resumeAfterBackoff = this::resumeAfterBackoff;
+
+    private synchronized void resumeAfterBackoff() {
+        scheduledBackoffDeadlineMs = 0;
+        Runnable callback = continueLoadingCallback;
+        if (!released && (sabrStream == null || sabrStream.getFormatSelector() == formatSelector)
+                && callback != null) callback.run();
+    }
+
+    @Override
+    public synchronized void setOnContinueLoadingRequested(Runnable callback) {
+        if (released) return;
+        continueLoadingCallback = callback;
+        if (backoffHandler == null) backoffHandler = Clock.DEFAULT.createHandler(Assertions.checkNotNull(Looper.myLooper()), null);
+    }
+
+    private synchronized boolean deferForServerBackoff() {
+        if (released) return true;
+        long deadlineMs = sabrStream == null ? 0 : sabrStream.getNextRequestNotBeforeRealtimeMs();
+        long remainingMs = deadlineMs - Clock.DEFAULT.elapsedRealtime();
+        if (remainingMs <= 0) {
+            if (backoffHandler != null) backoffHandler.removeCallbacks(resumeAfterBackoff);
+            scheduledBackoffDeadlineMs = 0;
+            return false;
+        }
+        if (backoffHandler != null && continueLoadingCallback != null && scheduledBackoffDeadlineMs != deadlineMs) {
+            backoffHandler.removeCallbacks(resumeAfterBackoff);
+            scheduledBackoffDeadlineMs = deadlineMs;
+            backoffHandler.postDelayed(resumeAfterBackoff, remainingMs);
+        }
+        return true;
+    }
     private long liveEdgeTimeUs;
 
     @Nullable private final SabrStream sabrStream;
@@ -301,6 +339,8 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
             return;
         }
 
+        if (deferForServerBackoff()) return;
+
         // Container chunks are constructed before their SABR headers arrive. The completed
         // header is authoritative for subsequent requests, including short final segments.
         if (!queue.isEmpty() && sabrStream != null) {
@@ -381,8 +421,11 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
     }
 
     @Override
-    public void release() {
+    public synchronized void release() {
         released = true;
+        if (backoffHandler != null) backoffHandler.removeCallbacks(resumeAfterBackoff);
+        continueLoadingCallback = null;
+        scheduledBackoffDeadlineMs = 0;
         // Deselection must stop requesting this track, even while another track keeps
         // the presentation warm. A late old release cannot clear a newer owner.
         if (sabrStream != null && sabrStream.getFormatSelector() == formatSelector) {

@@ -9,6 +9,7 @@ import nl.neerdael.milkbeat.plugin.ServerAbrFormat
 import nl.neerdael.milkbeat.plugin.ServerAbrPlayback
 import nl.neerdael.milkbeat.sabr.manifest.AdaptationSet
 import nl.neerdael.milkbeat.sabr.manifest.Period
+import nl.neerdael.milkbeat.sabr.manifest.RangedUri
 import nl.neerdael.milkbeat.sabr.manifest.Representation
 import nl.neerdael.milkbeat.sabr.manifest.SabrManifest
 import nl.neerdael.milkbeat.sabr.manifest.SegmentBase
@@ -33,7 +34,9 @@ object ServerAbrPresentation {
                                 Representation.REVISION_ID_DEFAULT,
                                 mediaFormat(tuple),
                                 playback.url,
-                                SegmentBase.SingleSegmentBase(),
+                                // SmartTube always supplies an initialization range marker, even
+                                // without a byte range. SABR requests initialization through a POST.
+                                SegmentBase.SingleSegmentBase(RangedUri(playback.url, 0, C.LENGTH_UNSET.toLong()), 1, 0, 0, 0),
                             )
                         }
                     AdaptationSet(index, type, representations)

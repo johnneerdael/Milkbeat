@@ -207,6 +207,8 @@ public class SabrStream {
         return processor.getSegmentDurationMs(iTag);
     }
 
+    public long getNextRequestNotBeforeRealtimeMs() { return processor.getNextRequestNotBeforeRealtimeMs(); }
+
     public int getBackoffTimeMs() {
         return processor.getBackoffTimeMs();
     }

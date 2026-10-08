@@ -606,6 +606,7 @@ final class SabrMediaPeriod
                         drmEventDispatcher,
                         loadErrorHandlingPolicy,
                         eventDispatcher, false, C.TIME_UNSET, null);
+        chunkSource.setOnContinueLoadingRequested(() -> onContinueLoadingRequested(stream));
         synchronized (this) {
             // The map is also accessed on the loading thread so synchronize access.
             trackEmsgHandlerBySampleStream.put(stream, trackPlayerEmsgHandler);
