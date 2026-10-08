@@ -1,7 +1,5 @@
 package io.github.aedev.flow.plugin.catalog
 
-import io.github.aedev.flow.data.catalog.CatalogPlayback
-import io.github.aedev.flow.data.music.model.MusicTrack
 import io.github.aedev.flow.plugin.PluginHost
 import io.github.aedev.flow.plugin.registry.PluginRegistry
 import io.github.aedev.flow.plugin.runtime.PluginCallException
@@ -9,26 +7,19 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
-import nl.neerdael.milkbeat.catalog.EntityRef
-import nl.neerdael.milkbeat.catalog.HomeRequest
-import nl.neerdael.milkbeat.catalog.MetadataItem
-import nl.neerdael.milkbeat.catalog.MetadataPage
-import nl.neerdael.milkbeat.catalog.MetadataProvider
-import nl.neerdael.milkbeat.catalog.PageRequest
 import nl.neerdael.milkbeat.catalog.ProviderAccount
 import nl.neerdael.milkbeat.plugin.PluginErrorCode
 import nl.neerdael.milkbeat.plugin.PluginOperation
-import nl.neerdael.milkbeat.plugin.PluginOperations
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/** No plugin provides music metadata yet; Home offers to add one. */
-class NoMetadataPluginException : Exception("No music plugin is selected")
+/** Neither a metadata plugin nor a music folder backs this page; it offers to add one. */
+class NoMetadataPluginException : Exception("No music plugin or folder backs this page")
 
 /**
- * The listener's chosen metadata plugin, behind the catalog's [MetadataProvider]: Home and the
- * artist, album and playlist pages come from it. A call that says the sign-in expired marks the
- * account expired, so the pages ask the listener to sign in again.
+ * Calls into metadata plugins on behalf of one music tab or page: [scoped] gives one plugin's
+ * catalog. A call that says the sign-in expired marks the account expired, so the pages ask the
+ * listener to sign in again.
  */
 @Singleton
 class PluginMetadataProvider
@@ -37,33 +28,7 @@ class PluginMetadataProvider
         private val host: PluginHost,
         private val registry: PluginRegistry,
         private val accounts: PluginAccounts,
-    ) : MetadataProvider,
-        CatalogPlayback {
-        private val selected: String?
-            get() = registry.state.value.selection.metadata
-
-        override val id: String
-            get() = selected ?: "none"
-
-        /** Emits again when another plugin is chosen, even if both are signed out, so pages reload. */
-        override val account: Flow<ProviderAccount> =
-            combine(registry.state.map { it.selection.metadata }.distinctUntilChanged(), accounts.accounts) { plugin, known ->
-                plugin to (plugin?.let { known[it] } ?: ProviderAccount.Anonymous)
-            }.distinctUntilChanged().map { it.second }
-
-        override suspend fun home(request: HomeRequest): Result<MetadataPage> = call(PluginOperations.home, request)
-
-        override suspend fun page(
-            entity: EntityRef,
-            cursor: String?,
-        ): Result<MetadataPage> = call(PluginOperations.entity, PageRequest(entity, cursor = cursor))
-
-        override fun track(item: MetadataItem): MusicTrack? {
-            val plugin = selected ?: return null
-            return item.track?.toMusicTrack(plugin)
-        }
-
-        /** Calls [operation] on the selected metadata plugin; a failure carries the plugin's reason. */
+    ) {
         fun scoped(pluginId: String): ScopedPluginCatalog = ScopedPluginCatalog(this, pluginId)
 
         internal fun accountFor(pluginId: String): Flow<ProviderAccount> =
@@ -71,14 +36,13 @@ class PluginMetadataProvider
                 if (registry.plugin(pluginId) == null) ProviderAccount.Anonymous else accounts[pluginId] ?: ProviderAccount.Anonymous
             }.distinctUntilChanged()
 
-        suspend fun <Request, Response> call(
-            operation: PluginOperation<Request, Response>,
-            request: Request,
-        ): Result<Response> {
-            val plugin = selected ?: return Result.failure(NoMetadataPluginException())
-            return callFor(plugin, operation, request)
-        }
+        /** Which installation of [pluginId] answers, or null while none is enabled; a reinstall changes it. */
+        internal fun installationOf(pluginId: String): Flow<Any?> =
+            registry.state
+                .map { state -> state.plugin(pluginId)?.let { it.installedAtMs to it.manifest.versionCode } }
+                .distinctUntilChanged()
 
+        /** Calls [operation] on [plugin], asking for its account first when it is not known yet. */
         internal suspend fun <Request, Response> callFor(
             plugin: String,
             operation: PluginOperation<Request, Response>,

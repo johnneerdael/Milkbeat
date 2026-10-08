@@ -6,11 +6,13 @@ import io.github.aedev.flow.plugin.PluginHost
 import io.github.aedev.flow.plugin.runtime.PluginCallException
 import io.github.aedev.flow.utils.PerformanceDispatcher
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -79,20 +81,80 @@ class PluginAccounts internal constructor(
         }
 
     private val revalidations = mutableMapOf<String, Job>()
+
+    private class AccountCheck(
+        val generation: Int,
+        val answer: CompletableDeferred<ProviderAccount>,
+    )
+
+    private val checks = mutableMapOf<String, AccountCheck>()
+    private val generations = mutableMapOf<String, Int>()
+
+    private fun generation(pluginId: String): Int = synchronized(generations) { generations[pluginId] ?: 0 }
+
+    /** A new installation of [pluginId] answers from now on; a check still running asks the one it replaced. */
+    fun replaced(pluginId: String) {
+        supersedeChecks(pluginId)
+        cancelRevalidation(pluginId)
+    }
+
+    /** The listener acted on the account; a check still running answers for the account before that. */
+    private fun supersedeChecks(pluginId: String) = synchronized(generations) { generations[pluginId] = generation(pluginId) + 1 }
+
     private val lastRevalidationMs = mutableMapOf<String, Long>()
     private val expiredDuringCheck = mutableSetOf<String>()
 
+    /** Asks [pluginId] for its account; callers asking while a check runs share it rather than repeat it. */
     suspend fun refresh(pluginId: String): ProviderAccount {
-        val account = ask(pluginId)
-        if (playbackIdentity(_accounts.value[pluginId]) != playbackIdentity(account)) invalidatePlayback(pluginId)
-        _accounts.update { it + (pluginId to account) }
-        return account
+        val check = AccountCheck(generation(pluginId), CompletableDeferred())
+        // A check begun for an earlier installation or account is not this caller's answer.
+        val running =
+            synchronized(checks) {
+                checks[pluginId]?.takeIf { it.generation == check.generation } ?: run {
+                    checks[pluginId] = check
+                    null
+                }
+            }
+        if (running != null) {
+            return try {
+                running.answer.await()
+            } catch (e: CancellationException) {
+                // The caller running the check was cancelled; one still waiting asks for itself.
+                currentCoroutineContext().ensureActive()
+                refresh(pluginId)
+            }
+        }
+        try {
+            val asked = check.generation
+            val answer = ask(pluginId)
+            if (generation(pluginId) == asked && playbackIdentity(_accounts.value[pluginId]) != playbackIdentity(answer)) {
+                invalidatePlayback(pluginId)
+            }
+            // A sign-in or sign-out finished while this check ran is newer than its answer.
+            var account = answer
+            _accounts.update { known ->
+                if (generation(pluginId) == asked) {
+                    known + (pluginId to answer)
+                } else {
+                    account = known[pluginId] ?: answer
+                    known
+                }
+            }
+            check.answer.complete(account)
+            return account
+        } catch (e: Throwable) {
+            check.answer.completeExceptionally(e)
+            throw e
+        } finally {
+            synchronized(checks) { checks.remove(pluginId, check) }
+        }
     }
 
     suspend fun complete(
         pluginId: String,
         result: WebLoginResult,
     ): ProviderAccount {
+        supersedeChecks(pluginId)
         cancelRevalidation(pluginId)
         invalidatePlayback(pluginId)
         val account = host.call(pluginId, PluginOperations.completeSignIn, result)
@@ -142,6 +204,7 @@ class PluginAccounts internal constructor(
             host.call(pluginId, PluginOperations.confirmSignIn, DeviceCodeSession(session)) as? ProviderAccount.SignedIn
                 ?: error("Pairing confirmation did not return a signed-in account")
         require(account.key.isNotBlank()) { "Pairing confirmation returned an empty account identity" }
+        supersedeChecks(pluginId)
         cancelRevalidation(pluginId)
         _accounts.update { it + (pluginId to account) }
         return account
@@ -149,6 +212,7 @@ class PluginAccounts internal constructor(
 
     suspend fun signOut(pluginId: String) {
         invalidatePlayback(pluginId)
+        supersedeChecks(pluginId)
         cancelRevalidation(pluginId)
         host.call(pluginId, PluginOperations.signOut, Unit)
         _accounts.update { it + (pluginId to ProviderAccount.Anonymous) }
@@ -186,6 +250,7 @@ class PluginAccounts internal constructor(
         if (last != null) delay((last + REVALIDATION_COOLDOWN_MS - nowMs()).coerceAtLeast(0))
         for (attempt in 0..RETRY_BACKOFF_MS.size) {
             synchronized(revalidations) { lastRevalidationMs[pluginId] = nowMs() }
+            val asked = generation(pluginId)
             val account =
                 try {
                     ask(pluginId)
@@ -200,8 +265,20 @@ class PluginAccounts internal constructor(
                     Log.w(TAG, "Re-checking the $pluginId account failed", e)
                     return
                 }
-            if (_accounts.value[pluginId] == ProviderAccount.Expired && account != ProviderAccount.Expired) invalidatePlayback(pluginId)
-            _accounts.update { if (it[pluginId] == ProviderAccount.Expired) it + (pluginId to account) else it }
+            if (generation(pluginId) == asked && _accounts.value[pluginId] == ProviderAccount.Expired &&
+                account != ProviderAccount.Expired
+            ) {
+                invalidatePlayback(pluginId)
+            }
+            _accounts.update {
+                if (it[pluginId] == ProviderAccount.Expired &&
+                    generation(pluginId) == asked
+                ) {
+                    it + (pluginId to account)
+                } else {
+                    it
+                }
+            }
             return
         }
     }

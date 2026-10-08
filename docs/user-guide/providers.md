@@ -66,11 +66,11 @@ These two captures show the code-enabled development build. Stable builds can re
   retain their Widevine playback path, subject to device support and account license access.
   Playback from a TV-paired SoundCloud account does not currently report listens to SoundCloud.
 
-## Select metadata and video
+## Music tabs and video
 
-Under **Metadata**, choose the catalog for the Music tab. Under **Video**, choose the video provider. Changing metadata changes Home and music search; it does not remove folders or playlists from other signed-in providers in Library.
+There is no metadata provider to choose. Every installed, enabled catalog plugin you are signed in to gets its own tab in the sidebar, marked with the service's logo; YouTube Music's tab appears without sign-in. Signing out of a provider, or disabling it, removes its tab. Under **Video**, choose the video provider.
 
-![Spotify metadata with YouTube Music and Beatport audio providers](images/plugins-current.png)
+![Plugins settings with YouTube Music and Beatport audio providers](images/plugins-current.png)
 
 ## Set audio priority
 

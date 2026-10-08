@@ -103,7 +103,7 @@ Embedded title, artist, album, duration and cover art load in the background for
 
 Use **Refresh** to reload a source's listing and metadata. Open the source in Settings → Music folders to edit or remove it. Removing the source removes Milkbeat's configuration and saved passwords or keys, not the music files on the storage device or server.
 
-The Folders browser uses a bounded metadata cache. **Local library** also builds a persistent tag
+The Folders browser uses a bounded metadata cache. The **Local library** tab also builds a persistent tag
 index for browsing artists, releases, playlists, genres, labels and years. Selecting a track there
 plays it alone; collection **Play** and **Shuffle** actions queue the collection. With an enabled
 YouTube Music plugin, [radio](playback.md#mixes) is seeded from the first queued song while local

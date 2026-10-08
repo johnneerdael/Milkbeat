@@ -361,7 +361,7 @@ class PlaylistMirrorBatchDeviceTest {
                         mapOf("dataSyncId" to "fixture-sync"),
                     ),
                 ) as ProviderAccount.SignedIn
-            registry.select(ProviderSelection(metadata = spotify.id, audio = listOf(youtube.id)))
+            registry.select(ProviderSelection(audio = listOf(youtube.id)))
             val key =
                 MirrorKey(
                     spotify.id,

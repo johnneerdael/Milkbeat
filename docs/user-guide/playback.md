@@ -43,7 +43,7 @@ SoundCloud web sessions retain their Widevine path when the recording, account a
 
 ## Mixes
 
-Once a streaming queue starts playing, Milkbeat seeds a mix from the queue's first song. When the metadata provider has no radio, Milkbeat tries compatible audio providers in priority order.
+Once a streaming queue starts playing, Milkbeat seeds a mix from the queue's first song. When the provider the songs came from has no radio, Milkbeat tries compatible audio providers in priority order.
 
 For normal Spotify playback through YouTube, that first song's matched YouTube ID seeds the radio. [Private playlist preparation](providers.md#why-prepare-a-youtube-playlist) instead gives YouTube the whole matched playlist as its native autoplay context. Milkbeat can then exclude the playlist's matched songs from later suggestions, helping avoid repeats as the radio continuation begins.
 

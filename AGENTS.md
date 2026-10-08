@@ -749,10 +749,21 @@ revision must pass the configured ktlint rules.
 - Use JDK 21, as CI does, with an Android SDK containing platform 37 (`compileSdk = 37`).
   Supply the SDK through `ANDROID_HOME` or an untracked `local.properties` containing `sdk.dir`.
   The app targets Android 36, supports API 26+, and compiles Java/Kotlin to JVM 17.
+- There is no selected metadata provider. `data/catalog/MusicSources` derives the rail's music tabs
+  (enabled metadata plugins with HOME that are signed in or expired, YouTube Music also signed out
+  via `plugin/catalog/KnownProviders`, then Local when a folder exists), asks each sign-in plugin's
+  account once, and stores the last tab used. The activity-scoped `TvMusicTabsViewModel` waits for
+  the remembered tab instead of opening another. All music tabs share the `music` nav route; each
+  source gets an assisted `MusicHomeFeedViewModel` keyed by `MusicSource.key` plus its own saveable
+  state. Every catalog route, search chip and Library account chip passes its provider explicitly;
+  never reintroduce a global "current provider". Focused regressions: `./gradlew
+  :app:testGithubDebugUnitTest --tests '*MusicSourcesTest' --tests '*TvMusicTabsStateTest'
+  --tests '*TvSearchViewModelTest' --tests '*MusicHomeFeedViewModelTest'`.
 - `MusicHomeFeedViewModel` owns Home catalog requests, separately from playback. Its state is
-  collected only by `TvMusicScreen` using `collectAsStateWithLifecycle` for the Music route.
+  collected only by `TvMusicScreen` using `collectAsStateWithLifecycle` for its music tab.
   Automatic first-page retries wait for a state subscriber after backoff; preserve that lifecycle
-  gate when adding consumers. Never tie playback or queue preparation to Home visibility.
+  gate when adding consumers. Never tie playback or queue preparation to Home visibility. Home and
+  Library playlist radio seeds carry their provider (`ProviderEntityReference`), as catalog pages do.
 - `Media3MusicService` retains the sole music player and media-session ownership. Its existing
   radio, recovery, listening, locks and session callbacks live in `service/MusicService*.kt`.
   `player/audio/MusicOutputRecovery` checks actual PCM output frames at 1 Hz only while the

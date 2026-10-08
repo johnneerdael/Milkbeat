@@ -7,10 +7,14 @@ import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
+import dagger.assisted.Assisted
+import dagger.assisted.AssistedFactory
+import dagger.assisted.AssistedInject
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.aedev.flow.data.music.model.MusicTrack
 import io.github.aedev.flow.data.paging.PluginPagingSource
 import io.github.aedev.flow.plugin.catalog.PluginMetadataProvider
+import io.github.aedev.flow.plugin.catalog.ScopedPluginCatalog
 import io.github.aedev.flow.plugin.catalog.listenerMessage
 import io.github.aedev.flow.ui.screens.music.extendedBy
 import io.github.aedev.flow.ui.screens.music.withPage
@@ -22,9 +26,11 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -33,18 +39,28 @@ import nl.neerdael.milkbeat.catalog.MetadataItem
 import nl.neerdael.milkbeat.catalog.PageBlock
 import nl.neerdael.milkbeat.catalog.ProviderAccount
 import nl.neerdael.milkbeat.plugin.PluginOperations
-import javax.inject.Inject
 
 /**
- * The signed-in account's library sections from the music plugin's `metadata.library`. A section is
- * read when it is first shown and kept for a while; another account reads everything afresh.
+ * One plugin's signed-in account library sections from its `metadata.library`. A section is read
+ * when it is first shown and kept for a while; another account reads everything afresh.
  */
-@HiltViewModel
+@HiltViewModel(assistedFactory = TvAccountLibraryViewModel.Factory::class)
 class TvAccountLibraryViewModel
-    @Inject
-    constructor(
-        private val provider: PluginMetadataProvider,
+    internal constructor(
+        private val provider: ScopedPluginCatalog,
+        installation: Flow<Any?> = flowOf(null),
     ) : ViewModel() {
+        @AssistedInject
+        constructor(
+            @Assisted pluginId: String,
+            plugins: PluginMetadataProvider,
+        ) : this(plugins.scoped(pluginId), plugins.installationOf(pluginId))
+
+        @AssistedFactory
+        interface Factory {
+            fun create(pluginId: String): TvAccountLibraryViewModel
+        }
+
         private val _sections = MutableStateFlow<Map<TvAccountLibrarySection, TvLibrarySectionState>>(emptyMap())
         val sections: StateFlow<Map<TvAccountLibrarySection, TvLibrarySectionState>> = _sections.asStateFlow()
 
@@ -53,7 +69,10 @@ class TvAccountLibraryViewModel
         private val tabState = MutableStateFlow(libraryTabs(null))
         internal val tabs: StateFlow<List<TvAccountLibraryTab>> = tabState.asStateFlow()
 
-        val accountIdentity: Flow<String> = provider.account.map { "${provider.id}:${it.key.orEmpty()}" }.distinctUntilChanged()
+        /** The account and the installation answering for it: an in-place plugin update reads the library afresh. */
+        val accountIdentity: Flow<String> =
+            combine(provider.account, installation) { account, installed -> "${provider.id}:${account.key.orEmpty()}:$installed" }
+                .distinctUntilChanged()
 
         fun accountChanged(identity: String) {
             if (activeIdentity == identity) return
@@ -77,6 +96,17 @@ class TvAccountLibraryViewModel
                 }.cachedIn(viewModelScope)
 
         fun track(item: MetadataItem): MusicTrack? = provider.track(item)
+
+        /**
+         * The pane left the screen (another provider's chip, or another section of Library): what is still
+         * being read stops, and those sections are read afresh on the next visit.
+         */
+        fun hide() {
+            val reading = jobs.filterValues { it.isActive }.keys
+            jobs.values.forEach { it.cancel() }
+            jobs.clear()
+            if (reading.isNotEmpty()) _sections.update { it - reading }
+        }
 
         fun open(section: TvAccountLibrarySection) {
             if (section.isVideoGrid || jobs[section]?.isActive == true) return

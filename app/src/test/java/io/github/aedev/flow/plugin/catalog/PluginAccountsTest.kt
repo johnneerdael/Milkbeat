@@ -65,6 +65,83 @@ class PluginAccountsTest {
         }
 
     @Test
+    fun `a check after a plugin update asks the new installation, not the one still answering`() =
+        runTest {
+            val old = CompletableDeferred<ProviderAccount>()
+            var calls = 0
+            coEvery { host.call("youtube", PluginOperations.account, Unit) } coAnswers {
+                calls++
+                if (calls == 1) old.await() else ProviderAccount.SignedIn("new-installation")
+            }
+            val accounts = accounts()
+
+            val before = async { accounts.refresh("youtube") }
+            runCurrent()
+            accounts.replaced("youtube")
+            val after = accounts.refresh("youtube")
+            val acceptedEpoch = accounts.playbackEpoch.value
+            val acceptedContext = accounts.providerPlaybackContext("youtube")
+            old.complete(ProviderAccount.SignedIn("old-installation"))
+            before.await()
+
+            assertThat(after).isEqualTo(ProviderAccount.SignedIn("new-installation"))
+            assertThat(accounts.accounts.value["youtube"]).isEqualTo(ProviderAccount.SignedIn("new-installation"))
+            assertThat(calls).isEqualTo(2)
+            assertThat(accounts.playbackEpoch.value).isEqualTo(acceptedEpoch)
+            assertThat(accounts.providerPlaybackContext("youtube")).isEqualTo(acceptedContext)
+        }
+
+    @Test
+    fun `an expiry re-check of a replaced plugin does not answer for the new installation`() =
+        runTest {
+            val old = CompletableDeferred<ProviderAccount>()
+            coEvery { host.call("youtube", PluginOperations.account, Unit) } coAnswers { old.await() }
+            val accounts = accounts()
+
+            accounts.expired("youtube")
+            runCurrent()
+            accounts.replaced("youtube")
+            old.complete(ProviderAccount.SignedIn("old-installation"))
+            runCurrent()
+
+            assertThat(accounts.accounts.value["youtube"]).isNotEqualTo(ProviderAccount.SignedIn("old-installation"))
+        }
+
+    @Test
+    fun `a check answering after a sign-out does not bring the old account back`() =
+        runTest {
+            val answer = CompletableDeferred<ProviderAccount>()
+            coEvery { host.call("youtube", PluginOperations.account, Unit) } coAnswers { answer.await() }
+            coEvery { host.call("youtube", PluginOperations.signOut, Unit) } returns Unit
+            val accounts = accounts()
+
+            val check = async { accounts.refresh("youtube") }
+            runCurrent()
+            accounts.signOut("youtube")
+            answer.complete(ProviderAccount.SignedIn("listener"))
+            check.await()
+
+            assertThat(accounts.accounts.value["youtube"]).isEqualTo(ProviderAccount.Anonymous)
+        }
+
+    @Test
+    fun `concurrent account checks of one plugin share a single call`() =
+        runTest {
+            val answer = CompletableDeferred<ProviderAccount>()
+            coEvery { host.call("youtube", PluginOperations.account, Unit) } coAnswers { answer.await() }
+            val accounts = accounts()
+
+            val first = async { accounts.refresh("youtube") }
+            val second = async { accounts.refresh("youtube") }
+            runCurrent()
+            answer.complete(ProviderAccount.SignedIn("listener"))
+
+            assertThat(first.await()).isEqualTo(ProviderAccount.SignedIn("listener"))
+            assertThat(second.await()).isEqualTo(ProviderAccount.SignedIn("listener"))
+            coVerify(exactly = 1) { host.call("youtube", PluginOperations.account, Unit) }
+        }
+
+    @Test
     fun `an expiry reported by a call is re-checked at once and heals a sign-in the plugin still has`() =
         runTest {
             coEvery { host.call("youtube", PluginOperations.account, Unit) } returns ProviderAccount.SignedIn("listener")

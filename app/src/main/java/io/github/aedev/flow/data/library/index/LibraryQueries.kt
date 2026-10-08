@@ -11,6 +11,8 @@ internal data class LibraryFilter(
     val year: Int? = null,
     val releaseKey: String? = null,
     val playlistId: String? = null,
+    /** Words searched for, matched case-insensitively anywhere in the query's own text columns. */
+    val text: String? = null,
 )
 
 internal enum class TrackOrder { RELEASE, NEWEST, PLAYLIST }
@@ -29,7 +31,7 @@ internal object LibraryQueries {
         limit: Int = Int.MAX_VALUE,
         offset: Int = 0,
     ): SupportSQLiteQuery {
-        val scope = Scope(filter)
+        val scope = Scope(filter, textColumns = listOf("t.title", "t.artist"))
         val orderBy =
             when (order) {
                 TrackOrder.RELEASE -> "t.discNumber, t.trackNumber, t.title COLLATE NOCASE"
@@ -50,7 +52,7 @@ internal object LibraryQueries {
         limit: Int = Int.MAX_VALUE,
         offset: Int = 0,
     ): SupportSQLiteQuery {
-        val scope = Scope(filter)
+        val scope = Scope(filter, textColumns = listOf("t.album", "t.releaseArtist"))
         val orderBy =
             when (order) {
                 ReleaseOrder.RECENT -> "MAX(t.addedAtMs) DESC, MAX(t.year) DESC"
@@ -77,7 +79,13 @@ internal object LibraryQueries {
         offset: Int = 0,
         named: String? = null,
     ): SupportSQLiteQuery {
-        val scope = Scope(filter, extraConditions = listOfNotNull(kind.presentCondition), match = named?.let { kind.column to it })
+        val scope =
+            Scope(
+                filter,
+                extraConditions = listOfNotNull(kind.presentCondition),
+                match = named?.let { kind.column to it },
+                textColumns = listOf(kind.column),
+            )
         val orderBy =
             when (order) {
                 GroupOrder.TRACKS -> "trackCount DESC, name COLLATE NOCASE"
@@ -142,6 +150,7 @@ internal object LibraryQueries {
         filter: LibraryFilter,
         extraConditions: List<String> = emptyList(),
         match: Pair<String, String>? = null,
+        textColumns: List<String> = emptyList(),
     ) {
         private val args = mutableListOf<Any>()
         val joins: String
@@ -178,6 +187,11 @@ internal object LibraryQueries {
             filter.releaseKey?.let {
                 conditions += "t.releaseKey = ?"
                 args += it
+            }
+            filter.text?.trim()?.takeIf { it.isNotEmpty() && textColumns.isNotEmpty() }?.let { text ->
+                val pattern = "%" + text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+                conditions += textColumns.joinToString(" OR ", "(", ")") { "$it LIKE ? ESCAPE '\\'" }
+                repeat(textColumns.size) { args += pattern }
             }
             where = if (conditions.isEmpty()) "" else "WHERE " + conditions.joinToString(" AND ")
         }

@@ -61,7 +61,7 @@ abstract class PluginAudioFixture {
         val state =
             PluginRegistryState(
                 listOf(plugin),
-                ProviderSelection(metadata = "spotify", audio = listOf("youtube")),
+                ProviderSelection(audio = listOf("youtube")),
             )
         every { registry.state } returns MutableStateFlow(state)
         coEvery { host.call("youtube", PluginOperations.matchAudio, any()) } returns AudioMatches(listOf(unavailable, candidate))
