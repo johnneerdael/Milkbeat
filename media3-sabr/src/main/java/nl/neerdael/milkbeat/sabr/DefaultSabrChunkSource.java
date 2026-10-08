@@ -475,6 +475,7 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
     @Override
     public boolean onChunkLoadError(Chunk chunk, boolean cancelable, androidx.media3.exoplayer.upstream.LoadErrorHandlingPolicy.LoadErrorInfo errorInfo, androidx.media3.exoplayer.upstream.LoadErrorHandlingPolicy policy) {
         Exception e = errorInfo.exception;
+        if (e instanceof SabrRequestDeferredException) return cancelable;
         if (e instanceof SabrPlaybackException) return false;
         int excluded = 0;
         for (int i = 0; i < trackSelection.length(); i++) if (trackSelection.isTrackExcluded(i, SystemClock.elapsedRealtime())) excluded++;

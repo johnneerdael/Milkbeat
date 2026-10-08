@@ -80,6 +80,14 @@ public class SabrStream {
     private int sqMismatchForwardCount;
     private int sqMismatchBacktrackCount;
     private boolean receivedNewSegments;
+    private boolean positiveBackoffInResponse;
+    private boolean mediaHeaderInResponse;
+
+    public void beginResponse() {
+        positiveBackoffInResponse = false;
+        mediaHeaderInResponse = false;
+    }
+    public boolean hasResponseBackoffAcknowledgement() { return positiveBackoffInResponse && !mediaHeaderInResponse; }
     private String url;
     private List<? extends SabrPart> multiResult = null;
     private volatile Runnable liveMetadataListener;
@@ -272,6 +280,7 @@ public class SabrStream {
     }
 
     private MediaSegmentInitSabrPart processMediaHeader(UMPPart part) {
+        mediaHeaderInResponse = true;
         MediaHeader mediaHeader;
 
         try {
@@ -396,6 +405,7 @@ public class SabrStream {
         }
 
         processor.processNextRequestPolicy(nextRequestPolicy);
+        positiveBackoffInResponse = nextRequestPolicy.getBackoffTimeMs() > 0;
     }
 
     private void processSabrError(UMPPart part) {

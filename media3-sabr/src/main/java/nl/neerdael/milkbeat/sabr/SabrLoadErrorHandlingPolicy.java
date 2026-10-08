@@ -8,7 +8,7 @@ final class SabrLoadErrorHandlingPolicy extends DefaultLoadErrorHandlingPolicy {
     @Override public long getRetryDelayMsFor(LoadErrorInfo info) {
         Throwable cause = info.exception;
         while (cause != null) {
-            if (cause instanceof SabrPlaybackException) return C.TIME_UNSET;
+            if (cause instanceof SabrPlaybackException || cause instanceof SabrRequestDeferredException) return C.TIME_UNSET;
             if (cause.getCause() == cause) break;
             cause = cause.getCause();
         }

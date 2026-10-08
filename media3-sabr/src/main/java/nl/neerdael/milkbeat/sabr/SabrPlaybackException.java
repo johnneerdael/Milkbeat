@@ -14,6 +14,7 @@ public final class SabrPlaybackException extends IOException {
         Throwable current = cause;
         while (current != null) {
             if (current instanceof SabrPlaybackException) return (SabrPlaybackException) current;
+            if (current instanceof SabrRequestDeferredException) throw (SabrRequestDeferredException) current;
             if (current instanceof androidx.media3.datasource.HttpDataSource.InvalidResponseCodeException) throw (IOException) current;
             if (current.getCause() == current) break;
             current = current.getCause();

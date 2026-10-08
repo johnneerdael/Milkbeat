@@ -7,6 +7,7 @@ import nl.neerdael.milkbeat.sabr.parser.SabrStream;
 import nl.neerdael.milkbeat.sabr.parser.parts.MediaSegmentDataSabrPart;
 import nl.neerdael.milkbeat.sabr.parser.parts.SabrPart;
 import nl.neerdael.milkbeat.sabr.SabrPlaybackException;
+import nl.neerdael.milkbeat.sabr.SabrRequestDeferredException;
 import nl.neerdael.milkbeat.sabr.parser.parts.PoTokenStatusSabrPart;
 import nl.neerdael.milkbeat.sabr.parser.parts.RefreshPlayerResponseSabrPart;
 import java.io.EOFException;
@@ -26,6 +27,7 @@ public final class SabrExtractorInput implements ExtractorInput {
     public void init(ExtractorInput input) {
         if (this.input == input) return;
         this.input = input;
+        sabrStream.beginResponse();
         data = null;
         remaining = 0;
         receivedMedia = false;
@@ -48,6 +50,9 @@ public final class SabrExtractorInput implements ExtractorInput {
             try { part = sabrStream.parse(input); }
             catch (RuntimeException error) { throw SabrPlaybackException.noProgress(sabrStream.getUrl(), error); }
             if (part == null) {
+                if (!receivedMedia && !sabrStream.hasPendingSegments() && sabrStream.hasResponseBackoffAcknowledgement()) {
+                    throw new SabrRequestDeferredException();
+                }
                 if (!receivedMedia || sabrStream.hasPendingSegments()) {
                     throw new SabrPlaybackException(SabrPlaybackException.Reason.NO_PROGRESS, sabrStream.getUrl(), null);
                 }
