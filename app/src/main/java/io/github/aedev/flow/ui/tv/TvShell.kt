@@ -14,6 +14,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
@@ -124,9 +125,14 @@ fun TvShell(
     }
 
     val tabHistory = remember { mutableStateListOf<TvTab>() }
+    // The rail keeps the selectTab reference of the composition that built it, so the tab shown is read
+    // at the press rather than captured then.
+    val shownTab by rememberUpdatedState(currentTab)
+    val onDetailRoute by rememberUpdatedState(isOnDetailRoute)
+    val selectMusic by rememberUpdatedState(onSelectMusic)
 
     fun navigateToTab(tab: TvTab) {
-        if (tab is TvTab.Music) tab.source?.let(onSelectMusic)
+        if (tab is TvTab.Music) tab.source?.let(selectMusic)
         navController.navigate(tab.destination.route) {
             popUpTo(TvDestination.start.route) { saveState = true }
             launchSingleTop = true
@@ -135,11 +141,12 @@ fun TvShell(
     }
 
     fun selectTab(tab: TvTab) {
-        if (tab != currentTab) {
+        val current = shownTab
+        if (tab != current) {
             tabHistory.remove(tab)
-            if (!isOnDetailRoute) {
-                tabHistory.remove(currentTab)
-                tabHistory.add(currentTab)
+            if (!onDetailRoute) {
+                tabHistory.remove(current)
+                tabHistory.add(current)
             }
         }
         navigateToTab(tab)
