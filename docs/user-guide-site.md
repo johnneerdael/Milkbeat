@@ -1,8 +1,13 @@
 # Maintain the user guide
 
-Edit the Markdown in `docs/user-guide/`. The same files render on GitHub and in the
-GitHub Pages manual. MkDocs supplies navigation, search and Markdown rendering;
-the app's build and runtime dependencies are unchanged.
+Edit the Markdown in `docs/user-guide/`. The site uses [Material for MkDocs](https://squidfunk.github.io/mkdocs-material/)
+(pinned in `docs/site-requirements.txt`, with MkDocs 1.6.1) and the Milkbeat palette in
+`docs/user-guide/stylesheets/milkbeat.css`: top tabs, card grids, content tabs and a hero home page,
+in the same style as the [ProjectM TV guide](https://johnneerdael.github.io/ProjectM-TV/). Pages use
+Material's Markdown extensions (`grid cards`, `=== "Tab"` blocks, `md_in_html` screenshot pairs in
+`<div class="mb-pair" markdown>`), so they read best on the Pages site rather than on GitHub.
+The app's build and runtime dependencies are unchanged. Keep the CSS free of gradients, blur
+and glow, as the app's design rules require.
 
 ## Preview locally
 
@@ -37,12 +42,15 @@ to **GitHub Actions**. The site address is
 
 ## Screenshots
 
-Keep raw TV captures under `docs/user-guide/images/`, with descriptive names and
-alt text. Check for passwords, sign-in QR codes and account details before adding
-a capture. Explain controls next to the relevant image instead of placing every
-screenshot in an undifferentiated gallery.
+Keep TV captures under `docs/user-guide/images/` at 1920×1080, with descriptive names and
+alt text. PNG suits menus and settings; JPEG (quality about 86) suits visualizer, video and
+artwork captures. Check for passwords, sign-in QR codes and account details before adding a
+capture, and blur account names, avatars and usernames (the plugin details, YouTube Music's
+Listen again shelf and SMB usernames in the current set). Explain controls next to the relevant
+image instead of placing every screenshot in an undifferentiated gallery.
 
-The guide was checked against 0.8.9 on an Ugoos AM6 on 2 October 2026. Its Home,
-provider, settings, SMB setup, player and queue captures come from that session.
-The album, artist, search and music-video examples were retained from the
-existing README captures. Replace an example when that surface changes.
+The current set was captured over `adb` from Milkbeat 0.9.55 on a 4K Smart TV Pro box
+(Android 14, 1920×1080 UI) on 8 October 2026. Retained older captures: the local storage picker,
+the SFTP server-key editor, the SoundCloud pairing example (with a fake code), the diagnostics
+line and two visualizer effect examples, plus the preview app's controlled emulator captures.
+Replace an example when that surface changes. Delete images that no page references.

@@ -105,9 +105,9 @@ Window created at: `app/src/main/java/io/github/aedev/flow/player/PopupPlayerWin
 
 ## Google account sign-in
 
-On Android TV, Settings > Account > Sign in with phone lets the user sign in to their own Google
-account so the Music tab and Library show that account's YouTube Music and YouTube feeds. Without
-it, the app shows the regular signed-out YouTube Music home.
+On Android TV, Settings > Plugins > YouTube Music > Sign in lets the user sign in to their own Google
+account so the YouTube Music tab and Library show that account's YouTube Music and YouTube feeds.
+Without it, the tab shows the regular signed-out YouTube Music home.
 
 - Google's own sign-in page runs on the TV in a WebView with its own isolated profile, separate from
   the storage used for playback. What the user types on the phone, the password included, is
@@ -124,9 +124,9 @@ it, the app shows the regular signed-out YouTube Music home.
   Music player request is made with the session, as YouTube Music itself does. When a track has
   played for 30 seconds (or half of a shorter track), the play is reported to the playback-tracking
   address that request returned, so it appears in the account's history and shapes its
-  recommendations. Settings > Account > Add plays to your YouTube history switches the reporting
-  off. The audio itself may come from YouTube's other clients, whichever answers fastest.
-- Settings > Account > Sign out deletes the stored session.
+  recommendations. **Report plays to YouTube Music** in that plugin's details (Settings > Plugins)
+  switches the reporting off. The audio itself may come from YouTube's other clients, whichever answers fastest.
+- **Sign out** in that plugin's details deletes the stored session.
 
 ## The remaining permissions
 

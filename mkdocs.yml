@@ -1,33 +1,77 @@
-site_name: Milkbeat user guide
-site_description: Play local music, SMB shares and streaming catalogs on Android TV.
+site_name: Milkbeat
+site_description: A music player for Android TV. Local files, network shares and streaming catalogs, with MilkDrop visuals behind every track.
 site_url: https://johnneerdael.github.io/Milkbeat/
 repo_url: https://github.com/johnneerdael/Milkbeat
+repo_name: johnneerdael/Milkbeat
 edit_uri: blob/main/docs/user-guide/
 docs_dir: docs/user-guide
 site_dir: debug/user-guide-site
 theme:
-  name: readthedocs
-  highlightjs: false
-  navigation_depth: 2
+  name: material
+  language: en
+  logo: images/logo.png
+  favicon: images/favicon.png
+  palette:
+    scheme: slate
+    primary: custom
+    accent: custom
+  font:
+    text: Inter
+    code: JetBrains Mono
+  icon:
+    repo: fontawesome/brands/github
+  features:
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.sections
+    - navigation.indexes
+    - navigation.top
+    - navigation.footer
+    - navigation.instant
+    - navigation.instant.progress
+    - toc.follow
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.action.edit
 extra_css:
   - stylesheets/milkbeat.css
 plugins:
   - search
 markdown_extensions:
   - tables
+  - admonition
+  - attr_list
+  - def_list
+  - md_in_html
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
   - toc:
       permalink: true
 nav:
-  - User guide: index.md
-  - Install and get started: getting-started.md
-  - Local folders and SMB: folders.md
-  - Providers and sign-in: providers.md
-  - Home, Search and Library: library.md
-  - Playback and visuals: playback.md
-  - Video matching preview: preview-testing.md
-  - Settings reference: settings.md
-  - Troubleshooting: troubleshooting.md
-  - Release notes: releases.md
+  - Home: index.md
+  - Use it:
+      - Install and get started: getting-started.md
+      - Music tabs, Search and Library: library.md
+      - Local and network folders: folders.md
+      - Providers and sign-in: providers.md
+      - Playback, queue and radio: playback.md
+      - The visualizer: visualizer.md
+      - Troubleshooting: troubleshooting.md
+  - Settings:
+      - settings.md
+  - Releases:
+      - releases.md
+      - Video matching preview: preview-testing.md
 validation:
   links:
     not_found: warn
