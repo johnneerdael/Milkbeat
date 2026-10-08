@@ -730,8 +730,10 @@ revision must pass the configured ktlint rules.
   Supply the SDK through `ANDROID_HOME` or an untracked `local.properties` containing `sdk.dir`.
   The app targets Android 36, supports API 26+, and compiles Java/Kotlin to JVM 17.
 - There is no selected metadata provider. `data/catalog/MusicSources` derives the rail's music tabs
-  (enabled metadata plugins with HOME that are signed in or expired, YouTube Music also signed out
-  via `plugin/catalog/KnownProviders`, then Local when a folder exists), asks each sign-in plugin's
+  (enabled metadata plugins with HOME that are signed in or expired, YouTube Music and YouTube Video
+  also signed out via `plugin/catalog/KnownProviders`, then Local when a folder exists; plugins of one
+  `KnownProviders` service share a tab held by the first listed, so YouTube Music hides YouTube
+  Video's catalog and YouTube Video takes the YouTube tab alone), asks each sign-in plugin's
   account once, and stores the last tab used. The activity-scoped `TvMusicTabsViewModel` waits for
   the remembered tab instead of opening another. All music tabs share the `music` nav route; each
   source gets an assisted `MusicHomeFeedViewModel` keyed by `MusicSource.key` plus its own saveable

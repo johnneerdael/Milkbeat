@@ -70,6 +70,8 @@ These two captures show the code-enabled development build. Stable builds can re
 
 There is no metadata provider to choose. Every installed, enabled catalog plugin you are signed in to gets its own tab in the sidebar, marked with the service's logo; YouTube Music's tab appears without sign-in. Signing out of a provider, or disabling it, removes its tab. Under **Video**, choose the video provider.
 
+YouTube Music and YouTube Video (a Preview app plugin) share one YouTube tab. With both installed, it shows YouTube Music's catalog and YouTube Video's catalog stays hidden; with only YouTube Video installed, the same tab shows YouTube Video's catalog, also without sign-in.
+
 ![Plugins settings with YouTube Music and Beatport audio providers](images/plugins-current.png)
 
 ## Set audio priority
