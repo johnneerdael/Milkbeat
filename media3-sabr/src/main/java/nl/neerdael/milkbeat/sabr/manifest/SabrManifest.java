@@ -99,13 +99,19 @@ public class SabrManifest implements FilterableManifest<SabrManifest> {
 
     public synchronized long getLiveWindowStartMs() {
         long start = -1;
-        for (SabrStream stream : sabrStreams.values()) start = Math.max(start, stream.getLiveWindowStartMs());
+        for (SabrStream stream : sabrStreams.values()) {
+            if (!stream.getFormatSelector().discardMedia) start = Math.max(start, stream.getLiveWindowStartMs());
+        }
         return start;
     }
 
     public synchronized long getLiveWindowEndMs() {
         long end = -1;
-        for (SabrStream stream : sabrStreams.values()) end = Math.max(end, stream.getLiveWindowEndMs());
+        for (SabrStream stream : sabrStreams.values()) {
+            if (stream.getFormatSelector().discardMedia) continue;
+            long availableEnd = stream.getLiveWindowEndMs();
+            if (availableEnd >= 0) end = end < 0 ? availableEnd : Math.min(end, availableEnd);
+        }
         return end;
     }
     private final FormatSelector emptySelector;

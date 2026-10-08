@@ -50,6 +50,72 @@ class ServerAbrPresentationTest {
         )
 
     @Test
+    fun `live window end intersects active audio and video and ignores a released track`() {
+        val manifest =
+            ServerAbrPresentation.create(
+                ServerAbrPlayback(url, "fixture-video", "AQI", ServerAbrClientInfo(7, "fixture-tv"), listOf(audio, video), live = true),
+            )
+        val groups = manifest.getPeriod(0).adaptationSets
+        manifest.getSabrStream(C.TRACK_TYPE_AUDIO).formatSelector =
+            AudioSelector(
+                "audio",
+                false,
+                groups
+                    .single { it.type == C.TRACK_TYPE_AUDIO }
+                    .representations
+                    .single()
+                    .format,
+            )
+        manifest.getSabrStream(C.TRACK_TYPE_VIDEO).formatSelector =
+            VideoSelector(
+                "video",
+                false,
+                groups
+                    .single { it.type == C.TRACK_TYPE_VIDEO }
+                    .representations
+                    .single()
+                    .format,
+            )
+
+        fun head(
+            type: Int,
+            end: Long,
+        ) {
+            val body =
+                nl.neerdael.milkbeat.sabr.protos.videostreaming.LiveMetadata
+                    .newBuilder()
+                    .setHeadSequenceTimeMs(
+                        end,
+                    ).setHeadSequenceNumber(24)
+                    .build()
+                    .toByteArray()
+            val bytes =
+                byteArrayOf(
+                    nl.neerdael.milkbeat.sabr.parser.ump.UMPPartId.LIVE_METADATA
+                        .toByte(),
+                    body.size.toByte(),
+                ) + body
+            manifest
+                .getSabrStream(
+                    type,
+                ).parse(androidx.media3.extractor.DefaultExtractorInput(java.io.ByteArrayInputStream(bytes)::read, 0, bytes.size.toLong()))
+        }
+        head(C.TRACK_TYPE_AUDIO, 150000)
+        head(C.TRACK_TYPE_VIDEO, 120000)
+        assertEquals(120000L, manifest.liveWindowEndMs)
+        head(C.TRACK_TYPE_VIDEO, 160000)
+        assertEquals(150000L, manifest.liveWindowEndMs)
+        manifest.getSabrStream(C.TRACK_TYPE_AUDIO).formatSelector =
+            nl.neerdael.milkbeat.sabr.parser.models
+                .FormatSelector("released", true)
+        assertEquals(160000L, manifest.liveWindowEndMs)
+        manifest.getSabrStream(C.TRACK_TYPE_VIDEO).formatSelector =
+            nl.neerdael.milkbeat.sabr.parser.models
+                .FormatSelector("released", true)
+        assertEquals(-1L, manifest.liveWindowEndMs)
+    }
+
+    @Test
     fun `container MIME normalization matches provider validation and extractor selection`() {
         val source = presentation(listOf(audio.copy(format = audio.format.copy(mimeType = " Audio/WebM ; codecs=opus"))))
         assertEquals(

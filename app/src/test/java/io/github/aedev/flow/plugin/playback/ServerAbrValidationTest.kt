@@ -120,4 +120,20 @@ class ServerAbrValidationTest {
         )
         validateServerAbr(presentation.copy(formats = listOf(audio, webmPicture)), true, listOf("cdn.example"))
     }
+
+    @Test
+    fun `malformed encoded config or attestation is rejected at the provider boundary`() {
+        for (invalid in listOf(
+            presentation.copy(config = "x"),
+            presentation.copy(config = "%%%"),
+            presentation.copy(poToken = "x"),
+            presentation.copy(poToken = "AQI==="),
+        )) {
+            val error = runCatching { validateServerAbr(invalid, false, listOf("cdn.example")) }.exceptionOrNull()
+            assertThat(error).isInstanceOf(java.io.IOException::class.java)
+            assertThat(error!!.message).doesNotContain(invalid.config)
+        }
+        validateServerAbr(presentation.copy(config = "-_8=", poToken = "AQI"), false, listOf("cdn.example"))
+        validateServerAbr(presentation.copy(poToken = ""), false, listOf("cdn.example"))
+    }
 }
