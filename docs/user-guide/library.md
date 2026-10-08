@@ -10,6 +10,7 @@ Milkbeat has no "metadata provider" setting any more. Instead, every music catal
 | --- | --- |
 | **YouTube Music** | As soon as the plugin is installed and enabled. Sign-in is optional |
 | **Spotify**, **Beatport**, **SoundCloud** | Once the plugin is installed, enabled and signed in |
+| **YouTube Video** (Preview app only) | Shares the YouTube tab: it shows YouTube Music's catalog when both are installed, and YouTube Video's catalog, also signed out, when it is the only one |
 | **Local library** | Once at least one music folder is linked |
 | **Music** | Only while none of the above exists; it offers to add a plugin or a music folder |
 

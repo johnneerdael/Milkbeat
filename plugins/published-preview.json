@@ -44,6 +44,17 @@
       "fingerprint": "39dca3d132c56262c0873ec96faf22cc8ed9ca30c7ed1f135049f8570b943adc",
       "contentDigest": "d9c1528bb6bb0d6bbf51399371add0cfdbf3758ce6b144ed2063912741b2ca92",
       "code": "089"
+    },
+    {
+      "id": "nl.neerdael.youtube-video",
+      "name": "YouTube Video",
+      "version": "0.1.0-preview.4",
+      "versionCode": 4,
+      "sha256": "70b25943ddf445eb269f893d78d7525d8dce7003e38d5b280d56cedcdc50e8d3",
+      "size": 97159,
+      "fingerprint": "39dca3d132c56262c0873ec96faf22cc8ed9ca30c7ed1f135049f8570b943adc",
+      "contentDigest": "57b9b4990ca18b1f709ce0fc109b0716c134e3874960c622e5bf0b1c404b7114",
+      "code": "744"
     }
   ]
 }

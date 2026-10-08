@@ -96,7 +96,9 @@ and sign-in method, playback and radio, the visualizer, every Settings page and 
 | **Spotify**, **Beatport**, **SoundCloud** | Once installed, enabled and signed in |
 | **Local library** | Once a music folder is linked |
 
-Each tab shows that provider's own feed through Milkbeat's TV components and keeps its place while
+The YouTube Video plugin, offered only in the Preview app, shares the YouTube tab: with YouTube Music
+also installed, the tab shows YouTube Music's catalog; with only YouTube Video, it shows YouTube
+Video's. Each tab shows that provider's own feed through Milkbeat's TV components and keeps its place while
 you visit another. **Search** offers a chip per music tab, including Local library, plus Videos,
 each with its provider's filters and suggestions. **Library** starts with a chip per signed-in
 account, then Folders, History, Watch later and Playlists (app and provider playlists together,

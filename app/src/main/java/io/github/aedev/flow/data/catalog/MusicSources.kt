@@ -141,7 +141,8 @@ internal fun musicTabs(
                     is ProviderAccount.SignedIn, ProviderAccount.Expired -> true
                     else -> KnownProviders.anonymousHome(plugin.id)
                 }
-            }.sortedBy { it.manifest.name.lowercase() }
+            }.let { usable -> KnownProviders.onePerService(usable) { it.id } }
+            .sortedBy { it.manifest.name.lowercase() }
             .map { plugin ->
                 MusicTab(
                     source = MusicSource.Plugin(plugin.id),
