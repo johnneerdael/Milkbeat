@@ -1,4 +1,4 @@
-package io.github.aedev.flow.ui.tv.screens.music
+package io.github.aedev.flow.ui.tv.navigation
 
 import com.google.common.truth.Truth.assertThat
 import io.github.aedev.flow.data.catalog.MusicSource

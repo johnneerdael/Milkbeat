@@ -52,9 +52,9 @@ import androidx.compose.ui.unit.dp
 import io.github.aedev.flow.R
 import io.github.aedev.flow.data.catalog.MusicSource
 import io.github.aedev.flow.ui.tv.navigation.TvDestination
+import io.github.aedev.flow.ui.tv.navigation.TvMusicTabsState
 import io.github.aedev.flow.ui.tv.navigation.TvTab
 import io.github.aedev.flow.ui.tv.navigation.railFocusTab
-import io.github.aedev.flow.ui.tv.screens.music.TvMusicTabsState
 import io.github.aedev.flow.ui.tv.theme.LocalTvDimens
 
 /** A rail entry's icon: a Material symbol, or a provider's monochrome logo, both tinted as rail content. */

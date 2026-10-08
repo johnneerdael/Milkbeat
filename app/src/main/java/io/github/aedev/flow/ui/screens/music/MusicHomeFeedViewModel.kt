@@ -21,10 +21,13 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
@@ -64,6 +67,7 @@ data class MusicHomeFeedState(
 class MusicHomeFeedViewModel internal constructor(
     private val provider: MetadataProvider?,
     private val playback: CatalogPlayback,
+    installation: Flow<Any?> = flowOf(null),
 ) : ViewModel() {
     @AssistedInject
     constructor(
@@ -72,9 +76,10 @@ class MusicHomeFeedViewModel internal constructor(
         local: dagger.Lazy<LocalCatalogProvider>,
     ) : this(catalogOf(source, plugins, local))
 
-    private constructor(catalog: Pair<MetadataProvider, CatalogPlayback>?) : this(
-        catalog?.first,
-        catalog?.second ?: CatalogPlayback { null },
+    private constructor(catalog: FeedCatalog?) : this(
+        catalog?.provider,
+        catalog?.playback ?: CatalogPlayback { null },
+        catalog?.installation ?: flowOf(null),
     )
 
     @AssistedFactory
@@ -87,6 +92,9 @@ class MusicHomeFeedViewModel internal constructor(
 
     private val account = provider?.account ?: flowOf(ProviderAccount.Anonymous)
 
+    /** Whose home this is: the account, and the installation answering for it (anonymous across a reinstall). */
+    private val identity = combine(account, installation) { account, installed -> account to installed }.distinctUntilChanged()
+
     val isAccountExpired: StateFlow<Boolean> =
         account
             .map { it is ProviderAccount.Expired }
@@ -97,12 +105,12 @@ class MusicHomeFeedViewModel internal constructor(
     private var loadedAtMs = 0L
 
     init {
-        // A sign-in, sign-out or expiry swaps whose home this is; never keep showing the old one. A tab not
-        // shown drops it and loads the new account's home on its next visit, so hidden tabs fetch nothing.
+        // A sign-in, sign-out, expiry or reinstall swaps whose home this is; never keep showing the old one. A
+        // tab not shown drops it and loads the new home on its next visit, so hidden tabs fetch nothing.
         viewModelScope.launch {
-            account.collect { account ->
+            identity.collect { identity ->
                 val loaded = loadedKey ?: return@collect
-                if (loaded.account == account) return@collect
+                if (loaded.identity == identity) return@collect
                 if (_state.subscriptionCount.value > 0) {
                     load(filterId = null, force = true)
                 } else {
@@ -140,7 +148,7 @@ class MusicHomeFeedViewModel internal constructor(
         job?.cancel()
         job =
             viewModelScope.launch {
-                val key = FeedKey(provider.id, provider.account.first(), filterId)
+                val key = FeedKey(provider.id, identity.first(), filterId)
                 // A refresh of the same feed keeps what it shows (its blocks, or the failure with its retry, and
                 // the focus on them) until page one replaces it.
                 val sameFeed = key == loadedKey
@@ -227,7 +235,7 @@ class MusicHomeFeedViewModel internal constructor(
 
     private data class FeedKey(
         val providerId: String,
-        val account: ProviderAccount,
+        val identity: Pair<ProviderAccount, Any?>,
         val filterId: String?,
     )
 
@@ -238,13 +246,19 @@ class MusicHomeFeedViewModel internal constructor(
     }
 }
 
+private class FeedCatalog(
+    val provider: MetadataProvider,
+    val playback: CatalogPlayback,
+    val installation: Flow<Any?>,
+)
+
 private fun catalogOf(
     source: MusicSource?,
     plugins: PluginMetadataProvider,
     local: dagger.Lazy<LocalCatalogProvider>,
-): Pair<MetadataProvider, CatalogPlayback>? =
+): FeedCatalog? =
     when (source) {
-        is MusicSource.Plugin -> plugins.scoped(source.id).let { it to it }
-        MusicSource.Local -> local.get().let { it to it }
+        is MusicSource.Plugin -> plugins.scoped(source.id).let { FeedCatalog(it, it, plugins.installationOf(source.id)) }
+        MusicSource.Local -> local.get().let { FeedCatalog(it, it, flowOf(null)) }
         null -> null
     }

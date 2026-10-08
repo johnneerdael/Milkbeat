@@ -36,8 +36,8 @@ import io.github.aedev.flow.data.music.model.MusicTrack
 import io.github.aedev.flow.ui.tv.components.TvFilterChip
 import io.github.aedev.flow.ui.tv.components.TvSearchField
 import io.github.aedev.flow.ui.tv.focus.tvRowFocus
+import io.github.aedev.flow.ui.tv.navigation.TvMusicTabsState
 import io.github.aedev.flow.ui.tv.screens.TvRecentSearches
-import io.github.aedev.flow.ui.tv.screens.music.TvMusicTabsState
 import io.github.aedev.flow.ui.tv.theme.LocalTvDimens
 import nl.neerdael.milkbeat.catalog.EntityRef
 import nl.neerdael.milkbeat.plugin.MetadataSurface

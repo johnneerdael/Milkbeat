@@ -14,6 +14,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -290,6 +291,33 @@ class MusicHomeFeedViewModelTest {
         provider.id = LocalCatalogProvider.ID
         assertThat(viewModel().radioSeed("local-playlist")).isNull()
     }
+
+    @Test
+    fun `a reinstalled provider whose account stays anonymous loads its home again`() =
+        runTest(dispatcher) {
+            var fetches = 0
+            provider.pages = {
+                fetches++
+                Result.success(page("Home $fetches"))
+            }
+            val installation = MutableStateFlow<Any?>("install-1")
+            val vm = MusicHomeFeedViewModel(provider, CatalogPlayback { null }, installation)
+            val shown = show(vm)
+            vm.load()
+            advanceUntilIdle()
+            shown.cancel()
+
+            installation.value = null
+            advanceUntilIdle()
+            installation.value = "install-2"
+            advanceUntilIdle()
+            show(vm)
+            vm.load()
+            advanceUntilIdle()
+
+            assertThat(fetches).isEqualTo(2)
+            assertThat(vm.titles).containsExactly("Home 2")
+        }
 
     @Test
     fun `the tab without a provider asks for one and fetches nothing`() =

@@ -37,11 +37,11 @@ import io.github.aedev.flow.ui.tv.components.tvRailItems
 import io.github.aedev.flow.ui.tv.navigation.TvBackAction
 import io.github.aedev.flow.ui.tv.navigation.TvBackModel
 import io.github.aedev.flow.ui.tv.navigation.TvDestination
+import io.github.aedev.flow.ui.tv.navigation.TvMusicTabsState
 import io.github.aedev.flow.ui.tv.navigation.TvNavHost
 import io.github.aedev.flow.ui.tv.navigation.TvRoutes
 import io.github.aedev.flow.ui.tv.navigation.TvTab
 import io.github.aedev.flow.ui.tv.navigation.shownRailTab
-import io.github.aedev.flow.ui.tv.screens.music.TvMusicTabsState
 import io.github.aedev.flow.ui.tv.theme.LocalTvDimens
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first

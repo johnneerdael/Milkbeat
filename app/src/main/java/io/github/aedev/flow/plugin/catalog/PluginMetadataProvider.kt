@@ -6,6 +6,7 @@ import io.github.aedev.flow.plugin.runtime.PluginCallException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import nl.neerdael.milkbeat.catalog.ProviderAccount
 import nl.neerdael.milkbeat.plugin.PluginErrorCode
 import nl.neerdael.milkbeat.plugin.PluginOperation
@@ -34,6 +35,12 @@ class PluginMetadataProvider
             combine(registry.state, accounts.accounts) { registry, accounts ->
                 if (registry.plugin(pluginId) == null) ProviderAccount.Anonymous else accounts[pluginId] ?: ProviderAccount.Anonymous
             }.distinctUntilChanged()
+
+        /** Which installation of [pluginId] answers, or null while none is enabled; a reinstall changes it. */
+        internal fun installationOf(pluginId: String): Flow<Any?> =
+            registry.state
+                .map { state -> state.plugin(pluginId)?.let { it.installedAtMs to it.manifest.versionCode } }
+                .distinctUntilChanged()
 
         /** Calls [operation] on [plugin], asking for its account first when it is not known yet. */
         internal suspend fun <Request, Response> callFor(

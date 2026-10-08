@@ -44,12 +44,12 @@ import io.github.aedev.flow.ui.tv.components.TvScreenScaffold
 import io.github.aedev.flow.ui.tv.components.TvVideoCard
 import io.github.aedev.flow.ui.tv.focus.ProvideTvColumnPivot
 import io.github.aedev.flow.ui.tv.focus.tvRowFocus
+import io.github.aedev.flow.ui.tv.navigation.TvMusicTabsState
 import io.github.aedev.flow.ui.tv.screens.account.TvAccountLibraryCallbacks
 import io.github.aedev.flow.ui.tv.screens.account.TvAccountLibraryPane
 import io.github.aedev.flow.ui.tv.screens.folders.TvMusicFoldersContent
 import io.github.aedev.flow.ui.tv.screens.library.TvLibraryMixedContent
 import io.github.aedev.flow.ui.tv.screens.library.TvMergedPlaylistsPane
-import io.github.aedev.flow.ui.tv.screens.music.TvMusicTabsState
 import io.github.aedev.flow.ui.tv.theme.LocalTvDimens
 import io.github.aedev.flow.ui.tv.toTvMusicTrack
 import io.github.aedev.flow.ui.tv.toTvVideo
