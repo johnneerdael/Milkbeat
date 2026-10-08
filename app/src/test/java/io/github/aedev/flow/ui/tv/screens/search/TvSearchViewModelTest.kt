@@ -344,6 +344,22 @@ class TvSearchViewModelTest {
         }
 
     @Test
+    fun `switching to another music chip asks it for typeahead on the current query`() =
+        runTest(dispatcher) {
+            local.typeahead = { Result.success(Suggestions(listOf("$it local"))) }
+            val vm = viewModel()
+            vm.showSource(MUSIC)
+            vm.onQueryChange("cafe")
+            advanceUntilIdle()
+
+            vm.showSource(LOCAL)
+            advanceUntilIdle()
+
+            assertThat(local.suggests).containsExactly("cafe")
+            assertThat(vm.state.value.musicSuggestions).containsExactly("cafe local")
+        }
+
+    @Test
     fun `typeahead asks the music chip shown last and the video plugin`() =
         runTest(dispatcher) {
             val vm = viewModel()

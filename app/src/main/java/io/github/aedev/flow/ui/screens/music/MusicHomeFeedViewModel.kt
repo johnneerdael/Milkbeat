@@ -26,6 +26,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
@@ -105,20 +106,20 @@ class MusicHomeFeedViewModel internal constructor(
     private var loadedAtMs = 0L
 
     init {
-        // A sign-in, sign-out, expiry or reinstall swaps whose home this is; never keep showing the old one. A
-        // tab not shown drops it and loads the new home on its next visit, so hidden tabs fetch nothing.
+        // A sign-in, sign-out, expiry or reinstall swaps whose home this is; never keep showing the old one. It is
+        // followed only while the tab is shown: a hidden tab neither fetches nor listens, and catches up on its
+        // next visit, when the identity it then sees differs from the one its home was loaded for.
         viewModelScope.launch {
-            identity.collect { identity ->
-                val loaded = loadedKey ?: return@collect
-                if (loaded.identity == identity) return@collect
-                if (_state.subscriptionCount.value > 0) {
-                    load(filterId = null, force = true)
-                } else {
-                    job?.cancel()
-                    loadedKey = null
-                    _state.update { it.copy(blocks = emptyList(), isLoading = true, isLoadingMore = false, error = null) }
+            _state.subscriptionCount
+                .map { it > 0 }
+                .distinctUntilChanged()
+                .collectLatest { shown ->
+                    if (!shown) return@collectLatest
+                    identity.collect { identity ->
+                        val loaded = loadedKey ?: return@collect
+                        if (loaded.identity != identity) load(filterId = null, force = true)
+                    }
                 }
-            }
         }
     }
 

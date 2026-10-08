@@ -88,6 +88,7 @@ class TvSearchViewModel internal constructor(
     private val searchJobs = HashMap<String, Job>()
     private val moreJobs = HashMap<String, Job>()
     private var suggestJob: Job? = null
+    private var musicSuggestJob: Job? = null
     private var lastRecordedQuery: String? = null
 
     /** A music result of the chip on screen as a playable track. */
@@ -111,7 +112,14 @@ class TvSearchViewModel internal constructor(
     /** The chip on screen; it searches the current query now unless it already answers it. */
     fun showSource(target: TvSearchSource) {
         source = target
-        if (target is TvSearchSource.Music) lastMusic = target.source
+        if (target is TvSearchSource.Music && target.source != lastMusic) {
+            lastMusic = target.source
+            // The typeahead shown is the last music chip's; another chip answers the query on screen itself.
+            _state.value.query
+                .trim()
+                .takeIf { it.isNotEmpty() }
+                ?.let(::suggestMusic)
+        }
         search(target, _state.value.results(target).filterId, delayMs = 0L)
     }
 
@@ -207,6 +215,7 @@ class TvSearchViewModel internal constructor(
 
     private fun clear() {
         suggestJob?.cancel()
+        musicSuggestJob?.cancel()
         (searchJobs.values + moreJobs.values).forEach(Job::cancel)
         searchJobs.clear()
         moreJobs.clear()
@@ -256,6 +265,7 @@ class TvSearchViewModel internal constructor(
 
     private fun suggest(query: String) {
         suggestJob?.cancel()
+        musicSuggestJob?.cancel()
         suggestJob =
             viewModelScope.launch {
                 delay(DEBOUNCE_MS)
@@ -276,6 +286,17 @@ class TvSearchViewModel internal constructor(
                         videoSuggestions = visual.getOrNull()?.queries.orEmpty(),
                     )
                 }
+            }
+    }
+
+    private fun suggestMusic(query: String) {
+        musicSuggestJob?.cancel()
+        val musicSource = lastMusic ?: return
+        musicSuggestJob =
+            viewModelScope.launch {
+                val musical = attempt { music(musicSource).suggest(query) }
+                currentCoroutineContext().ensureActive()
+                _state.update { it.copy(musicSuggestions = musical.getOrNull()?.queries.orEmpty()) }
             }
     }
 

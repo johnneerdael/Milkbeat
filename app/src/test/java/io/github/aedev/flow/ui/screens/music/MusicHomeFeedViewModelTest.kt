@@ -12,6 +12,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -240,16 +241,16 @@ class MusicHomeFeedViewModelTest {
             val shown = show(vm)
             vm.load()
             advanceUntilIdle()
-            shown.cancel()
+            shown.cancelAndJoin()
             advanceUntilIdle()
 
             provider.current = ProviderAccount.SignedIn("account-1")
             advanceUntilIdle()
 
             assertThat(fetches).isEqualTo(1)
-            assertThat(vm.titles).isEmpty()
 
             show(vm)
+            runCurrent()
             vm.load()
             advanceUntilIdle()
 
@@ -305,18 +306,36 @@ class MusicHomeFeedViewModelTest {
             val shown = show(vm)
             vm.load()
             advanceUntilIdle()
-            shown.cancel()
+            shown.cancelAndJoin()
 
             installation.value = null
             advanceUntilIdle()
             installation.value = "install-2"
             advanceUntilIdle()
             show(vm)
+            runCurrent()
             vm.load()
             advanceUntilIdle()
 
             assertThat(fetches).isEqualTo(2)
             assertThat(vm.titles).containsExactly("Home 2")
+        }
+
+    @Test
+    fun `a hidden tab stops following its account and installation`() =
+        runTest(dispatcher) {
+            provider.pages = { Result.success(page("Home")) }
+            val installation = MutableStateFlow<Any?>("install-1")
+            val vm = MusicHomeFeedViewModel(provider, CatalogPlayback { null }, installation)
+            val shown = show(vm)
+            vm.load()
+            advanceUntilIdle()
+            assertThat(installation.subscriptionCount.value).isEqualTo(1)
+
+            shown.cancelAndJoin()
+            advanceUntilIdle()
+
+            assertThat(installation.subscriptionCount.value).isEqualTo(0)
         }
 
     @Test
@@ -485,7 +504,7 @@ class MusicHomeFeedViewModelTest {
             vm.load()
             runCurrent()
 
-            shown.cancel()
+            shown.cancelAndJoin()
             advanceTimeBy(10 * 60_000L)
             assertThat(provider.requests).hasSize(1)
             assertThat(vm.state.value.isLoading).isFalse()
@@ -511,7 +530,7 @@ class MusicHomeFeedViewModelTest {
             vm.load()
             runCurrent()
 
-            shown.cancel()
+            shown.cancelAndJoin()
             advanceTimeBy(10 * 60_000L)
             vm.load(force = true)
             advanceUntilIdle()
