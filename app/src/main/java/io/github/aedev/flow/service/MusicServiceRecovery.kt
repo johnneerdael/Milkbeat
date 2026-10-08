@@ -10,7 +10,7 @@ import io.github.aedev.flow.player.EnhancedMusicPlayerManager
 import io.github.aedev.flow.player.MusicPlaybackRecoveryPlanner
 import io.github.aedev.flow.player.MusicQueuePlanner
 import io.github.aedev.flow.player.MusicVideoItems
-import io.github.aedev.flow.plugin.playback.isSabrPictureUnavailable
+import io.github.aedev.flow.plugin.playback.isPictureUnavailable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.Locale
@@ -51,8 +51,8 @@ internal fun Media3MusicService.handlePlayerError(
         notifyMusicWarning(getString(R.string.music_playback_warning_generic))
         return
     }
-    if (error.isSabrPictureUnavailable()) {
-        if (fallBackToSong(failed)) Log.w(TAG, "Native picture unavailable; continuing the accepted song")
+    if (error.isPictureUnavailable()) {
+        if (fallBackToSong(failed)) Log.w(TAG, "Picture unavailable; continuing the accepted song")
         return
     }
     io.github.aedev.flow.player.error.serverAbrFailureOf(error)?.let { failure ->

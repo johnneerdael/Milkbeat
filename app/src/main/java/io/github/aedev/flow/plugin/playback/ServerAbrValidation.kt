@@ -4,11 +4,6 @@ import nl.neerdael.milkbeat.plugin.FormatType
 import nl.neerdael.milkbeat.plugin.ServerAbrPlayback
 import java.io.IOException
 
-/** The recording still has audio; only the accepted picture request is unavailable. */
-internal class SabrPictureUnavailable : IOException("SABR presentation has no picture")
-
-internal fun Throwable.isSabrPictureUnavailable(): Boolean = generateSequence(this) { it.cause }.any { it is SabrPictureUnavailable }
-
 /** Validate the native protocol marker before any conventional URL/cache resolution occurs. */
 internal fun validateServerAbr(
     playback: ServerAbrPlayback?,
@@ -24,7 +19,7 @@ internal fun validateServerAbr(
         throw IOException("VOD SABR presentation requires a positive duration")
     }
     if (playback.formats.none { it.format.type == FormatType.AUDIO }) throw IOException("SABR presentation has no audio")
-    if (picture && playback.formats.none { it.format.type == FormatType.VIDEO }) throw SabrPictureUnavailable()
+    if (picture && playback.formats.none { it.format.type == FormatType.VIDEO }) throw PictureUnavailable()
     if (!picture &&
         playback.formats.any { it.format.type == FormatType.VIDEO }
     ) {

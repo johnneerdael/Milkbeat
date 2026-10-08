@@ -36,6 +36,11 @@ private const val DEFAULT_LIFETIME_MS = 5 * 60 * 60_000L
 
 internal class AudioCatalogMiss : Exception()
 
+/** The recording still has audio; only its requested picture delivery is unavailable. */
+internal class PictureUnavailable : IOException("The accepted source has no picture")
+
+internal fun Throwable.isPictureUnavailable(): Boolean = generateSequence(this) { it.cause }.any { it is PictureUnavailable }
+
 private data class AudioIdentity(
     val ref: EntityRef,
     val ids: Map<String, String>,
@@ -237,6 +242,7 @@ class PluginAudio
                             host.withPlaybackReceipt(
                                 plugin.id,
                             ) { host.call(plugin.id, PluginOperations.resolveAudio, request) }
+                        rejectAudioOnlyHlsPicture(stream, picture != null)
                         if (picture != null && stream.video == null && stream.serverAbr == null && !isHlsStream(stream)) {
                             throw PluginCallException(
                                 plugin.id,
@@ -338,6 +344,7 @@ class PluginAudio
             ) {
                 throw IOException("The provider changed the accepted recording")
             }
+            rejectAudioOnlyHlsPicture(stream, audio.withPicture)
             validateDrm(audio.pluginId, stream)
             requireNativeSabrMarker(stream.mimeType, stream.serverAbr)
             validateServerAbr(
@@ -419,6 +426,15 @@ class PluginAudio
                     ?.grantedNetwork
                     .orEmpty()
             }
+
+        private fun rejectAudioOnlyHlsPicture(
+            stream: AudioStream,
+            picture: Boolean,
+        ) {
+            if (picture && stream.serverAbr == null && isHlsStream(stream) && stream.requireAudioOnlyHls) {
+                throw PictureUnavailable()
+            }
+        }
 
         private fun validateDrm(
             pluginId: String,

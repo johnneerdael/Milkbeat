@@ -85,6 +85,11 @@ existing song fallback at the same playback position; genuine SABR renewal prese
 listener's selected picture view and accepted recording. If an SDR TV has a conventional SDR
 alternative to an HDR-only native presentation, use that alternative.
 
+When HLS is the selected delivery, `requireAudioOnlyHls=true` cannot satisfy a picture request,
+even if a separate progressive video URL is present: the HLS source does not merge that URL.
+Treat this as picture unavailable and retain the recording and position through song fallback.
+An unused strict HLS backup does not restrict an accepted native SABR picture.
+
 Prime each native rendition with Media3's initialization chunk before advertising it as
 selected. Subsequent media chunks reuse its initialization metadata and extractor. A server
 next-request backoff sets a monotonic deadline and resumes the existing period loader once;

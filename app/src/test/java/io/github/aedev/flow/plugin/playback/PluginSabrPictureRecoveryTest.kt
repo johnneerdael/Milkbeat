@@ -92,8 +92,38 @@ class PluginSabrPictureRecoveryTest : PluginAudioFixture() {
         service.player = player
         service.pluginAudio = audio
         service.downloadUtil = mockk<DownloadUtil>(relaxed = true)
+        every { service.downloadUtil.invalidateUrlCache(mediaId) } answers { audio.forget(mediaId) }
         return service to items
     }
+
+    @Test
+    fun `strict audio HLS answer falls back at the same position despite a cached native song`() =
+        runTest {
+            val accepted = audio.resolve(original, null, playbackId = mediaId)
+            coEvery { host.call("youtube", PluginOperations.resolveAudio, match { it.track.ref == candidate.ref }) } returns
+                stream.copy(url = "https://cdn.example/master.m3u8", mimeType = "application/x-mpegURL", requireAudioOnlyHls = true)
+            val unavailable =
+                runCatching {
+                    audio.resolve(original, PictureLimits(2160, listOf("av1")), playbackId = mediaId)
+                }.exceptionOrNull()
+            assertThat(unavailable).isNotNull()
+            val (service, items) = service()
+            service.handlePlayerError(PlaybackException("fixture", unavailable, PlaybackException.ERROR_CODE_IO_UNSPECIFIED), 0)
+            assertThat(
+                items
+                    .single()
+                    .localConfiguration!!
+                    .uri.scheme,
+            ).isEqualTo("music")
+            assertThat(items.single().mediaId).isEqualTo(mediaId)
+            verify { service.player.seekTo(0, position) }
+            assertThat(service.retryCountMap).isEmpty()
+            val song = audio.resolve(original, null, playbackId = mediaId)
+            assertThat(song.track.ref).isEqualTo(accepted.track.ref)
+            assertThat(song.stream.requireAudioOnlyHls).isTrue()
+            assertThat(song.withPicture).isFalse()
+            service.pendingRetryJob?.cancel()
+        }
 
     @Test
     fun `missing native picture falls back at the same position despite a cached accepted native song`() =
