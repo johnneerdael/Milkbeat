@@ -246,6 +246,8 @@ public class SabrStream {
                 - processor.getLiveSegmentTargetDurationToleranceMs();
     }
 
+    public boolean hasCompletedFinalSegment() { return processor.hasCompletedFinalSegment(); }
+
     public long getSegmentDurationMs(int iTag) {
         return processor.getSegmentDurationMs(iTag);
     }

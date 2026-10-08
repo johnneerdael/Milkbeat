@@ -108,6 +108,16 @@ public class SabrTransportRegressionTest {
             assertFalse(p.hasPendingSegments());assertEquals(5000,p.getSegmentStartTimeMs(251));
         }
     }
+    @Test public void terminalVodSequenceRequiresCompletedMediaAndNeverEndsLiveOrASeek() {
+        SabrProcessor p=processor();p.setFormatSelector(new FormatSelector("audio",false,AUDIO));
+        p.processFormatInitializationMetadata(FormatInitializationMetadata.newBuilder().setFormatId(AUDIO).setMimeType("audio/webm").setEndSegmentNumber(1).build());
+        p.processMediaHeader(header(AUDIO,1).toBuilder().setIsInitSeg(true).setContentLength(0).build());p.processMediaEnd(1);
+        assertFalse(p.hasCompletedFinalSegment());
+        p.processMediaHeader(header(AUDIO,2).toBuilder().setSequenceNumber(1).setContentLength(0).build());
+        assertFalse(p.hasCompletedFinalSegment());p.processMediaEnd(2);assertTrue(p.hasCompletedFinalSegment());
+        p.setLive(true);assertFalse(p.hasCompletedFinalSegment());p.setLive(false);
+        p.reset(251);assertFalse(p.hasCompletedFinalSegment());
+    }
     private static MediaHeader header(FormatId id,int header) { return MediaHeader.newBuilder().setHeaderId(header).setFormatId(id).setSequenceNumber(header).setStartMs(0).setDurationMs(5000).build(); }
     private static SabrContextUpdate context(int type,boolean send,String value) { return SabrContextUpdate.newBuilder().setType(type).setValue(ByteString.copyFromUtf8(value)).setSendByDefault(send).setWritePolicy(SabrContextUpdate.SabrContextWritePolicy.SABR_CONTEXT_WRITE_POLICY_OVERWRITE).build(); }
     private static DefaultExtractorInput raw(byte[] bytes) { return new DefaultExtractorInput(new ByteArrayInputStream(bytes)::read,0,bytes.length); }

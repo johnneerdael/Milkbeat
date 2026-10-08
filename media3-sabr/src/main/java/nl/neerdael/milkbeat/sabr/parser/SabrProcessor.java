@@ -26,6 +26,7 @@ import nl.neerdael.milkbeat.sabr.parser.results.ProcessMediaHeaderResult;
 import nl.neerdael.milkbeat.sabr.parser.results.ProcessMediaResult;
 import nl.neerdael.milkbeat.sabr.parser.results.ProcessSabrSeekResult;
 import nl.neerdael.milkbeat.sabr.parser.results.ProcessStreamProtectionStatusResult;
+import nl.neerdael.milkbeat.sabr.protos.misc.FormatId;
 import nl.neerdael.milkbeat.sabr.protos.videostreaming.FormatInitializationMetadata;
 import nl.neerdael.milkbeat.sabr.protos.videostreaming.LiveMetadata;
 import nl.neerdael.milkbeat.sabr.protos.videostreaming.MediaHeader;
@@ -638,6 +639,17 @@ public class SabrProcessor {
         }
 
         return mediaHeader.getStartMs() + mediaHeader.getDurationMs();
+    }
+
+    /** Only completed selected VOD media can satisfy an explicit protocol terminal sequence. */
+    public synchronized boolean hasCompletedFinalSegment() {
+        if (isLive() || formatSelector == null || hasPendingSegments()) return false;
+        FormatId id = formatSelector.getSelectedFormatId();
+        SelectedFormat selected = id == null ? null : selectedFormats.get(id.toString());
+        return selected != null && !selected.discard && selected.totalSegments >= 0
+                && selected.currentSegment != null && !selected.currentSegment.isInitSegment
+                && !selected.currentSegment.discard
+                && selected.currentSegment.sequenceNumber >= selected.totalSegments;
     }
 
     public synchronized long getSegmentDurationMs(int iTag) {

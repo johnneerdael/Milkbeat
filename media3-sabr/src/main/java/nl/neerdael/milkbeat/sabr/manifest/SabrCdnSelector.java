@@ -86,7 +86,8 @@ final class SabrCdnSelector {
                 continue;
             }
 
-            String host = "rr" + (i + 1) + "---" + networks[i] + GOOGLEVIDEO_SUFFIX;
+            String prefix = initialHost.substring(0, initialHost.indexOf("---") + 3);
+            String host = prefix + networks[i] + GOOGLEVIDEO_SUFFIX;
             String alternateUrl = replaceAuthority(initialUrl, initialUri, host);
 
             if (alternateUrl != null) {

@@ -409,7 +409,10 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
 
         long periodDurationUs = representationHolder.periodDurationUs;
         boolean periodEnded = periodDurationUs != C.TIME_UNSET;
-        if (periodEnded && loadPositionUs >= periodDurationUs) {
+        boolean terminalSegmentCompleted = !manifest.dynamic && sabrStream != null
+                && (previous != null || continueInitializationMedia)
+                && sabrStream.hasCompletedFinalSegment();
+        if (terminalSegmentCompleted || (periodEnded && loadPositionUs >= periodDurationUs)) {
             out.endOfStream = true;
             return;
         }

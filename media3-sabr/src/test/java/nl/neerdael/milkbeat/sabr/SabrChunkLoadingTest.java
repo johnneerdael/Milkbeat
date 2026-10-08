@@ -144,17 +144,24 @@ public class SabrChunkLoadingTest {
             source.release();samples.release();
         }
     }
-    @Test public void realContainerLoadsAdvanceFromHeadersAndKeepShortFinalSegmentAndSeek() throws Exception {
+    @Test public void finalProtocolSegmentEndsRoundedUpVodWithoutAnotherPost() throws Exception { verifyRealContainer(5000,true); }
+    @Test public void realContainerLoadsAdvanceFromHeadersAndKeepShortFinalSegmentAndSeek() throws Exception { verifyRealContainer(4500,false); }
+    private void verifyRealContainer(long declaredDuration,boolean terminalMetadata) throws Exception {
         byte[] bytes=SabrContainerExtractorTest.fixture("fragmented-short.mp4");
         List<byte[]> segments=segments(bytes); assertEquals(3,segments.size());
         List<Long> requested=new ArrayList<>();
-        SabrManifest manifest=manifest(4500,false);
+        SabrManifest manifest=manifest(declaredDuration,false);
         DataSource.Factory data=()->new BaseDataSource(false) {
             ByteArrayDataSource delegate;
             @Override public long open(DataSpec spec) throws IOException {
                 long time=VideoPlaybackAbrRequest.parseFrom(spec.httpBody).getClientAbrState().getPlayerTimeMs();requested.add(time);
                 int index=(int)(time/2000);assertTrue(index<3);
                 byte[] packet=SabrContainerExtractorTest.framed(segments.get(index),137,"video/mp4",index*2000,index==2?500:2000,index==0);
+                if(index==0&&terminalMetadata) {
+                    FormatInitializationMetadata metadata=FormatInitializationMetadata.newBuilder().setFormatId(nl.neerdael.milkbeat.sabr.protos.misc.FormatId.newBuilder().setItag(137)).setMimeType("video/mp4").setEndSegmentNumber(3).setEndTimeMs(4500).build();
+                    int oldHeaderSize=2+(packet[1]&0xff);byte[] body=metadata.toByteArray();
+                    ByteArrayOutputStream rewritten=new ByteArrayOutputStream();rewritten.write(nl.neerdael.milkbeat.sabr.parser.ump.UMPPartId.FORMAT_INITIALIZATION_METADATA);rewritten.write(body.length);rewritten.write(body);rewritten.write(packet,oldHeaderSize,packet.length-oldHeaderSize);packet=rewritten.toByteArray();
+                }
                 delegate=new ByteArrayDataSource(packet);return delegate.open(spec);
             }
             @Override public int read(byte[] target,int offset,int length) throws IOException {return delegate.read(target,offset,Math.min(length,7));}
