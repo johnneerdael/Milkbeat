@@ -84,8 +84,18 @@ public class SabrStream {
     private boolean mediaHeaderInResponse;
     private boolean redirectInResponse;
     private boolean controlInResponse;
+    private volatile boolean discardPartialOnNextResponse;
+
+    public void abandonCurrentResponse() {
+        discardPartialOnNextResponse = true;
+        processor.discardPartialSegments();
+    }
 
     public void beginResponse() {
+        if (discardPartialOnNextResponse) {
+            processor.discardPartialSegments();
+            discardPartialOnNextResponse = false;
+        }
         positiveBackoffInResponse = false;
         mediaHeaderInResponse = false;
         redirectInResponse = false;

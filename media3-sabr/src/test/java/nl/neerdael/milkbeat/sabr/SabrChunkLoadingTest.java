@@ -24,6 +24,34 @@ import org.robolectric.annotation.Config;
 @RunWith(RobolectricTestRunner.class)
 @Config(sdk = 35)
 public class SabrChunkLoadingTest {
+    @Test public void adaptiveCancellationAndOwnedReleaseDiscardOnlyAbandonedPartialSegments() throws Exception {
+        for(boolean releasing:new boolean[]{false,true}) {
+            SabrManifest manifest=manifest(4500,false);
+            Format format=manifest.getPeriod(0).adaptationSets.get(0).representations.get(0).format;
+            FixedTrackSelection fixed=new FixedTrackSelection(new TrackGroup("video",format),0);
+            androidx.media3.exoplayer.trackselection.ExoTrackSelection selection=(androidx.media3.exoplayer.trackselection.ExoTrackSelection)java.lang.reflect.Proxy.newProxyInstance(
+                    fixed.getClass().getClassLoader(),new Class[]{androidx.media3.exoplayer.trackselection.ExoTrackSelection.class},
+                    (proxy,method,args)->method.getName().equals("shouldCancelChunkLoad")?true:method.invoke(fixed,args));
+            DefaultSabrChunkSource source=new DefaultSabrChunkSource(new LoaderErrorThrower(){public void maybeThrowError(){}public void maybeThrowError(int retries){}},manifest,0,new int[]{0},selection,C.TRACK_TYPE_VIDEO,new ByteArrayDataSource(new byte[]{0}),0,1,false,Collections.emptyList(),null);
+            ChunkHolder holder=new ChunkHolder();source.getNextChunk(new LoadingInfo.Builder().setPlaybackPositionUs(0).build(),0,Collections.emptyList(),holder);
+            nl.neerdael.milkbeat.sabr.parser.SabrStream stream=manifest.getSabrStream(C.TRACK_TYPE_VIDEO);
+            nl.neerdael.milkbeat.sabr.protos.misc.FormatId id=nl.neerdael.milkbeat.sabr.protos.misc.FormatId.newBuilder().setItag(137).build();
+            stream.parse(packet(nl.neerdael.milkbeat.sabr.parser.ump.UMPPartId.FORMAT_INITIALIZATION_METADATA,FormatInitializationMetadata.newBuilder().setFormatId(id).setMimeType("video/mp4").build().toByteArray()));
+            stream.parse(packet(nl.neerdael.milkbeat.sabr.parser.ump.UMPPartId.MEDIA_HEADER,MediaHeader.newBuilder().setHeaderId(1).setFormatId(id).setSequenceNumber(1).setStartMs(0).setDurationMs(2000).setContentLength(0).build().toByteArray()));
+            stream.parse(packet(nl.neerdael.milkbeat.sabr.parser.ump.UMPPartId.MEDIA_END,new byte[]{1}));
+            byte[] unfinished=MediaHeader.newBuilder().setHeaderId(2).setFormatId(id).setSequenceNumber(2).setStartMs(2000).setDurationMs(2000).setContentLength(1).build().toByteArray();
+            stream.parse(packet(nl.neerdael.milkbeat.sabr.parser.ump.UMPPartId.MEDIA_HEADER,unfinished));
+            assertTrue(stream.hasPendingSegments());
+            if(releasing)source.release();else assertTrue(source.shouldCancelLoad(0,holder.chunk,Collections.emptyList()));
+            assertFalse("abandoned header cannot poison the next whole POST",stream.hasPendingSegments());
+            assertEquals(releasing?0:2000,stream.getSegmentStartTimeMs(137));
+            // Cancellation can race a final old-header parse; the next response boundary clears it again.
+            stream.parse(packet(nl.neerdael.milkbeat.sabr.parser.ump.UMPPartId.MEDIA_HEADER,unfinished));
+            assertTrue(stream.hasPendingSegments());stream.beginResponse();assertFalse(stream.hasPendingSegments());
+            assertEquals(releasing?0:2000,stream.getSegmentStartTimeMs(137));
+            if(!releasing)source.release();
+        }
+    }
     @Test public void serverBackoffBlocksNextPostUntilOriginalMonotonicDeadline() throws Exception {
         SabrManifest manifest=manifest(4500,false);
         SabrChunkSource source=source(manifest,()->new ByteArrayDataSource(new byte[]{0}));

@@ -120,6 +120,8 @@ public class SabrProcessor {
         initializeFormatSelector();
     }
 
+    public synchronized void discardPartialSegments() { partialSegments.clear(); }
+
     public synchronized boolean hasPendingSegments() {
         return !partialSegments.isEmpty();
     }

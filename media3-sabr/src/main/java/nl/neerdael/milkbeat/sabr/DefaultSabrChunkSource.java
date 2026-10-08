@@ -430,7 +430,9 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
 
     @Override
     public boolean shouldCancelLoad(long playbackPositionUs, Chunk loadingChunk, List<? extends MediaChunk> queue) {
-        return trackSelection.shouldCancelChunkLoad(playbackPositionUs, loadingChunk, queue);
+        boolean cancel = trackSelection.shouldCancelChunkLoad(playbackPositionUs, loadingChunk, queue);
+        if (cancel && sabrStream != null && sabrStream.getFormatSelector() == formatSelector) sabrStream.abandonCurrentResponse();
+        return cancel;
     }
 
     @Override
@@ -442,6 +444,7 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
         // Deselection must stop requesting this track, even while another track keeps
         // the presentation warm. A late old release cannot clear a newer owner.
         if (sabrStream != null && sabrStream.getFormatSelector() == formatSelector) {
+            sabrStream.abandonCurrentResponse();
             sabrStream.setFormatSelector(new FormatSelector("released", true));
         }
         for (RepresentationHolder holder : representationHolders) {
