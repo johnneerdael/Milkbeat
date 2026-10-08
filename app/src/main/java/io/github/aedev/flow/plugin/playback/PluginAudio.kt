@@ -224,6 +224,7 @@ class PluginAudio
                 throw PluginCallException("none", PluginError(PluginErrorCode.UNAVAILABLE, "No audio plugin plays ${track.title}"))
             }
             var last: PluginCallException? = null
+            var lastPictureUnavailable: PictureUnavailable? = null
             for ((plugin, known) in attempts) {
                 var playable = known ?: match(track, plugin.id, strict, strategy = plugin.audioMatchStrategy()) ?: continue
                 for (attempt in 0..1) {
@@ -291,6 +292,9 @@ class PluginAudio
                                 }
                             }
                         }
+                    } catch (e: PictureUnavailable) {
+                        lastPictureUnavailable = e
+                        break
                     } catch (e: PluginCallException) {
                         last = e
                         if (e.error.code != PluginErrorCode.UNAVAILABLE && e.error.code != PluginErrorCode.NOT_FOUND) throw e
@@ -303,6 +307,7 @@ class PluginAudio
                     }
                 }
             }
+            lastPictureUnavailable?.let { throw it }
             if (strict && last?.error?.code == PluginErrorCode.NOT_FOUND) {
                 throw PluginCallException(
                     last.pluginId,

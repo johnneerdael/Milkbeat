@@ -90,8 +90,8 @@ alternative to an HDR-only native presentation, use that alternative.
 
 When HLS is the selected delivery, `requireAudioOnlyHls=true` cannot satisfy a picture request,
 even if a separate progressive video URL is present: the HLS source does not merge that URL.
-Treat this as picture unavailable and retain the recording and position through song fallback.
-An unused strict HLS backup does not restrict an accepted native SABR picture.
+Treat this as picture unavailable for that provider and try the remaining picture-capable providers. Only after none can supply picture does song fallback retain the recording and position.
+An unused strict HLS backup does not restrict an accepted native SABR picture. For audio-only conventional playback, an explicitly selected progressive audio stream takes precedence over an accompanying HLS master that could contain video; HLS remains available when there is no progressive audio stream.
 
 Audio-only HLS parsing accepts omitted `CODECS` only for a trusted sound-only provider contract
 with no advertised video codecs, dimensions or video groups. A video-origin master still needs

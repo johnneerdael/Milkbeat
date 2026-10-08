@@ -57,6 +57,12 @@ class VideoPlaybackResolver(
                 "dash=${!dashManifestUrl.isNullOrEmpty()}, hls=${!hlsUrl.isNullOrEmpty()}, duration=${durationSeconds}s",
         )
 
+        // The selected progressive stream already guarantees sound-only delivery.
+        // A video HLS master may be muxed and fail audio-only parsing asynchronously.
+        if (audioOnly && !hlsUrl.isNullOrEmpty() && audioStream?.deliveryMethod == DeliveryMethod.PROGRESSIVE_HTTP) {
+            createAudioSource(audioStream, durationSeconds)?.let { return it }
+        }
+
         if (!hlsUrl.isNullOrEmpty()) {
             try {
                 Log.d(TAG, "Using YouTube HLS manifest for live playback: ${hlsUrl.take(80)}...")
