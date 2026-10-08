@@ -31,6 +31,23 @@ class PluginAccountsTest {
     private fun failure(code: PluginErrorCode) = PluginCallException("youtube", PluginError(code, code.name))
 
     @Test
+    fun `a check answering after a sign-out does not bring the old account back`() =
+        runTest {
+            val answer = CompletableDeferred<ProviderAccount>()
+            coEvery { host.call("youtube", PluginOperations.account, Unit) } coAnswers { answer.await() }
+            coEvery { host.call("youtube", PluginOperations.signOut, Unit) } returns Unit
+            val accounts = accounts()
+
+            val check = async { accounts.refresh("youtube") }
+            runCurrent()
+            accounts.signOut("youtube")
+            answer.complete(ProviderAccount.SignedIn("listener"))
+            check.await()
+
+            assertThat(accounts.accounts.value["youtube"]).isEqualTo(ProviderAccount.Anonymous)
+        }
+
+    @Test
     fun `concurrent account checks of one plugin share a single call`() =
         runTest {
             val answer = CompletableDeferred<ProviderAccount>()

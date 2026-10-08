@@ -60,11 +60,12 @@ fun TvMusicScreen(
     onOpenMusicFolders: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // Above the loading return, so a moment of not knowing the tab keeps every tab's saved scroll and focus.
+    val states = rememberSaveableStateHolder()
     if (!ready) {
         TvScreenScaffold(title = null, modifier = modifier) { TvShimmerRow() }
         return
     }
-    val states = rememberSaveableStateHolder()
     states.SaveableStateProvider(source?.key ?: NO_SOURCE_KEY) {
         val viewModel =
             hiltViewModel<MusicHomeFeedViewModel, MusicHomeFeedViewModel.Factory>(

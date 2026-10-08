@@ -53,6 +53,13 @@ class PluginAccounts internal constructor(
 
     private val revalidations = mutableMapOf<String, Job>()
     private val checks = mutableMapOf<String, CompletableDeferred<ProviderAccount>>()
+    private val generations = mutableMapOf<String, Int>()
+
+    private fun generation(pluginId: String): Int = synchronized(generations) { generations[pluginId] ?: 0 }
+
+    /** The listener acted on the account; a check still running answers for the account before that. */
+    private fun supersedeChecks(pluginId: String) = synchronized(generations) { generations[pluginId] = generation(pluginId) + 1 }
+
     private val lastRevalidationMs = mutableMapOf<String, Long>()
     private val expiredDuringCheck = mutableSetOf<String>()
 
@@ -70,8 +77,18 @@ class PluginAccounts internal constructor(
             }
         }
         try {
-            val account = ask(pluginId)
-            _accounts.update { it + (pluginId to account) }
+            val asked = generation(pluginId)
+            val answer = ask(pluginId)
+            // A sign-in or sign-out finished while this check ran is newer than its answer.
+            var account = answer
+            _accounts.update { known ->
+                if (generation(pluginId) == asked) {
+                    known + (pluginId to answer)
+                } else {
+                    account = known[pluginId] ?: answer
+                    known
+                }
+            }
             check.complete(account)
             return account
         } catch (e: Throwable) {
@@ -86,6 +103,7 @@ class PluginAccounts internal constructor(
         pluginId: String,
         result: WebLoginResult,
     ): ProviderAccount {
+        supersedeChecks(pluginId)
         cancelRevalidation(pluginId)
         val account = host.call(pluginId, PluginOperations.completeSignIn, result)
         _accounts.update { it + (pluginId to account) }
@@ -133,12 +151,14 @@ class PluginAccounts internal constructor(
             host.call(pluginId, PluginOperations.confirmSignIn, DeviceCodeSession(session)) as? ProviderAccount.SignedIn
                 ?: error("Pairing confirmation did not return a signed-in account")
         require(account.key.isNotBlank()) { "Pairing confirmation returned an empty account identity" }
+        supersedeChecks(pluginId)
         cancelRevalidation(pluginId)
         _accounts.update { it + (pluginId to account) }
         return account
     }
 
     suspend fun signOut(pluginId: String) {
+        supersedeChecks(pluginId)
         cancelRevalidation(pluginId)
         host.call(pluginId, PluginOperations.signOut, Unit)
         _accounts.update { it + (pluginId to ProviderAccount.Anonymous) }
