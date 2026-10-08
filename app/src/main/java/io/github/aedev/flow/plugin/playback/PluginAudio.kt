@@ -92,7 +92,7 @@ class PluginAudio
                     playbackIds.entries
                         .filter { (_, identity) ->
                             resolved[identity]?.let { audio ->
-                                audio.preparationContext == context &&
+                                (audio.preparationContext == context || ownsNativeSource(audio)) &&
                                     state
                                         .plugin(audio.pluginId)
                                         ?.manifest

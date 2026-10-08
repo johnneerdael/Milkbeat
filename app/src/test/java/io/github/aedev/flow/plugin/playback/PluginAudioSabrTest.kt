@@ -9,10 +9,16 @@ import io.mockk.every
 import io.mockk.slot
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import nl.neerdael.milkbeat.plugin.*
 import org.junit.Test
 
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class PluginAudioSabrTest : PluginAudioFixture() {
     private val presentation =
         ServerAbrPlayback(
@@ -60,6 +66,80 @@ class PluginAudioSabrTest : PluginAudioFixture() {
                 ),
             )
         coEvery { host.call("youtube", PluginOperations.resolveAudio, match { it.track.ref == candidate.ref }) } returns native()
+    }
+
+    @Test
+    fun `accepted native picture capability survives unrelated account refresh without resolving again`() =
+        runTest {
+            coEvery { host.call("youtube", PluginOperations.resolveAudio, match { it.track.ref == candidate.ref }) } returns native(true)
+            val capable = capabilities()
+            audio.resolve(original, PictureLimits(2160, listOf("av1")), playbackId = "catalog-id")
+            runCurrent()
+            assertThat(capable.value).containsExactly("catalog-id")
+            coEvery { host.call("soundcloud", PluginOperations.account, Unit) } returns
+                nl.neerdael.milkbeat.catalog.ProviderAccount.Anonymous
+            accounts.refresh("soundcloud")
+            runCurrent()
+            assertThat(capable.value).containsExactly("catalog-id")
+            coVerify(exactly = 1) { host.call("youtube", PluginOperations.resolveAudio, match { it.track.ref == candidate.ref }) }
+        }
+
+    @Test
+    fun `conventional picture capability keeps broad preparation cache invalidation`() =
+        runTest {
+            coEvery { host.call("youtube", PluginOperations.resolveAudio, match { it.track.ref == candidate.ref }) } returns
+                stream.copy(
+                    url = "https://cdn.example/audio",
+                    video = MediaFormat("picture", FormatType.VIDEO, "https://cdn.example/picture", "video/mp4", codecs = "avc1"),
+                )
+            val capable = capabilities()
+            audio.resolve(original, PictureLimits(2160, listOf("av1")), playbackId = "catalog-id")
+            runCurrent()
+            assertThat(capable.value).containsExactly("catalog-id")
+            coEvery { host.call("soundcloud", PluginOperations.account, Unit) } returns
+                nl.neerdael.milkbeat.catalog.ProviderAccount.Anonymous
+            accounts.refresh("soundcloud")
+            runCurrent()
+            assertThat(capable.value).isEmpty()
+        }
+
+    @Test
+    fun `accepted native picture capability ends on its provider anonymous sign-out`() =
+        runTest {
+            coEvery { host.call("youtube", PluginOperations.account, Unit) } returns
+                nl.neerdael.milkbeat.catalog.ProviderAccount.Anonymous
+            accounts.refresh("youtube")
+            coEvery { host.call("youtube", PluginOperations.resolveAudio, match { it.track.ref == candidate.ref }) } returns native(true)
+            val capable = capabilities()
+            audio.resolve(original, PictureLimits(2160, listOf("av1")), playbackId = "catalog-id")
+            runCurrent()
+            assertThat(capable.value).containsExactly("catalog-id")
+            coEvery { host.call("youtube", PluginOperations.signOut, Unit) } returns Unit
+            accounts.signOut("youtube")
+            runCurrent()
+            assertThat(capable.value).isEmpty()
+        }
+
+    @Test
+    fun `accepted native picture capability ends when its network grants are revoked`() =
+        runTest {
+            coEvery { host.call("youtube", PluginOperations.resolveAudio, match { it.track.ref == candidate.ref }) } returns native(true)
+            val capable = capabilities()
+            audio.resolve(original, PictureLimits(2160, listOf("av1")), playbackId = "catalog-id")
+            runCurrent()
+            assertThat(capable.value).containsExactly("catalog-id")
+            val state = registry.state as MutableStateFlow<PluginRegistryState>
+            state.value = state.value.copy(plugins = state.value.plugins.map { it.copy(grantedNetwork = emptyList()) })
+            runCurrent()
+            assertThat(capable.value).isEmpty()
+        }
+
+    private fun TestScope.capabilities(): MutableStateFlow<Set<String>> {
+        val observed = MutableStateFlow(emptySet<String>())
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            audio.videoCapablePlaybackIds.collect { observed.value = it }
+        }
+        return observed
     }
 
     @Test
