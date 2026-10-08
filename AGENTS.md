@@ -694,6 +694,18 @@ revision must pass the configured ktlint rules.
 - `:plugin-api` defines the plain Kotlin catalog/plugin contract; `:spike-plugin-runtime` contains
   runtime experiments. `:benchmark` is the Android baseline-profile and benchmark module
   configured in `settings.gradle.kts` (there is no `:baselineprofile` module).
+- `:media3-sabr` adapts the explicitly requested SmartTube SABR transport to the existing Media3
+  engine. Its Java sources and protocol tests are under `media3-sabr/src/`; provenance and
+  adaptation notes are in `media3-sabr/UPSTREAM.md`. `:media3-sabr-protocol` generates Java-lite
+  protobuf classes from pinned upstream schemas. Generation uses a JVM module because protobuf
+  Gradle 0.9.5 does not support AGP 9.3's Android library DSL. Validate this module with
+  `./gradlew :media3-sabr:testDebugUnitTest :media3-sabr:assembleDebug`.
+- Plugin API 6 adds optional SABR presentation data and audio playback artwork. Keep SABR's
+  unsigned last-modified values as strings on the JavaScript wire, then preserve the complete
+  itag/last-modified/xTags tuple in Media3 format metadata. Do not interpret a SABR endpoint as
+  a progressive URL. The provider's authentication and YouTube discovery stay in the private
+  plugin repository. SABR source/player integration remains in development on this branch;
+  parser tests alone do not establish playable streams or sustained 4K playback.
 - Plugin API 4 adds optional `AudioStream.drm` for platform Widevine playback. Keep DRM license
   transport separate from media caches and headers; validate initial, redirect and provisioning
   destinations against the installed plugin's current network grants. Share the bound stream's
