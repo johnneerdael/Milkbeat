@@ -43,7 +43,6 @@ object KnownProviders {
     @DrawableRes
     fun iconFor(pluginId: String): Int? = providers[pluginId]?.icon
 
-    /** The service's name for its shared tab, or null to use the plugin's own name. */
     @StringRes
     fun serviceLabelFor(pluginId: String): Int? = providers[pluginId]?.serviceLabel
 

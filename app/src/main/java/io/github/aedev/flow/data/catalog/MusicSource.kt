@@ -37,10 +37,7 @@ sealed interface MusicSource {
     }
 }
 
-/**
- * One music tab of the rail. [labelRes], when set, names it instead of [label]: the service a shared
- * tab browses. [label] is null for the local library, whose name is a string resource.
- */
+/** One music tab of the rail; [label] is null for the local library, whose name is a string resource. */
 data class MusicTab(
     val source: MusicSource,
     val label: String?,
