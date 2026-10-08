@@ -48,13 +48,13 @@
     {
       "id": "nl.neerdael.youtube-video",
       "name": "YouTube Video",
-      "version": "0.1.0-preview.4",
-      "versionCode": 4,
-      "sha256": "70b25943ddf445eb269f893d78d7525d8dce7003e38d5b280d56cedcdc50e8d3",
-      "size": 97159,
+      "version": "0.1.0-preview.6",
+      "versionCode": 6,
+      "sha256": "1d1c799fbde739cab36fbef5c7cc9a2df13cec302c5509d583905c5034706644",
+      "size": 97271,
       "fingerprint": "39dca3d132c56262c0873ec96faf22cc8ed9ca30c7ed1f135049f8570b943adc",
-      "contentDigest": "57b9b4990ca18b1f709ce0fc109b0716c134e3874960c622e5bf0b1c404b7114",
-      "code": "744"
+      "contentDigest": "f80e00b6d9af24ed211402bb30b15a0b23983ec42e6b7500a30b46912fb9dad7",
+      "code": "304"
     }
   ]
 }
