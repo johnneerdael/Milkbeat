@@ -12,9 +12,11 @@ Preview packages are published only for the separate Preview installation.
 
 ## YouTube Video plugin
 
-The Preview app also offers **YouTube Video** (**0.1.0-preview.4**), installed with downloader code **744**. This code exists only in the Preview app's bundled catalog; stable Milkbeat does not offer it. Like YouTube Music it provides metadata, audio and video, and it browses YouTube's TV Music feeds.
+The Preview app also offers **YouTube Video** (**0.1.0-preview.6**), installed with downloader code **304**. This code exists only in the Preview app's bundled catalog; stable Milkbeat does not offer it. Like YouTube Music it provides metadata, audio and video, and it browses YouTube's TV Music feeds.
 
-1. In **Milkbeat Preview**, open **Settings > Plugins**, enter **744** and confirm the install.
+Earlier code **744** remains pinned to preview 4. New Preview builds include code **304** for preview 6; if your installed build lacks it, update the Preview app first. Preview 6 adds the exact Google activation destinations used by TV code sign-in.
+
+1. In **Milkbeat Preview**, open **Settings > Plugins**, enter **304** and confirm the install.
 2. Optionally select YouTube Video and choose **Sign in with a TV code** for personalized Home and Library; it also works signed out.
 3. Under **Audio** and **Video**, choose it where you want it to supply playback.
 

@@ -21,7 +21,7 @@ There is no metadata provider to choose: every installed, enabled catalog you ca
 | Beatport | **393** | Catalog, genres, charts, artists, labels, library | Full streams with a streaming subscription | — |
 | SoundCloud | **089** | Discover, Stream, Search, Artists, albums, playlists, Liked Songs, history | Available full tracks, matching and stations | — |
 
-Capabilities depend on the installed plugin version, the account and its subscription. The separate [Preview app](preview-testing.md#youtube-video-plugin) also offers **YouTube Video** (code **744**, Preview only), which shares the YouTube tab with YouTube Music: with both installed the tab shows YouTube Music's catalog, and YouTube Video's catalog appears, also without sign-in, when it is the only one.
+Capabilities depend on the installed plugin version, the account and its subscription. The separate [Preview app](preview-testing.md#youtube-video-plugin) also offers **YouTube Video** (code **304**, Preview only), which shares the YouTube tab with YouTube Music: with both installed the tab shows YouTube Music's catalog, and YouTube Video's catalog appears, also without sign-in, when it is the only one.
 
 ## Install a plugin
 
