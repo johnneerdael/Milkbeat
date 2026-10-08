@@ -34,3 +34,19 @@ test('the default publication validator accepts all registered providers includi
  const rows=verifyPublishedPlugins({descriptor,catalog});
  assert.ok(rows.some(row=>row.id==='nl.neerdael.soundcloud'));
 });
+
+test('stable publication rejects prerelease packages before an automatic update can advertise them',()=>{
+ const value=fixture();value.descriptor.plugins[0].version='1.0.1-preview.1';
+ assert.throws(()=>verifyPublishedPlugins(value),/prerelease.*stable/i);
+});
+
+test('preview metadata uses only its pinned nightly catalog and retains the original signed archive',()=>{
+ const descriptor=JSON.parse(readFileSync(new URL('../published-preview.json',import.meta.url)));
+ const catalog=readCatalog(new URL('../../app/src/nightly/assets/plugin-preview-download-catalog.json',import.meta.url)).entries;
+ const rows=verifyPublishedPlugins({descriptor,catalog,channel:'preview'});
+ const preview=rows.find(row=>row.id==='nl.neerdael.youtube-music');
+ assert.equal(preview.versionCode,14);
+ assert.equal(preview.sha256,'7f7354fdebb8cce461edd84669bc553fd4bebbe2b5c243631ca46191fa8db346');
+ assert.equal(catalog.find(entry=>entry.code===preview.code).url,'https://buzzheavier.com/2t67lln3fh00');
+ assert.throws(()=>verifyPublishedPlugins({descriptor,catalog}),/prerelease.*stable/i);
+});

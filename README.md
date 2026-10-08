@@ -124,7 +124,9 @@ Add optional **third-party plugins** in **Settings > Plugins** using their downl
 
 You can also enter a plugin download URL, including a supported Buzzheavier file page; a bare
 address defaults to HTTPS. Review its requested permissions before installing. Plugin packages
-are distributed separately and are not included in Milkbeat releases.
+are distributed separately and are not included in Milkbeat releases. Stable plugin downloads and automatic updates stay on stable packages.
+The separate Milkbeat Preview app uses its pinned preview catalog; preview packages are not
+advertised to stable installations.
 
 Plugins can provide separate roles:
 

@@ -6,10 +6,13 @@ const AUTHOR='39dca3d132c56262c0873ec96faf22cc8ed9ca30c7ed1f135049f8570b943adc';
 const PROVIDERS=['nl.neerdael.beatport','nl.neerdael.spotify','nl.neerdael.youtube-music','nl.neerdael.soundcloud'];
 // Packages are not kept in git: the publisher verifies their bytes against the Buzzheavier account
 // listing before it registers them. This checks that the list the app reads agrees with its catalog.
-export function verifyPublishedPlugins({descriptor,catalog,expectedAuthor=AUTHOR,expectedIds=PROVIDERS}){
+export function verifyPublishedPlugins({descriptor,catalog,expectedAuthor=AUTHOR,expectedIds=PROVIDERS,channel='stable'}){
  if(descriptor.format!==1 || !Array.isArray(descriptor.plugins) || descriptor.plugins.length!==expectedIds.length)throw new Error('Invalid published plugin descriptor');
+ if(!['stable','preview'].includes(channel))throw new Error('Invalid publication channel');
  const ids=new Set();
  for(const row of descriptor.plugins){
+  if(typeof row.version!=='string' || !row.version)throw new Error('Invalid published plugin version');
+  if(channel==='stable' && row.version.includes('-'))throw new Error('Prerelease plugin cannot appear in stable publication');
   if(!expectedIds.includes(row.id) || ids.has(row.id) || row.fingerprint!==expectedAuthor || !/^[a-f0-9]{64}$/.test(row.sha256) || !Number.isInteger(row.size) || row.size<=0 || row.size>64*1024*1024 || !Number.isInteger(row.versionCode) || !/^[0-9]{3}$/.test(row.code))throw new Error('Invalid published plugin identity');
   ids.add(row.id);
   const entry=catalog.find(entry=>entry.code===row.code);
