@@ -149,6 +149,16 @@ internal class PluginRuntime(
         operation: PluginOperation<Request, Response>,
         request: Request,
         timeoutMs: Long,
+    ): Response =
+        withContext(context.thread) {
+            invokeOnOwner(context, operation, request, timeoutMs)
+        }
+
+    private suspend fun <Request, Response> invokeOnOwner(
+        context: PluginContext,
+        operation: PluginOperation<Request, Response>,
+        request: Request,
+        timeoutMs: Long,
     ): Response {
         val id = nextRequest.incrementAndGet()
         requests[id] = operation.path to PluginJson.encodeToString(operation.request, request)
@@ -313,7 +323,7 @@ internal class PluginRuntime(
 
     private class PluginContext(
         val js: QuickJs,
-        private val thread: ExecutorCoroutineDispatcher,
+        val thread: ExecutorCoroutineDispatcher,
         val bridge: PluginHostBridge,
     ) {
         var tainted = false

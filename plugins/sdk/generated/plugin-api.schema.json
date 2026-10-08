@@ -1,7 +1,7 @@
 {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "title": "MilkbeatPluginApi",
-    "description": "Plugin API v5, generated from the plugin-api module. Do not edit.",
+    "description": "Plugin API v6, generated from the plugin-api module. Do not edit.",
     "type": "object",
     "properties": {
         "manifest": {
@@ -1071,6 +1071,22 @@
             "properties": {
                 "url": {
                     "type": "string"
+                },
+                "width": {
+                    "type": [
+                        "integer",
+                        "null"
+                    ],
+                    "minimum": -2147483648,
+                    "maximum": 2147483647
+                },
+                "height": {
+                    "type": [
+                        "integer",
+                        "null"
+                    ],
+                    "minimum": -2147483648,
+                    "maximum": 2147483647
                 }
             },
             "title": "Artwork"
@@ -2424,6 +2440,26 @@
                             "$ref": "#/$defs/nl.neerdael.milkbeat.plugin.AudioDrm"
                         }
                     ]
+                },
+                "serverAbr": {
+                    "oneOf": [
+                        {
+                            "type": "null"
+                        },
+                        {
+                            "$ref": "#/$defs/nl.neerdael.milkbeat.plugin.ServerAbrPlayback"
+                        }
+                    ]
+                },
+                "artwork": {
+                    "oneOf": [
+                        {
+                            "type": "null"
+                        },
+                        {
+                            "$ref": "#/$defs/nl.neerdael.milkbeat.catalog.Artwork"
+                        }
+                    ]
                 }
             },
             "title": "AudioStream"
@@ -3538,6 +3574,150 @@
             },
             "title": "Roles"
         },
+        "nl.neerdael.milkbeat.plugin.ServerAbrClientInfo": {
+            "type": "object",
+            "required": [
+                "clientName",
+                "clientVersion"
+            ],
+            "properties": {
+                "clientName": {
+                    "type": "integer",
+                    "minimum": -2147483648,
+                    "maximum": 2147483647
+                },
+                "clientVersion": {
+                    "type": "string"
+                },
+                "deviceMake": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "deviceModel": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "osName": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "osVersion": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "hl": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "gl": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "utcOffsetMinutes": {
+                    "type": [
+                        "integer",
+                        "null"
+                    ],
+                    "minimum": -9223372036854775808,
+                    "maximum": 9223372036854775807
+                }
+            },
+            "title": "ServerAbrClientInfo"
+        },
+        "nl.neerdael.milkbeat.plugin.ServerAbrFormat": {
+            "type": "object",
+            "required": [
+                "format",
+                "itag",
+                "lastModified"
+            ],
+            "properties": {
+                "format": {
+                    "$ref": "#/$defs/nl.neerdael.milkbeat.plugin.MediaFormat"
+                },
+                "itag": {
+                    "type": "integer",
+                    "minimum": -2147483648,
+                    "maximum": 2147483647
+                },
+                "lastModified": {
+                    "type": "string"
+                },
+                "xTags": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                }
+            },
+            "title": "ServerAbrFormat"
+        },
+        "nl.neerdael.milkbeat.plugin.ServerAbrPlayback": {
+            "type": "object",
+            "required": [
+                "url",
+                "videoId",
+                "config",
+                "client",
+                "formats"
+            ],
+            "properties": {
+                "url": {
+                    "type": "string"
+                },
+                "videoId": {
+                    "type": "string"
+                },
+                "config": {
+                    "type": "string"
+                },
+                "client": {
+                    "$ref": "#/$defs/nl.neerdael.milkbeat.plugin.ServerAbrClientInfo"
+                },
+                "formats": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/$defs/nl.neerdael.milkbeat.plugin.ServerAbrFormat"
+                    }
+                },
+                "poToken": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "visitorCookie": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "durationMs": {
+                    "type": [
+                        "integer",
+                        "null"
+                    ],
+                    "minimum": -9223372036854775808,
+                    "maximum": 9223372036854775807
+                },
+                "live": {
+                    "type": "boolean"
+                }
+            },
+            "title": "ServerAbrPlayback"
+        },
         "nl.neerdael.milkbeat.plugin.SettingDefinition": {
             "type": "object",
             "required": [
@@ -3721,6 +3901,12 @@
                     ],
                     "minimum": -2147483648,
                     "maximum": 2147483647
+                },
+                "reloadPlaybackContext": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
                 }
             },
             "title": "StreamFailure"
@@ -3903,6 +4089,16 @@
                     "type": [
                         "string",
                         "null"
+                    ]
+                },
+                "serverAbr": {
+                    "oneOf": [
+                        {
+                            "type": "null"
+                        },
+                        {
+                            "$ref": "#/$defs/nl.neerdael.milkbeat.plugin.ServerAbrPlayback"
+                        }
                     ]
                 }
             },

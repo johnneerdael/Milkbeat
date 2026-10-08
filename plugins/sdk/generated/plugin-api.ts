@@ -36,7 +36,7 @@ export type HashAlgorithm = 'SHA1' | 'SHA256';
 export type LogLevel = 'DEBUG' | 'INFO' | 'WARN' | 'ERROR';
 
 /**
- * Plugin API v5, generated from the plugin-api module. Do not edit.
+ * Plugin API v6, generated from the plugin-api module. Do not edit.
  */
 export interface MilkbeatPluginApi {
   manifest: PluginManifest;
@@ -351,6 +351,8 @@ export interface CollectionHeader {
 }
 export interface Artwork {
   url: string;
+  width?: number | null;
+  height?: number | null;
 }
 export interface EntityRef {
   kind: EntityKind;
@@ -511,6 +513,7 @@ export interface ResolveAudioRequest {
 export interface StreamFailure {
   url: string;
   status?: number | null;
+  reloadPlaybackContext?: string | null;
 }
 export interface AudioStream {
   url: string;
@@ -528,6 +531,8 @@ export interface AudioStream {
   trackingToken?: string | null;
   video?: null | MediaFormat;
   drm?: null | AudioDrm;
+  serverAbr?: null | ServerAbrPlayback;
+  artwork?: null | Artwork;
 }
 export interface MediaFormat {
   id: string;
@@ -568,6 +573,34 @@ export interface AudioDrm {
   headers?: {
     [k: string]: string;
   };
+}
+export interface ServerAbrPlayback {
+  url: string;
+  videoId: string;
+  config: string;
+  client: ServerAbrClientInfo;
+  formats: ServerAbrFormat[];
+  poToken?: string | null;
+  visitorCookie?: string | null;
+  durationMs?: number | null;
+  live?: boolean;
+}
+export interface ServerAbrClientInfo {
+  clientName: number;
+  clientVersion: string;
+  deviceMake?: string | null;
+  deviceModel?: string | null;
+  osName?: string | null;
+  osVersion?: string | null;
+  hl?: string | null;
+  gl?: string | null;
+  utcOffsetMinutes?: number | null;
+}
+export interface ServerAbrFormat {
+  format: MediaFormat;
+  itag: number;
+  lastModified: string;
+  xTags?: string | null;
 }
 export interface MatchAudioRequest {
   track: TrackDescriptor;
@@ -625,6 +658,7 @@ export interface VideoPlayback {
   availableInMs?: number | null;
   dvr?: boolean;
   trackingToken?: string | null;
+  serverAbr?: null | ServerAbrPlayback;
 }
 export interface VideoDetails {
   entity: EntityRef;
