@@ -74,6 +74,7 @@ class PluginVideoTest {
                         ServerAbrFormat(PluginVideoStreamsTest.audioOriginal.copy(url = ""), 251, "100"),
                         ServerAbrFormat(hdr.copy(url = ""), 337, "101"),
                     ),
+                    durationMs = 212000,
                 )
             val mixed = playback().copy(serverAbr = native)
             every { limits.hdr } returns false
@@ -85,6 +86,54 @@ class PluginVideoTest {
             // If no SDR picture exists anywhere, retain the provider's only usable picture.
             val onlyHdr = mixed.copy(formats = listOf(PluginVideoStreamsTest.audioOriginal))
             assertThat(withoutUnshownHdr(onlyHdr, false).serverAbr).isEqualTo(native)
+        }
+
+    @Test
+    fun `native and catalog live markers must agree in both directions`() =
+        runTest {
+            val formats =
+                listOf(
+                    ServerAbrFormat(PluginVideoStreamsTest.audioOriginal.copy(url = ""), 251, "100"),
+                    ServerAbrFormat(PluginVideoStreamsTest.video1080.copy(url = ""), 137, "101"),
+                )
+            val rejected =
+                listOf(VideoKind.LIVE to false, VideoKind.VOD to true).map { (kind, nativeLive) ->
+                    val native =
+                        ServerAbrPlayback(
+                            "https://media.example/sabr",
+                            VIDEO_ID,
+                            "fixture",
+                            ServerAbrClientInfo(7, "fixture"),
+                            formats,
+                            durationMs = 212000,
+                            live = nativeLive,
+                        )
+                    coEvery { provider.resolveBound(any(), any(), any()) } returns playback(kind).copy(serverAbr = native)
+                    PluginVideo(provider, preferences, limits).resolve(VIDEO_ID).exceptionOrNull()?.message
+                }
+            assertThat(rejected).containsExactly("Video and SABR live markers disagree", "Video and SABR live markers disagree")
+        }
+
+    @Test
+    fun `consistent live native playback accepts absent duration and retains live kind`() =
+        runTest {
+            val native =
+                ServerAbrPlayback(
+                    "https://media.example/sabr",
+                    VIDEO_ID,
+                    "fixture",
+                    ServerAbrClientInfo(7, "fixture"),
+                    listOf(
+                        ServerAbrFormat(PluginVideoStreamsTest.audioOriginal.copy(url = ""), 251, "100"),
+                        ServerAbrFormat(PluginVideoStreamsTest.video1080.copy(url = ""), 137, "101"),
+                    ),
+                    live = true,
+                )
+            coEvery { provider.resolveBound(any(), any(), any()) } returns playback(VideoKind.LIVE).copy(serverAbr = native)
+            val accepted = pluginVideo.resolve(VIDEO_ID).getOrThrow()
+            assertThat(accepted.kind).isEqualTo(VideoKind.LIVE)
+            assertThat(accepted.serverAbr!!.live).isTrue()
+            assertThat(accepted.serverAbr!!.durationMs).isNull()
         }
 
     @Test

@@ -20,6 +20,9 @@ internal fun validateServerAbr(
     if (playback.videoId.isBlank() || playback.config.isBlank() || playback.client.clientVersion.isBlank() || playback.formats.isEmpty()) {
         throw IOException("Incomplete SABR presentation")
     }
+    if (!playback.live && (playback.durationMs ?: 0L) <= 0L) {
+        throw IOException("VOD SABR presentation requires a positive duration")
+    }
     if (playback.formats.none { it.format.type == FormatType.AUDIO }) throw IOException("SABR presentation has no audio")
     if (picture && playback.formats.none { it.format.type == FormatType.VIDEO }) throw SabrPictureUnavailable()
     if (!picture &&

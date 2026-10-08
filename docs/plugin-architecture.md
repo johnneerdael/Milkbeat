@@ -61,6 +61,11 @@ attestation and TV device-code account flow. The generic `media3-sabr` module pe
 requests and container extraction in the existing Media3 player; plugins do not produce audio
 or video bytes. Protobuf definitions are generated in `media3-sabr-protocol`.
 
+VOD SABR presentations require a positive `durationMs` so native playback can reach a defined
+end. Live presentations may omit duration. When a video response includes SABR,
+`VideoPlayback.kind == LIVE` must agree with `ServerAbrPlayback.live`; inconsistent static/live
+markers are rejected before source creation.
+
 Keep unsigned last-modified values as strings on the JavaScript wire and preserve the complete
 itag/last-modified/xTags identity in Media3 metadata. Protocol failures carry typed renewal
 reasons and opaque reload context; they are not invented HTTP errors. SABR endpoints must never

@@ -12,7 +12,9 @@ data class ServerAbrPlayback(
     val formats: List<ServerAbrFormat>,
     val poToken: String? = null,
     val visitorCookie: String? = null,
+    /** Positive for VOD; a live presentation may omit its duration. */
     val durationMs: Long? = null,
+    /** Dynamic source mode; VideoPlayback.kind must be LIVE exactly when this is true. */
     val live: Boolean = false,
 )
 

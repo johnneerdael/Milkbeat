@@ -25,7 +25,24 @@ class ServerAbrValidationTest {
             "dXBzdHJlYW0=",
             ServerAbrClientInfo(7, "fixture"),
             listOf(audio),
+            durationMs = 120000,
         )
+
+    @Test
+    fun `VOD presentations reject absent zero and negative duration while live may omit it`() {
+        val errors =
+            listOf(null, 0L, -1L).map { duration ->
+                val malformed = presentation.copy(durationMs = duration)
+                runCatching { validateServerAbr(malformed, false, listOf("cdn.example")) }.exceptionOrNull()?.message
+            }
+        assertThat(errors).containsExactly(
+            "VOD SABR presentation requires a positive duration",
+            "VOD SABR presentation requires a positive duration",
+            "VOD SABR presentation requires a positive duration",
+        )
+        validateServerAbr(presentation, false, listOf("cdn.example"))
+        validateServerAbr(presentation.copy(live = true, durationMs = null), false, listOf("cdn.example"))
+    }
 
     @Test
     fun `accepted picture presentations require a native video tuple`() {

@@ -27,6 +27,7 @@ class PluginAudioSabrTest : PluginAudioFixture() {
             "dXBzdHJlYW0=",
             ServerAbrClientInfo(7, "fixture"),
             listOf(ServerAbrFormat(MediaFormat("251", FormatType.AUDIO, "", "audio/webm", codecs = "opus"), 251, "123")),
+            durationMs = 120000,
         )
 
     private fun native(withPicture: Boolean = false): AudioStream {

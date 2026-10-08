@@ -41,6 +41,7 @@ class PluginSabrPictureRecoveryTest : PluginAudioFixture() {
             "fixture",
             ServerAbrClientInfo(7, "fixture"),
             listOf(ServerAbrFormat(MediaFormat("251", FormatType.AUDIO, "", "audio/webm", codecs = "opus"), 251, "100")),
+            durationMs = 120000,
         )
 
     init {

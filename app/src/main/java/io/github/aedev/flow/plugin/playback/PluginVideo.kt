@@ -227,6 +227,11 @@ class PluginVideo
                         ) {
                             throw IOException("The provider changed the accepted recording")
                         }
+                        response.serverAbr?.let { native ->
+                            if ((response.kind == VideoKind.LIVE) != native.live) {
+                                throw IOException("Video and SABR live markers disagree")
+                            }
+                        }
                         validateServerAbr(response.serverAbr, picture = true, provider.playbackGrants(pluginId))
                         withoutUnshownHdr(response, limits.hdr)
                     }.onSuccess { playback ->
