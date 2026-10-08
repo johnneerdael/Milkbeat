@@ -25,10 +25,10 @@ Most screenshots were captured on Milkbeat 0.8.9; the provider guide also shows 
 | --- | --- |
 | Files on the TV or a USB drive | Settings → Music folders → Choose local folder |
 | Files on a NAS or computer | Settings → Music folders → Add SMB share, WebDAV server, SFTP server or NFS export |
-| YouTube Music | Install the YouTube Music plugin and select its metadata/audio roles |
-| Spotify catalog with YouTube playback | Select Spotify for metadata and YouTube Music for audio |
+| YouTube Music | Install the YouTube Music plugin; its tab appears at once. Enable it under Audio to play |
+| Spotify catalog with YouTube playback | Sign in to Spotify and enable YouTube Music under Audio |
 | Beatport catalog and streaming | Install Beatport; full streams require an appropriate subscription |
 
-The metadata provider controls the Music tab and music search. Audio providers supply streams in the order you choose. The video provider handles video content. Your local and network folders are independent of these selections.
+Each music catalog you can use has its own tab in the sidebar, and linked folders add a **Local library** tab. Audio providers supply streams in the order you choose. The video provider handles video content.
 
 [Project and releases](https://github.com/johnneerdael/Milkbeat) · [README quick start](https://github.com/johnneerdael/Milkbeat#readme)

@@ -2,6 +2,7 @@ package io.github.aedev.flow.ui.tv.screens.search
 
 import androidx.lifecycle.SavedStateHandle
 import com.google.common.truth.Truth.assertThat
+import io.github.aedev.flow.data.catalog.MusicSource
 import io.github.aedev.flow.data.local.SearchHistoryRepository
 import io.github.aedev.flow.data.local.SearchType
 import io.github.aedev.flow.data.stats.VideoStatsRecorder
@@ -48,7 +49,7 @@ class TvSearchViewModelTest {
 
     private class FakeBackend(
         var pages: suspend (SearchRequest) -> Result<MetadataPage> = { Result.success(page(it.query)) },
-        var typeahead: (String) -> Result<Suggestions> = { Result.success(Suggestions(emptyList())) },
+        var typeahead: suspend (String) -> Result<Suggestions> = { Result.success(Suggestions(emptyList())) },
     ) : TvSearchBackend {
         val searches = mutableListOf<SearchRequest>()
         val suggests = mutableListOf<String>()
@@ -65,14 +66,15 @@ class TvSearchViewModelTest {
     }
 
     private val music = FakeBackend()
+    private val local = FakeBackend()
     private val videos = FakeBackend()
 
     private fun viewModel(query: String? = null) =
         TvSearchViewModel(
             SavedStateHandle(listOfNotNull(query?.let { "query" to it }).toMap()),
-            music,
+            { source -> if (source == MusicSource.Local) local else music },
             videos,
-            { null },
+            { _, _ -> null },
             history,
             stats,
         )
@@ -93,7 +95,7 @@ class TvSearchViewModelTest {
             music.typeahead = { Result.success(Suggestions(listOf("$it live"))) }
             videos.typeahead = { Result.success(Suggestions(listOf("$it set"))) }
             val vm = viewModel()
-            vm.showSource(TvSearchSource.MUSIC)
+            vm.showSource(MUSIC)
 
             vm.onQueryChange("ca")
             advanceTimeBy(100)
@@ -105,40 +107,48 @@ class TvSearchViewModelTest {
             assertThat(music.suggests).containsExactly("cafe")
             assertThat(videos.suggests).containsExactly("cafe")
             val state = vm.state.value
-            assertThat(state.music.blocks).isEqualTo(page("cafe").blocks)
-            assertThat(state.music.filters.map { it.id }).containsExactly("songs", "albums").inOrder()
-            assertThat(state.suggestions(TvSearchSource.VIDEOS)).containsExactly("cafe set", "cafe live").inOrder()
+            assertThat(state.results(MUSIC).blocks).isEqualTo(page("cafe").blocks)
+            assertThat(state.results(MUSIC).filters.map { it.id }).containsExactly("songs", "albums").inOrder()
+            assertThat(state.suggestions(TvSearchSource.Videos)).containsExactly("cafe set", "cafe live").inOrder()
         }
 
     @Test
     fun `showing the other half searches it once and switching back fetches nothing`() =
         runTest(dispatcher) {
             val vm = viewModel()
-            vm.showSource(TvSearchSource.MUSIC)
+            vm.showSource(MUSIC)
             vm.onQueryChange("cafe")
             advanceUntilIdle()
 
-            vm.showSource(TvSearchSource.VIDEOS)
+            vm.showSource(TvSearchSource.Videos)
             advanceUntilIdle()
-            vm.showSource(TvSearchSource.MUSIC)
-            vm.showSource(TvSearchSource.VIDEOS)
+            vm.showSource(MUSIC)
+            vm.showSource(TvSearchSource.Videos)
             advanceUntilIdle()
 
             assertThat(music.searches).hasSize(1)
             assertThat(videos.searches).containsExactly(SearchRequest("cafe"))
-            assertThat(vm.state.value.videos.loaded).isTrue()
+            assertThat(
+                vm.state.value
+                    .results(TvSearchSource.Videos)
+                    .loaded,
+            ).isTrue()
         }
 
     @Test
     fun `a filter searches with its id, and picking it again goes back to the mixed results`() =
         runTest(dispatcher) {
             val vm = viewModel()
-            vm.showSource(TvSearchSource.MUSIC)
+            vm.showSource(MUSIC)
             vm.onQueryChange("cafe")
             advanceUntilIdle()
 
             vm.selectFilter("songs")
-            assertThat(vm.state.value.music.filterId).isEqualTo("songs")
+            assertThat(
+                vm.state.value
+                    .results(MUSIC)
+                    .filterId,
+            ).isEqualTo("songs")
             advanceUntilIdle()
             vm.showAll("songs")
             advanceUntilIdle()
@@ -148,7 +158,11 @@ class TvSearchViewModelTest {
             assertThat(music.searches)
                 .containsExactly(SearchRequest("cafe"), SearchRequest("cafe", "songs"), SearchRequest("cafe"))
                 .inOrder()
-            assertThat(vm.state.value.music.filterId).isNull()
+            assertThat(
+                vm.state.value
+                    .results(MUSIC)
+                    .filterId,
+            ).isNull()
         }
 
     @Test
@@ -164,22 +178,28 @@ class TvSearchViewModelTest {
                 )
             }
             val vm = viewModel()
-            vm.showSource(TvSearchSource.VIDEOS)
+            vm.showSource(TvSearchSource.Videos)
             vm.onQueryChange("cafe")
             advanceUntilIdle()
 
-            vm.loadMore(TvSearchSource.VIDEOS)
-            vm.loadMore(TvSearchSource.VIDEOS)
+            vm.loadMore(TvSearchSource.Videos)
+            vm.loadMore(TvSearchSource.Videos)
             advanceUntilIdle()
-            vm.loadMore(TvSearchSource.VIDEOS)
+            vm.loadMore(TvSearchSource.Videos)
             advanceUntilIdle()
 
             assertThat(videos.searches).containsExactly(SearchRequest("cafe"), SearchRequest("cafe", cursor = "c1")).inOrder()
             val block =
-                vm.state.value.videos.blocks
+                vm.state.value
+                    .results(TvSearchSource.Videos)
+                    .blocks
                     .single() as CollectionBlock
             assertThat(block.items.map { it.id }).containsExactly("a", "b", "c").inOrder()
-            assertThat(vm.state.value.videos.nextCursor).isNull()
+            assertThat(
+                vm.state.value
+                    .results(TvSearchSource.Videos)
+                    .nextCursor,
+            ).isNull()
         }
 
     @Test
@@ -190,14 +210,22 @@ class TvSearchViewModelTest {
                 Result.success(page(request.query))
             }
             val vm = viewModel()
-            vm.showSource(TvSearchSource.MUSIC)
+            vm.showSource(MUSIC)
             vm.onQueryChange("old")
             advanceTimeBy(1_000)
             vm.onQueryChange("new")
             advanceUntilIdle()
 
-            assertThat(vm.state.value.music.query).isEqualTo("new")
-            assertThat(vm.state.value.music.blocks).isEqualTo(page("new").blocks)
+            assertThat(
+                vm.state.value
+                    .results(MUSIC)
+                    .query,
+            ).isEqualTo("new")
+            assertThat(
+                vm.state.value
+                    .results(MUSIC)
+                    .blocks,
+            ).isEqualTo(page("new").blocks)
         }
 
     @Test
@@ -206,15 +234,27 @@ class TvSearchViewModelTest {
             music.pages = { Result.failure(NoMetadataPluginException()) }
             videos.pages = { Result.failure(IllegalStateException("YouTube said no")) }
             val vm = viewModel()
-            vm.showSource(TvSearchSource.MUSIC)
+            vm.showSource(MUSIC)
             vm.onQueryChange("cafe")
             advanceUntilIdle()
-            vm.showSource(TvSearchSource.VIDEOS)
+            vm.showSource(TvSearchSource.Videos)
             advanceUntilIdle()
 
-            assertThat(vm.state.value.music.noPlugin).isTrue()
-            assertThat(vm.state.value.videos.noPlugin).isFalse()
-            assertThat(vm.state.value.videos.error).isEqualTo("YouTube said no")
+            assertThat(
+                vm.state.value
+                    .results(MUSIC)
+                    .noPlugin,
+            ).isTrue()
+            assertThat(
+                vm.state.value
+                    .results(TvSearchSource.Videos)
+                    .noPlugin,
+            ).isFalse()
+            assertThat(
+                vm.state.value
+                    .results(TvSearchSource.Videos)
+                    .error,
+            ).isEqualTo("YouTube said no")
         }
 
     @Test
@@ -223,33 +263,34 @@ class TvSearchViewModelTest {
             music.typeahead = { Result.success(Suggestions(listOf("cafe del mar"))) }
             videos.typeahead = { Result.failure(NoVideoPluginException()) }
             val vm = viewModel()
+            vm.showSource(MUSIC)
             vm.onQueryChange("cafe")
             advanceUntilIdle()
 
-            assertThat(vm.state.value.suggestions(TvSearchSource.VIDEOS)).containsExactly("cafe del mar")
+            assertThat(vm.state.value.suggestions(TvSearchSource.Videos)).containsExactly("cafe del mar")
         }
 
     @Test
     fun `clearing the query drops results and typeahead but keeps the filters`() =
         runTest(dispatcher) {
             val vm = viewModel()
-            vm.showSource(TvSearchSource.MUSIC)
+            vm.showSource(MUSIC)
             vm.onQueryChange("cafe")
             advanceUntilIdle()
             vm.onQueryChange("")
             advanceUntilIdle()
 
             val state = vm.state.value
-            assertThat(state.music.blocks).isEmpty()
-            assertThat(state.music.filters).isNotEmpty()
-            assertThat(state.suggestions(TvSearchSource.MUSIC)).isEmpty()
+            assertThat(state.results(MUSIC).blocks).isEmpty()
+            assertThat(state.results(MUSIC).filters).isNotEmpty()
+            assertThat(state.suggestions(MUSIC)).isEmpty()
         }
 
     @Test
     fun `a restored query searches when its half is shown, and a picked suggestion is saved`() =
         runTest(dispatcher) {
             val vm = viewModel(query = "cafe")
-            vm.showSource(TvSearchSource.MUSIC)
+            vm.showSource(MUSIC)
             advanceUntilIdle()
             vm.submit("cafe del mar", SearchType.SUGGESTION)
             advanceUntilIdle()
@@ -258,7 +299,239 @@ class TvSearchViewModelTest {
             coVerify { history.saveSearchQuery("cafe del mar", SearchType.SUGGESTION) }
         }
 
+    @Test
+    fun `each music chip searches its own provider once and keeps its own results`() =
+        runTest(dispatcher) {
+            local.pages = { Result.success(page("local ${it.query}")) }
+            val vm = viewModel()
+            vm.showSource(MUSIC)
+            vm.onQueryChange("cafe")
+            advanceUntilIdle()
+
+            vm.showSource(LOCAL)
+            advanceUntilIdle()
+            vm.showSource(MUSIC)
+            vm.showSource(LOCAL)
+            advanceUntilIdle()
+
+            assertThat(music.searches).containsExactly(SearchRequest("cafe"))
+            assertThat(local.searches).containsExactly(SearchRequest("cafe"))
+            assertThat(
+                vm.state.value
+                    .results(MUSIC)
+                    .blocks,
+            ).isEqualTo(page("cafe").blocks)
+            assertThat(
+                vm.state.value
+                    .results(LOCAL)
+                    .blocks,
+            ).isEqualTo(page("local cafe").blocks)
+        }
+
+    @Test
+    fun `a chip that goes away and comes back searches its provider again`() =
+        runTest(dispatcher) {
+            val vm = viewModel()
+            vm.showSource(MUSIC)
+            vm.onQueryChange("cafe")
+            advanceUntilIdle()
+
+            vm.retainSources(mapOf(LOCAL.key to null, TvSearchSource.Videos.key to null))
+            vm.showSource(MUSIC)
+            advanceUntilIdle()
+
+            assertThat(music.searches).containsExactly(SearchRequest("cafe"), SearchRequest("cafe"))
+        }
+
+    @Test
+    fun `switching to another music chip asks it for typeahead on the current query`() =
+        runTest(dispatcher) {
+            local.typeahead = { Result.success(Suggestions(listOf("$it local"))) }
+            val vm = viewModel()
+            vm.showSource(MUSIC)
+            vm.onQueryChange("cafe")
+            advanceUntilIdle()
+
+            vm.showSource(LOCAL)
+            advanceUntilIdle()
+
+            assertThat(local.suggests).containsExactly("cafe")
+            assertThat(vm.state.value.musicSuggestions).containsExactly("cafe local")
+        }
+
+    @Test
+    fun `switching music chips while typeahead is pending asks only the new chip, once`() =
+        runTest(dispatcher) {
+            music.typeahead = { Result.success(Suggestions(listOf("$it spotify"))) }
+            local.typeahead = { Result.success(Suggestions(listOf("$it local"))) }
+            val vm = viewModel()
+            vm.showSource(MUSIC)
+            vm.onQueryChange("cafe")
+            advanceTimeBy(100)
+
+            vm.showSource(LOCAL)
+            advanceUntilIdle()
+
+            assertThat(music.suggests).isEmpty()
+            assertThat(local.suggests).containsExactly("cafe")
+            assertThat(videos.suggests).containsExactly("cafe")
+            assertThat(vm.state.value.musicSuggestions).containsExactly("cafe local")
+        }
+
+    @Test
+    fun `a music chip that goes away takes its typeahead with it`() =
+        runTest(dispatcher) {
+            music.typeahead = { Result.success(Suggestions(listOf("$it spotify"))) }
+            val vm = viewModel()
+            vm.showSource(MUSIC)
+            vm.showSource(TvSearchSource.Videos)
+            vm.onQueryChange("cafe")
+            advanceUntilIdle()
+            assertThat(vm.state.value.musicSuggestions).containsExactly("cafe spotify")
+
+            vm.retainSources(mapOf(TvSearchSource.Videos.key to null))
+            vm.onQueryChange("cafe del")
+            advanceUntilIdle()
+
+            assertThat(vm.state.value.musicSuggestions).isEmpty()
+            assertThat(music.suggests).containsExactly("cafe")
+        }
+
+    @Test
+    fun `a chip that goes away during the typing pause never searches`() =
+        runTest(dispatcher) {
+            val vm = viewModel()
+            vm.showSource(MUSIC)
+            vm.onQueryChange("cafe")
+            advanceTimeBy(100)
+
+            vm.retainSources(mapOf(TvSearchSource.Videos.key to null))
+            advanceUntilIdle()
+
+            assertThat(music.searches).isEmpty()
+            assertThat(vm.state.value.results).doesNotContainKey(MUSIC.key)
+        }
+
+    @Test
+    fun `a chip whose provider identity changes searches and suggests afresh`() =
+        runTest(dispatcher) {
+            music.typeahead = { Result.success(Suggestions(listOf("$it spotify"))) }
+            val vm = viewModel()
+            vm.retainSources(mapOf(MUSIC.key to "account-1", TvSearchSource.Videos.key to null))
+            vm.showSource(MUSIC)
+            vm.onQueryChange("cafe")
+            advanceUntilIdle()
+
+            vm.retainSources(mapOf(MUSIC.key to "anonymous", TvSearchSource.Videos.key to null))
+            advanceUntilIdle()
+
+            // The chip on screen searches again by itself; showing it again asks nothing more.
+            assertThat(music.searches).containsExactly(SearchRequest("cafe"), SearchRequest("cafe"))
+            assertThat(
+                vm.state.value
+                    .results(MUSIC)
+                    .loaded,
+            ).isTrue()
+            vm.showSource(MUSIC)
+            advanceUntilIdle()
+            assertThat(music.searches).hasSize(2)
+        }
+
+    @Test
+    fun `the chip on screen keeps answering typeahead after its identity changes`() =
+        runTest(dispatcher) {
+            val vm = viewModel()
+            vm.retainSources(mapOf(MUSIC.key to "account-1", TvSearchSource.Videos.key to null))
+            vm.showSource(MUSIC)
+            vm.onQueryChange("cafe")
+            advanceUntilIdle()
+
+            vm.retainSources(mapOf(MUSIC.key to "anonymous", TvSearchSource.Videos.key to null))
+            advanceUntilIdle()
+            vm.onQueryChange("cafe del")
+            advanceUntilIdle()
+
+            assertThat(music.suggests).contains("cafe del")
+        }
+
+    @Test
+    fun `a typeahead from before an identity change never replaces the new account's`() =
+        runTest(dispatcher) {
+            var account = "account-1"
+            music.typeahead = { query ->
+                val asked = account
+                delay(if (asked == "account-1") 2_000 else 100)
+                Result.success(Suggestions(listOf("$query $asked")))
+            }
+            val vm = viewModel()
+            vm.retainSources(mapOf(MUSIC.key to "account-1", TvSearchSource.Videos.key to null))
+            vm.showSource(MUSIC)
+            vm.onQueryChange("cafe")
+            advanceTimeBy(500)
+
+            account = "account-2"
+            vm.retainSources(mapOf(MUSIC.key to "account-2", TvSearchSource.Videos.key to null))
+            advanceUntilIdle()
+
+            assertThat(vm.state.value.musicSuggestions).containsExactly("cafe account-2")
+        }
+
+    @Test
+    fun `the last music chip keeps answering typeahead from Videos after its identity changes`() =
+        runTest(dispatcher) {
+            val vm = viewModel()
+            vm.retainSources(mapOf(MUSIC.key to "account-1", TvSearchSource.Videos.key to null))
+            vm.showSource(MUSIC)
+            vm.showSource(TvSearchSource.Videos)
+            vm.onQueryChange("cafe")
+            advanceUntilIdle()
+
+            vm.retainSources(mapOf(MUSIC.key to "anonymous", TvSearchSource.Videos.key to null))
+            advanceUntilIdle()
+            vm.onQueryChange("cafe del")
+            advanceUntilIdle()
+
+            assertThat(music.suggests).contains("cafe del")
+        }
+
+    @Test
+    fun `leaving a chip during its typing pause stops its search, and coming back searches it`() =
+        runTest(dispatcher) {
+            val vm = viewModel()
+            vm.showSource(MUSIC)
+            vm.onQueryChange("cafe")
+            advanceTimeBy(100)
+
+            vm.showSource(LOCAL)
+            advanceUntilIdle()
+
+            assertThat(music.searches).isEmpty()
+            assertThat(local.searches).containsExactly(SearchRequest("cafe"))
+
+            vm.showSource(MUSIC)
+            advanceUntilIdle()
+            assertThat(music.searches).containsExactly(SearchRequest("cafe"))
+        }
+
+    @Test
+    fun `typeahead asks the music chip shown last and the video plugin`() =
+        runTest(dispatcher) {
+            val vm = viewModel()
+            vm.showSource(LOCAL)
+            vm.showSource(MUSIC)
+            vm.showSource(TvSearchSource.Videos)
+            vm.onQueryChange("cafe")
+            advanceUntilIdle()
+
+            assertThat(music.suggests).containsExactly("cafe")
+            assertThat(videos.suggests).containsExactly("cafe")
+            assertThat(local.suggests).isEmpty()
+        }
+
     private companion object {
+        val MUSIC = TvSearchSource.Music(MusicSource.Plugin("spotify"))
+        val LOCAL = TvSearchSource.Music(MusicSource.Local)
+
         fun item(id: String) = MetadataItem(id = id, entity = EntityRef(EntityKind.VIDEO, id), title = id)
 
         fun results(vararg ids: String) =

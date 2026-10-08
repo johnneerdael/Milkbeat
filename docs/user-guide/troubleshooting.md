@@ -4,10 +4,10 @@
 
 ## Music Home is empty
 
-For a streaming Home feed, select a metadata plugin in Settings → Plugins and complete sign-in
-if its feed requires an account. With no metadata provider selected, Home uses the tagged local
-library. Local music is also available in Library → Local library and Library → Folders without
-a metadata plugin. When the provider's Home has nothing to show, select **Retry** to ask for it again.
+A provider gets its own tab once its plugin is installed and enabled and you are signed in
+(YouTube Music needs no sign-in). If a provider's tab is missing, check Settings → Plugins. Local
+music is in the **Local library** tab once a music folder is linked, and in Library → Folders.
+When a provider's Home has nothing to show, select **Retry** to ask for it again.
 
 ## Music Home says Couldn't load content
 

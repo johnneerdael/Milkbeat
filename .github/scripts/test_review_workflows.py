@@ -91,12 +91,25 @@ class WorkflowPolicyTests(unittest.TestCase):
         query = next(step for step in analyze["steps"] if step.get("name") == "Perform CodeQL analysis")
         self.assertEqual(query["with"]["upload"], "never")
         upload = codeql["jobs"]["upload"]
-        self.assertEqual(upload["steps"][0]["with"]["ref"], "main")
-        download = upload["steps"][1]["with"]
+        steps = upload["steps"]
+        self.assertEqual(steps[0]["with"]["ref"], "main")
+        download = next(step for step in steps if step.get("uses", "").startswith("actions/download-artifact"))["with"]
         self.assertIn("sarif_artifact", download["artifact-ids"])
-        publish = upload["steps"][2]["with"]
+        publish_index, publish_step = next(
+            (index, step) for index, step in enumerate(steps) if step.get("uses", "").startswith("github/codeql-action/upload-sarif")
+        )
+        publish = publish_step["with"]
         self.assertIn("refs/pull", publish["ref"])
         self.assertIn("source_ref", publish["sha"])
+        # upload-sarif reports the HEAD of checkout_path, so it must be a checkout of the analyzed revision.
+        analyzed = next(
+            step
+            for step in steps[:publish_index]
+            if step.get("uses", "").startswith("actions/checkout") and step["with"].get("path")
+        )["with"]
+        self.assertIn("source_ref", analyzed["ref"])
+        self.assertEqual(analyzed["persist-credentials"], "false")
+        self.assertTrue(publish["checkout_path"].endswith("/" + analyzed["path"]))
 
     def test_pages_deployments_share_a_lock_and_reject_stale_main(self):
         docs = workflow("docs.yml")

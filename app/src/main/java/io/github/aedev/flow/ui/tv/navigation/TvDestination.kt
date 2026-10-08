@@ -9,7 +9,10 @@ import androidx.compose.material.icons.outlined.VideoLibrary
 import androidx.compose.ui.graphics.vector.ImageVector
 import io.github.aedev.flow.R
 
-/** Stable top-level destinations for Flow's TV interface. */
+/**
+ * Top-level destinations of the TV navigation graph. [MUSIC] hosts every music tab of the rail; the
+ * [fixed] destinations follow them.
+ */
 enum class TvDestination(
     val route: String,
     @StringRes val labelRes: Int,
@@ -22,9 +25,9 @@ enum class TvDestination(
     ;
 
     companion object {
-        val primary: List<TvDestination> = entries.toList()
+        val fixed: List<TvDestination> = listOf(SEARCH, LIBRARY, SETTINGS)
 
-        /** The tab the app opens on and Back converges to. */
+        /** The destination the app opens on and Back converges to: the music tabs. */
         val start: TvDestination = MUSIC
 
         fun fromRoute(route: String?): TvDestination =

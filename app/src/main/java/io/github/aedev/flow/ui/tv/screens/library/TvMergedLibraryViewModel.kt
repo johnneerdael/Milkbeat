@@ -84,7 +84,7 @@ internal class TvMergedLibraryViewModel
             combine(mirrorStore.records, registry.state, accounts.accounts) { records, registry, accounts ->
                 records
                     .filter { record ->
-                        record.ready && record.key.sourcePlugin == registry.selection.metadata &&
+                        record.ready && registry.plugin(record.key.sourcePlugin) != null &&
                             (accounts[record.key.sourcePlugin] as? ProviderAccount.SignedIn)?.key == record.key.sourceAccount &&
                             (accounts[record.key.targetPlugin] as? ProviderAccount.SignedIn)?.key == record.key.targetAccount
                     }.mapNotNull { record -> record.destination?.let { "${record.key.targetPlugin}:${it.kind}:${it.providerId}" } }

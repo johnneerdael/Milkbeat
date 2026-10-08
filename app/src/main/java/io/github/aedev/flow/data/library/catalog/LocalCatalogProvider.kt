@@ -39,6 +39,7 @@ import nl.neerdael.milkbeat.catalog.MetadataItem
 import nl.neerdael.milkbeat.catalog.MetadataPage
 import nl.neerdael.milkbeat.catalog.MetadataProvider
 import nl.neerdael.milkbeat.catalog.ProviderAccount
+import nl.neerdael.milkbeat.catalog.SearchRequest
 import java.io.FileNotFoundException
 import java.time.Instant
 import java.time.ZoneId
@@ -134,6 +135,27 @@ class LocalCatalogProvider
                         is LocalRef.Playlist -> playlistPage(pages, ref)
                         is LocalRef.All -> allPage(pages, ref, cursor?.toIntOrNull() ?: 0)
                     }
+                }
+            }
+
+        /** Songs, releases and artists whose names contain the query; one page, no continuation. */
+        suspend fun search(request: SearchRequest): Result<MetadataPage> =
+            runCatching {
+                withContext(PerformanceDispatcher.diskIO) {
+                    val query = request.query.trim()
+                    if (request.cursor != null ||
+                        query.isEmpty()
+                    ) {
+                        return@withContext MetadataPage(id = "local:search", blocks = emptyList())
+                    }
+                    val filter = LibraryFilter(text = query)
+                    val more = LocalCatalogPages.SHELF_SIZE + 1
+                    pages(folders.folders.first()).search(
+                        query = query,
+                        tracks = dao.tracks(LibraryQueries.tracks(filter, TrackOrder.NEWEST, SEARCH_TRACKS)),
+                        releases = dao.releases(LibraryQueries.releases(filter, ReleaseOrder.NEWEST, more)),
+                        artists = dao.groups(LibraryQueries.groups(GroupKind.ARTIST, filter, GroupOrder.TRACKS, more)),
+                    )
                 }
             }
 
@@ -297,5 +319,6 @@ class LocalCatalogProvider
         companion object {
             const val ID = "local"
             private const val MILLIS_PER_SECOND = 1_000L
+            private const val SEARCH_TRACKS = 50
         }
     }

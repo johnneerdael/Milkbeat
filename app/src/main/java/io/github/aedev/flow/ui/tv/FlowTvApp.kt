@@ -44,6 +44,7 @@ import io.github.aedev.flow.ui.tv.music.TvVisualizerViewModel
 import io.github.aedev.flow.ui.tv.music.rememberTvNowPlayingVisual
 import io.github.aedev.flow.ui.tv.navigation.TvDestination
 import io.github.aedev.flow.ui.tv.screens.TvPlayerScreen
+import io.github.aedev.flow.ui.tv.screens.music.TvMusicTabsViewModel
 import io.github.aedev.flow.ui.tv.screens.settings.TvUpdatesViewModel
 import io.github.aedev.flow.ui.tv.theme.LocalTvDimens
 import io.github.aedev.flow.ui.tv.theme.TvTheme
@@ -64,6 +65,8 @@ fun FlowTvApp(
     val visualizerViewModel: TvVisualizerViewModel = hiltViewModel(activity)
     val visualizerActive by visualizerViewModel.active.collectAsStateWithLifecycle()
     val nowPlayingView by visualizerViewModel.nowPlayingView.collectAsStateWithLifecycle()
+    val musicTabsViewModel: TvMusicTabsViewModel = hiltViewModel(activity)
+    val musicTabs by musicTabsViewModel.state.collectAsStateWithLifecycle()
     val navController = rememberNavController()
     // A plugin link opens Settings, where Plugins picks it up and asks the listener.
     LaunchedEffect(pluginLinkPending) {
@@ -251,6 +254,8 @@ fun FlowTvApp(
                         focusMusicStrip = focusMusicStrip,
                         onMusicStripFocused = { focusMusicStrip = false },
                         badged = TvDestination.SETTINGS.takeIf { settingsNeedsAttention },
+                        musicTabs = musicTabs,
+                        onSelectMusic = musicTabsViewModel::select,
                     )
                 } else {
                     TvPlayerScreen(

@@ -17,7 +17,7 @@ The Downloader app accepts code **7170062** for the release download. Subsequent
 
 For your own files, [add a local folder or an SMB, WebDAV, SFTP or NFS server](folders.md). No plugin is needed.
 
-For a streaming catalog, [install and select providers](providers.md). The Music tab can be empty until a metadata provider is selected; this does not prevent playback through Library → Folders.
+For a streaming catalog, [install providers and sign in](providers.md). Each one you can use gets its own tab in the sidebar. Until a provider or folder offers music, a single **Music** tab offers to add a plugin or a music folder; Library → Folders still plays your folders.
 
 ## Remote controls
 

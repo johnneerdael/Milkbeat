@@ -10,6 +10,7 @@ import nl.neerdael.milkbeat.catalog.MetadataPage
 import nl.neerdael.milkbeat.catalog.MetadataProvider
 import nl.neerdael.milkbeat.catalog.PageRequest
 import nl.neerdael.milkbeat.catalog.ProviderAccount
+import nl.neerdael.milkbeat.plugin.PluginOperation
 import nl.neerdael.milkbeat.plugin.PluginOperations
 
 class ScopedPluginCatalog internal constructor(
@@ -27,4 +28,9 @@ class ScopedPluginCatalog internal constructor(
     ): Result<MetadataPage> = owner.callFor(id, PluginOperations.entity, PageRequest(entity, cursor = cursor))
 
     override fun track(item: MetadataItem): MusicTrack? = item.track?.toMusicTrack(id)
+
+    suspend fun <Request, Response> call(
+        operation: PluginOperation<Request, Response>,
+        request: Request,
+    ): Result<Response> = owner.callFor(id, operation, request)
 }

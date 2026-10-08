@@ -4,6 +4,7 @@ import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -15,6 +16,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
@@ -23,9 +25,10 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.aedev.flow.R
+import io.github.aedev.flow.data.catalog.MusicSource
 import io.github.aedev.flow.data.music.model.MusicTrack
 import io.github.aedev.flow.ui.screens.folders.LibraryScanViewModel
 import io.github.aedev.flow.ui.screens.music.MusicHomeFeedViewModel
@@ -41,15 +44,57 @@ import io.github.aedev.flow.ui.tv.focus.ProvideTvColumnPivot
 import io.github.aedev.flow.ui.tv.theme.LocalTvDimens
 import nl.neerdael.milkbeat.catalog.EntityRef
 
-/** TV music home: the music provider's home page — its filters, then every block in the order it is served. */
+/**
+ * The music tabs: the shown [source]'s home page — its filters, then every block in the order it is
+ * served. Each source keeps its own feed and scroll position while another tab shows; until [ready],
+ * the tab to show is not known yet and the page shows it is loading.
+ */
 @Composable
 fun TvMusicScreen(
+    source: MusicSource?,
+    ready: Boolean,
+    onPlayCollection: (MusicTrack, List<MusicTrack>, String, String?) -> Unit,
+    onPlayMix: (MusicTrack) -> Unit,
+    onOpen: (EntityRef, MusicSource) -> Unit,
+    onOpenPlugins: () -> Unit,
+    onOpenMusicFolders: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    // Above the loading return, so a moment of not knowing the tab keeps every tab's saved scroll and focus.
+    val states = rememberSaveableStateHolder()
+    if (!ready) {
+        TvScreenScaffold(title = null, modifier = modifier) { TvShimmerRow() }
+        return
+    }
+    states.SaveableStateProvider(source?.key ?: NO_SOURCE_KEY) {
+        val viewModel =
+            hiltViewModel<MusicHomeFeedViewModel, MusicHomeFeedViewModel.Factory>(
+                key = "music-feed:${source?.key ?: NO_SOURCE_KEY}",
+                creationCallback = { factory -> factory.create(source) },
+            )
+        TvMusicFeed(
+            viewModel = viewModel,
+            onPlayCollection = onPlayCollection,
+            onPlayMix = onPlayMix,
+            onOpen = { ref -> source?.let { onOpen(ref, it) } },
+            onOpenPlugins = onOpenPlugins,
+            onOpenMusicFolders = onOpenMusicFolders,
+            modifier = modifier,
+        )
+    }
+}
+
+private const val NO_SOURCE_KEY = "none"
+
+@Composable
+private fun TvMusicFeed(
+    viewModel: MusicHomeFeedViewModel,
     onPlayCollection: (MusicTrack, List<MusicTrack>, String, String?) -> Unit,
     onPlayMix: (MusicTrack) -> Unit,
     onOpen: (EntityRef) -> Unit,
     onOpenPlugins: () -> Unit,
-    modifier: Modifier = Modifier,
-    viewModel: MusicHomeFeedViewModel = hiltViewModel(),
+    onOpenMusicFolders: () -> Unit,
+    modifier: Modifier,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val accountExpired by viewModel.isAccountExpired.collectAsStateWithLifecycle()
@@ -69,7 +114,9 @@ fun TvMusicScreen(
             TvCatalogActions(
                 trackFor = viewModel::track,
                 onPlayMix = { playMix(it) },
-                onPlayList = { track, queue, source, radioPlaylistId -> playCollection(track, queue, source, radioPlaylistId) },
+                onPlayList = { track, queue, source, radioPlaylistId ->
+                    playCollection(track, queue, source, viewModel.radioSeed(radioPlaylistId))
+                },
                 onOpen = { open(it) },
             )
         }
@@ -129,11 +176,14 @@ fun TvMusicScreen(
                                         title = stringResource(R.string.tv_plugins_empty_home),
                                         message = stringResource(R.string.tv_plugins_empty_home_message),
                                     )
-                                    TvButton(
-                                        text = stringResource(R.string.tv_plugins_add),
-                                        onClick = onOpenPlugins,
-                                        modifier = Modifier.focusRequester(firstShelfFocus),
-                                    )
+                                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                        TvButton(
+                                            text = stringResource(R.string.tv_plugins_add),
+                                            onClick = onOpenPlugins,
+                                            modifier = Modifier.focusRequester(firstShelfFocus),
+                                        )
+                                        TvButton(text = stringResource(R.string.music_folders_title), onClick = onOpenMusicFolders)
+                                    }
                                 }
                             }
                         }

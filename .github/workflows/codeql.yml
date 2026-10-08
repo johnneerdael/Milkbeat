@@ -116,6 +116,19 @@ jobs:
         with:
           ref: main
           persist-credentials: false
+      # upload-sarif reports `git rev-parse HEAD` of its checkout_path as the commit, ignoring the
+      # sha input whenever git answers. Against the main checkout above it published results for
+      # main's tip, and a pull request's merge ref is rejected once that tip is not a merge
+      # commit. The analyzed revision is checked out on its own, without credentials; nothing in
+      # it is built or run.
+      - name: Checkout the analyzed revision for its commit identity
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.source_ref || github.sha }}
+          path: analyzed-revision
+          persist-credentials: false
+          sparse-checkout: .gitignore
+          sparse-checkout-cone-mode: false
       - name: Download the analyzed job's exact artifact
         uses: actions/download-artifact@v8
         with:
@@ -125,6 +138,7 @@ jobs:
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: codeql-results
+          checkout_path: ${{ github.workspace }}/analyzed-revision
           ref: ${{ inputs.pr_number && format('refs/pull/{0}/merge', inputs.pr_number) || github.ref }}
           sha: ${{ inputs.source_ref || github.sha }}
           category: /language:java-kotlin

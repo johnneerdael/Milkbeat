@@ -49,7 +49,7 @@ import nl.neerdael.milkbeat.catalog.ProviderAccount
 import nl.neerdael.milkbeat.plugin.MetadataSurface
 import nl.neerdael.milkbeat.plugin.PluginManifest
 
-private enum class ProviderRole { MUSIC, AUDIO, VIDEO }
+private enum class ProviderRole { AUDIO, VIDEO }
 
 /**
  * Settings, Plugins: the plugins that provide music, audio and videos, adding one from a link (with
@@ -461,21 +461,18 @@ private fun providerNames(
 
 private fun ProviderRole.label(): Int =
     when (this) {
-        ProviderRole.MUSIC -> R.string.tv_plugins_metadata
         ProviderRole.AUDIO -> R.string.tv_plugins_audio
         ProviderRole.VIDEO -> R.string.tv_plugins_video
     }
 
 private fun ProviderRole.offeredBy(manifest: PluginManifest): Boolean =
     when (this) {
-        ProviderRole.MUSIC -> manifest.roles.metadata != null
         ProviderRole.AUDIO -> manifest.roles.audio != null
         ProviderRole.VIDEO -> manifest.roles.video != null
     }
 
 private fun ProviderRole.current(selection: ProviderSelection): List<String> =
     when (this) {
-        ProviderRole.MUSIC -> listOfNotNull(selection.metadata)
         ProviderRole.AUDIO -> selection.audio
         ProviderRole.VIDEO -> listOfNotNull(selection.video)
     }
@@ -485,5 +482,5 @@ private fun ProviderRole.with(
     pluginId: String?,
 ): ProviderSelection {
     check(this != ProviderRole.AUDIO)
-    return if (this == ProviderRole.MUSIC) selection.copy(metadata = pluginId) else selection.copy(video = pluginId)
+    return selection.copy(video = pluginId)
 }
