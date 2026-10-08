@@ -81,7 +81,6 @@ data class TvRailItem(
     val badged: Boolean = false,
 )
 
-/** The name a music tab goes by wherever it is offered: the rail, Search and the Library. */
 @Composable
 fun MusicTab.displayLabel(): String = labelRes?.let { stringResource(it) } ?: label ?: stringResource(R.string.local_library_title)
 
