@@ -61,6 +61,11 @@ internal class StreamDenialRecovery(
         handleStreamExpired(context)
     }
 
+    fun handleProtocolFailure(failure: nl.neerdael.milkbeat.plugin.StreamFailure) {
+        // Do not classify attestation or ReloadPlayerResponse as a fabricated HTTP 403.
+        handleStreamExpired(StreamFailureContext(reason = "sabr-${failure.serverAbrFailure}"))
+    }
+
     fun hasGivenUp(): Boolean = expiryRetryLimiter.hasGivenUp()
 
     /**

@@ -187,7 +187,11 @@ class EnhancedPlayerManager private constructor() {
     var lastStreamHttpFailure: Pair<String, Int>? = null
         private set
 
+    var lastServerAbrFailure: nl.neerdael.milkbeat.plugin.StreamFailure? = null
+        private set
+
     private var currentRequestHeaders: StreamRequestHeaders = StreamRequestHeaders.NONE
+    private var currentServerAbr: io.github.aedev.flow.plugin.playback.BoundServerAbr? = null
 
     // Coroutine scope
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
@@ -226,6 +230,8 @@ class EnhancedPlayerManager private constructor() {
                             .toVideoSessionMetadata()
                             .toMedia3Metadata(),
                     requestHeaders = resolved.requestHeaders,
+                    serverAbr = resolved.serverAbr,
+                    hlsUrl = resolved.hlsUrl,
                 )
             },
             log = { autoNextLog(it) },
@@ -817,6 +823,9 @@ class EnhancedPlayerManager private constructor() {
                 }
 
                 override fun onPlayerError(error: PlaybackException) {
+                    lastServerAbrFailure =
+                        io.github.aedev.flow.player.error
+                            .serverAbrFailureOf(error)
                     StreamHttpFailure.of(error)?.let { lastStreamHttpFailure = it }
                     errorHandler?.handleError(error, player)
                 }
@@ -899,6 +908,7 @@ class EnhancedPlayerManager private constructor() {
         preferredLiveQualityHeight: Int = 0,
         requestHeaders: StreamRequestHeaders = StreamRequestHeaders.NONE,
         skipSegments: List<SponsorBlockSegment>? = null,
+        serverAbr: io.github.aedev.flow.plugin.playback.BoundServerAbr? = null,
     ) {
         if (!isOnMainThread()) {
             autoNextLog("setStreams switching to main id=$videoId from=${Thread.currentThread().name}")
@@ -921,6 +931,7 @@ class EnhancedPlayerManager private constructor() {
                     preferredLiveQualityHeight = preferredLiveQualityHeight,
                     requestHeaders = requestHeaders,
                     skipSegments = skipSegments,
+                    serverAbr = serverAbr,
                 )
             }
             return
@@ -939,6 +950,7 @@ class EnhancedPlayerManager private constructor() {
         currentLocalFilePath = localFilePath
         if (localFilePath != null) configureTrackSelectorForLocalFile()
         currentRequestHeaders = requestHeaders
+        currentServerAbr = serverAbr
         audioOnlyMode.applyStreams(keepAudioOnly)
         setVideoTracksDisabled(keepAudioOnly)
 
@@ -954,16 +966,16 @@ class EnhancedPlayerManager private constructor() {
         val useLiveManifest =
             streamType == StreamType.LIVE_STREAM ||
                 streamType == StreamType.POST_LIVE_STREAM
-        this.currentHlsUrl = hlsUrl.takeIf { useLiveManifest }
+        this.currentHlsUrl = hlsUrl
         val liveDurationMs =
-            if (!currentHlsUrl.isNullOrEmpty() && durationSeconds > 0) {
+            if (useLiveManifest && !currentHlsUrl.isNullOrEmpty() && durationSeconds > 0) {
                 durationSeconds * 1000L
             } else {
                 0L
             }
         val isLiveStream =
             useLiveManifest &&
-                (!currentHlsUrl.isNullOrEmpty() || !currentDashManifestUrl.isNullOrEmpty())
+                (!currentHlsUrl.isNullOrEmpty() || !currentDashManifestUrl.isNullOrEmpty() || currentServerAbr?.playback?.live == true)
         pendingLiveQualityHeight = if (isLiveStream) preferredLiveQualityHeight else 0
         if (isLiveStream) {
             videoMimeTypes = VideoCodecUtils.preferredVideoMimeTypes(preferredVideoCodecKey)
@@ -987,7 +999,7 @@ class EnhancedPlayerManager private constructor() {
         // Update quality manager with available streams
         qualityManager?.setAvailableStreams(availableVideoStreams)
         qualityManager?.preferredCodecKey = preferredVideoCodec
-        qualityFromTracks = isLiveStream || (localFilePath == null && availableVideoStreams.size > 1)
+        qualityFromTracks = currentServerAbr != null || isLiveStream || (localFilePath == null && availableVideoStreams.size > 1)
         qualityManager?.isDashSource = !currentDashManifestUrl.isNullOrEmpty() || qualityFromTracks
 
         // Quality selection: respect user preference
@@ -1057,7 +1069,9 @@ class EnhancedPlayerManager private constructor() {
         currentLocalFilePath = null
         clearedMediaRecoveryState.clear()
         currentRequestHeaders = StreamRequestHeaders.NONE
+        currentServerAbr = null
         lastStreamHttpFailure = null
+        lastServerAbrFailure = null
         currentVideoStream = null
         currentAudioStream = null
         currentDashManifestUrl = null
@@ -1199,7 +1213,7 @@ class EnhancedPlayerManager private constructor() {
         }
 
         val audio = audioStream ?: availableAudioStreams.firstOrNull()
-        if (audioOnly && audio == null) {
+        if (audioOnly && audio == null && currentServerAbr == null && currentHlsUrl.isNullOrEmpty()) {
             Log.w(TAG, "loadMediaInternal: audio-only load requested without an audio stream")
             return false
         }
@@ -1208,7 +1222,7 @@ class EnhancedPlayerManager private constructor() {
                 currentVideoStream != null ||
                 availableVideoStreams.isNotEmpty() ||
                 !currentDashManifestUrl.isNullOrEmpty() ||
-                !currentHlsUrl.isNullOrEmpty()
+                !currentHlsUrl.isNullOrEmpty() || currentServerAbr != null
         if (audio == null && !hasPlayableVideo) {
             Log.w(TAG, "loadMediaInternal: no playable audio/video streams")
             return false
@@ -1234,6 +1248,7 @@ class EnhancedPlayerManager private constructor() {
                 mediaId = sessionMetadata?.mediaId.orEmpty(),
                 mediaMetadata = sessionMetadata?.toMedia3Metadata() ?: MediaMetadata.EMPTY,
                 requestHeaders = currentRequestHeaders,
+                serverAbr = currentServerAbr,
             ) ?: false
         if (result) {
             qualityManager?.isDashSource = !currentDashManifestUrl.isNullOrEmpty() || qualityFromTracks
@@ -1644,6 +1659,7 @@ class EnhancedPlayerManager private constructor() {
             keepAudioOnly = resumeInAudioOnly,
             requestHeaders = data.requestHeaders,
             skipSegments = data.skipSegments,
+            serverAbr = data.serverAbr,
         )
         play()
         autoNextLog("playVideoFromServiceLayer loaded video=${video.id} reason=$reason via source")
@@ -1707,10 +1723,12 @@ class EnhancedPlayerManager private constructor() {
         }
 
         currentRequestHeaders = data.requestHeaders
+        currentServerAbr = data.serverAbr
         lastStreamHttpFailure = null
+        lastServerAbrFailure = null
         currentDurationSeconds = data.durationSeconds
         currentDashManifestUrl = data.dashManifestUrl
-        currentHlsUrl = null
+        currentHlsUrl = data.hlsUrl
         currentIsLiveStream = false
         pendingInitialLiveEdgeSeek = false
         currentVideoId = data.enrichedVideo.id
@@ -1726,7 +1744,7 @@ class EnhancedPlayerManager private constructor() {
         qualityManager?.resetForNewVideo()
         qualityManager?.setAvailableStreams(availableVideoStreams)
         qualityManager?.preferredCodecKey = data.preferredCodec
-        qualityFromTracks = availableVideoStreams.size > 1
+        qualityFromTracks = currentServerAbr != null || availableVideoStreams.size > 1
         qualityManager?.isDashSource = !currentDashManifestUrl.isNullOrEmpty() || qualityFromTracks
         qualityManager?.setCurrentStream(currentVideoStream)
         if (!qualityFromTracks && data.videoStream != null) {

@@ -85,6 +85,7 @@ internal class PluginRuntime(
     private val requests = ConcurrentHashMap<Long, Pair<String, String>>()
     private val nextRequest = AtomicLong()
     private val failures = AtomicInteger()
+    val contextGeneration: Long get() = contexts.liveGeneration
     private val holds = AtomicInteger()
     private val running = AtomicInteger()
 
@@ -149,6 +150,16 @@ internal class PluginRuntime(
         operation: PluginOperation<Request, Response>,
         request: Request,
         timeoutMs: Long,
+    ): Response =
+        withContext(context.thread) {
+            invokeOnOwner(context, operation, request, timeoutMs)
+        }
+
+    private suspend fun <Request, Response> invokeOnOwner(
+        context: PluginContext,
+        operation: PluginOperation<Request, Response>,
+        request: Request,
+        timeoutMs: Long,
     ): Response {
         val id = nextRequest.incrementAndGet()
         requests[id] = operation.path to PluginJson.encodeToString(operation.request, request)
@@ -209,11 +220,12 @@ internal class PluginRuntime(
             Executors
                 .newSingleThreadExecutor { runnable -> Thread(null, runnable, "plugin-$shortName", STACK_BYTES) }
                 .asCoroutineDispatcher()
+        val browserOwner = PluginBrowser.Owner()
         var initialized: PluginContext? = null
         return try {
             withContext(thread) {
                 val js = QuickJsInstances.create(thread)
-                val bridge = PluginHostBridge(js) { path, json -> host(js, path, json) }
+                val bridge = PluginHostBridge(js) { path, json -> host(js, path, json, browserOwner) }
                 try {
                     js.memoryLimit = memoryLimit
                     js.maxStackSize = JS_STACK_BYTES
@@ -234,9 +246,10 @@ internal class PluginRuntime(
                     } finally {
                         bridge.finishCall(0)
                     }
-                    PluginContext(js, thread, bridge).also { initialized = it }
+                    PluginContext(js, thread, bridge) { browser.closeOwner(browserOwner) }.also { initialized = it }
                 } catch (e: Exception) {
                     bridge.close()
+                    withContext(NonCancellable) { browser.closeOwner(browserOwner) }
                     withContext(NonCancellable) { QuickJsInstances.close(js) }
                     throw e
                 }
@@ -254,6 +267,7 @@ internal class PluginRuntime(
         js: QuickJs,
         path: String,
         requestJson: String,
+        browserOwner: PluginBrowser.Owner,
     ): String =
         when (path) {
             HostOperations.codeLoad.path -> {
@@ -269,7 +283,7 @@ internal class PluginRuntime(
                 hostApi.envelope {
                     PluginHostApi.success(
                         HostOperations.browserOpen.response,
-                        browser.open(PluginJson.decodeFromString(HostOperations.browserOpen.request, requestJson)),
+                        browser.open(PluginJson.decodeFromString(HostOperations.browserOpen.request, requestJson), browserOwner),
                     )
                 }
             }
@@ -278,14 +292,14 @@ internal class PluginRuntime(
                 hostApi.envelope {
                     PluginHostApi.success(
                         HostOperations.browserEvaluate.response,
-                        browser.evaluate(PluginJson.decodeFromString(HostOperations.browserEvaluate.request, requestJson)),
+                        browser.evaluate(PluginJson.decodeFromString(HostOperations.browserEvaluate.request, requestJson), browserOwner),
                     )
                 }
             }
 
             HostOperations.browserClose.path -> {
                 hostApi.envelope {
-                    browser.close(PluginJson.decodeFromString(HostOperations.browserClose.request, requestJson))
+                    browser.close(PluginJson.decodeFromString(HostOperations.browserClose.request, requestJson), browserOwner)
                     PluginHostApi.success(HostOperations.browserClose.response, Unit)
                 }
             }
@@ -313,13 +327,15 @@ internal class PluginRuntime(
 
     private class PluginContext(
         val js: QuickJs,
-        private val thread: ExecutorCoroutineDispatcher,
+        val thread: ExecutorCoroutineDispatcher,
         val bridge: PluginHostBridge,
+        private val closeBrowserOwner: suspend () -> Unit,
     ) {
         var tainted = false
 
         suspend fun close() {
             bridge.close()
+            withContext(NonCancellable) { closeBrowserOwner() }
             try {
                 withContext(NonCancellable + thread) { QuickJsInstances.close(js) }
             } finally {

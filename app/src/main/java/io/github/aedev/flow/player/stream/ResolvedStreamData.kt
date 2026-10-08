@@ -28,4 +28,5 @@ data class ResolvedStreamData(
     val requestHeaders: StreamRequestHeaders = StreamRequestHeaders.NONE,
     /** Segments the source already knows; null leaves them to the player's own SponsorBlock lookup. */
     val skipSegments: List<SponsorBlockSegment>? = null,
+    val serverAbr: io.github.aedev.flow.plugin.playback.BoundServerAbr? = null,
 )

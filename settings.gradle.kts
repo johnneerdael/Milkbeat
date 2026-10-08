@@ -39,3 +39,7 @@ include(":app")
 include(":plugin-api")
 include(":spike-plugin-runtime")
 include(":benchmark")
+
+include(":media3-sabr")
+
+include(":media3-sabr-protocol")

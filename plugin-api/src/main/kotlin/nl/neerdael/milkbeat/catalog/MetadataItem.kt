@@ -1,5 +1,7 @@
 package nl.neerdael.milkbeat.catalog
 
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 
 /**
@@ -77,7 +79,10 @@ data class ArtistCredit(
     val entity: EntityRef? = null,
 )
 
+@OptIn(ExperimentalSerializationApi::class)
 @Serializable
 data class Artwork(
     val url: String,
+    @EncodeDefault(EncodeDefault.Mode.NEVER) val width: Int? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER) val height: Int? = null,
 )

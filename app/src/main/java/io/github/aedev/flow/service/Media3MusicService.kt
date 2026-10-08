@@ -488,12 +488,7 @@ class Media3MusicService : MediaLibraryService() {
                         refreshLearnDuration()
                         applyLoudnessGain()
                         player.currentMediaItem?.mediaId?.let { mediaId ->
-                            val lastErrorAt = lastPlaybackErrorAtMap[mediaId] ?: 0L
-                            if (System.currentTimeMillis() - lastErrorAt > RECOVERY_SUCCESS_GRACE_MS) {
-                                retryCountMap.remove(mediaId)
-                                recentlyFailedSongs.remove(mediaId)
-                                lastPlaybackErrorAtMap.remove(mediaId)
-                            }
+                            resetRecoveredRetryBudget(mediaId)
                         }
                     }
                 }
@@ -561,6 +556,7 @@ class Media3MusicService : MediaLibraryService() {
     override fun onDestroy() {
         EnhancedMusicPlayerManager.prefetcher = null
         EnhancedMusicPlayerManager.setVideoCapablePlaybackIds(emptySet())
+        EnhancedMusicPlayerManager.playbackArtworkState.value = null
         // Flush the in-flight listen session before the player goes away.
         finalizeListenSession()
 

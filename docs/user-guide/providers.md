@@ -24,6 +24,35 @@ There is no metadata provider to choose: every installed, enabled catalog you ca
 
 Capabilities depend on the installed plugin version, the account and its subscription. YouTube Video shares the YouTube tab with YouTube Music: with both installed the tab shows YouTube Music's catalog, and YouTube Video's catalog appears, also without sign-in, when it is the only one. Sign-in with a TV code is optional. The [Preview app](preview-testing.md#youtube-video-plugin) installs its prerelease versions with code **304**.
 
+## YouTube Video preview
+
+**YouTube Video** is a separate provider for a compatible API 6 Preview app. It keeps its own
+account alongside YouTube Music and supplies SmartTube's regular YouTube TV Music section:
+recommended music, charts, new videos and the other rows supplied for your region or account.
+Signing in adds Liked Music before those rows. Show More includes the original row and its
+continuations; playlist and mix pages retain track order.
+
+To browse these feeds, disable YouTube Music while testing YouTube Video; the shared YouTube
+tab, Search and Library then show YouTube Video's catalog. YouTube Music's installed package
+and account remain independent. Choose the audio and video sources under Settings → Plugins.
+
+In YouTube Video's details, choose **Sign in with a TV code**. Scan the QR or open the displayed
+Google activation address and enter the code, then approve it in your Google account. The phone
+need not share the TV's network. Keep the TV screen open until pairing completes. Cancelled,
+declined or expired attempts need a fresh code. Guest Music browsing and playback need no
+sign-in. After signing out or changing accounts, refresh open pages; old account or guest-session
+page tokens are rejected.
+
+YouTube Video searches regular YouTube recordings, including unofficial uploads. Audio starts
+without picture; choose Video in Now Playing to show the accepted recording. Artwork uses its
+highest available thumbnail, with the catalog cover as a fallback, while retaining the original
+catalog title, artist and recording identity.
+
+The paired host handles SABR through Media3. SABR streams support playback, not offline
+downloads. Audio-only HLS needs an independent audio rendition; a combined audio/video stream
+cannot silently fetch video bytes in audio-only mode. Install the paired provider package for
+your compatible Preview build; app and plugin packages are distributed separately.
+
 ## Install a plugin
 
 1. Open **Settings → Plugins** and scroll to **Add a plugin**.
@@ -110,7 +139,7 @@ Open the installed plugin's details and choose its sign-in method.
 
 ![Example TV pairing screen with a fake demonstration code](images/soundcloud-tv-pairing-example.png)
 
-**Web sign-in (other providers):** scan the TV's QR code with a phone on the same network. The [phone viewer](https://github.com/johnneerdael/Milkbeat/blob/main/docs/phone-sign-in-remote-view.md) streams the provider's real sign-in page from the TV; use touch and typing on the phone to complete sign-in and any verification. Browsing and playback stay in Milkbeat's TV interface.
+**Web sign-in (YouTube Music, Spotify and Beatport):** scan the TV's QR code with a phone on the same network. The [phone viewer](https://github.com/johnneerdael/Milkbeat/blob/main/docs/phone-sign-in-remote-view.md) streams the provider's real sign-in page from the TV; use touch and typing on the phone to complete sign-in and any verification. Browsing and playback stay in Milkbeat's TV interface.
 
 When a provider reports an expired sign-in, Milkbeat asks the plugin again in the background, retrying temporary connection failures, and restores the account without any action when it still works; private playlist preparation then resumes on its own. With YouTube Music 0.2.4 or later, a single refused request no longer signs the account out. An account the provider confirms expired needs sign-in again; local folders keep working.
 
@@ -167,6 +196,6 @@ Managed copies are reused after restarting Milkbeat. When Spotify changes, Milkb
 
 Only the source playlist's matched songs belong in the private copy. YouTube's autoplay and radio suggestions are added to Milkbeat's playback queue, outside that copy. Changing a radio mode does not change either playlist.
 
-Prepared playback uses known YouTube IDs and native collection autoplay, while displaying Spotify's song metadata and artwork. Choosing a missing song starts at the next available match. Initial preparation can delay playback, especially for large playlists. Play shares any preparation already running on the page. Recently verified copies and their matches are reused across restarts. Previously unavailable songs are retried once when the matching rules change, so an old rejection does not hide a newly valid match. Interrupted work resumes from checkpoints.
+Prepared playback uses known YouTube IDs and native collection autoplay, while displaying Spotify's song metadata and catalog cover. [Artwork view](playback.md#visualizer-music-video-or-artwork) can show the accepted audio provider's playback thumbnail, falling back to that cover. Choosing a missing song starts at the next available match. Initial preparation can delay playback, especially for large playlists. Play shares any preparation already running on the page. Recently verified copies and their matches are reused across restarts. Previously unavailable songs are retried once when the matching rules change, so an old rejection does not hide a newly valid match. Interrupted work resumes from checkpoints.
 
 Disable the option to return to normal matching and radio based on the first playing song. Existing private copies remain in your YouTube library. While Spotify is signed in, Library hides managed copies that duplicate their source playlists.

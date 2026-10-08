@@ -2,7 +2,11 @@ package io.github.aedev.flow.ui.screens.player.effects
 
 import com.google.common.truth.Truth.assertThat
 import io.github.aedev.flow.data.model.Video
+import io.github.aedev.flow.ui.screens.player.VideoPlayerViewModel
 import io.github.aedev.flow.ui.screens.player.state.VideoPlayerUiState
+import io.github.aedev.flow.ui.screens.player.state.applyLiveStreams
+import io.mockk.mockk
+import io.mockk.verify
 import org.junit.Test
 import org.schabi.newpipe.extractor.Image
 
@@ -71,7 +75,28 @@ class WatchHistoryEntryTest {
 
     @Test
     fun `a live stream is never written`() {
-        assertThat(entry(VideoPlayerUiState(hlsUrl = "https://example.invalid/manifest.m3u8"))).isNull()
+        assertThat(entry(VideoPlayerUiState(isLive = true, hlsUrl = "https://example.invalid/manifest.m3u8"))).isNull()
+    }
+
+    @Test
+    fun `SABR live playback without a manifest URL records a live visit instead of resumable history`() {
+        val state = VideoPlayerUiState().applyLiveStreams(emptyList(), hlsUrl = null)
+        val current = video()
+        val viewModel = mockk<VideoPlayerViewModel>(relaxed = true)
+        assertThat(state.isCurrentLiveStream()).isTrue()
+        assertThat(entry(state, duration = 120_000L)).isNull()
+        saveWatchProgress(viewModel, current, state, 30_000L, 120_000L)
+        verify(exactly = 1) { viewModel.trackLivePlayback(current, 30_000L) }
+        verify(exactly = 0) { viewModel.savePlaybackPosition(any(), any(), any(), any(), any(), any(), any(), any()) }
+    }
+
+    @Test
+    fun `VOD HLS and a new load after live retain resumable history`() {
+        val vod = VideoPlayerUiState(isLive = false, hlsUrl = "https://example.invalid/vod.m3u8")
+        assertThat(entry(vod)).isNotNull()
+        val next = VideoPlayerUiState(isLive = true).resetForVideo(video())
+        assertThat(next.isCurrentLiveStream()).isFalse()
+        assertThat(entry(next)).isNotNull()
     }
 
     @Test
