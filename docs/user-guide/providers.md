@@ -1,23 +1,65 @@
-# Providers and phone sign-in
+# Providers and sign-in
 
-[User guide](index.md)
+Streaming catalogs come from optional, separately distributed **plugins**. Local and network folders are built in and need none. A plugin can offer any mix of three capabilities, shown under its name in Settings → Plugins:
 
-## Understand the three roles
-
-| Role | Controls |
+| Capability | What it supplies |
 | --- | --- |
-| Metadata | Music Home, music search, artist/album/playlist pages and account libraries |
-| Audio | Streams and matches for tracks described by metadata providers |
-| Video | Video search and playback |
+| **metadata** | A music tab with Home, Search, artist, album and playlist pages, and the account's library |
+| **audio** | Playable streams, including matches for tracks from another provider's catalog |
+| **video** | Video search and playback, and music videos in now playing |
 
-A plugin can provide more than one role. Local and network folder playback (SMB, WebDAV, SFTP and NFS) are built in and need none of these roles.
+There is no metadata provider to choose: every installed, enabled catalog you can use gets its own [music tab](library.md#a-tab-per-music-service). You only choose the order of audio providers and which plugin supplies video.
 
-## Install a third-party plugin
+![Settings → Plugins: Audio and Video sources, then the installed plugins with their capabilities and versions](images/settings-plugins.png)
 
-1. Open Settings → Plugins.
-2. Enter a registered 3-digit third-party plugin code or a third-party plugin download URL. Plugin packages are distributed separately from Milkbeat app releases.
+## The available plugins
+
+| Plugin | Code | Catalog | Audio | Video |
+| --- | --- | --- | --- | --- |
+| YouTube Music | **494** | Home, Search, artists, albums, playlists, library | Streams, cross-provider matching and radio | YouTube videos, channels and playlists |
+| Spotify | **981** | Home, Search, artists, albums, playlists, library | **None: use another audio provider** | — |
+| Beatport | **393** | Catalog, genres, charts, artists, labels, library | Full streams with a streaming subscription | — |
+| SoundCloud | **089** | Discover, Stream, Search, Artists, albums, playlists, Liked Songs, history | Available full tracks, matching and stations | — |
+
+Capabilities depend on the installed plugin version, the account and its subscription. The separate [Preview app](preview-testing.md#youtube-video-plugin) also offers **YouTube Video** (code **744**, Preview only), which shares the YouTube tab with YouTube Music: with both installed the tab shows YouTube Music's catalog, and YouTube Video's catalog appears, also without sign-in, when it is the only one.
+
+## YouTube Video preview
+
+**YouTube Video** is a separate provider for a compatible API 6 Preview app. It keeps its own
+account alongside YouTube Music and supplies SmartTube's regular YouTube TV Music section:
+recommended music, charts, new videos and the other rows supplied for your region or account.
+Signing in adds Liked Music before those rows. Show More includes the original row and its
+continuations; playlist and mix pages retain track order.
+
+To browse these feeds, disable YouTube Music while testing YouTube Video; the shared YouTube
+tab, Search and Library then show YouTube Video's catalog. YouTube Music's installed package
+and account remain independent. Choose the audio and video sources under Settings → Plugins.
+
+In YouTube Video's details, choose **Sign in with a TV code**. Scan the QR or open the displayed
+Google activation address and enter the code, then approve it in your Google account. The phone
+need not share the TV's network. Keep the TV screen open until pairing completes. Cancelled,
+declined or expired attempts need a fresh code. Guest Music browsing and playback need no
+sign-in. After signing out or changing accounts, refresh open pages; old account or guest-session
+page tokens are rejected.
+
+YouTube Video searches regular YouTube recordings, including unofficial uploads. Audio starts
+without picture; choose Video in Now Playing to show the accepted recording. Artwork uses its
+highest available thumbnail, with the catalog cover as a fallback, while retaining the original
+catalog title, artist and recording identity.
+
+The paired host handles SABR through Media3. SABR streams support playback, not offline
+downloads. Audio-only HLS needs an independent audio rendition; a combined audio/video stream
+cannot silently fetch video bytes in audio-only mode. Install the paired provider package for
+your compatible Preview build; app and plugin packages are distributed separately.
+
+## Install a plugin
+
+1. Open **Settings → Plugins** and scroll to **Add a plugin**.
+2. Enter a registered three-digit code, or a plugin download URL (a `.mbplugin` file or a supported Buzzheavier file page; an address without a scheme defaults to HTTPS).
 3. Select **Add a plugin**.
-4. Review its author, roles and requested access, then install it.
+4. Review the plugin's author, description, capabilities and requested access, then select **Install** (or **Update** when that plugin is already installed). **Cancel** leaves everything as it was.
+
+![Add a plugin: the code field and the Add a plugin action](images/settings-plugins-updates.png)
 
 ### Download codes
 
@@ -30,61 +72,89 @@ A plugin can provide more than one role. Local and network folder playback (SMB,
 | **089** | SoundCloud |
 <!-- /plugin-codes -->
 
-Codes need a Milkbeat build with download-code support; earlier releases accept URLs. Stable builds prefer the publisher's live catalog and use the bundled catalog offline. The separate Preview app pins codes to its test catalog. An unknown code reports an error; try its full URL or update the app.
+Stable builds prefer the publisher's live catalog and fall back to the bundled one offline, so newly published codes work without an app update. The separate [Preview app](preview-testing.md) pins its codes to its own test catalog. The original codes **102** (Beatport), **772** (Spotify) and **416** (YouTube Music) still work. An unknown code reports an error; try the plugin's full URL or update Milkbeat.
 
-![Adding Beatport with its three-digit code](images/plugin-download-code.png)
+<div class="mb-pair" markdown>
+![Beatport's code 393 entered above Add a plugin](images/plugin-download-code.png)
+![The review: name, version, author, description and capabilities, with Update and Cancel](images/plugin-update-consent.png)
+</div>
 
-Full URLs still work, including supported Buzzheavier file pages. An address without a scheme defaults to HTTPS. Milkbeat resolves Buzzheavier's download link, downloads the package, and verifies its signature before offering installation.
+Milkbeat verifies a plugin's signature before offering installation. Buzzheavier sometimes asks to check the download in a browser; Milkbeat continues once the page lets it through.
 
-![Reviewing the author, roles and access after a coded download](images/plugin-download-consent.png)
+## Keep plugins up to date
 
-These two captures show the code-enabled development build. Stable builds can resolve newly published codes without an app update. Preview codes are delivered with the preview APK; entering a code does not update an already-installed plugin.
+| Control | What it does |
+| --- | --- |
+| **Update plugins automatically** | On by default. Looks for new plugin versions when Milkbeat starts and every 6 hours and installs them. An update that asks for new permissions waits for your review |
+| **Update all plugins** | Checks now and installs every available update. It reads *All plugins are up to date* when there is nothing to install, and lists any update that needs your review as **Update** *plugin* |
 
-| Plugin | Metadata | Audio | Video |
-| --- | --- | --- | --- |
-| YouTube Music | Home, Search, artists, albums, playlists, library | Streams, cross-provider matching and radio | YouTube videos, channels and playlists |
-| Spotify | Home, Search, artists, albums, playlists, library | **None — select a separate audio provider** | None |
-| Beatport | Catalog, genres, charts, artists, labels, library | Full streams with a streaming subscription | None |
-| SoundCloud | Discover, Stream, Search, Artists, albums, playlists, Liked Songs and history | Available full tracks, matching and stations | None |
+An update must come from the same signing author and cannot be older than the installed version. When updates were installed or need review, Milkbeat shows a short notice; reviews wait in Settings → Plugins. Entering a plugin's code or link again still works too. Plugin updates are separate from [app updates](settings.md#about).
+
+## Plugin details
+
+Select an installed plugin to see its version, description and account, and to sign in or out, report plays, index playlists or remove it. Removing a plugin never removes local music sources. Account names are blurred in these captures.
+
+=== "YouTube Music"
+
+    ![YouTube Music details: Index playlists, version, Signed in as, Report plays, Sign out and Remove](images/plugin-details-youtube-music.png)
+
+=== "Spotify"
+
+    ![Spotify details: Index playlists, Prepare private playlists in YouTube Music, version, Signed in as and Sign out](images/plugin-details-spotify.png)
+
+=== "Beatport"
+
+    ![Beatport details: Index playlists, version, Signed in as, Report plays to Beatport, Sign out and Remove](images/plugin-details-beatport.png)
+
+=== "SoundCloud"
+
+    ![SoundCloud details while not signed in: Sign in with a TV code and Remove](images/plugin-details-soundcloud.png)
+
+| Item | What it does |
+| --- | --- |
+| **Index playlists** | Matches the account's playlist tracks and Liked Songs against your audio providers in priority order, so playback can reuse the matches |
+| **Prepare private playlists in YouTube Music** | Spotify and YouTube Music: see [below](#prepare-private-playlists). Needs both providers signed in |
+| **Report plays to** *provider* | Tracks you listen to for 30 seconds or more, or for half of a track shorter than a minute, are reported to that provider and count toward your listening there |
+| **Signed in as** / **Not signed in** | The account state. *Signed out: sign in again* means the provider confirmed the session expired |
+| **Sign in** / **Sign out** | Starts the provider's [sign-in method](#sign-in) or forgets the session |
+| **Remove** | Uninstalls the plugin and its tab |
+
+Completed indexing matches are kept when you cancel. Index again after changing the account or the audio-provider order.
 
 ## Sign-in and account requirements
 
-- **YouTube Music:** sign-in is optional. Signing in changes Home into a personalized feed based on the account and makes its library available. Free YouTube accounts are supported; Premium is not required for this personalization.
-- **Spotify:** a metadata provider with **no audio source**. It can technically access catalog metadata without sign-in, but its practical value is your personalized feed, playlists, Liked songs and library after signing in. Select a separate audio provider for playback.
-- **Beatport:** sign in for catalog metadata and your library. Beatport's own full-length audio
-  requires an active streaming subscription. You can instead select SoundCloud or YouTube Music
-  for audio and let Milkbeat match the available recording. Catalog access and matching still
-  depend on the account and service; a free account is not a guarantee of a particular match.
-- **SoundCloud:** sign in for personalized Home, playlists, Liked Songs, history and Artists
-  (the accounts SoundCloud calls Following). Public search and catalog pages can work anonymously.
-  Full-track availability and quality depend on the recording and consumer subscription;
-  Artist Pro does not grant Go+ listening rights. Preview-only or restricted recordings can still
-  appear as metadata, but cannot supply full-track audio. Enable another audio provider as a fallback.
-  Install a Milkbeat build with plugin API 5 support before installing SoundCloud plugin 0.2.0.
-  TV-paired accounts currently play clear HLS streams only. Protected-only recordings cannot play
-  with this session because the mobile license exchange remains unverified. Existing web sessions
-  retain their Widevine playback path, subject to device support and account license access.
-  Playback from a TV-paired SoundCloud account does not currently report listens to SoundCloud.
+- **YouTube Music:** sign-in is optional. Signing in turns Home into a personalized feed and makes your library available. Free YouTube accounts are supported; Premium is not required for personalization.
+- **Spotify:** a catalog with **no audio source**. Its value is your personalized feed, playlists, Liked Songs and library after signing in. Keep at least one audio provider enabled.
+- **Beatport:** sign in for the catalog and your library. Beatport's own full-length audio needs an active streaming subscription; otherwise SoundCloud or YouTube Music can match the recording. A free account does not guarantee a match.
+- **SoundCloud:** sign in for personalized Home, playlists, Liked Songs, history and Artists. Public search and catalog pages can work anonymously. Full-track availability depends on the recording and your listening subscription; Artist Pro does not grant Go+ listening rights. Preview-only or restricted recordings can appear but cannot supply full-track audio, so keep another audio provider as a fallback. SoundCloud plugin 0.2.0 needs a Milkbeat build with plugin API 5. TV-paired accounts currently play clear HLS streams only; protected-only recordings cannot play with this session, and plays from a TV-paired account are not reported to SoundCloud. Existing web sessions keep their Widevine playback path where the account and device allow it.
 
-## Music tabs and video
+## Sign in
 
-There is no metadata provider to choose. Every installed, enabled catalog plugin you are signed in to gets its own tab in the sidebar, marked with the service's logo; YouTube Music's tab appears without sign-in. Signing out of a provider, or disabling it, removes its tab. Under **Video**, choose the video provider.
+Open the installed plugin's details and choose its sign-in method.
 
-YouTube Music and YouTube Video (a Preview app plugin) share one YouTube tab. With both installed, it shows YouTube Music's catalog and YouTube Video's catalog stays hidden; with only YouTube Video installed, the same tab shows YouTube Video's catalog, also without sign-in.
+**TV code pairing (SoundCloud):** select **Sign in with a TV code**, scan the QR code or open the displayed address on a phone or computer, sign in and approve the short code. The phone does not need to be on the TV's network. Keep the TV screen open while it waits: leaving it, pressing Back or sending Milkbeat to the background cancels the attempt, and an expired or declined code can be requested again. The plugin accepts the account only after its account and Home requests succeed.
 
-![Plugins settings with YouTube Music and Beatport audio providers](images/plugins-current.png)
+![Example TV pairing screen with a fake demonstration code](images/soundcloud-tv-pairing-example.png)
+
+**Web sign-in (YouTube Music, Spotify and Beatport):** scan the TV's QR code with a phone on the same network. The [phone viewer](https://github.com/johnneerdael/Milkbeat/blob/main/docs/phone-sign-in-remote-view.md) streams the provider's real sign-in page from the TV; use touch and typing on the phone to complete sign-in and any verification. Browsing and playback stay in Milkbeat's TV interface.
+
+When a provider reports an expired sign-in, Milkbeat asks the plugin again in the background, retrying temporary connection failures, and restores the account without any action when it still works; private playlist preparation then resumes on its own. With YouTube Music 0.2.4 or later, a single refused request no longer signs the account out. An account the provider confirms expired needs sign-in again; local folders keep working.
 
 ## Set audio priority
 
-Under **Audio**, enable the providers you want to use. Select **Move earlier** or **Move later** to change their order, then **Done**.
+![Audio provider priority: YouTube Music, Beatport, then SoundCloud, with the per-provider audio switches](images/settings-audio-priority.png)
 
-For example, YouTube Music first and Beatport second means Milkbeat tries YouTube first. If it cannot find or play a recording, it tries Beatport. Availability depends on each catalog, account and subscription. YouTube matching searches recorded videos, including static Art Tracks and archived live sets, regardless of whether you choose the visualizer, artwork or video view. It still checks recording identity; an unrelated performance, cover or excerpt is rejected. The picture loads only when you select Video in Now Playing.
+Under **Audio**, switch on the providers you want (**Use** *provider* **for audio**), use **Move earlier** and **Move later** to order them, then select **Done**. Milkbeat searches from top to bottom: if a provider cannot find or play a track, it tries the next one.
 
-![Audio provider priority: YouTube Music first and Beatport second](images/audio-priority.png)
+YouTube matching searches recorded videos, including static Art Tracks and archived live sets, whichever now-playing view you use. It checks recording identity, so an unrelated performance, cover, different remix or short excerpt is rejected, and full versions are preferred over mixed excerpts. The picture loads only when you choose [the video view](playback.md#visualizer-music-video-or-artwork).
+
+![Video: None or YouTube Music](images/settings-video-provider.png)
+
+Under **Video**, choose which plugin supplies videos, or **None**.
 
 ## Spotify with YouTube audio
 
-Select Spotify for metadata and YouTube Music for audio. Spotify supplies the catalog and playlists; YouTube supplies a matched recording. The playing recording can differ from the catalog entry. Supported YouTube audio radio can continue with the matched track's mix.
+Sign in to Spotify and keep YouTube Music enabled under Audio. Spotify supplies the catalog and playlists; YouTube supplies a matched recording, which can differ from the catalog entry. The queue then continues with the matched track's YouTube radio.
 
 ## Prepare private playlists
 
@@ -112,7 +182,10 @@ This option is **off by default** and requires Milkbeat 0.9.0 or later and compa
 3. Let your own Spotify playlists and Liked Songs prepare in the background. Other playlists, including generated mixes, begin preparing when you open them.
 4. Select Play or a track. If syncing is still in progress, Milkbeat shows a short message that playback will start when the playlist is ready. The page shows percentage progress through matching, writing and verification, plus unavailable tracks. Once the copy is ready, a small YouTube mark appears beside **Private playlist ready**: playing the playlist then uses its private YouTube Music copy. Select **Retry preparation** if it fails.
 
-   ![The YouTube mark beside a ready private playlist](images/playlist-youtube-indicator.png)
+   <div class="mb-pair" markdown>
+   ![Preparing: progress, matched and unavailable counts under the playlist](images/playlist-preparing.png)
+   ![The YouTube mark beside Private playlist ready](images/playlist-ready.png)
+   </div>
 
 Milkbeat creates private YouTube copies with the source playlist cover, resolves the source songs, then adds the matched songs together and verifies the copy. With a Milkbeat build that supports batch matching and YouTube Music 0.2.3 or later, matching runs in bounded parallel batches while the empty copy is prepared. Recording title, performer and named remix/edit checks reject conflicting candidates. Remixer credits can appear in the title or artist list, and explicitly listed members can identify a collective artist credit regardless of their order. Longer recordings have no duration cap or required full/extended label when the recording title, performers and named remix/edit agree; full versions are preferred over mixed excerpts. Shorter conflicting excerpts are rejected. Additional searches run only when the first search has no acceptable match. Older compatible plugins retain sequential matching. Copies refresh from Spotify in one direction and preserve track order and duplicate occurrences. Confidently unmatched songs are left out of the copy; temporary connection failures remain retryable. Spotify's playlists are not edited. Background refresh is scheduled approximately every six hours, subject to network and device constraints; opening a ready playlist reuses its saved preparation for up to six hours, without fetching the source again, re-matching tracks or rewriting the YouTube copy. Older preparations, changed titles or covers, and unfinished preparations are checked again on open.
 
@@ -120,76 +193,6 @@ Managed copies are reused after restarting Milkbeat. When Spotify changes, Milkb
 
 Only the source playlist's matched songs belong in the private copy. YouTube's autoplay and radio suggestions are added to Milkbeat's playback queue, outside that copy. Changing a radio mode does not change either playlist.
 
-Prepared playback uses known YouTube IDs and native collection autoplay, while displaying Spotify's song metadata and catalog cover. [Artwork view](playback.md#visualizer-music-video-or-artwork)
-can show the accepted audio provider's playback thumbnail, falling back to that catalog cover. Choosing a missing song starts at the next available match. Initial preparation can delay playback, especially for large playlists. Play shares any preparation already running on the page. Recently verified copies and their matches are reused across restarts. Previously unavailable songs are retried once when the matching rules change, so an old rejection does not hide a newly valid match. Interrupted work resumes from checkpoints.
+Prepared playback uses known YouTube IDs and native collection autoplay, while displaying Spotify's song metadata and catalog cover. [Artwork view](playback.md#visualizer-music-video-or-artwork) can show the accepted audio provider's playback thumbnail, falling back to that cover. Choosing a missing song starts at the next available match. Initial preparation can delay playback, especially for large playlists. Play shares any preparation already running on the page. Recently verified copies and their matches are reused across restarts. Previously unavailable songs are retried once when the matching rules change, so an old rejection does not hide a newly valid match. Interrupted work resumes from checkpoints.
 
-Disable the option to return to normal matching and radio based on the first playing song. Existing private copies remain in your YouTube library. While Spotify is selected for metadata, Library hides managed copies that duplicate their source playlists.
-
-## Sign in on your phone
-
-### YouTube Video preview
-
-**YouTube Video** is a separate provider for the API 6 Preview app. It keeps its own account and
-can be installed alongside **YouTube Music**. Select it for metadata to browse SmartTube's Music
-section: recommended music, charts, new videos and the other rows supplied for your region or
-account. TV-code sign-in adds Liked Music before those rows. Show More includes the full original
-row and its continuation; playlist and mix pages retain their track order.
-
-In the installed provider's details, choose **Sign in with a TV code**. Scan the QR link or open
-the displayed YouTube address, then approve the code in your Google account. Keep the TV screen
-open until pairing completes. Cancelled, declined or expired attempts need a fresh code. Guest
-browsing and playback do not require sign-in. After signing out or changing accounts, refresh
-open catalog pages; old account or guest-session page tokens are rejected.
-
-YouTube Video searches regular YouTube recordings for music playback, including uploads from
-unofficial channels. Audio starts without picture; choose Video in Now Playing to show the
-accepted recording's picture. Artwork view uses its highest available thumbnail, with the
-catalog cover as a fallback. Switching views retains the original catalog title, artist and
-recording identity. Resolution depends on the recording and the TV's supported codecs.
-
-The paired host handles SABR streaming through Media3. SABR streams are currently available
-for playback, not offline downloads. An audio-only live source needs an independent audio
-rendition; a stream with only combined audio/video cannot silently fetch picture bytes in
-audio-only mode. This preview's provider package is distributed separately from the app;
-use the paired test package supplied with the preview build.
-
-### Other provider sign-ins
-
-Open the installed plugin's details and choose its sign-in method.
-
-**SoundCloud TV pairing:** scan the activation QR code or open the displayed address on your phone,
-then enter the short code and approve sign-in. Your phone does not need to share the TV’s network.
-Leave this screen open while approval completes. Leaving it or sending Milkbeat to the background
-cancels the pending attempt; request a fresh code when you return. Expired or declined codes can
-be retried. The plugin checks that the completed session can fetch the account and Home before
-accepting sign-in.
-
-**Web sign-ins:** scan the TV's QR code with a phone on the same network. The phone viewer streams the actual provider page on the TV: use touch and typing to complete sign-in and provider verification.
-
-The viewer handles sign-in. Music browsing and playback remain in Milkbeat's TV interface. When a provider reports that a sign-in expired, Milkbeat immediately asks the plugin again in the background whether the account still signs in, retrying temporary connection failures, and restores it without any action when it does; private playlist preparation then resumes on its own. With YouTube Music 0.2.4 or later, a single refused request, such as a saved playlist YouTube will not open, no longer signs the account out. An account the provider confirms expired needs sign-in again; local folders remain usable.
-
-## Index playlists
-
-In a signed-in metadata plugin's details, select **Index playlists**. Tracks and Liked songs are matched against audio providers in priority order. Completed matches are reused during playback and kept if indexing is cancelled. Re-index after changing the account, plugin or audio-provider order.
-
-## Update or remove a plugin
-
-Select **Check for updates** under the installed plugins. Milkbeat asks the plugin publisher for the current version of each installed plugin and lists every newer one by the same author as **Update** with its version; select one to download it. Milkbeat presents the update for review; it must have the same signing author and cannot be older than the installed version. Entering a plugin's download code or link again still works too. Plugin updates are separate from app updates.
-
-![Check for updates offering YouTube Music 0.2.1 over the installed 0.1.3](images/plugin-update-available.png)
-
-![Reviewing a signed YouTube Music plugin update](images/plugin-update-consent.png)
-
-Select an installed plugin to inspect its account, sign out or remove it. Removing a plugin does not remove local music sources.
-
-## Third-party plugin downloads
-
-Third-party plugins are optional downloads and are not included in Milkbeat app releases. Install them through the codes above or a plugin download URL. The original codes **102** (Beatport), **772** (Spotify) and **416** (YouTube Music) remain supported.
-
-### SoundCloud TV pairing
-
-Choose **Sign in with a TV code**, scan the QR link or open the displayed address on a phone or computer, sign in to SoundCloud and approve the code. Keep the TV screen open while it waits for confirmation. Back/Cancel or leaving the screen stops the attempt; request a new code when it expires. The plugin accepts the account only after its mobile account and Home requests succeed.
-
-![Example TV pairing screen with a fake demonstration code](images/soundcloud-tv-pairing-example.png)
-
-The image uses a fake code; enter the code shown on the TV. Pairing requires a compatible plugin API 5 build and the updated SoundCloud plugin. Existing web-cookie accounts can continue while accepted by SoundCloud; when reauthentication is needed, pair again. TV sessions do not submit unverified listening-history telemetry.
+Disable the option to return to normal matching and radio based on the first playing song. Existing private copies remain in your YouTube library. While Spotify is signed in, Library hides managed copies that duplicate their source playlists.

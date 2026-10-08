@@ -1,122 +1,89 @@
-# Playback, queues and visuals
+# Playback, queue and radio
 
-[User guide](index.md)
+## The full player
 
-## Player controls
+Selecting a track, **Play** or **Shuffle** opens the full player. The track's cover, artists and title sit in the upper left over the [visualizer](visualizer.md), the music video or the artwork. Press **OK** to show the controls.
 
-Press OK in the full music player to show seeking, shuffle, previous, play/pause, next, repeat, like, the view button and the queue. Back closes the current panel or player surface.
+![The player controls over a MilkDrop preset: audio level, seek bar and the control row](images/player-controls-current.jpg)
 
-![Player controls over projectM visuals](images/player-controls.png)
+| Control | What it does |
+| --- | --- |
+| Audio level (visualizer only) | **Listening**, **Very quiet** or **No sound**: what the visualizer currently hears |
+| Seek bar | Elapsed and total time of the track |
+| Shuffle, Previous, Play/pause, Next, Repeat | The usual queue controls |
+| Heart | Like the track; music likes appear under **Liked songs** in Library |
+| View button | Steps through the visualizer, the music video and the artwork |
+| Queue | Opens the queue and radio presets beside the player |
 
-## Queues and preparation
-
-Open the queue to inspect upcoming tracks or jump to one. Holding Up or Down accelerates scrolling. Queue preparation follows playback order and matches the entire remaining queue one track at a time while music plays. Jumping elsewhere gives the new playback position priority. Tracks with native audio IDs do not need cross-provider matching. Video-capable audio providers use video matching for ordinary playback, queue preparation and playlist indexing regardless of the chosen view. Successful recording matches stay cached; old Songs-only misses are reconsidered.
-
-When matching streaming recordings, Milkbeat prefers full recordings over mixed excerpts and permits any longer recording when the title, performers and named remix/edit agree, without a duration cap or required full/extended label. Remixer credits may be supplied in either the title or artist list.
-
-Confirmed unmatched tracks can be removed from the future queue. Temporary failures remain retryable. Preparation reduces the work needed at a transition, but does not guarantee gapless playback under every network, format or provider condition.
-
-Streamed music loads well ahead of the playing position: Milkbeat keeps loading until about 16 MB is buffered (roughly 13 minutes of typical audio, so usually the whole song), then loads more once less than 30 seconds of buffered media remain. A stream link that stops answering after a song has loaded therefore no longer interrupts it. The buffer is shared with a music video's picture, so less of the song is held while the video plays, and a slow network or low memory can keep the buffer shorter. If a stream fails, Milkbeat asks the audio provider for a fresh link to the same recording and resumes where it stopped.
-
-If normal decoded TV audio (PCM) stops advancing for about five seconds while the player still reports
-playback, Milkbeat freezes the displayed progress and reconnects the output from the last position
-where audio was advancing. It keeps the same track and queue, and reports recovery until output resumes. It tries
-twice before leaving the track paused; press Play to retry. Pause, seeking, choosing another track or
-Stop cancels the pending restart. Quiet passages do not trigger recovery while audio frames still advance.
-Recovery may repeat a short stretch of the song so it does not skip ahead using an inaccurate progress estimate.
-Hardware-offloaded audio and encoded HDMI passthrough are outside automatic stall detection.
-
-![Upcoming queue beside the player controls](images/queue-open.png)
-
-## Encrypted provider audio
-
-Compatible plugins can supply Widevine-protected audio through the device's DRM implementation.
-Milkbeat fetches licenses separately from audio and limits license destinations to the plugin's
-approved network access. Availability depends on the account, recording and device. SoundCloud
-previews are not substituted for full tracks, and a creator membership does not imply a listening
-subscription. The current offline downloader supports clear progressive audio; HLS playlists and
-DRM audio cannot be downloaded for offline playback.
-
-SoundCloud TV-paired accounts currently supply clear HLS playback only. Protected-only recordings
-are unavailable through this session: the mobile license exchange has not been validated. Existing
-SoundCloud web sessions retain their Widevine path when the recording, account and device allow it.
-
-## Mixes
-
-Once a streaming queue starts playing, Milkbeat seeds a mix from the queue's first song. When the provider the songs came from has no radio, Milkbeat tries compatible audio providers in priority order.
-
-For normal Spotify playback through YouTube, that first song's matched YouTube ID seeds the radio. [Private playlist preparation](providers.md#why-prepare-a-youtube-playlist) instead gives YouTube the whole matched playlist as its native autoplay context. Milkbeat can then exclude the playlist's matched songs from later suggestions, helping avoid repeats as the radio continuation begins.
-
-Every queue continues as a radio: a [prepared private playlist](providers.md#prepare-private-playlists) from its YouTube copy, anything else from its first song. All the presets YouTube Music offers for that radio (**All**, **Popular**, **Discover**, **Deep cuts**, moods and decades) appear in one scrolling line above the queue; press Right on a queue track to reach them and Down to return to it. Changing the mode replaces upcoming radio-added songs while keeping the playing song, the original playlist and tracks you added yourself. Continuations stay in the selected mode, and the controls remain visible as more suggestions load. Presets only appear when the provider supplies them for the current playback context. The queue keeps space for the focused row’s border even when no presets are available. The controls stay pinned above the scrolling rows; press Back to close the queue. Radio suggestions are not saved into a [prepared private playlist](providers.md#prepare-private-playlists).
-
-Press Right on a queue track to focus the pinned radio presets. Move Left or Right between presets, then press Down to return to the track you left, with the queue's scroll position retained. If that track was removed while you changed the mix, focus falls back to an available row.
-
-Local music keeps playing from its device, USB or network-folder file. With an enabled YouTube
-Music plugin, Milkbeat matches the first queued local song's title, artists and duration in the
-background and uses that match only to seed YouTube Music radio. It does not replace local audio
-with a YouTube stream. A local album, playlist or artist queue uses its first song as the seed.
-Collection queues continue with suggestions when endless radio is enabled. Selecting one local
-track requests its radio explicitly, as it does for streaming tracks. Without the plugin, a
-connection or a confident match, the local queue still plays and earlier radio suggestions are cleared.
-
-Selecting a track in **Local library** plays only that track followed by its radio. This applies
-to artist, release, album, playlist, year, genre and label pages. Use the collection's **Play** or
-**Shuffle** button to queue the whole collection. **Play folder** queues tracks from the current folder.
-
-## MilkDrop visualizer
-
-The visualizer uses projectM through ProjectM TV, with 9,606 Cream of the Crop presets. Its input comes from Milkbeat's player. With controls hidden, Left and Right step through presets.
-
-Out of the box the engine uses ProjectM TV's defaults for your device: a 30 fps target, automatic resolution and transitions, Standard native trails and slow-preset skipping. Performance varies by preset and device. Resolution and RAM budgeting stay automatic; the frame rate, trails and other offered controls are in [Settings → Visualizations](settings.md#visualizations).
-
-Rendering and audio monitoring stop when the visualizer leaves the screen or the app goes into the background. A visible visualizer can keep drifting on silence when music is paused.
-
-![ProjectM visualizer in the updated TV release](images/player-start.png)
-
-## Timing and diagnostics
-
-Settings → Visualizations contains the visualizer switch, the projectM settings, diagnostics and the timing offset. Resolution adapts automatically to the target frame rate and live memory headroom, up to native 4K on a 4K panel. Native trails defaults to Standard; Medium and High add detail above 1330p and may lower the resolution Auto can sustain. Raise the timing value if the visuals arrive after the beat; lower it if they arrive before. Adjust by listening and watching on your own audio setup.
-
-Diagnostics show measured fps, target fps, render dimensions and the automatic render size, transition state, audio level and preset. Use these values when investigating slow visuals instead of judging performance from a still screenshot.
-
-![Diagnostics with the defaults: 30 fps target, automatic resolution, adaptive blend](images/visualizer-diagnostics-defaults.png)
-
-## What the visualizer settings change
-
-The diagnostics line shows the actual automatic render size and selected FPS target. Raising **Frame rate** can cause Auto to lower resolution; Standard trails and shorter transitions reduce rendering work. The resulting size depends on the preset, device and available memory rather than a fixed-height setting.
-
-With **Transition style** set to Lightweight, presets cut and the old one fades out on top; the line reads `lightweight` instead of `blend`:
-
-![Lightweight transitions](images/visualizer-effect-lightweight-transition.png)
-
-With **Change presets automatically** off, a preset stays until you press Left or Right. With **Cut on loud beats** on, a loud beat can cut to the next preset before its duration is up.
-
-![A preset held with automatic changes off](images/visualizer-effect-auto-change-off.png)
-
-![A preset reached by a cut on a loud beat](images/visualizer-effect-beat-cuts.png)
+The controls hide on their own after a few seconds. With them hidden, **Left** and **Right** step through visualizer presets. **Back** hides the controls, then leaves the player; the [mini player](getting-started.md#find-your-way-around) keeps showing the track elsewhere in the app. Music keeps playing in the background unless you turn off **Background Play** in [Settings → Playback](settings.md#playback).
 
 ## Visualizer, music video or artwork
 
-The view button in the player steps through three views while audio continues: the visualizer (the default), the music video, and playback artwork filling the screen. Milkbeat remembers the view you leave it on for later tracks and later sessions.
+The view button steps through three views while the audio carries on. Milkbeat remembers the view you leave it on for later tracks and later sessions.
 
-Artwork view uses the best available thumbnail supplied by the accepted audio provider, even when
-SoundCloud or Spotify supplies the catalog entry. If the provider supplies no usable image or the
-image cannot load, the original catalog cover fills the screen. The title, artist, queue identity and
-playing recording stay the same. Local files and providers without playback artwork keep their cover.
-The thumbnail loads as an image; choosing Artwork does not start video playback.
+=== "Visualizer"
 
-A confirmed YouTube audio source can offer Video even when the original SoundCloud or Spotify catalog entry did not advertise a video. Art Tracks with static album artwork are valid video choices. Discovering a match does not start picture loading: select Video with the view button to show it. A track without a usable video skips from the visualizer straight to the artwork, and with the video view chosen it shows the visualizer instead. With visualizations turned off, the button moves between the video and the artwork. Unsupported or unavailable video falls back to audio and visuals.
+    ![The visualizer view with the view button focused](images/view-visualizer.jpg)
 
-Picture requests follow the TV's physical display resolution, up to 2160p, and its supported
-hardware codecs. A 1080p or 720p display keeps that lower limit. The provider, recording and
-available bandwidth can offer lower quality.
+    The default: [MilkDrop presets](visualizer.md) that react to the track you hear.
 
-![The view button on the visualizer](images/now-playing-view-visualizer.png)
+=== "Music video"
 
-![The music video view](images/now-playing-view-video.png)
+    ![The music-video view, with the video icon on the view button](images/view-video.jpg)
 
-![The artwork view: the cover filling the screen](images/now-playing-view-artwork.png)
+    The matched YouTube video, capped at the TV's physical display resolution up to 2160p, in a codec the TV decodes in hardware. A 1080p or 720p display retains that lower limit; the recording, provider and bandwidth can offer lower quality. Art Tracks with static album artwork count as videos.
 
-![Full-screen music-video example from the existing README](images/music-video.jpg)
+=== "Artwork"
 
-The video-matching test prerelease runs beside the stable app. See [preview setup and checks](preview-testing.md).
+    ![The artwork view: the cover filling the screen behind the controls](images/view-artwork.jpg)
+
+    The accepted audio provider's best available playback thumbnail fills the screen, even when Spotify or SoundCloud supplies the catalog entry. Missing or failed images use the original catalog cover. The title, artist, queue identity and playing recording stay the same. Local files and providers without playback artwork retain their cover. Loading the thumbnail does not start video playback.
+
+YouTube matching searches recorded videos for every track while you listen, whichever view you use, but the picture only loads when you select the video view. A confirmed YouTube match can offer video even for Spotify, SoundCloud or Beatport tracks. A track without a usable video skips from the visualizer straight to the artwork; with the video view chosen, such a track shows the visualizer instead. With visualizations turned off, the button moves between video and artwork. A video that cannot play falls back to audio with the visuals.
+
+## The queue
+
+![The queue beside the player, with the radio presets pinned above it](images/queue-radio.jpg)
+
+Open the queue with the button at the end of the control row to see what is coming and jump to any track. Holding **Up** or **Down** scrolls repeatedly and accelerates through a long queue. **Back** closes the queue.
+
+## Radio and its presets
+
+Every queue continues as a radio once its own tracks run out:
+
+- A streaming album, playlist or artist hands over to the mix of its first song. When the provider it came from has no radio, Milkbeat asks your audio providers in priority order.
+- Spotify tracks use the radio of their matched YouTube recording. A [prepared private playlist](providers.md#prepare-private-playlists) instead gives YouTube the whole playlist as its autoplay context.
+- Selecting a single track plays it and then its radio.
+- [Local music](#local-music-and-radio) seeds the radio from its first song without leaving the local file.
+
+![Focus on the Party radio preset above the queue](images/queue-radio-presets.jpg)
+
+All the presets YouTube Music offers for the current radio appear in one scrolling line pinned above the queue: **All**, **Discover**, **Popular**, **Deep cuts**, moods such as **Party** or **Pump-up**, and decades such as **2010s**. Press **Right** on a queue track to reach them, **Left** and **Right** to move along them, **OK** to switch, and **Down** to return to the track you left with the queue's scroll position kept.
+
+Switching a preset replaces the upcoming radio suggestions while keeping the playing song, the original playlist or album and any tracks you added yourself. Later continuations stay in the chosen preset. Presets only appear when the provider supplies them for the current context; the queue keeps room for the focused row's border even when there are none. Radio suggestions are never written into a prepared private playlist, and artists you hide stay out of mixes.
+
+## Local music and radio
+
+Local and network-folder music always plays from its file. With an enabled YouTube Music plugin, Milkbeat matches the first queued local song's title, artists and duration in the background and uses that match only to seed YouTube Music radio. A local album, playlist or artist queue uses its first song; collection queues continue with suggestions when endless radio is on. Without the plugin, a connection or a confident match, the local queue still plays and earlier radio suggestions are cleared.
+
+In the **Local library** tab, selecting a track on an artist, release, playlist, year, genre or label page plays that track followed by its radio; **Play** and **Shuffle** queue the whole collection. **Play folder** in Library → Folders queues the current folder.
+
+## Queue preparation and matching
+
+When a track from one catalog plays through another provider's audio, Milkbeat has to find the same recording there. It prepares the entire remaining queue one track at a time, in playback order, while music plays; jumping elsewhere gives the new position priority. Tracks with native audio IDs need no matching.
+
+Matching checks recording identity: title, performers and any named remix or edit must agree. Remixer credits may appear in the title or the artist list. Full versions are preferred over mixed excerpts, and a longer recording is accepted without a duration cap when everything else agrees; shorter conflicting excerpts are rejected. Video-capable audio providers match against recorded videos for ordinary playback, queue preparation and playlist indexing. Successful matches are cached and reused; confirmed unmatched tracks can be removed from the future queue, while temporary failures stay retryable.
+
+Preparation reduces the work at each transition but cannot guarantee gapless playback under every network, format or provider condition.
+
+## Buffering and recovery
+
+Streamed music loads well ahead of the playing position: Milkbeat keeps loading until about 16 MB is buffered (roughly 13 minutes of typical audio, usually the whole song) and loads more once less than 30 seconds remain. A music video's picture shares that buffer, and a slow network or low memory keeps it shorter. If a stream fails, Milkbeat asks the audio provider for a fresh link to the same recording and resumes where it stopped.
+
+If normal decoded TV audio (PCM) stops advancing for about five seconds while the player still reports playback, Milkbeat freezes the displayed progress and reconnects the output from the last position where audio was advancing, keeping the same track and queue. It tries twice before leaving the track paused with **Audio output stopped. Press Play to retry.** Pause, seeking, choosing another track or Stop cancels a pending restart. Quiet passages do not trigger recovery, though a recovery may repeat a short stretch of the song. Hardware-offloaded audio and encoded HDMI passthrough are outside this check.
+
+## Encrypted provider audio
+
+Compatible plugins can supply Widevine-protected audio through the device's DRM implementation. Milkbeat fetches licenses separately from the audio and only from destinations the plugin is allowed to reach. Availability depends on the account, the recording and the device. SoundCloud previews are never treated as full tracks. The offline downloader supports clear progressive audio only; HLS, DRM and native SABR streams cannot be downloaded.
+
+The [video-matching preview](preview-testing.md) runs beside the stable app for testing upcoming playback changes.

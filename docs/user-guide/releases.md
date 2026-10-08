@@ -1,5 +1,39 @@
 # Release notes
 
+Every merged change to `main` publishes a new release with its own notes on [GitHub Releases](https://github.com/johnneerdael/Milkbeat/releases). This page summarizes the larger changes.
+
+## Since 0.9.0 (up to 0.9.55)
+
+### Browsing
+
+- **A sidebar tab per music service** (0.9.55). Each catalog you can use gets its own tab with its logo: YouTube Music as soon as it is installed, the others once you are signed in. The metadata provider setting is gone. Milkbeat opens on the music tab you used last, and each tab keeps its place. [Music tabs](library.md#a-tab-per-music-service)
+- **Local library** (0.9.10, its own tab since 0.9.55). Linked music folders get a library built from your tags: genres, recently added, artists, releases, playlists, labels and years, with tagged BPM. [Local library](library.md#local-library)
+- **Search** shows a chip per music tab, including your local library, plus Videos. **Library** shows a chip per signed-in account with its own sections.
+
+### Music folders
+
+- **WebDAV, SFTP and NFS** (v3, 4.0, 4.1) sources next to SMB, with SFTP server-key confirmation (0.9.14). [Folders](folders.md)
+- **Local storage with the remote**: Milkbeat's own D-pad browser for the TV's storage and USB drives, asking for storage access only when you choose a folder (0.9.33).
+- **Radio for local music**: an enabled YouTube Music plugin seeds radio from the first local song while the file keeps playing (0.9.39).
+
+### Providers and plugins
+
+- **SoundCloud** plugin with protected audio support (0.9.40), and **TV code pairing** for sign-in from any phone (0.9.43, plugin 0.2.0 in 0.9.44). [Sign in](providers.md#sign-in)
+- **Automatic plugin updates** and **Update all plugins** (0.9.9); updates asking for new permissions wait for your review. [Keep plugins up to date](providers.md#keep-plugins-up-to-date)
+- Expired sign-ins are re-checked in the background at once (0.9.15), and a provider that briefly refuses requests pauses and resumes work instead of failing (0.9.18).
+- Private playlist copies prepare in parallel batches with verified progress (0.9.12), show a YouTube mark when ready (0.9.20) and reopen without another pass for six hours (0.9.27).
+
+### Playback
+
+- **Whole songs buffer ahead**, and a failed stream resumes the same recording (0.9.16).
+- **Audio output recovery**: silent output with advancing progress reconnects the same track, twice at most (0.9.49). [Buffering and recovery](playback.md#buffering-and-recovery)
+- **Video-first matching** in the separate [Preview app](preview-testing.md) (0.9.48).
+- The remote stays usable when a music home fails to load (0.9.25).
+
+### Visualizer
+
+- **Automatic native quality** from the ProjectM TV core: resolution follows frame rate and live memory up to 4K, with Native trails and beta preset moods (0.9.28). [Visualizer](visualizer.md)
+
 ## Milkbeat 0.9.0
 
 ### Private playlists and native YouTube autoplay
@@ -22,7 +56,7 @@ This feature requires playlist-preparation support in both third-party plugins (
 
 ### Install and learn more
 
-Update your existing Milkbeat installation to retain sign-ins and settings. Local and SMB music continue to work without plugins; streaming plugins are third-party downloads distributed separately from the app.
+Update your existing Milkbeat installation to retain sign-ins and settings. Local and network-folder music continue to work without plugins; streaming plugins are third-party downloads distributed separately from the app.
 
 | Third-party plugin | Downloader code |
 | --- | --- |
@@ -34,7 +68,7 @@ Plugin capabilities depend on the installed version, account and subscription. A
 
 - [Install Milkbeat](getting-started.md)
 - [Prepare private playlists](providers.md#prepare-private-playlists)
-- [Use radio modes and the queue](playback.md#mixes)
+- [Use radio modes and the queue](playback.md#radio-and-its-presets)
 - [All GitHub releases](https://github.com/johnneerdael/Milkbeat/releases)
 
 ## When a new build becomes available

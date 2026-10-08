@@ -1,115 +1,135 @@
 # Settings reference
 
-[User guide](index.md)
-
-Settings uses a category list on the left and its controls on the right. Change only the options relevant to your listening setup.
+Settings has five categories on the left: **Plugins**, **Music folders**, **Playback**, **Visualizations** and **About**. Their controls are on the right. Select a category again to return to its first page; pickers open as a side panel that **Back** closes, with the default for your device marked.
 
 ## Plugins
 
-Install packages, select metadata/audio/video roles, set audio priority, manage provider sign-ins and play-history reporting, and index supported provider playlists. See [Providers](providers.md).
+![Settings → Plugins: where content comes from, the installed plugins and their capabilities](images/settings-plugins.png)
 
-![Installed plugins and the three provider roles](images/plugins-current.png)
+| Item | What it does |
+| --- | --- |
+| **Audio** | The providers that supply audio and the order Milkbeat tries them. [Set audio priority](providers.md#set-audio-priority) |
+| **Video** | The plugin that supplies videos, or None |
+| **Installed** | Each plugin with its capabilities (metadata, audio, video) and version. Select one for its [details](providers.md#plugin-details): account, sign-in, play reporting, playlist indexing, private playlists and Remove |
+| **Update plugins automatically** | On by default: checks at start and every 6 hours and installs updates; updates asking for new permissions wait for review |
+| **Update all plugins** | Checks and installs updates now |
+| **Add a plugin** | A three-digit code or plugin URL. [Install a plugin](providers.md#install-a-plugin) |
+
+There is no Metadata option: each catalog you can use has its own [music tab](library.md#a-tab-per-music-service).
+
+<div class="mb-pair" markdown>
+![Audio provider priority with Move earlier, Move later and the Use for audio switches](images/settings-audio-priority.png)
+![The Video provider choice: None or YouTube Music](images/settings-video-provider.png)
+</div>
+
+<div class="mb-pair" markdown>
+![Automatic plugin updates, Update all plugins and Add a plugin](images/settings-plugins-updates.png)
+![YouTube Music details with Index playlists and Report plays](images/plugin-details-youtube-music.png)
+</div>
 
 ## Music folders
 
-Choose local folders with Milkbeat's D-pad browser (storage access is requested only after **Choose local folder**), add SMB shares and WebDAV, SFTP or NFS servers, test access, and edit or remove sources. See [Folders](folders.md).
+![Settings → Music folders: Choose local folder, Android folder picker, and the SMB, WebDAV, SFTP and NFS actions](images/settings-music-folders.png)
 
-![Music folders settings with local folder, SMB, WebDAV, SFTP and NFS actions](images/settings-folders.png)
+| Item | What it does |
+| --- | --- |
+| **Choose local folder** | Milkbeat's D-pad browser for the TV's storage and USB drives. Storage access is asked for only here |
+| **Use Android folder picker** | The system picker, granting access to one folder only |
+| **Add SMB share** / **WebDAV server** / **SFTP server** / **NFS export** | A network source; each has **Test access** and **Save** |
+| **Local library** → **Rescan library** | Scans every source now; the index otherwise updates when sources change and at start when older than six hours |
+| Saved sources | Each source with its type. Select one to edit it or **Remove folder** |
+
+![The Local library section with Rescan library, and the saved DJ SMB share](images/settings-music-folders-library.png)
+
+See [Local and network folders](folders.md) for every field and server requirement.
 
 ## Playback
 
-| Setting | Purpose |
-| --- | --- |
-| Background Play | Allow playback to continue outside the app |
-| Autoplay related videos | Play a suggested video when nothing is queued |
-| Subtitles | Set the default subtitle preference |
-| Skip silence | Skip supported silent sections |
-| Stable Voice | Normalize supported audio for more consistent volume |
-| Ambient mode | Use the existing video ambient background effect |
+![Settings → Playback with Background Play, Autoplay related videos, Subtitles, Skip Silence, Stable Voice and Ambient mode](images/settings-playback-current.png)
 
-![Playback settings: background play, autoplay, subtitles, silence, volume and ambient mode](images/settings-playback.png)
+| Setting | What it does |
+| --- | --- |
+| **Background Play** | Keep playing when Milkbeat is in the background. On by default |
+| **Autoplay related videos** | Play a suggested video when nothing is queued |
+| **Subtitles** | Show subtitles on videos by default |
+| **Skip Silence** | Skip parts with no audio |
+| **Stable Voice** | Normalize audio volume for more consistent playback |
+| **Ambient mode** | A soft glow of the video's colours around it |
+
+Video quality and codec are picked automatically for your TV and the available streams, and SponsorBlock is always on for supported videos; neither has a setting.
 
 ## Visualizations
 
-The projectM settings from ProjectM TV, applied to Milkbeat's own visualizer. Anything you never change keeps the default ProjectM TV picks for your device; settings with several values open in a side panel that marks that default. Changes take effect the next time now playing shows the visualizer.
+The ProjectM TV engine's settings, applied to Milkbeat's own visualizer. Changes apply the next time now playing shows the visualizer. The [visualizer page](visualizer.md) explains what each one does, with links to ProjectM TV's in-depth guide.
 
-![Visualizations settings](images/settings-visualizations-enabled.png)
-
-| Setting | Purpose |
-| --- | --- |
-| Enable visualizations | Enable projectM on supported devices |
-
-Whether now playing shows the visualizer, the music video or the artwork is chosen in the player with its view button, not here. See [Playback and visuals](playback.md#visualizer-music-video-or-artwork).
+![Enable visualizations and the Presets section](images/settings-visualizations-presets.png)
 
 ### Presets
 
-| Setting | Purpose | Default |
+| Setting | What it does | Default |
 | --- | --- | --- |
-| Change presets automatically | Move on to another preset after the preset duration. Left and Right on the remote always switch | On |
-| Preset duration | How long a preset plays before the next one: 10 to 90 s | 30 s |
-| Preset mood | All, or the core’s beta Chill, Normal and Intense collections. Previously saved retired music categories use All | All |
-| Cut on loud beats | A loud beat can cut to the next preset before its time is up | Off |
-| Skip blank presets | Leave presets that stay black, often because a texture is missing | On |
-| Skip slow presets | Leave presets that stay far below the frame rate even at the lowest resolution | On |
-| Reset skipped presets | Bring back every preset skipped as blank or slow | — |
+| **Enable visualizations** | projectM visuals behind now playing | On with about 2 GB of RAM or more |
+| **Change presets automatically** | Move on after the preset duration; Left and Right always switch | On |
+| **Preset duration** | 10, 15, 20, 30, 45, 60 or 90 s | 30 s |
+| **Preset mood** | All, or the beta Chill, Normal and Intense collections | All |
+| **Cut on loud beats** | A loud beat can switch to the next preset early | Off |
+| **Skip blank presets** | Leave presets that stay black, often because a texture is missing | On |
+| **Skip slow presets** | Leave presets far below the frame rate even at the lowest resolution | On |
+| **Reset skipped presets** | Shows how many presets were skipped; select to bring them back | — |
 
-![Preset settings](images/visualizer-settings-presets.png)
+<div class="mb-pair" markdown>
+![Preset mood picker](images/picker-preset-mood.png)
+![Preset duration picker with 30 s marked as the default](images/picker-preset-duration.png)
+</div>
 
-![Preset duration picker with the device default marked](images/visualizer-picker-preset-duration.png)
+### Transitions and picture quality
 
-The current core offers beta preset moods. The earlier music-category picker screenshot has been retired.
+![Transitions and Picture quality: Transition length, Transition style, Native trails, Frame rate and Detail](images/settings-visualizations-quality.png)
 
-![Reset skipped presets after resetting](images/visualizer-reset-skipped-after.png)
-
-### Transitions
-
-| Setting | Purpose | Default |
+| Setting | What it does | Default |
 | --- | --- | --- |
-| Transition length | How long one preset blends into the next, from instant to 10 s. Two presets render during a blend | 7 s (2 s on low-end devices) |
-| Transition style | **Auto** blends at a lower resolution that adapts to keep the frame rate. **Lightweight** cuts while the old preset fades out on top, the cheapest. **Classic** is projectM's own blend at full resolution, the heaviest | Auto |
+| **Transition length** | Instant to 10 s; two presets render during a blend | 7 s (2 s on low-RAM devices) |
+| **Transition style** | **Auto** blends at a lower, adaptive resolution; **Lightweight** cuts and fades the old preset out on top; **Classic** is a full-resolution blend and costs the most | Auto |
+| **Native trails** | **Standard** keeps authored feedback; **Medium** and **High** add trail detail above 1330p at extra GPU cost | Standard |
+| **Frame rate** | The display rate divided by 1, 2 or 4, at least 24 fps. A lower rate leaves room for a sharper picture | 30 fps |
+| **Detail** | Warp mesh from Minimal to Ultra: finer warps and zooms for more processor time | By device (Medium here) |
+| **Show diagnostics** | Frame rate, render size, transition, audio level and preset in the playback controls | Off |
 
-![Transition length picker](images/visualizer-picker-transition-length.png)
+Resolution is always automatic: it follows the frame-rate target and live memory headroom up to the screen's native size, including 4K. Previously saved fixed resolutions and memory toggles no longer apply.
 
-![Transition style picker](images/visualizer-picker-transition-style.png)
+<div class="mb-pair" markdown>
+![Transition length picker](images/picker-transition-length.png)
+![Transition style picker: Auto, Lightweight and Classic](images/picker-transition-style.png)
+</div>
 
-### Picture quality
+<div class="mb-pair" markdown>
+![Native trails picker: Standard, Medium and High](images/picker-native-trails.png)
+![Frame rate picker: 30 and 60 fps on a 60 Hz display](images/picker-frame-rate.png)
+</div>
 
-Resolution is always **Auto**. It responds to the frame rate target and live memory headroom, up to your screen’s native size, including 4K. The core estimates rendering allocations and reserves memory for playback; Android can still reclaim processes under other system pressure. Previously saved fixed resolutions and memory-limit toggles now use automatic budgeting.
-
-
-| Setting | Purpose | Default |
-| --- | --- | --- |
-| Native trails | **Standard** retains authored feedback; **Medium** and **High** add native trail detail above 1330p. Extra detail costs GPU work and can cause Auto to choose a lower resolution | Standard |
-| Frame rate | Your display's refresh rate divided by 1, 2 or 4, at least 24 fps. A lower rate leaves room for a sharper picture | 30 fps |
-| Detail | The per-vertex mesh, from Minimal to Ultra: finer warps and zooms at more processor time per frame | Medium (by device) |
-| Show diagnostics | Show frame rate, render size, transition, audio level and preset in the playback controls | Off |
-
-![Automatic quality controls in the isolated TV settings component](images/visualizer-settings-quality-native.png)
-
-![Native trails picker with Standard selected](images/visualizer-picker-native-trails.png)
-
-![Frame rate picker](images/visualizer-picker-frame-rate.png)
-
-![Detail picker](images/visualizer-picker-detail.png)
+<div class="mb-pair" markdown>
+![Detail picker: Minimal, Low, Medium, High and Ultra](images/picker-detail.png)
+![Show diagnostics and Visualizer timing](images/settings-visualizations-timing.png)
+</div>
 
 ### Visualizer timing
 
-**Timing offset** moves the visuals from −100 ms to +200 ms against the sound. Raise it if the visuals come after the beat you hear, lower it if they come before.
+**Timing offset** moves the visuals against the sound. The choices are −100, −50, −25, +0, +25, +50, +75, +100, +150 and +200 ms. Raise it if the visuals come after the beat you hear, lower it if they come before.
 
-![Visualizer timing](images/visualizer-settings-timing.png)
+![Timing offset picker with +0 ms as the default](images/picker-timing.png)
 
-![Timing offset picker](images/visualizer-picker-timing.png)
-
-See [Playback and visuals](playback.md) for what these settings look like in now playing.
-
-## Video playback without settings
-
-Video tracks pick their own quality and codec automatically for your TV and the available streams, and SponsorBlock is always on for supported videos. Neither has a setting.
+Whether now playing shows the visualizer, the music video or the artwork is chosen in the player with its [view button](playback.md#visualizer-music-video-or-artwork), not here.
 
 ## About
 
-View app/build information and update controls. The GitHub build provides automatic app updates and manual update checking. Update availability depends on the release service and device installer. The FOSS flavor does not include the app updater.
+![About: version, Automatic updates, update status, Changelog and GitHub](images/settings-about-current.png)
 
-![About with build information and automatic app updates](images/settings-about.png)
+| Item | What it does |
+| --- | --- |
+| Version | The installed Milkbeat version and build number |
+| **Automatic updates** | GitHub build only, on by default: looks for a new Milkbeat at start and every 6 hours, downloads it and offers to install it |
+| Update status | *Milkbeat is up to date*, or the available update; select to check again |
+| **Changelog** | What's new in Milkbeat |
+| Contact and credits | GitHub source and issues, the creator, Flow, projectM and the licence |
 
-App updates and plugin updates are separate. Installing a signed release over the existing Milkbeat package preserves app data; uninstalling first does not.
+The FOSS build has no updater. App updates and [plugin updates](providers.md#keep-plugins-up-to-date) are separate. Installing a signed release over the existing app keeps its data; uninstalling first does not.
