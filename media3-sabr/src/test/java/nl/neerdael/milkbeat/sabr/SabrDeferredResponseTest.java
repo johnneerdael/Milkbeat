@@ -63,6 +63,20 @@ public class SabrDeferredResponseTest {
         input.init(raw(new byte[0]));
         assertEquals(SabrPlaybackException.Reason.NO_PROGRESS,assertThrows(SabrPlaybackException.class,()->input.read(new byte[1],0,1)).reason);
     }
+    @Test public void contextOnlyResponsesContinueAndKeepTheNextRequestState() throws Exception {
+        for(boolean policy:new boolean[]{false,true}) {
+            nl.neerdael.milkbeat.sabr.parser.SabrStream stream=new nl.neerdael.milkbeat.sabr.parser.SabrStream("https://fixture","",StreamerContext.ClientInfo.getDefaultInstance(),-1,-1,0,null,false,null,4500);
+            byte[] update=SabrContextUpdate.newBuilder().setType(1).setValue(com.google.protobuf.ByteString.copyFromUtf8("fixture-context")).setSendByDefault(!policy).setWritePolicy(SabrContextUpdate.SabrContextWritePolicy.SABR_CONTEXT_WRITE_POLICY_OVERWRITE).build().toByteArray();
+            if(policy)stream.parse(raw(frame(nl.neerdael.milkbeat.sabr.parser.ump.UMPPartId.SABR_CONTEXT_UPDATE,update)));
+            byte[] body=policy?SabrContextSendingPolicy.newBuilder().addStartPolicy(1).build().toByteArray():update;
+            int type=policy?nl.neerdael.milkbeat.sabr.parser.ump.UMPPartId.SABR_CONTEXT_SENDING_POLICY:nl.neerdael.milkbeat.sabr.parser.ump.UMPPartId.SABR_CONTEXT_UPDATE;
+            nl.neerdael.milkbeat.sabr.parser.misc.SabrExtractorInput input=new nl.neerdael.milkbeat.sabr.parser.misc.SabrExtractorInput(stream);
+            input.init(raw(frame(type,body)));assertThrows(SabrRequestDeferredException.class,()->input.read(new byte[1],0,1));
+            assertEquals(1,stream.createStreamerContext().getSabrContextsCount());
+            assertEquals("fixture-context",stream.createStreamerContext().getSabrContexts(0).getValue().toStringUtf8());
+            input.init(raw(new byte[0]));assertEquals(SabrPlaybackException.Reason.NO_PROGRESS,assertThrows(SabrPlaybackException.class,()->input.read(new byte[1],0,1)).reason);
+        }
+    }
     private static byte[] frame(int type,byte[] body) {
         assertTrue(body.length<128);byte[] bytes=new byte[body.length+2];bytes[0]=(byte)type;bytes[1]=(byte)body.length;System.arraycopy(body,0,bytes,2,body.length);return bytes;
     }

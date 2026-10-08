@@ -83,14 +83,16 @@ public class SabrStream {
     private boolean positiveBackoffInResponse;
     private boolean mediaHeaderInResponse;
     private boolean redirectInResponse;
+    private boolean contextInResponse;
 
     public void beginResponse() {
         positiveBackoffInResponse = false;
         mediaHeaderInResponse = false;
         redirectInResponse = false;
+        contextInResponse = false;
     }
     public boolean hasResponseBackoffAcknowledgement() { return positiveBackoffInResponse && !mediaHeaderInResponse; }
-    public boolean hasResponseContinuationAcknowledgement() { return (positiveBackoffInResponse || redirectInResponse) && !mediaHeaderInResponse; }
+    public boolean hasResponseContinuationAcknowledgement() { return (positiveBackoffInResponse || redirectInResponse || contextInResponse) && !mediaHeaderInResponse; }
     private String url;
     private List<? extends SabrPart> multiResult = null;
     private volatile Runnable liveMetadataListener;
@@ -434,6 +436,7 @@ public class SabrStream {
         }
 
         processor.processSabrContextUpdate(sabrCtxUpdate);
+        if (sabrCtxUpdate.hasType() && sabrCtxUpdate.hasValue() && sabrCtxUpdate.hasWritePolicy()) contextInResponse = true;
     }
 
     private void processSabrContextSendingPolicy(UMPPart part) {
@@ -446,6 +449,7 @@ public class SabrStream {
         }
 
         processor.processSabrContextSendingPolicy(sabrCtxSendingPolicy);
+        if (sabrCtxSendingPolicy.getStartPolicyCount() + sabrCtxSendingPolicy.getStopPolicyCount() + sabrCtxSendingPolicy.getDiscardPolicyCount() > 0) contextInResponse = true;
     }
 
     /**
