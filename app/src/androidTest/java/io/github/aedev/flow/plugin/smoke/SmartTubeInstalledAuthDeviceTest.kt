@@ -135,17 +135,20 @@ class SmartTubeInstalledAuthDeviceTest {
             val savedSelection = registry.state.value.selection
             try {
                 val previous =
-                    requireNotNull(
-                        registry.state.value.plugins
-                            .firstOrNull { it.id == pack.manifest.id },
+                    registry.state.value.plugins
+                        .firstOrNull { it.id == pack.manifest.id }
+                if (previous != null) assertEquals(pack.signerFingerprint, previous.signerFingerprint)
+                if (previous == null || pack.manifest.versionCode != previous.manifest.versionCode) {
+                    assertTrue(
+                        "Pairing installation requires explicit consent to the signed permissions",
+                        SmartTubeSmoke.arguments.getString("smartTubeInstallConsent") == "true",
                     )
-                assertEquals(pack.signerFingerprint, previous.signerFingerprint)
-                if (pack.manifest.versionCode != previous.manifest.versionCode) {
                     assertTrue(
                         "Pairing may only update the same author to an explicitly authorized higher version",
-                        pack.manifest.versionCode > previous.manifest.versionCode &&
-                            SmartTubeSmoke.arguments.getString("smartTubeInstallConsent") == "true" &&
-                            SmartTubeSmoke.arguments.getString("smartTubeAllowProviderUpdate") == "true",
+                        previous == null || (
+                            pack.manifest.versionCode > previous.manifest.versionCode &&
+                                SmartTubeSmoke.arguments.getString("smartTubeAllowProviderUpdate") == "true"
+                        ),
                     )
                     installer.install(installer.check(pack, "test://signed-local-smoke"))
                     SmartTubeSmoke.report("SIGNED_INSTALLER_ACCEPTED", mapOf("signatureVerified" to true, "installerPerformed" to true))
