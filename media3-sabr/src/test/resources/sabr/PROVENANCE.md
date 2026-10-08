@@ -17,3 +17,11 @@ ffmpeg -f lavfi -i sine=frequency=440:sample_rate=48000 -t 2 -vn -c:a aac -ac 2 
 ```
 
 Split this independent muxed container at its first `moof`: the initialization POST receives `ftyp`/`moov` and format metadata; the subsequent selected-format POST receives media fragments without repeating metadata. Both traverse the maintained Media3 chunk/extractor pipeline.
+
+For initialization responses that also contain media, use a four-second stereo AAC fixture with 1.92-second fragments (90 AAC frames at 48 kHz):
+
+```sh
+ffmpeg -f lavfi -i sine=frequency=440:sample_rate=48000 -t 4 -vn -c:a aac -ac 2 -movflags frag_keyframe+empty_moov+default_base_moof -frag_duration 1920000 audio-multi-fragmented.mp4
+```
+
+The fixture server returns initialization plus the first fragment in its initial response. A repeated request at zero returns that first fragment again; a request at 1920 ms returns the second fragment. The regression drives actual Media3 initialization/container loads and drains their shared sample queue to verify retained, nonduplicated presentation timestamps.

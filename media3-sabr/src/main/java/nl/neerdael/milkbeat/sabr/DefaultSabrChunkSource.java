@@ -165,6 +165,7 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
     @Nullable private final SabrStream sabrStream;
     private final Map<String, String> sabrHeaders;
     private int nexChunkIdx = -1;
+    private long pendingInitializationMediaEndUs = C.TIME_UNSET;
 
     /**
      * @param manifestLoaderErrorThrower Throws errors affecting loading of manifests.
@@ -341,6 +342,18 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
 
         if (deferForServerBackoff()) return;
 
+        // An initialization response may also emit complete media into Media3's sample
+        // queues. Continue after those samples; resetting the empty chunk queue would
+        // request and play the same first segment again.
+        boolean continueInitializationMedia = false;
+        if (pendingInitializationMediaEndUs != C.TIME_UNSET) {
+            if (queue.isEmpty() && loadPositionUs < pendingInitializationMediaEndUs) {
+                loadPositionUs = pendingInitializationMediaEndUs;
+                continueInitializationMedia = true;
+            }
+            pendingInitializationMediaEndUs = C.TIME_UNSET;
+        }
+
         // Container chunks are constructed before their SABR headers arrive. The completed
         // header is authoritative for subsequent requests, including short final segments.
         if (!queue.isEmpty() && sabrStream != null) {
@@ -401,7 +414,7 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
             return;
         }
 
-        long seekTimeUs = queue.isEmpty() ? loadPositionUs : C.TIME_UNSET;
+        long seekTimeUs = queue.isEmpty() && !continueInitializationMedia ? loadPositionUs : C.TIME_UNSET;
         out.chunk =
                 newMediaChunk(
                         representationHolder,
@@ -449,10 +462,10 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
                 fatalError = new SabrPlaybackException(SabrPlaybackException.Reason.NO_PROGRESS, sabrStream.getUrl(), null);
             }
         }
-        if (chunk instanceof InitializationChunk) {
-            InitializationChunk initializationChunk = (InitializationChunk) chunk;
-            int trackIndex = trackSelection.indexOf(initializationChunk.trackFormat);
-            RepresentationHolder representationHolder = representationHolders[trackIndex];
+        if (chunk instanceof InitializationChunk && sabrStream != null) {
+            FormatId initialized = new FormatSelector("initialized", false, chunk.trackFormat).getSelectedFormatId();
+            long endMs = sabrStream.getSegmentStartTimeMs(initialized.getItag());
+            pendingInitializationMediaEndUs = endMs > 0 ? endMs * 1_000L : C.TIME_UNSET;
         }
         if (playerTrackEmsgHandler != null) {
             playerTrackEmsgHandler.onChunkLoadCompleted(chunk);
