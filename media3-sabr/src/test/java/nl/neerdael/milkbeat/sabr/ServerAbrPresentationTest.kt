@@ -473,6 +473,129 @@ class ServerAbrPresentationTest {
     }
 
     @Test
+    fun `requested track determines the bitfield when video dimensions are omitted`() {
+        val dimensionless = video.copy(format = video.format.copy(width = null, height = null))
+        val manifest = presentation(listOf(audio, dimensionless))
+        val chosenVideo =
+            manifest
+                .getPeriod(0)
+                .adaptationSets
+                .single { it.type == C.TRACK_TYPE_VIDEO }
+                .representations
+                .single()
+                .format
+        manifest.getSabrStream(C.TRACK_TYPE_VIDEO).formatSelector = VideoSelector("video", false, chosenVideo)
+        val videoRequest = manifest.createVideoPlaybackAbrRequest(C.TRACK_TYPE_VIDEO, true)
+        assertEquals(2, videoRequest.clientAbrState.enabledTrackTypesBitfield)
+        assertFalse(videoRequest.clientAbrState.hasStickyResolution())
+        assertFalse(videoRequest.clientAbrState.hasLastManualSelectedResolution())
+        assertEquals(listOf(337), videoRequest.preferredVideoFormatIdsList.map { it.itag })
+        val knownHeight = presentation()
+        val chosen = knownHeight.getPeriod(0).adaptationSets
+        knownHeight.getSabrStream(C.TRACK_TYPE_VIDEO).formatSelector =
+            VideoSelector(
+                "2160p",
+                false,
+                chosen
+                    .single { it.type == C.TRACK_TYPE_VIDEO }
+                    .representations
+                    .single()
+                    .format,
+            )
+        knownHeight.getSabrStream(C.TRACK_TYPE_AUDIO).formatSelector =
+            AudioSelector(
+                "audio",
+                false,
+                chosen
+                    .single { it.type == C.TRACK_TYPE_AUDIO }
+                    .representations
+                    .single()
+                    .format,
+            )
+        val audioRequest = knownHeight.createVideoPlaybackAbrRequest(C.TRACK_TYPE_AUDIO, true)
+        assertEquals(1, audioRequest.clientAbrState.enabledTrackTypesBitfield)
+        assertFalse(audioRequest.clientAbrState.hasStickyResolution())
+    }
+
+    @Test
+    fun `live finite and absent durations remain dynamic while finite VOD stays static`() {
+        for ((live, duration) in listOf(true to 60_000L, true to null, false to 60_000L)) {
+            val manifest =
+                ServerAbrPresentation.create(
+                    ServerAbrPlayback(
+                        url,
+                        "fixture-video",
+                        "AQI",
+                        ServerAbrClientInfo(7, "fixture-tv"),
+                        listOf(audio, video),
+                        durationMs = duration,
+                        live = live,
+                    ),
+                )
+            val source = SabrMediaSource.Factory { ByteArrayDataSource(byteArrayOf(0)) }.createMediaSource(manifest)
+            val timelines = mutableListOf<androidx.media3.common.Timeline>()
+            val caller =
+                androidx.media3.exoplayer.source.MediaSource
+                    .MediaSourceCaller { _, timeline -> timelines += timeline }
+            source.prepareSource(
+                caller,
+                androidx.media3.exoplayer.analytics.PlayerId.UNSET,
+                androidx.media3.exoplayer.upstream.BandwidthMeter.NO_OP,
+            )
+            val window =
+                timelines.last().getWindow(
+                    0,
+                    androidx.media3.common.Timeline
+                        .Window(),
+                )
+            assertEquals(live, window.isDynamic)
+            assertEquals(if (live) C.TIME_UNSET else duration, manifest.durationMs)
+            if (live) {
+                val metadata =
+                    nl.neerdael.milkbeat.sabr.protos.videostreaming.LiveMetadata
+                        .newBuilder()
+                        .setHeadSequenceTimeMs(
+                            120_000,
+                        ).setHeadSequenceNumber(24)
+                        .build()
+                        .toByteArray()
+                val packet =
+                    byteArrayOf(
+                        nl.neerdael.milkbeat.sabr.parser.ump.UMPPartId.LIVE_METADATA
+                            .toByte(),
+                        metadata.size.toByte(),
+                    ) + metadata
+                manifest
+                    .getSabrStream(
+                        C.TRACK_TYPE_VIDEO,
+                    ).parse(
+                        androidx.media3.extractor.DefaultExtractorInput(
+                            java.io.ByteArrayInputStream(packet)::read,
+                            0,
+                            packet.size.toLong(),
+                        ),
+                    )
+                org.robolectric.Shadows
+                    .shadowOf(android.os.Looper.getMainLooper())
+                    .idle()
+                assertEquals(C.TIME_UNSET, manifest.durationMs)
+                assertTrue(
+                    timelines
+                        .last()
+                        .getWindow(
+                            0,
+                            androidx.media3.common.Timeline
+                                .Window(),
+                        ).isDynamic,
+                )
+            } else {
+                assertEquals(60_000_000L, window.durationUs)
+            }
+            source.releaseSource(caller)
+        }
+    }
+
+    @Test
     fun `audio request excludes video and subtitles and uses the bound client context`() {
         val manifest = presentation()
         val groups = manifest.getPeriod(0).adaptationSets

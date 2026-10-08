@@ -52,7 +52,7 @@ object ServerAbrPresentation {
         identity.utcOffsetMinutes?.let(client::setUtcOffsetMinutes)
         return SabrManifest(
             C.TIME_UNSET,
-            playback.durationMs ?: C.TIME_UNSET,
+            if (playback.live) C.TIME_UNSET else playback.durationMs ?: C.TIME_UNSET,
             1500,
             playback.live,
             C.TIME_UNSET,

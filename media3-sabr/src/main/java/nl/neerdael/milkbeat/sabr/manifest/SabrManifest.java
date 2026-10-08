@@ -286,7 +286,7 @@ public class SabrManifest implements FilterableManifest<SabrManifest> {
                 .setClientViewportIsFlexible(false)
                 .setBandwidthEstimate(bandwidthEstimate)
                 .setDrcEnabled(false)
-                .setEnabledTrackTypesBitfield(height != -1 ? EnabledTrackTypes.VIDEO_ONLY : EnabledTrackTypes.AUDIO_ONLY);
+                .setEnabledTrackTypesBitfield(trackType == C.TRACK_TYPE_VIDEO ? EnabledTrackTypes.VIDEO_ONLY : EnabledTrackTypes.AUDIO_ONLY);
 
         if (height != -1) {
             clientAbrStateBuilder
