@@ -82,12 +82,15 @@ public class SabrStream {
     private boolean receivedNewSegments;
     private boolean positiveBackoffInResponse;
     private boolean mediaHeaderInResponse;
+    private boolean redirectInResponse;
 
     public void beginResponse() {
         positiveBackoffInResponse = false;
         mediaHeaderInResponse = false;
+        redirectInResponse = false;
     }
     public boolean hasResponseBackoffAcknowledgement() { return positiveBackoffInResponse && !mediaHeaderInResponse; }
+    public boolean hasResponseContinuationAcknowledgement() { return (positiveBackoffInResponse || redirectInResponse) && !mediaHeaderInResponse; }
     private String url;
     private List<? extends SabrPart> multiResult = null;
     private volatile Runnable liveMetadataListener;
@@ -374,11 +377,12 @@ public class SabrStream {
         }
 
 
-        if (!sabrRedirect.hasRedirectUrl()) {
+        if (!sabrRedirect.hasRedirectUrl() || sabrRedirect.getRedirectUrl().isEmpty()) {
             return;
         }
 
         setUrl(sabrRedirect.getRedirectUrl());
+        redirectInResponse = true;
     }
 
     private FormatInitializedSabrPart processFormatInitializationMetadata(UMPPart part) {

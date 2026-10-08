@@ -50,7 +50,7 @@ public final class SabrExtractorInput implements ExtractorInput {
             try { part = sabrStream.parse(input); }
             catch (RuntimeException error) { throw SabrPlaybackException.noProgress(sabrStream.getUrl(), error); }
             if (part == null) {
-                if (!receivedMedia && !sabrStream.hasPendingSegments() && sabrStream.hasResponseBackoffAcknowledgement()) {
+                if (!receivedMedia && !sabrStream.hasPendingSegments() && sabrStream.hasResponseContinuationAcknowledgement()) {
                     throw new SabrRequestDeferredException();
                 }
                 if (!receivedMedia || sabrStream.hasPendingSegments()) {

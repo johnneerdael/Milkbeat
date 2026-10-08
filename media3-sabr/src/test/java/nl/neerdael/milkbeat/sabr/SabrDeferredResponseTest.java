@@ -27,6 +27,8 @@ import org.robolectric.annotation.Config;
 public class SabrDeferredResponseTest {
     @Test public void controlOnlyAcknowledgementIsRemovedAndWaitsWithoutAdvancingMedia() throws Exception { verify(false); }
     @Test public void controlOnlyInitializationWaitsAndStillRequestsInitialization() throws Exception { verify(true); }
+    @Test public void redirectOnlyAcknowledgementPostsToNewUrlWithoutRenewingOrAdvancing() throws Exception { verify(false, true); }
+    @Test public void redirectOnlyInitializationStillInitializesAtNewUrl() throws Exception { verify(true, true); }
 
     @Test public void cachedPolicyCannotTurnEmptyOrTruncatedResponsesIntoAcknowledgements() throws Exception {
         nl.neerdael.milkbeat.sabr.parser.SabrStream stream=new nl.neerdael.milkbeat.sabr.parser.SabrStream("https://fixture","",StreamerContext.ClientInfo.getDefaultInstance(),-1,-1,0,null,false,null,4500);
@@ -53,6 +55,14 @@ public class SabrDeferredResponseTest {
             SabrPlaybackException failure=assertThrows(SabrPlaybackException.class,()->input.read(new byte[1],0,1));assertEquals(SabrPlaybackException.Reason.NO_PROGRESS,failure.reason);
         }
     }
+    @Test public void redirectAcknowledgementDoesNotMaskTheNextEmptyResponse() throws Exception {
+        nl.neerdael.milkbeat.sabr.parser.SabrStream stream=new nl.neerdael.milkbeat.sabr.parser.SabrStream("https://fixture","",StreamerContext.ClientInfo.getDefaultInstance(),-1,-1,0,null,false,null,4500);
+        nl.neerdael.milkbeat.sabr.parser.misc.SabrExtractorInput input=new nl.neerdael.milkbeat.sabr.parser.misc.SabrExtractorInput(stream);
+        input.init(raw(frame(nl.neerdael.milkbeat.sabr.parser.ump.UMPPartId.SABR_REDIRECT,SabrRedirect.newBuilder().setRedirectUrl("https://redirected.example/post").build().toByteArray())));
+        assertThrows(SabrRequestDeferredException.class,()->input.read(new byte[1],0,1));
+        input.init(raw(new byte[0]));
+        assertEquals(SabrPlaybackException.Reason.NO_PROGRESS,assertThrows(SabrPlaybackException.class,()->input.read(new byte[1],0,1)).reason);
+    }
     private static byte[] frame(int type,byte[] body) {
         assertTrue(body.length<128);byte[] bytes=new byte[body.length+2];bytes[0]=(byte)type;bytes[1]=(byte)body.length;System.arraycopy(body,0,bytes,2,body.length);return bytes;
     }
@@ -60,10 +70,11 @@ public class SabrDeferredResponseTest {
         return new androidx.media3.extractor.DefaultExtractorInput(new java.io.ByteArrayInputStream(bytes)::read,0,bytes.length);
     }
 
-    private static void verify(boolean initialization) throws Exception {
+    private static void verify(boolean initialization) throws Exception { verify(initialization, false); }
+    private static void verify(boolean initialization, boolean redirect) throws Exception {
         byte[] media=SabrContainerExtractorTest.framed(SabrContainerExtractorTest.fixture("fragmented-short.mp4"),137,"video/mp4",0,4500,true);
-        byte[] policy=NextRequestPolicy.newBuilder().setBackoffTimeMs(100).build().toByteArray();
-        byte[] acknowledgement=new byte[policy.length+2];acknowledgement[0]=(byte)nl.neerdael.milkbeat.sabr.parser.ump.UMPPartId.NEXT_REQUEST_POLICY;acknowledgement[1]=(byte)policy.length;System.arraycopy(policy,0,acknowledgement,2,policy.length);
+        byte[] policy=(redirect ? SabrRedirect.newBuilder().setRedirectUrl("https://redirected.example/post").build().toByteArray() : NextRequestPolicy.newBuilder().setBackoffTimeMs(100).build().toByteArray());
+        byte[] acknowledgement=new byte[policy.length+2];acknowledgement[0]=(byte)(redirect ? nl.neerdael.milkbeat.sabr.parser.ump.UMPPartId.SABR_REDIRECT : nl.neerdael.milkbeat.sabr.parser.ump.UMPPartId.NEXT_REQUEST_POLICY);acknowledgement[1]=(byte)policy.length;System.arraycopy(policy,0,acknowledgement,2,policy.length);
         List<DataSpec> opened=new ArrayList<>();
         DataSource data=new BaseDataSource(false) {
             ByteArrayDataSource delegate;
@@ -99,11 +110,21 @@ public class SabrDeferredResponseTest {
         samples.continueLoading(loading);org.robolectric.Shadows.shadowOf(Looper.getMainLooper()).idle();
         assertNotNull(observed.get());assertFalse("valid deferred acknowledgement must not renew the provider",observed.get() instanceof SabrPlaybackException);
         assertTrue("Media3 must cancel/remove the empty acknowledgement chunk",handled.get());
-        samples.maybeThrowError();assertEquals(0,samples.getNextLoadPositionUs());assertEquals(0,samples.getBufferedPositionUs());
-        assertEquals(0,manifest.getSabrStream(C.TRACK_TYPE_VIDEO).getSegmentStartTimeMs(137));
-        assertEquals(1,opened.size());
-        org.robolectric.Shadows.shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(99));assertEquals(1,opened.size());
-        org.robolectric.Shadows.shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(1));assertEquals(2,opened.size());
+        samples.maybeThrowError();
+        if (!redirect) {
+            assertEquals(0,samples.getNextLoadPositionUs());assertEquals(0,samples.getBufferedPositionUs());
+            assertEquals(0,manifest.getSabrStream(C.TRACK_TYPE_VIDEO).getSegmentStartTimeMs(137));
+        }
+        if (!redirect) {
+            assertEquals(1,opened.size());
+            org.robolectric.Shadows.shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(99));assertEquals(1,opened.size());
+            org.robolectric.Shadows.shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(1));
+        }
+        assertEquals(2,opened.size());
+        if (redirect) {
+            assertEquals("https",opened.get(1).uri.getScheme());assertEquals("redirected.example",opened.get(1).uri.getHost());
+            assertEquals("/post",opened.get(1).uri.getPath());assertEquals("1",opened.get(1).uri.getQueryParameter("rn"));
+        }
         samples.maybeThrowError();
         VideoPlaybackAbrRequest next=VideoPlaybackAbrRequest.parseFrom(opened.get(1).httpBody);
         assertEquals(0,next.getClientAbrState().getPlayerTimeMs());assertTrue(next.getBufferedRangesList().isEmpty());
