@@ -72,6 +72,15 @@ class LocalCatalogPagesTest {
         ).hasSize(page.blocks.sumOf { (it as CollectionBlock).items.size })
     }
 
+    @Test fun searchPageShowsSongsReleasesAndArtistsAndLeavesOutEmptyOnes() {
+        val page = pages.search("arma", listOf(track("t1")), listOf(release("r1")), emptyList())
+
+        val blocks = page.blocks.filterIsInstance<CollectionBlock>()
+        assertThat(blocks.map { it.header?.title }).containsExactly("Tracks", "Releases").inOrder()
+        assertThat(blocks.first().layout).isEqualTo(CollectionLayout.TRACK_TABLE)
+        assertThat(pages.search("none", emptyList(), emptyList(), emptyList()).blocks).isEmpty()
+    }
+
     @Test fun releasePageCreditsACompilationToVariousArtistsAndNumbersItsTracks() {
         val release = release("bp:1", releaseArtist = "A, B, C, D", label = ".defaultbox", catalogNumber = "DBR015")
         val page =

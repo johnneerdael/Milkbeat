@@ -1,6 +1,7 @@
 package io.github.aedev.flow.ui.tv.screens.search
 
 import com.google.common.truth.Truth.assertThat
+import io.github.aedev.flow.data.catalog.MusicSource
 import nl.neerdael.milkbeat.catalog.CollectionBlock
 import nl.neerdael.milkbeat.catalog.CollectionHeader
 import nl.neerdael.milkbeat.catalog.CollectionLayout
@@ -42,11 +43,11 @@ class TvSearchStateTest {
     }
 
     @Test
-    fun `the half on screen leads the typeahead`() {
+    fun `the kind on screen leads the typeahead`() {
         val state = TvSearchUiState(musicSuggestions = listOf("m"), videoSuggestions = listOf("v"))
 
-        assertThat(state.suggestions(TvSearchSource.MUSIC)).containsExactly("m", "v").inOrder()
-        assertThat(state.suggestions(TvSearchSource.VIDEOS)).containsExactly("v", "m").inOrder()
+        assertThat(state.suggestions(TvSearchSource.Music(MusicSource.Local))).containsExactly("m", "v").inOrder()
+        assertThat(state.suggestions(TvSearchSource.Videos)).containsExactly("v", "m").inOrder()
     }
 
     @Test

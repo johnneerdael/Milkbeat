@@ -88,6 +88,22 @@ internal class LocalCatalogPages(
                 },
         )
 
+    fun search(
+        query: String,
+        tracks: List<LibraryTrackRow>,
+        releases: List<LibraryReleaseRow>,
+        artists: List<LibraryGroupRow>,
+    ): MetadataPage =
+        MetadataPage(
+            id = "local:search:$query",
+            blocks =
+                listOfNotNull(
+                    trackTable("tracks", text.tracks, tracks),
+                    shelf("releases", text.releases, releases, null, ::releaseItem),
+                    shelf("artists", text.artists, artists, null, ::artistItem, ItemView.ARTIST_PORTRAIT),
+                ),
+        )
+
     fun release(
         release: LibraryReleaseRow,
         tracks: List<LibraryTrackRow>,

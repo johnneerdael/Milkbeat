@@ -38,12 +38,12 @@ fun TvNavHost(
     onPlayVideo: (Video) -> Unit,
     onPlayPlaylist: (List<Video>, String) -> Unit,
     onOpenPlugins: () -> Unit,
+    musicTabs: TvMusicTabsState,
     modifier: Modifier = Modifier,
 ) {
     val openChannel: (String) -> Unit = { channelRef ->
         navController.navigate(TvRoutes.channel(channelRef))
     }
-    val openCatalog: (EntityRef) -> Unit = { navController.navigate(TvRoutes.catalog(it)) }
 
     NavHost(
         navController = navController,
@@ -52,10 +52,13 @@ fun TvNavHost(
     ) {
         composable(TvDestination.MUSIC.route) {
             TvMusicScreen(
+                source = musicTabs.selected,
+                ready = musicTabs.ready,
                 onPlayCollection = onPlayCollection,
                 onPlayMix = onPlayMix,
-                onOpen = openCatalog,
+                onOpen = { entity, source -> navController.navigate(TvRoutes.catalog(entity, source.providerId)) },
                 onOpenPlugins = onOpenPlugins,
+                onOpenMusicFolders = { navController.navigate(TvRoutes.MUSIC_FOLDERS_SETTINGS) },
                 modifier = Modifier.fillMaxSize(),
             )
         }
@@ -95,16 +98,18 @@ fun TvNavHost(
         }
         composable(TvDestination.SEARCH.route) {
             TvSearchScreen(
+                musicTabs = musicTabs,
                 onVideoClick = onPlayVideo,
                 onChannelClick = openChannel,
                 onOpenPlaylist = { navController.navigate(TvRoutes.playlist(it)) },
                 onPlayMix = onPlayMix,
-                onOpenCatalog = openCatalog,
+                onOpenCatalog = { entity, provider -> navController.navigate(TvRoutes.catalog(entity, provider)) },
                 modifier = Modifier.fillMaxSize(),
             )
         }
         composable(TvDestination.LIBRARY.route) {
             TvLibraryScreen(
+                musicTabs = musicTabs,
                 onVideoClick = onPlayVideo,
                 onOpenPlaylist = { navController.navigate(TvRoutes.playlist(it)) },
                 onPlayTrack = onPlayTrack,
@@ -112,7 +117,6 @@ fun TvNavHost(
                 onOpenMusicCollection = { navController.navigate(TvRoutes.musicCollection(it)) },
                 onPlayMix = onPlayMix,
                 onPlayCollection = onPlayCollection,
-                onOpenCatalog = openCatalog,
                 onOpenProviderCatalog = { plugin, entity -> navController.navigate(TvRoutes.catalog(entity, plugin)) },
                 modifier = Modifier.fillMaxSize(),
             )

@@ -2,8 +2,9 @@ package io.github.aedev.flow.ui.screens.music
 
 import com.google.common.truth.Truth.assertThat
 import io.github.aedev.flow.data.catalog.CatalogPlayback
+import io.github.aedev.flow.data.library.catalog.LocalCatalogProvider
 import io.github.aedev.flow.data.library.catalog.LocalLibraryEmptyException
-import io.github.aedev.flow.plugin.catalog.NoMetadataPluginException
+import io.github.aedev.flow.plugin.catalog.ProviderEntityReference
 import io.github.aedev.flow.plugin.runtime.PluginCallException
 import io.github.aedev.flow.plugin.runtime.TransientRetryBackoffMs
 import kotlinx.coroutines.CompletableDeferred
@@ -11,8 +12,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -26,6 +29,7 @@ import kotlinx.coroutines.withContext
 import nl.neerdael.milkbeat.catalog.CollectionBlock
 import nl.neerdael.milkbeat.catalog.CollectionHeader
 import nl.neerdael.milkbeat.catalog.CollectionLayout
+import nl.neerdael.milkbeat.catalog.EntityKind
 import nl.neerdael.milkbeat.catalog.EntityRef
 import nl.neerdael.milkbeat.catalog.FilterControl
 import nl.neerdael.milkbeat.catalog.FilterOption
@@ -215,12 +219,42 @@ class MusicHomeFeedViewModelTest {
                 if (provider.current is ProviderAccount.SignedIn) Result.success(page("Mine")) else Result.success(page("Anonymous"))
             }
             val vm = viewModel()
+            show(vm)
             vm.load()
             advanceUntilIdle()
 
             provider.current = ProviderAccount.SignedIn("account-1")
             advanceUntilIdle()
 
+            assertThat(vm.titles).containsExactly("Mine")
+        }
+
+    @Test
+    fun `a hidden tab fetches nothing when its account changes, and loads the new account's home when shown`() =
+        runTest(dispatcher) {
+            var fetches = 0
+            provider.pages = {
+                fetches++
+                if (provider.current is ProviderAccount.SignedIn) Result.success(page("Mine")) else Result.success(page("Anonymous"))
+            }
+            val vm = viewModel()
+            val shown = show(vm)
+            vm.load()
+            advanceUntilIdle()
+            shown.cancelAndJoin()
+            advanceUntilIdle()
+
+            provider.current = ProviderAccount.SignedIn("account-1")
+            advanceUntilIdle()
+
+            assertThat(fetches).isEqualTo(1)
+
+            show(vm)
+            runCurrent()
+            vm.load()
+            advanceUntilIdle()
+
+            assertThat(fetches).isEqualTo(2)
             assertThat(vm.titles).containsExactly("Mine")
         }
 
@@ -232,6 +266,7 @@ class MusicHomeFeedViewModelTest {
                 if (provider.current is ProviderAccount.SignedIn) Result.success(page("Mine")) else Result.success(page("Anonymous"))
             }
             val vm = viewModel()
+            show(vm)
             backgroundScope.launch { vm.isAccountExpired.collect {} }
             vm.load()
             advanceUntilIdle()
@@ -244,21 +279,130 @@ class MusicHomeFeedViewModelTest {
         }
 
     @Test
-    fun `without a music plugin the page asks for one, and choosing one loads its home`() =
+    fun `a station of the home seeds its radio from this tab's provider`() {
+        provider.id = "nl.neerdael.spotify"
+        val vm = viewModel()
+
+        val seed = ProviderEntityReference.decode(checkNotNull(vm.radioSeed("station-1")))
+
+        assertThat(seed?.pluginId).isEqualTo("nl.neerdael.spotify")
+        assertThat(seed?.entity).isEqualTo(EntityRef(EntityKind.PLAYLIST, "station-1"))
+        assertThat(vm.radioSeed(null)).isNull()
+        assertThat(MusicHomeFeedViewModel(null, CatalogPlayback { null }).radioSeed("station-1")).isNull()
+        provider.id = LocalCatalogProvider.ID
+        assertThat(viewModel().radioSeed("local-playlist")).isNull()
+    }
+
+    @Test
+    fun `a reinstalled provider whose account stays anonymous loads its home again`() =
         runTest(dispatcher) {
-            provider.id = "none"
-            provider.pages = { if (provider.id == "none") Result.failure(NoMetadataPluginException()) else Result.success(page("Home")) }
-            val vm = viewModel()
+            var fetches = 0
+            provider.pages = {
+                fetches++
+                Result.success(page("Home $fetches"))
+            }
+            val installation = MutableStateFlow<Any?>("install-1")
+            val vm = MusicHomeFeedViewModel(provider, CatalogPlayback { null }, installation)
+            val shown = show(vm)
             vm.load()
             advanceUntilIdle()
-            assertThat(vm.state.value.needsPlugin).isTrue()
+            shown.cancelAndJoin()
 
-            provider.id = "dev.example.music"
-            provider.current = ProviderAccount.Anonymous
+            installation.value = null
+            advanceUntilIdle()
+            installation.value = "install-2"
+            advanceUntilIdle()
+            show(vm)
+            runCurrent()
+            vm.load()
             advanceUntilIdle()
 
-            assertThat(vm.state.value.needsPlugin).isFalse()
+            assertThat(fetches).isEqualTo(2)
+            assertThat(vm.titles).containsExactly("Home 2")
+        }
+
+    @Test
+    fun `a hidden tab stops following its account and installation`() =
+        runTest(dispatcher) {
+            provider.pages = { Result.success(page("Home")) }
+            val installation = MutableStateFlow<Any?>("install-1")
+            val vm = MusicHomeFeedViewModel(provider, CatalogPlayback { null }, installation)
+            val shown = show(vm)
+            vm.load()
+            advanceUntilIdle()
+            assertThat(installation.subscriptionCount.value).isEqualTo(1)
+
+            shown.cancelAndJoin()
+            advanceUntilIdle()
+
+            assertThat(installation.subscriptionCount.value).isEqualTo(0)
+        }
+
+    @Test
+    fun `a tab hidden while its continuations load stops loading them`() =
+        runTest(dispatcher) {
+            var continuations = 0
+            provider.pages = { request ->
+                if (request.cursor == null) {
+                    Result.success(page("Home").copy(nextCursor = "c0"))
+                } else {
+                    continuations++
+                    delay(10_000)
+                    Result.success(page("More ${request.cursor}").copy(nextCursor = "c$continuations"))
+                }
+            }
+            val vm = viewModel()
+            val shown = show(vm)
+            vm.load()
+            runCurrent()
+            advanceTimeBy(100)
+            shown.cancelAndJoin()
+
+            advanceTimeBy(60_000)
+
+            assertThat(continuations).isEqualTo(1)
+        }
+
+    @Test
+    fun `a load that finishes while its tab is hidden stays fresh for the next visit`() =
+        runTest(dispatcher) {
+            var fetches = 0
+            provider.pages = {
+                fetches++
+                delay(1_000)
+                Result.success(page("Home"))
+            }
+            val vm = viewModel()
+            val shown = show(vm)
+            vm.load()
+            runCurrent()
+            shown.cancelAndJoin()
+            advanceTimeBy(10_000)
+
+            show(vm)
+            runCurrent()
+            vm.load()
+            advanceUntilIdle()
+
+            assertThat(fetches).isEqualTo(1)
             assertThat(vm.titles).containsExactly("Home")
+        }
+
+    @Test
+    fun `the tab without a provider asks for one and fetches nothing`() =
+        runTest(dispatcher) {
+            var fetches = 0
+            provider.pages = {
+                fetches++
+                Result.success(page("Home"))
+            }
+            val vm = MusicHomeFeedViewModel(null, CatalogPlayback { null })
+            vm.load()
+            advanceUntilIdle()
+
+            assertThat(vm.state.value.needsPlugin).isTrue()
+            assertThat(vm.state.value.isLoading).isFalse()
+            assertThat(fetches).isEqualTo(0)
         }
 
     @Test
@@ -268,6 +412,7 @@ class MusicHomeFeedViewModelTest {
             provider.pages =
                 { if (indexed) Result.success(page("Recently added")) else Result.failure(LocalLibraryEmptyException("Indexing")) }
             val vm = viewModel()
+            show(vm)
             vm.load()
             advanceUntilIdle()
             assertThat(vm.state.value.libraryEmpty).isTrue()
@@ -409,7 +554,7 @@ class MusicHomeFeedViewModelTest {
             vm.load()
             runCurrent()
 
-            shown.cancel()
+            shown.cancelAndJoin()
             advanceTimeBy(10 * 60_000L)
             assertThat(provider.requests).hasSize(1)
             assertThat(vm.state.value.isLoading).isFalse()
@@ -435,7 +580,7 @@ class MusicHomeFeedViewModelTest {
             vm.load()
             runCurrent()
 
-            shown.cancel()
+            shown.cancelAndJoin()
             advanceTimeBy(10 * 60_000L)
             vm.load(force = true)
             advanceUntilIdle()

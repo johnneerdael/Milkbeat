@@ -35,10 +35,9 @@ data class InstalledPlugin(
     val id: String get() = manifest.id
 }
 
-/** Which plugins the listener chose: one for metadata, audio in the order to try, one for video. */
+/** Which plugins the listener chose: audio in the order to try, and one for video. Music tabs need no choice. */
 @Serializable
 data class ProviderSelection(
-    val metadata: String? = null,
     val audio: List<String> = emptyList(),
     val video: String? = null,
 )
@@ -138,7 +137,6 @@ class PluginRegistry
                         plugins = state.plugins.filterNot { it.id == id },
                         selection =
                             state.selection.copy(
-                                metadata = state.selection.metadata.takeUnless { it == id },
                                 audio = state.selection.audio - id,
                                 video = state.selection.video.takeUnless { it == id },
                             ),
@@ -161,7 +159,6 @@ class PluginRegistry
         ): ProviderSelection {
             val roles = plugin.manifest.roles
             return selection.copy(
-                metadata = selection.metadata ?: plugin.id.takeIf { roles.metadata != null },
                 audio = if (roles.audio != null && plugin.id !in selection.audio) selection.audio + plugin.id else selection.audio,
                 video = selection.video ?: plugin.id.takeIf { roles.video != null },
             )

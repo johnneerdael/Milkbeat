@@ -5,10 +5,9 @@ import org.junit.Test
 
 class TvDestinationTest {
     @Test
-    fun `primary destinations keep a stable order`() {
-        assertThat(TvDestination.primary)
+    fun `fixed destinations follow the music tabs in a stable order`() {
+        assertThat(TvDestination.fixed)
             .containsExactly(
-                TvDestination.MUSIC,
                 TvDestination.SEARCH,
                 TvDestination.LIBRARY,
                 TvDestination.SETTINGS,

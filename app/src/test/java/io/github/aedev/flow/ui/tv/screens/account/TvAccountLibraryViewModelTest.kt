@@ -1,15 +1,18 @@
 package io.github.aedev.flow.ui.tv.screens.account
 
 import com.google.common.truth.Truth.assertThat
-import io.github.aedev.flow.plugin.catalog.PluginMetadataProvider
+import io.github.aedev.flow.plugin.catalog.ScopedPluginCatalog
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
@@ -36,7 +39,7 @@ class TvAccountLibraryViewModelTest {
     private val requests = mutableListOf<LibraryRequest>()
     private var sourceId = "first-provider"
     private val provider =
-        mockk<PluginMetadataProvider> {
+        mockk<ScopedPluginCatalog> {
             every { account } returns this@TvAccountLibraryViewModelTest.account
             every { id } answers { sourceId }
             coEvery { call(PluginOperations.library, any()) } answers {
@@ -69,6 +72,49 @@ class TvAccountLibraryViewModelTest {
     fun tearDown() {
         Dispatchers.resetMain()
     }
+
+    @Test
+    fun `a hidden provider's library stops reading, and reads afresh when shown again`() =
+        runTest(dispatcher) {
+            var continuations = 0
+            val slow =
+                mockk<ScopedPluginCatalog> {
+                    every { account } returns this@TvAccountLibraryViewModelTest.account
+                    every { id } returns "slow-provider"
+                    coEvery { call(PluginOperations.library, any()) } coAnswers {
+                        val request = secondArg<LibraryRequest>()
+                        if (request.cursor == null) {
+                            Result.success(MetadataPage("liked", listOf(tracks("a")), nextCursor = "more"))
+                        } else {
+                            continuations++
+                            delay(10_000)
+                            Result.success(MetadataPage("liked", listOf(tracks("c$continuations")), nextCursor = "more$continuations"))
+                        }
+                    }
+                }
+            val vm = TvAccountLibraryViewModel(slow)
+            vm.open(TvAccountLibrarySection.LIKED_MUSIC)
+            runCurrent()
+            advanceTimeBy(100)
+
+            vm.hide()
+            advanceTimeBy(60_000)
+
+            assertThat(continuations).isEqualTo(1)
+            assertThat(vm.sections.value[TvAccountLibrarySection.LIKED_MUSIC]).isNull()
+        }
+
+    @Test
+    fun `an updated plugin is another library identity, though the account stays the same`() =
+        runTest(dispatcher) {
+            val installation = MutableStateFlow<Any?>(1L to 1)
+            val vm = TvAccountLibraryViewModel(provider, installation)
+            val before = vm.accountIdentity.first()
+
+            installation.value = 2L to 2
+
+            assertThat(vm.accountIdentity.first()).isNotEqualTo(before)
+        }
 
     @Test
     fun `a section asks the plugin for its library section and extends it with the pages that follow`() =

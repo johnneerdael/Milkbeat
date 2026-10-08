@@ -497,7 +497,7 @@
     <string name="tv_plugins_empty_home">Nothing to show yet</string>
     <string name="tv_player_no_video_plugin">No video plugin</string>
     <string name="tv_player_no_video_plugin_hint">Add one in Settings, Plugins, to play videos.</string>
-    <string name="tv_plugins_empty_home_message">Add a plugin in Settings, Plugins to browse and play music.</string>
+    <string name="tv_plugins_empty_home_message">Sign in to a music provider in Settings, Plugins, or link a music folder, to browse and play music here.</string>
     <string name="tv_update_automatic">Automatic updates</string>
     <string name="tv_update_automatic_subtitle">Looks for a new Milkbeat when it starts and every 6 hours, downloads it, and offers to install it</string>
     <string name="tv_update_checking">Checking for updates…</string>

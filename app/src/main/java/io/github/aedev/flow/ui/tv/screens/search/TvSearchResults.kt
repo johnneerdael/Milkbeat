@@ -40,8 +40,8 @@ internal class TvSearchActions(
 ) {
     fun of(source: TvSearchSource): TvCatalogActions =
         when (source) {
-            TvSearchSource.MUSIC -> music
-            TvSearchSource.VIDEOS -> videos
+            is TvSearchSource.Music -> music
+            TvSearchSource.Videos -> videos
         }
 }
 
@@ -190,13 +190,13 @@ private fun LazyListState.nearsEnd(): Boolean {
 private val TvSearchSource.noPluginTitle: Int
     get() =
         when (this) {
-            TvSearchSource.MUSIC -> R.string.tv_search_no_music_plugin
-            TvSearchSource.VIDEOS -> R.string.tv_search_no_video_plugin
+            is TvSearchSource.Music -> R.string.tv_search_no_music_plugin
+            TvSearchSource.Videos -> R.string.tv_search_no_video_plugin
         }
 
 private val TvSearchSource.noResultsTitle: Int
     get() =
         when (this) {
-            TvSearchSource.MUSIC -> R.string.tv_search_no_music_results
-            TvSearchSource.VIDEOS -> R.string.tv_search_no_results
+            is TvSearchSource.Music -> R.string.tv_search_no_music_results
+            TvSearchSource.Videos -> R.string.tv_search_no_results
         }

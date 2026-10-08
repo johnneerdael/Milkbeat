@@ -305,7 +305,7 @@ class PluginAudioRoutingTest : PluginAudioFixture() {
                         ),
                 )
             every { registry.state } returns
-                MutableStateFlow(PluginRegistryState(listOf(youtube), ProviderSelection("youtube", listOf("youtube"))))
+                MutableStateFlow(PluginRegistryState(listOf(youtube), ProviderSelection(listOf("youtube"))))
             coEvery { host.call("youtube", PluginOperations.radio, any()) } returns TrackList(emptyList())
             coEvery { host.call("youtube", PluginOperations.audioRadio, any()) } returns TrackList(listOf(candidate))
             val result = radio.page(original.ref, original)!!
@@ -327,7 +327,7 @@ class PluginAudioRoutingTest : PluginAudioFixture() {
                         ),
                 )
             every { registry.state } returns
-                MutableStateFlow(PluginRegistryState(listOf(youtube), ProviderSelection("youtube", listOf("youtube"))))
+                MutableStateFlow(PluginRegistryState(listOf(youtube), ProviderSelection(listOf("youtube"))))
             coEvery { host.call("youtube", PluginOperations.radio, any()) } returns TrackList(emptyList())
             coEvery { host.call("youtube", PluginOperations.audioRadio, any()) } returns TrackList(listOf(candidate))
             assertThat(radio.page(candidate.ref, candidate)!!.fromAudio).isTrue()
@@ -367,7 +367,7 @@ class PluginAudioRoutingTest : PluginAudioFixture() {
                         ),
                 )
             every { registry.state } returns
-                MutableStateFlow(PluginRegistryState(listOf(youtube), ProviderSelection("youtube", listOf("youtube"))))
+                MutableStateFlow(PluginRegistryState(listOf(youtube), ProviderSelection(listOf("youtube"))))
             val described = original.copy(ids = original.ids + ("youtube" to "known-youtube"))
             coEvery { host.call("youtube", PluginOperations.radio, any()) } returns TrackList(listOf(candidate))
             assertThat(radio.page(described.ref, described)!!.seed.providerId).isEqualTo("known-youtube")
@@ -388,7 +388,7 @@ class PluginAudioRoutingTest : PluginAudioFixture() {
                         ),
                 )
             every { registry.state } returns
-                MutableStateFlow(PluginRegistryState(listOf(plugin, source), ProviderSelection("spotify", listOf("youtube"))))
+                MutableStateFlow(PluginRegistryState(listOf(plugin, source), ProviderSelection(listOf("youtube"))))
             coEvery { host.call("youtube", PluginOperations.matchAudio, any()) } returns AudioMatches(listOf(candidate))
             val id = ProviderEntityReference.encode("spotify", original.ref)
             val first = audio.resolve(original, null, playbackId = id)
