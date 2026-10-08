@@ -43,8 +43,12 @@ Decisions taken with the owner:
   `anonymousHome`. Providers sort by manifest name (case-insensitive), then Local when at least one
   folder is configured. `distinctUntilChanged`; no polling. It also exposes the last-used source
   (DataStore Preferences key `last_music_source`) with a `remember(source)` suspend setter.
-  The tab list must not trigger plugin account network refreshes beyond what `PluginAccounts`
-  already does.
+  `PluginAccounts.accounts` starts empty and is filled only by `refresh(id)`, so `MusicSources`
+  calls `refresh` once per enabled metadata plugin that declares sign-in methods and whose account
+  is unknown (deduped per plugin id while in flight, on `networkIO`). The result carries
+  `settled = true` once every such plugin has answered or failed; a failed check leaves the plugin
+  without a tab until a later account change. The shell waits for `settled` before choosing the
+  start tab, showing the Music loading state meanwhile.
 
 ### Navigation
 
@@ -98,6 +102,13 @@ provider id is the plugin id, or `LocalCatalogProvider.ID` for Local; nested ope
   plugin is signed in with the recorded account (drop the `== selection.metadata` condition).
 - `TvLocalLibraryViewModel`, `TvLocalLibraryContent` and Library's Local section are removed, with
   their strings and tests.
+- Library's account sections (Overview, Watch history, Recently played from `metadata.library`)
+  were the selected plugin's. Library now shows one chip per signed-in plugin declaring
+  `MetadataSurface.LIBRARY` (from `MusicSources`); picking it shows that plugin's section chips in
+  a second row, as Search shows filters. `TvAccountLibraryViewModel` becomes assisted-injected per
+  plugin id (`hiltViewModel(key = "account-library:$id")`) and calls `scoped(id)`/`callFor(id, …)`.
+  `TvPluginAccountViewModel` is replaced by `MusicSources` account state; the expired subtitle
+  shows when the chosen plugin's account is expired.
 - `MusicHomeFeedState.needsPlugin` and `NoMetadataPluginException` remain only for the empty
   "get started" tab, which offers **Add provider** (Settings → Plugins) and **Add music folder**
   (Settings → Music folders).
@@ -108,7 +119,8 @@ provider id is the plugin id, or `LocalCatalogProvider.ID` for Local; nested ope
   filters and jobs move from `EnumMap` to maps keyed by the source key.
 - The chip row shows one `TvFilterChip` per music tab (same label/icon as the rail) plus Videos,
   driven by `MusicSources`. The initially shown chip is the last-used music source, else Videos.
-- Only the visible chip searches; typeahead asks only the visible source. Switching chips searches
+- Only the visible chip searches. Typeahead asks the most recently shown music source and the video
+  provider, as the two halves are asked today (Local answers no suggestions). Switching chips searches
   that source once for the current query, as switching halves does today. A chip whose source
   disappears is dropped and the view falls back to the start source.
 - Plugin sources search through `scoped(id)` with `PluginOperations.search`/`suggest`, offered only
