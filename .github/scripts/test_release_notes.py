@@ -214,7 +214,7 @@ Co-Authored-By: Agent <agent@example.org>
         for expected in (
             "No app changes; this build updates the visualizer engine below.",
             "[ProjectM-TV core 2.2.4](https://github.com/johnneerdael/ProjectM-TV/releases/tag/v2.2.4)",
-            "enter code `7170062`",
+            "install [Downloader by AFTVnews](https://play.google.com/store/apps/details?id=com.esaba.downloader&hl=en) and enter code `7170062`",
             "https://github.com/johnneerdael/Milkbeat/releases/latest/download/milkbeat-universal.apk",
             "`checksums.txt`",
             "- **Beatport 0.1.3** (full-length streaming needs a Beatport streaming subscription): downloader code `393`",
