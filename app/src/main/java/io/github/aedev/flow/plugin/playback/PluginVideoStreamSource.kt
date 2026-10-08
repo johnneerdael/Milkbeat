@@ -47,7 +47,7 @@ class PluginVideoStreamSource
                 audioStreams = playable.audioStreams,
                 subtitles = playable.subtitles,
                 durationSeconds = playable.durationSeconds,
-                dashManifestUrl = playable.dashUrl.takeIf { playable.isLive },
+                dashManifestUrl = playable.dashUrl,
                 streamType = if (playable.isLive) StreamType.LIVE_STREAM else StreamType.VIDEO_STREAM,
                 relatedVideos = pluginVideo.related(video.id),
                 preferredCodec = VideoCodecUtils.NO_PREFERENCE,

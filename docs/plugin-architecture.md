@@ -73,8 +73,8 @@ enter progressive playback or offline-download caches. A prepared source owns it
 runtime lease and its provider's account epoch, installed version and network grants through
 release, so idle cleanup cannot discard a live attestation context and old account state cannot
 authorize a replacement source. Refreshing an unrelated provider does not retire that source;
-catalog and preparation caches still observe the broader provider revision. HLS-only VOD
-preloads preserve their accepted manifest during promotion and cleared-media recovery.
+catalog and preparation caches still observe the broader provider revision. VOD preloads
+preserve HLS and DASH manifests during promotion and cleared-media recovery.
 
 Initialization and media SABR POSTs include the accepted presentation's visitor cookie together
 with the protobuf/UMP protocol headers. Read the current manifest binding for each request;
