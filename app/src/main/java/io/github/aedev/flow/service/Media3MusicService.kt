@@ -488,12 +488,7 @@ class Media3MusicService : MediaLibraryService() {
                         refreshLearnDuration()
                         applyLoudnessGain()
                         player.currentMediaItem?.mediaId?.let { mediaId ->
-                            val lastErrorAt = lastPlaybackErrorAtMap[mediaId] ?: 0L
-                            if (System.currentTimeMillis() - lastErrorAt > RECOVERY_SUCCESS_GRACE_MS) {
-                                retryCountMap.remove(mediaId)
-                                recentlyFailedSongs.remove(mediaId)
-                                lastPlaybackErrorAtMap.remove(mediaId)
-                            }
+                            resetRecoveredRetryBudget(mediaId)
                         }
                     }
                 }

@@ -85,7 +85,7 @@ cookies are not taken from a shared browser or another provider's cookie jar.
 
 Accept a native picture presentation only when it contains video. A missing picture uses the
 existing song fallback at the same playback position; genuine SABR renewal preserves the
-listener's selected picture view and accepted recording. If an SDR TV has a conventional SDR
+listener's selected picture view and accepted recording. Native connection failures wait through the existing connectivity recovery path, retaining the failed recording, view and position for reconnect. Protocol renewal stays bounded across brief READY transitions; only sustained recovery clears its retry budget. If an SDR TV has a conventional SDR
 alternative to an HDR-only native presentation, use that alternative.
 
 When HLS is the selected delivery, `requireAudioOnlyHls=true` cannot satisfy a picture request,

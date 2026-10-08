@@ -23,6 +23,19 @@ private const val MAX_RETRY_DELAY_MS = 30000L
 private const val FAILED_SONGS_CACHE_SIZE = 50
 private const val MUSIC_URI_SCHEME = "music"
 
+/** The existing STATE_READY grace period clears a retry budget only after sustained recovery. */
+internal fun Media3MusicService.resetRecoveredRetryBudget(
+    mediaId: String,
+    nowMs: Long = System.currentTimeMillis(),
+) {
+    val lastErrorAt = lastPlaybackErrorAtMap[mediaId] ?: 0L
+    if (nowMs - lastErrorAt > Media3MusicService.RECOVERY_SUCCESS_GRACE_MS) {
+        retryCountMap.remove(mediaId)
+        recentlyFailedSongs.remove(mediaId)
+        lastPlaybackErrorAtMap.remove(mediaId)
+    }
+}
+
 /**
  * Main error handling logic with error-type-specific handlers.
  */
@@ -55,21 +68,43 @@ internal fun Media3MusicService.handlePlayerError(
         if (fallBackToSong(failed)) Log.w(TAG, "Picture unavailable; continuing the accepted song")
         return
     }
-    io.github.aedev.flow.player.error.serverAbrFailureOf(error)?.let { failure ->
+    val protocolFailure =
+        io.github.aedev.flow.player.error
+            .serverAbrFailureOf(error)
+    val accepted = pluginAudio.current(mediaId)
+    val nativeIoFailure =
+        accepted?.stream?.serverAbr != null && error.errorCode in
+            setOf(
+                PlaybackException.ERROR_CODE_IO_UNSPECIFIED,
+                PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
+                PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT,
+                PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS,
+                PlaybackException.ERROR_CODE_TIMEOUT,
+            )
+    if ((protocolFailure != null || nativeIoFailure) &&
+        (!connectivityObserver.checkCurrentConnectivity() || (protocolFailure == null && isNetworkError(error)))
+    ) {
+        lastPlaybackErrorAtMap[mediaId] = System.currentTimeMillis()
+        if (protocolFailure != null) {
+            pluginAudio.failed(
+                mediaId,
+                protocolFailure.url,
+                protocolFailure.status,
+                protocolFailure.reloadPlaybackContext,
+                protocolFailure.serverAbrFailure,
+            )
+        } else {
+            pluginAudio.forget(mediaId)
+        }
+        notifyMusicWarning(getString(R.string.music_playback_warning_network))
+        handleNetworkError(failed.copy(refreshNativeSource = true), retryCountMap.getOrDefault(mediaId, 0))
+        return
+    }
+    protocolFailure?.let { failure ->
         handleServerAbrFailure(failed, failure)
         return
     }
-
-    val accepted = pluginAudio.current(mediaId)
-    if (accepted?.stream?.serverAbr != null && error.errorCode in
-        setOf(
-            PlaybackException.ERROR_CODE_IO_UNSPECIFIED,
-            PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
-            PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT,
-            PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS,
-            PlaybackException.ERROR_CODE_TIMEOUT,
-        )
-    ) {
+    if (nativeIoFailure) {
         val http =
             io.github.aedev.flow.player.error.StreamHttpFailure
                 .of(error)
@@ -150,6 +185,7 @@ internal fun Media3MusicService.handleServerAbrFailure(
     failed: MusicPlaybackRecoveryPlanner.FailedItem,
     failure: nl.neerdael.milkbeat.plugin.StreamFailure,
 ) {
+    lastPlaybackErrorAtMap[failed.mediaId] = System.currentTimeMillis()
     val attempt = retryCountMap.getOrDefault(failed.mediaId, 0)
     if (attempt >= MAX_RETRY_PER_SONG || recentlyFailedSongs.contains(failed.mediaId)) {
         handleFinalFailure(failed)
@@ -223,7 +259,12 @@ internal fun Media3MusicService.restartFailedItem(
 ) {
     val index = playerIndexOf(failed)
     if (index == MusicQueuePlanner.INDEX_UNSET) return
-    player.seekTo(index, if (fromStart) 0L else failed.resumePositionMs)
+    val position = if (fromStart) 0L else failed.resumePositionMs
+    if (failed.refreshNativeSource) {
+        if (!refreshStreamMediaItemAt(index, failed.mediaId, position, preservePicture = true)) return
+    } else {
+        player.seekTo(index, position)
+    }
     player.prepare()
     player.play()
 }
@@ -433,6 +474,7 @@ internal fun Media3MusicService.handleNetworkError(
 ) {
     pendingNetworkRetry = failed
     if (!connectivityObserver.checkCurrentConnectivity()) {
+        retryJobCancel()
         Log.d(TAG, "No network connectivity, waiting for connection...")
         waitingForNetwork = true
         retryCountMap[failed.mediaId] = currentRetry + 1
@@ -497,6 +539,7 @@ internal fun Media3MusicService.notifyMusicWarning(message: String) {
 internal fun Media3MusicService.stopPlaybackAndService() {
     retryJobCancel()
     waitingForNetwork = false
+    pendingNetworkRetry = null
     if (playerInitialized) {
         player.pause()
         player.stop()
@@ -510,20 +553,23 @@ internal fun Media3MusicService.stopPlaybackAndService() {
 
 internal fun Media3MusicService.triggerRetryAfterNetworkRestore() {
     val failed = pendingNetworkRetry ?: return
+    waitingForNetwork = false
     val currentRetry = retryCountMap.getOrDefault(failed.mediaId, 0)
 
     if (currentRetry < MAX_RETRY_PER_SONG) {
         Log.d(TAG, "Triggering retry after network restore for ${failed.mediaId}")
         performAggressiveCacheClear(failed.mediaId)
 
-        lifecycleScope.launch {
-            delay(1000)
-            try {
-                restartFailedItem(failed)
-            } catch (e: Exception) {
-                Log.e(TAG, "Network restore retry failed for ${failed.mediaId}", e)
+        retryJobCancel()
+        pendingRetryJob =
+            lifecycleScope.launch {
+                delay(1000)
+                try {
+                    restartFailedItem(failed)
+                } catch (e: Exception) {
+                    Log.e(TAG, "Network restore retry failed for ${failed.mediaId}", e)
+                }
             }
-        }
     }
     pendingNetworkRetry = null
 }

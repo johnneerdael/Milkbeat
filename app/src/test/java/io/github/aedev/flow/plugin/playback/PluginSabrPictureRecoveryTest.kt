@@ -10,6 +10,9 @@ import io.github.aedev.flow.plugin.registry.PluginRegistryState
 import io.github.aedev.flow.plugin.registry.ProviderSelection
 import io.github.aedev.flow.service.Media3MusicService
 import io.github.aedev.flow.service.handlePlayerError
+import io.github.aedev.flow.service.resetRecoveredRetryBudget
+import io.github.aedev.flow.service.triggerRetryAfterNetworkRestore
+import io.github.aedev.flow.utils.NetworkConnectivityObserver
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
@@ -92,9 +95,165 @@ class PluginSabrPictureRecoveryTest : PluginAudioFixture() {
         service.player = player
         service.pluginAudio = audio
         service.downloadUtil = mockk<DownloadUtil>(relaxed = true)
+        service.connectivityObserver = mockk<NetworkConnectivityObserver>()
+        every { service.connectivityObserver.checkCurrentConnectivity() } returns true
         every { service.downloadUtil.invalidateUrlCache(mediaId) } answers { audio.forget(mediaId) }
         return service to items
     }
+
+    @Test
+    fun `online typed renewal reasons retain protocol priority and reload context`() =
+        runTest {
+            for (reason in nl.neerdael.milkbeat.sabr.SabrPlaybackException.Reason.entries) {
+                audio.resolve(original, null, playbackId = mediaId)
+                val (service, _) = service()
+                val context =
+                    if (reason ==
+                        nl.neerdael.milkbeat.sabr.SabrPlaybackException.Reason.PLAYBACK_CONTEXT_RELOAD
+                    ) {
+                        "opaque-fixture"
+                    } else {
+                        null
+                    }
+                val error =
+                    nl.neerdael.milkbeat.sabr
+                        .SabrPlaybackException(reason, native.url, context)
+                service.handlePlayerError(PlaybackException("fixture", error, PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED), 0)
+                assertThat(service.waitingForNetwork).isFalse()
+                assertThat(service.pendingNetworkRetry).isNull()
+                assertThat(service.retryCountMap[mediaId]).isEqualTo(1)
+                service.pendingRetryJob?.cancel()
+                val renewal = slot<nl.neerdael.milkbeat.plugin.ResolveAudioRequest>()
+                coEvery { host.call("youtube", PluginOperations.resolveAudio, capture(renewal)) } returns
+                    stream.copy(url = native.url, mimeType = "application/x-server-abr", serverAbr = native)
+                audio.resolve(original, null, playbackId = mediaId)
+                assertThat(
+                    renewal.captured.failure!!
+                        .serverAbrFailure!!
+                        .name,
+                ).isEqualTo(reason.name)
+                assertThat(renewal.captured.failure!!.reloadPlaybackContext).isEqualTo(context)
+            }
+        }
+
+    @Test
+    fun `online native connection timeout uses maintained network retry instead of protocol renewal`() =
+        runTest {
+            audio.resolve(original, null, playbackId = mediaId)
+            val (service, items) = service()
+            val uri = items.single().localConfiguration!!.uri
+            service.handlePlayerError(
+                PlaybackException("fixture", java.io.IOException("fixture"), PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT),
+                0,
+            )
+            assertThat(service.pendingNetworkRetry!!.mediaId).isEqualTo(mediaId)
+            assertThat(service.waitingForNetwork).isFalse()
+            org.robolectric.Shadows
+                .shadowOf(android.os.Looper.getMainLooper())
+                .idleFor(java.time.Duration.ofSeconds(3))
+            verify(exactly = 0) { service.player.seekTo(any<Int>(), any<Long>()) }
+            assertThat(items.single().localConfiguration!!.uri).isEqualTo(uri)
+            service.pendingRetryJob?.cancel()
+        }
+
+    @Test
+    fun `offline native playback waits for connectivity with accepted view and position`() =
+        runTest {
+            audio.resolve(original, null, playbackId = mediaId)
+            val (service, items) = service()
+            val uri = items.single().localConfiguration!!.uri
+            every { service.connectivityObserver.checkCurrentConnectivity() } returns false
+            service.handlePlayerError(
+                PlaybackException("fixture", java.io.IOException("fixture"), PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED),
+                0,
+            )
+            assertThat(service.waitingForNetwork).isTrue()
+            assertThat(service.pendingNetworkRetry!!.mediaId).isEqualTo(mediaId)
+            assertThat(service.pendingNetworkRetry!!.refreshNativeSource).isTrue()
+            assertThat(service.pendingNetworkRetry!!.resumePositionMs).isEqualTo(position)
+            assertThat(service.pendingRetryJob).isNull()
+            assertThat(items.single().localConfiguration!!.uri).isEqualTo(uri)
+            every { service.connectivityObserver.checkCurrentConnectivity() } returns true
+            service.waitingForNetwork = false
+            service.triggerRetryAfterNetworkRestore()
+            org.robolectric.Shadows
+                .shadowOf(android.os.Looper.getMainLooper())
+                .idleFor(java.time.Duration.ofSeconds(1))
+            verify { service.player.seekTo(0, position) }
+            verify(exactly = 0) { service.player.seekToNextMediaItem() }
+            assertThat(items.single().localConfiguration!!.uri).isEqualTo(uri)
+            assertThat(service.pendingNetworkRetry).isNull()
+            service.pendingRetryJob?.cancel()
+        }
+
+    @Test
+    fun `offline typed no-progress waits rather than immediately renewing`() =
+        runTest {
+            audio.resolve(original, null, playbackId = mediaId)
+            val (service, _) = service()
+            every { service.connectivityObserver.checkCurrentConnectivity() } returns false
+            val error =
+                nl.neerdael.milkbeat.sabr.SabrPlaybackException
+                    .noProgress(native.url, java.net.UnknownHostException("fixture"))
+            service.handlePlayerError(PlaybackException("fixture", error, PlaybackException.ERROR_CODE_IO_UNSPECIFIED), 0)
+            assertThat(service.waitingForNetwork).isTrue()
+            assertThat(service.pendingNetworkRetry!!.mediaId).isEqualTo(mediaId)
+            assertThat(service.pendingRetryJob).isNull()
+            every { service.connectivityObserver.checkCurrentConnectivity() } returns true
+            service.triggerRetryAfterNetworkRestore()
+            org.robolectric.Shadows
+                .shadowOf(android.os.Looper.getMainLooper())
+                .idleFor(java.time.Duration.ofSeconds(1))
+            verify { service.player.replaceMediaItem(0, any()) }
+            verify { service.player.seekTo(0, position) }
+            val renewal = slot<nl.neerdael.milkbeat.plugin.ResolveAudioRequest>()
+            coEvery { host.call("youtube", PluginOperations.resolveAudio, capture(renewal)) } returns
+                stream.copy(url = native.url, mimeType = "application/x-server-abr", serverAbr = native)
+            audio.resolve(original, null, playbackId = mediaId)
+            assertThat(renewal.captured.track.ref).isEqualTo(candidate.ref)
+            assertThat(renewal.captured.failure!!.serverAbrFailure).isEqualTo(nl.neerdael.milkbeat.plugin.ServerAbrFailure.NO_PROGRESS)
+            service.pendingRetryJob?.cancel()
+        }
+
+    @Test
+    fun `brief READY after native renewal retains its budget until repeated failures terminate`() =
+        runTest {
+            audio.resolve(original, null, playbackId = mediaId)
+            val (service, _) = service()
+            val error =
+                nl.neerdael.milkbeat.sabr.SabrPlaybackException(
+                    nl.neerdael.milkbeat.sabr.SabrPlaybackException.Reason.NO_PROGRESS,
+                    native.url,
+                    null,
+                )
+            for (attempt in 1..5) {
+                service.handlePlayerError(PlaybackException("fixture", error, PlaybackException.ERROR_CODE_IO_UNSPECIFIED), 0)
+                service.resetRecoveredRetryBudget(mediaId)
+                assertThat(service.retryCountMap[mediaId]).isEqualTo(attempt)
+            }
+            service.handlePlayerError(PlaybackException("fixture", error, PlaybackException.ERROR_CODE_IO_UNSPECIFIED), 0)
+            assertThat(service.recentlyFailedSongs).contains(mediaId)
+            service.pendingRetryJob?.cancel()
+        }
+
+    @Test
+    fun `stable READY after the existing grace window clears native renewal budget`() =
+        runTest {
+            audio.resolve(original, null, playbackId = mediaId)
+            val (service, _) = service()
+            val error =
+                nl.neerdael.milkbeat.sabr.SabrPlaybackException(
+                    nl.neerdael.milkbeat.sabr.SabrPlaybackException.Reason.NO_PROGRESS,
+                    native.url,
+                    null,
+                )
+            service.handlePlayerError(PlaybackException("fixture", error, PlaybackException.ERROR_CODE_IO_UNSPECIFIED), 0)
+            val lastError = service.lastPlaybackErrorAtMap.getValue(mediaId)
+            service.resetRecoveredRetryBudget(mediaId, lastError + Media3MusicService.RECOVERY_SUCCESS_GRACE_MS + 1)
+            assertThat(service.retryCountMap).isEmpty()
+            assertThat(service.lastPlaybackErrorAtMap).isEmpty()
+            service.pendingRetryJob?.cancel()
+        }
 
     @Test
     fun `strict audio HLS answer falls back at the same position despite a cached native song`() =
