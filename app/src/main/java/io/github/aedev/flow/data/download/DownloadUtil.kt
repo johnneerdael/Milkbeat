@@ -88,8 +88,7 @@ class DownloadUtil
         /** Music videos play no taller than the display, and at most at [MusicVideoFormats.MAX_HEIGHT]. */
         private val maxVideoHeight: Int by lazy {
             val mode = context.getSystemService(DisplayManager::class.java)?.getDisplay(Display.DEFAULT_DISPLAY)?.mode
-            val shortSide = mode?.let { minOf(it.physicalWidth, it.physicalHeight) } ?: MusicVideoFormats.MAX_HEIGHT
-            shortSide.coerceAtMost(MusicVideoFormats.MAX_HEIGHT)
+            MusicVideoFormats.heightForDisplay(mode?.physicalWidth, mode?.physicalHeight)
         }
 
         // URLs the audio plugin resolved for downloads, reused until they expire

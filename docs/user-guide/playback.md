@@ -107,6 +107,10 @@ The thumbnail loads as an image; choosing Artwork does not start video playback.
 
 A confirmed YouTube audio source can offer Video even when the original SoundCloud or Spotify catalog entry did not advertise a video. Art Tracks with static album artwork are valid video choices. Discovering a match does not start picture loading: select Video with the view button to show it. A track without a usable video skips from the visualizer straight to the artwork, and with the video view chosen it shows the visualizer instead. With visualizations turned off, the button moves between the video and the artwork. Unsupported or unavailable video falls back to audio and visuals.
 
+Picture requests follow the TV's physical display resolution, up to 2160p, and its supported
+hardware codecs. A 1080p or 720p display keeps that lower limit. The provider, recording and
+available bandwidth can offer lower quality.
+
 ![The view button on the visualizer](images/now-playing-view-visualizer.png)
 
 ![The music video view](images/now-playing-view-video.png)

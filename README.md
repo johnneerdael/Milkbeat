@@ -313,7 +313,8 @@ you leave it on for every track after.
 - YouTube matching searches recorded videos for every track, including Art Tracks and archived
   live sets, even when the visualizer or artwork is selected. Audio plays until you select Video
   with the view button. A confirmed YouTube match can offer Video for SoundCloud or Spotify metadata.
-  The picture is picked for your TV: at most 1080p, in a codec the TV decodes in hardware.
+  Picture requests follow your TV's physical display resolution, up to 2160p, in a codec the TV
+  decodes in hardware. The provider, recording and available bandwidth can offer lower quality.
 - If a video can't be played, the track carries on as audio with the visuals.
 
 <table>

@@ -5,7 +5,13 @@ import io.github.aedev.flow.player.stream.VideoCodecUtils
 
 /** The limits a music video's picture plays within on this device. */
 object MusicVideoFormats {
-    const val MAX_HEIGHT = 1080
+    const val MAX_HEIGHT = 2160
+
+    /** The active physical display mode bounds picture requests; an unknown mode retains 1080p. */
+    fun heightForDisplay(
+        width: Int?,
+        height: Int?,
+    ): Int = (if (width != null && height != null) minOf(width, height) else 1080).coerceAtMost(MAX_HEIGHT)
 
     private const val H264 = "h264"
 
