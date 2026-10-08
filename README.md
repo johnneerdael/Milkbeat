@@ -27,8 +27,11 @@ services and play music videos. Everything is built for the TV remote.
 - **Your own music:** local folders and SMB 2/3, WebDAV, SFTP and NFS (v3, v4.0, v4.1) servers,
   with embedded tags and album artwork.
 - **Streaming catalogs:** optional YouTube Music, Spotify, Beatport and SoundCloud plugins.
-- **One library:** app and provider playlists together, including Liked songs; **Local library**
-  groups folder music by artist, release, genre, label and year. **Folders** also supports direct browsing.
+- **A tab per provider:** each catalog you are signed in to gets its own sidebar tab with the
+  service's logo, and linked folders add a **Local library** tab that groups your music by artist,
+  release, genre, label and year.
+- **One library:** app and provider playlists together, including Liked songs. **Folders** also
+  supports direct browsing.
 - **Ordered audio providers:** try one provider first, then fall back to the next.
 - **Playback preparation:** index provider playlists in advance and resolve upcoming queue tracks
   one at a time across the remaining queue.
@@ -97,11 +100,11 @@ MP3, FLAC and M4A files have been tested, including playback, seeking and embedd
 Other audio formats depend on the codecs available on your device. Embedded title, artist,
 album, duration and cover art are read in the background as tracks become visible or play.
 Metadata and artwork use a bounded memory cache; this is folder browsing, not a persistent
-scan of the whole library in the Folders browser. **Library > Local library** uses a persistent
+scan of the whole library in the Folders browser. The **Local library** tab uses a persistent
 tag index for artists, releases, playlists, genres, labels and years. Sources can be edited,
 refreshed or removed in Settings.
 
-Selecting a track in Local library plays only that file. Use a collection's **Play** or **Shuffle**
+Selecting a track in the Local library tab plays only that file. Use a collection's **Play** or **Shuffle**
 button to queue its tracks. With an enabled YouTube Music plugin, Milkbeat matches the first
 queued song's title, artists and duration in the background to seed radio. The match supplies
 recommendations only: queued local files keep playing from their original storage. Suggestions
@@ -160,12 +163,13 @@ Plugins can provide separate roles:
 
 ### Provider selection and phone sign-in
 
-Choose your metadata provider and video provider in **Settings > Plugins**. Under **Audio**, enable
-providers and put them in priority order. For example, try YouTube Music first and Beatport second:
+There is no metadata provider to choose: every music catalog you can use gets its own sidebar tab.
+In **Settings > Plugins**, choose your video provider, and under **Audio** enable providers and put
+them in priority order. For example, try YouTube Music first and Beatport second:
 if the first cannot find or play a track, Milkbeat tries the next.
 
-For Spotify, select **Spotify** for metadata and **YouTube Music** for audio. Spotify provides the
-catalog; the audio provider supplies playback. Spotify tracks can continue with YouTube's mix
+For Spotify, sign in to **Spotify** and enable **YouTube Music** for audio. Spotify's tab provides
+the catalog; the audio provider supplies playback. Spotify tracks can continue with YouTube's mix
 through their matched YouTube track.
 
 With both providers signed in and compatible plugin versions installed, Spotify's details also offer
@@ -207,10 +211,15 @@ to fetch and review the available package. An update must have the same plugin I
 author; older versions are rejected. An app update does not by itself guarantee that installed
 plugins have been updated.
 
-## Home from metadata providers
+## A sidebar tab per provider
 
-Choose YouTube Music, Spotify, Beatport or SoundCloud for metadata. Each supplies its own feed, rendered
-through Milkbeat's TV interface. Your selected audio providers handle playback independently.
+Every installed, enabled catalog plugin you are signed in to gets its own tab in the sidebar, marked
+with the service's logo. YouTube Music's tab appears as soon as the plugin is installed, because it
+also works without an account. Linked music folders add a **Local library** tab, so you can have up
+to five music tabs above Search, Library and Settings. Each tab shows its provider's own feed,
+rendered through Milkbeat's TV interface, keeps its place while you visit another, and opens pages
+on that same provider. Milkbeat starts on the music tab you used last. Your audio providers handle
+playback independently.
 
 | YouTube Music | Spotify | Beatport |
 | --- | --- | --- |
@@ -256,7 +265,7 @@ Pages are laid out like YouTube Music on the web:
 
 With YouTube Music, a song can continue with the mix YouTube builds for it. Albums and playlists
 play through before handing over to related content. Spotify tracks use the matched audio
-provider's radio when their metadata provider does not supply one. Artists you hide stay out of mixes.
+provider's radio when the provider they came from does not supply one. Artists you hide stay out of mixes.
 
 During playback, Milkbeat matches the **entire remaining queue**, one track at a time, following
 the playback order. Jumping elsewhere gives the new playback position priority. Confirmed
@@ -319,11 +328,14 @@ you leave it on for every track after.
 
 ## Search and Library
 
-- **Search** uses your selected metadata provider for music and your selected video provider for
-  videos, with the filters and suggestions each provider supports.
+- **Search** offers a chip for each music tab that can search, including **Local library**, plus
+  **Videos**. It starts on the music tab you used last, and only the chip on screen searches, with
+  the filters and suggestions its provider supports.
 - **Library > Playlists** combines app playlists with playlists from every enabled, signed-in
   metadata provider. **Liked songs** brings music likes together; liked videos are omitted.
-  Opening a provider playlist keeps its original provider, even if another is selected for Home.
+  Opening a provider playlist keeps its original provider.
+- **Library** starts with a chip for each signed-in provider that has a library. Picking one shows
+  that account's own sections, such as its overview and listening history.
 - **Library > Folders** browses configured local and network sources. History and Watch later remain
   separate sections.
 - Background playback is on by default, so music can keep playing when you leave the app.

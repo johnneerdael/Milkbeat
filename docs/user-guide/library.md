@@ -2,9 +2,9 @@
 
 [User guide](index.md)
 
-## Home depends on metadata
+## A tab per provider
 
-The Music tab renders the selected metadata provider's feed using Milkbeat's TV components. Each provider chooses its content and sections.
+Every catalog you can use has its own tab in the sidebar, marked with the service's logo: YouTube Music as soon as it is installed, the others once you are signed in. Each tab renders that provider's feed using Milkbeat's TV components; the provider chooses its content and sections. Linked music folders add a **Local library** tab. Each tab keeps its place while you visit another, pages opened from it stay on its provider, and Milkbeat starts on the music tab you used last.
 
 ### YouTube Music
 
@@ -36,7 +36,7 @@ full recording.
 
 ## Search
 
-Music search uses the selected metadata provider. Video search uses the video provider. Filters and suggestions depend on that provider's supported features. Opening a result uses the catalog page appropriate to its type.
+Search shows a chip for each music tab that can search, including **Local library**, followed by **Videos**. It starts on the music tab you used last; only the chip on screen searches. Local library search matches song titles, artists, albums and artist names; it offers no typeahead. Filters and suggestions depend on each provider's supported features. Opening a result uses the catalog page appropriate to its type, on the provider of its chip.
 
 ![Music search suggestions and a result example](images/search.jpg)
 
@@ -59,15 +59,14 @@ The search, album and artist examples above are retained captures from the earli
 | Section | Contents |
 | --- | --- |
 | Folders | Configured local and SMB sources |
-| Local library | Folder music indexed by artists, releases, playlists, genres, labels and years |
 | History | Music and video activity recorded by the app |
 | Watch later | Saved items for later playback |
 | Playlists | App playlists and playlists from every enabled, signed-in metadata provider |
 | Liked songs, inside Playlists | Music likes from the app and supported provider libraries |
 
-There is one Playlists section. Liked videos are omitted from this TV library view. Other account-specific sections depend on the selected provider. Provider lists are paged; an unavailable provider does not hide the others, and failed pages can be retried.
+There is one Playlists section. Liked videos are omitted from this TV library view. Before these sections, Library shows a chip for each signed-in provider with a library; picking one shows that account's own sections, such as its overview and listening history. Provider lists are paged; an unavailable provider does not hide the others, and failed pages can be retried.
 
-Library → Folders browses the storage sources directly. **Local library** organizes their tagged
+Library → Folders browses the storage sources directly. The **Local library** tab organizes their tagged
 music into artists, releases, playlists, genres, labels and years. Selecting a track plays that
 track alone; use a collection's **Play** or **Shuffle** button to queue its tracks. An enabled
 YouTube Music plugin can seed [radio](playback.md#mixes) from the first song without changing
