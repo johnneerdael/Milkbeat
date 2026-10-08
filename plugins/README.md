@@ -29,3 +29,10 @@ npm run check
 Compiled third-party packages are not kept in git; they download only from Buzzheavier. The publisher verifies each package against its Buzzheavier account listing before registering it, and supplies the publication metadata (`published.json`) and the encrypted download catalog, which the app CI checks against each other.
 
 Third-party plugin packages are distributed separately from Milkbeat. Milkbeat releases contain the app APKs and checksums; the app's README lists optional third-party downloader codes.
+
+Stable publication is `published.json` with `app/src/main/assets/plugin-download-catalog.json`;
+its native acceptance fixture is `app/src/androidTest/assets/published-plugins.json`. Prerelease
+versions are rejected by the stable validator. `published-preview.json` records the signed
+packages pinned by `app/src/nightly/assets/plugin-preview-download-catalog.json` and is evaluated
+with the explicit preview channel. Original archive hashes and URLs remain immutable when a
+rebuild changes only its signature envelope. Actual package content changes require a new versionCode.

@@ -1,6 +1,7 @@
 # Video matching preview
 
-Install the prerelease APK named **Milkbeat Preview**. It uses a separate app ID and keeps its own settings, plugins and account sessions. Open that launcher entry to test; your stable Milkbeat app remains available.
+Install the prerelease APK named **Milkbeat Preview**. It uses a separate app ID and keeps its own settings, plugins and account sessions. Open that launcher entry to test; your stable Milkbeat app remains available. Stable downloader codes and automatic updates keep their stable packages;
+Preview packages are published only for the separate Preview installation.
 
 ## Set up
 
