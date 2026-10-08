@@ -164,6 +164,7 @@ class PluginAutoUpdater
                 } else {
                     // The registry writes its file before its state, so a run cancelled by leaving the app must not stop between them.
                     val installed = withContext(NonCancellable) { installer.install(pending) }
+                    accounts.replaced(installed.id)
                     if (installed.manifest.signIn.isNotEmpty()) runCatching { accounts.refresh(installed.id) }
                     UpdateOutcome.INSTALLED
                 }

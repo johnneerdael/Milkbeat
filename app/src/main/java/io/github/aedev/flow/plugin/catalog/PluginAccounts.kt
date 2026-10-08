@@ -52,10 +52,19 @@ class PluginAccounts internal constructor(
     val accounts: StateFlow<Map<String, ProviderAccount>> = _accounts.asStateFlow()
 
     private val revalidations = mutableMapOf<String, Job>()
-    private val checks = mutableMapOf<String, CompletableDeferred<ProviderAccount>>()
+
+    private class AccountCheck(
+        val generation: Int,
+        val answer: CompletableDeferred<ProviderAccount>,
+    )
+
+    private val checks = mutableMapOf<String, AccountCheck>()
     private val generations = mutableMapOf<String, Int>()
 
     private fun generation(pluginId: String): Int = synchronized(generations) { generations[pluginId] ?: 0 }
+
+    /** A new installation of [pluginId] answers from now on; a check still running asks the one it replaced. */
+    fun replaced(pluginId: String) = supersedeChecks(pluginId)
 
     /** The listener acted on the account; a check still running answers for the account before that. */
     private fun supersedeChecks(pluginId: String) = synchronized(generations) { generations[pluginId] = generation(pluginId) + 1 }
@@ -65,11 +74,18 @@ class PluginAccounts internal constructor(
 
     /** Asks [pluginId] for its account; callers asking while a check runs share it rather than repeat it. */
     suspend fun refresh(pluginId: String): ProviderAccount {
-        val check = CompletableDeferred<ProviderAccount>()
-        val running = synchronized(checks) { checks.putIfAbsent(pluginId, check) }
+        val check = AccountCheck(generation(pluginId), CompletableDeferred())
+        // A check begun for an earlier installation or account is not this caller's answer.
+        val running =
+            synchronized(checks) {
+                checks[pluginId]?.takeIf { it.generation == check.generation } ?: run {
+                    checks[pluginId] = check
+                    null
+                }
+            }
         if (running != null) {
             return try {
-                running.await()
+                running.answer.await()
             } catch (e: CancellationException) {
                 // The caller running the check was cancelled; one still waiting asks for itself.
                 currentCoroutineContext().ensureActive()
@@ -77,7 +93,7 @@ class PluginAccounts internal constructor(
             }
         }
         try {
-            val asked = generation(pluginId)
+            val asked = check.generation
             val answer = ask(pluginId)
             // A sign-in or sign-out finished while this check ran is newer than its answer.
             var account = answer
@@ -89,10 +105,10 @@ class PluginAccounts internal constructor(
                     known
                 }
             }
-            check.complete(account)
+            check.answer.complete(account)
             return account
         } catch (e: Throwable) {
-            check.completeExceptionally(e)
+            check.answer.completeExceptionally(e)
             throw e
         } finally {
             synchronized(checks) { checks.remove(pluginId, check) }

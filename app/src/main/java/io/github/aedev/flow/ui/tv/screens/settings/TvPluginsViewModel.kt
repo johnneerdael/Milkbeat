@@ -155,6 +155,7 @@ class TvPluginsViewModel
                 adding.value =
                     try {
                         val installed = installer.install(consent.pending)
+                        accounts.replaced(installed.id)
                         if (installed.manifest.signIn.isNotEmpty()) runCatching { accounts.refresh(installed.id) }
                         AddPluginState.Idle
                     } catch (e: PluginInstallException) {

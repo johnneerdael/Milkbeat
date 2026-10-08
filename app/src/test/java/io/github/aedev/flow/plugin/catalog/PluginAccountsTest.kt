@@ -31,6 +31,29 @@ class PluginAccountsTest {
     private fun failure(code: PluginErrorCode) = PluginCallException("youtube", PluginError(code, code.name))
 
     @Test
+    fun `a check after a plugin update asks the new installation, not the one still answering`() =
+        runTest {
+            val old = CompletableDeferred<ProviderAccount>()
+            var calls = 0
+            coEvery { host.call("youtube", PluginOperations.account, Unit) } coAnswers {
+                calls++
+                if (calls == 1) old.await() else ProviderAccount.SignedIn("new-installation")
+            }
+            val accounts = accounts()
+
+            val before = async { accounts.refresh("youtube") }
+            runCurrent()
+            accounts.replaced("youtube")
+            val after = accounts.refresh("youtube")
+            old.complete(ProviderAccount.SignedIn("old-installation"))
+            before.await()
+
+            assertThat(after).isEqualTo(ProviderAccount.SignedIn("new-installation"))
+            assertThat(accounts.accounts.value["youtube"]).isEqualTo(ProviderAccount.SignedIn("new-installation"))
+            assertThat(calls).isEqualTo(2)
+        }
+
+    @Test
     fun `a check answering after a sign-out does not bring the old account back`() =
         runTest {
             val answer = CompletableDeferred<ProviderAccount>()
