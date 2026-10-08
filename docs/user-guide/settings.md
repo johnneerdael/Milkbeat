@@ -114,7 +114,7 @@ Resolution is always automatic: it follows the frame-rate target and live memory
 
 ### Visualizer timing
 
-**Timing offset** moves the visuals from −100 ms to +200 ms against the sound, in 25 ms steps. Raise it if the visuals come after the beat you hear, lower it if they come before.
+**Timing offset** moves the visuals against the sound. The choices are −100, −50, −25, +0, +25, +50, +75, +100, +150 and +200 ms. Raise it if the visuals come after the beat you hear, lower it if they come before.
 
 ![Timing offset picker with +0 ms as the default](images/picker-timing.png)
 

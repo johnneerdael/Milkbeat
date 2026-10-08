@@ -40,7 +40,7 @@ All visualizer settings are in [Settings → Visualizations](settings.md#visuali
 | Frame rate | The display rate divided by 1, 2 or 4, at least 24 fps | 30 fps | [Frame rate and detail](https://johnneerdael.github.io/ProjectM-TV/picture-quality/#frame-rate-and-detail) |
 | Detail | Warp mesh from Minimal to Ultra | By device | [Frame rate and detail](https://johnneerdael.github.io/ProjectM-TV/picture-quality/#frame-rate-and-detail) |
 | Show diagnostics | A status line in the player controls | Off | [Diagnostics](https://johnneerdael.github.io/ProjectM-TV/settings/#diagnostics) |
-| Timing offset | Moves the visuals −100 to +200 ms against the sound | +0 ms | |
+| Timing offset | Moves the visuals against the sound: −100, −50, −25, +0, +25, +50, +75, +100, +150 or +200 ms | +0 ms | |
 
 **Resolution is always automatic in Milkbeat.** It follows the frame-rate target and live memory headroom, up to your screen's native size. Raising the frame rate or adding trail detail can make Auto choose a lower resolution. [How Auto resolution works](https://johnneerdael.github.io/ProjectM-TV/picture-quality/#resolution).
 
