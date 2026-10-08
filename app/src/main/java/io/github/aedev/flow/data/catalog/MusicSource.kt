@@ -1,6 +1,7 @@
 package io.github.aedev.flow.data.catalog
 
 import androidx.annotation.DrawableRes
+import androidx.annotation.StringRes
 import io.github.aedev.flow.data.library.catalog.LocalCatalogProvider
 import nl.neerdael.milkbeat.plugin.MetadataSurface
 
@@ -36,11 +37,15 @@ sealed interface MusicSource {
     }
 }
 
-/** One music tab of the rail; [label] is null for the local library, whose name is a string resource. */
+/**
+ * One music tab of the rail. [labelRes], when set, names it instead of [label]: the service a shared
+ * tab browses. [label] is null for the local library, whose name is a string resource.
+ */
 data class MusicTab(
     val source: MusicSource,
     val label: String?,
     @param:DrawableRes val iconRes: Int?,
+    @param:StringRes val labelRes: Int? = null,
     val expired: Boolean = false,
     val signedIn: Boolean = false,
     /** Shown before its account is known (YouTube Music works signed out); its home waits for the answer. */

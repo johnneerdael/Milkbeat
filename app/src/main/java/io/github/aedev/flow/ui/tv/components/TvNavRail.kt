@@ -53,6 +53,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.aedev.flow.R
 import io.github.aedev.flow.data.catalog.MusicSource
+import io.github.aedev.flow.data.catalog.MusicTab
 import io.github.aedev.flow.ui.tv.navigation.TvDestination
 import io.github.aedev.flow.ui.tv.navigation.TvMusicTabsState
 import io.github.aedev.flow.ui.tv.navigation.TvTab
@@ -80,6 +81,10 @@ data class TvRailItem(
     val badged: Boolean = false,
 )
 
+/** The name a music tab goes by wherever it is offered: the rail, Search and the Library. */
+@Composable
+fun MusicTab.displayLabel(): String = labelRes?.let { stringResource(it) } ?: label ?: stringResource(R.string.local_library_title)
+
 /** The music tabs (or the single Music tab while there are none), then the fixed destinations. */
 @Composable
 fun tvRailItems(
@@ -93,7 +98,7 @@ fun tvRailItems(
             music.tabs.map { tab ->
                 TvRailItem(
                     tab = TvTab.Music(tab.source),
-                    label = tab.label ?: stringResource(R.string.local_library_title),
+                    label = tab.displayLabel(),
                     icon =
                         tab.iconRes?.let { TvRailIcon.Logo(it) }
                             ?: TvRailIcon.Symbol(if (tab.source == MusicSource.Local) Icons.Outlined.Folder else Icons.Outlined.MusicNote),

@@ -42,6 +42,7 @@ import io.github.aedev.flow.ui.tv.components.TvMusicCollectionCard
 import io.github.aedev.flow.ui.tv.components.TvPlaylistCard
 import io.github.aedev.flow.ui.tv.components.TvScreenScaffold
 import io.github.aedev.flow.ui.tv.components.TvVideoCard
+import io.github.aedev.flow.ui.tv.components.displayLabel
 import io.github.aedev.flow.ui.tv.focus.ProvideTvColumnPivot
 import io.github.aedev.flow.ui.tv.focus.tvRowFocus
 import io.github.aedev.flow.ui.tv.navigation.TvMusicTabsState
@@ -125,7 +126,7 @@ fun TvLibraryScreen(
             ) {
                 items(accountTabs, key = { "account-${it.source.key}" }) { tab ->
                     TvFilterChip(
-                        label = tab.label.orEmpty(),
+                        label = tab.displayLabel(),
                         selected = shownProvider == tab,
                         onClick = {
                             localPaneSelected = false

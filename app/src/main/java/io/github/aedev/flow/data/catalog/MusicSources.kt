@@ -148,6 +148,7 @@ internal fun musicTabs(
                     source = MusicSource.Plugin(plugin.id),
                     label = plugin.manifest.name,
                     iconRes = KnownProviders.iconFor(plugin.id),
+                    labelRes = KnownProviders.serviceLabelFor(plugin.id),
                     expired = accounts[plugin.id] == ProviderAccount.Expired,
                     signedIn = accounts[plugin.id] is ProviderAccount.SignedIn,
                     accountPending = plugin.id in pending,
