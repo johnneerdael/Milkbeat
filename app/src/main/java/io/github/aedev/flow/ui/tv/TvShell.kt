@@ -40,6 +40,7 @@ import io.github.aedev.flow.ui.tv.navigation.TvDestination
 import io.github.aedev.flow.ui.tv.navigation.TvNavHost
 import io.github.aedev.flow.ui.tv.navigation.TvRoutes
 import io.github.aedev.flow.ui.tv.navigation.TvTab
+import io.github.aedev.flow.ui.tv.navigation.shownRailTab
 import io.github.aedev.flow.ui.tv.screens.music.TvMusicTabsState
 import io.github.aedev.flow.ui.tv.theme.LocalTvDimens
 import kotlinx.coroutines.delay
@@ -84,8 +85,15 @@ fun TvShell(
     // A detail page keeps the tab it was opened from highlighted.
     var detailOwner by remember { mutableStateOf<TvTab>(TvTab.Music(null)) }
     LaunchedEffect(routeTab) { routeTab?.let { detailOwner = it } }
+    val railItems = tvRailItems(musicTabs, badged)
     val currentTab: TvTab =
-        routeTab ?: if (currentRoute == TvRoutes.MUSIC_FOLDERS_SETTINGS) TvTab.Fixed(TvDestination.SETTINGS) else detailOwner
+        shownRailTab(
+            routeTab = routeTab,
+            settingsDetail = currentRoute == TvRoutes.MUSIC_FOLDERS_SETTINGS,
+            detailOwner = detailOwner,
+            railTabs = railItems.map { it.tab },
+            music = TvTab.Music(musicTabs.selected),
+        )
     var railHasFocus by remember { mutableStateOf(false) }
     val railFocusRequester = remember { FocusRequester() }
     val musicStripFocusRequester = remember { FocusRequester() }
@@ -195,7 +203,7 @@ fun TvShell(
             }
         }
         TvNavRail(
-            items = tvRailItems(musicTabs, badged),
+            items = railItems,
             selected = currentTab,
             onSelected = ::selectTab,
             onFocusChanged = { railHasFocus = it },

@@ -53,6 +53,7 @@ import io.github.aedev.flow.R
 import io.github.aedev.flow.data.catalog.MusicSource
 import io.github.aedev.flow.ui.tv.navigation.TvDestination
 import io.github.aedev.flow.ui.tv.navigation.TvTab
+import io.github.aedev.flow.ui.tv.navigation.railFocusTab
 import io.github.aedev.flow.ui.tv.screens.music.TvMusicTabsState
 import io.github.aedev.flow.ui.tv.theme.LocalTvDimens
 
@@ -199,6 +200,7 @@ fun TvNavRail(
                 }
             }
             Spacer(Modifier.height(8.dp))
+            val focusTab = railFocusTab(items.map { it.tab }, selected)
             items.forEach { item ->
                 TvRailEntry(
                     item = item,
@@ -206,7 +208,7 @@ fun TvNavRail(
                     expanded = expanded,
                     onClick = { onSelected(item.tab) },
                     modifier =
-                        if (item.tab == selected && selectedFocusRequester != null) {
+                        if (item.tab == focusTab && selectedFocusRequester != null) {
                             Modifier.focusRequester(selectedFocusRequester)
                         } else {
                             Modifier

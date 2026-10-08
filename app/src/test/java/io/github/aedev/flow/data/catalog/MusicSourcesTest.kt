@@ -56,9 +56,11 @@ class MusicSourcesTest {
 
     @Test
     fun youTubeMusicHasATabBeforeItsAccountIsKnown() {
-        val tabs = musicTabs(registry(youtube), emptyMap(), hasFolders = false, pending = emptySet())
+        val tabs = musicTabs(registry(youtube), emptyMap(), hasFolders = false, pending = setOf(YOUTUBE))
 
         assertEquals(listOf(MusicSource.Plugin(YOUTUBE)), tabs.tabs.map { it.source })
+        assertTrue(tabs.tabs.single().accountPending)
+        assertFalse(musicTabs(registry(youtube), emptyMap(), false, emptySet()).tabs.single().accountPending)
     }
 
     @Test

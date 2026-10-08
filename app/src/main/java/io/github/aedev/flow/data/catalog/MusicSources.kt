@@ -125,6 +125,7 @@ internal fun musicTabs(
                     iconRes = KnownProviders.iconFor(plugin.id),
                     expired = accounts[plugin.id] == ProviderAccount.Expired,
                     signedIn = accounts[plugin.id] is ProviderAccount.SignedIn,
+                    accountPending = plugin.id in pending,
                     surfaces =
                         plugin.manifest.roles.metadata
                             ?.surfaces

@@ -43,6 +43,8 @@ data class MusicTab(
     @param:DrawableRes val iconRes: Int?,
     val expired: Boolean = false,
     val signedIn: Boolean = false,
+    /** Shown before its account is known (YouTube Music works signed out); its home waits for the answer. */
+    val accountPending: Boolean = false,
     val surfaces: Set<MetadataSurface> = emptySet(),
 )
 

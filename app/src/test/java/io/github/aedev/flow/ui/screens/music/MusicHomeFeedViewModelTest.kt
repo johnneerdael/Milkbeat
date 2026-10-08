@@ -217,12 +217,42 @@ class MusicHomeFeedViewModelTest {
                 if (provider.current is ProviderAccount.SignedIn) Result.success(page("Mine")) else Result.success(page("Anonymous"))
             }
             val vm = viewModel()
+            show(vm)
             vm.load()
             advanceUntilIdle()
 
             provider.current = ProviderAccount.SignedIn("account-1")
             advanceUntilIdle()
 
+            assertThat(vm.titles).containsExactly("Mine")
+        }
+
+    @Test
+    fun `a hidden tab fetches nothing when its account changes, and loads the new account's home when shown`() =
+        runTest(dispatcher) {
+            var fetches = 0
+            provider.pages = {
+                fetches++
+                if (provider.current is ProviderAccount.SignedIn) Result.success(page("Mine")) else Result.success(page("Anonymous"))
+            }
+            val vm = viewModel()
+            val shown = show(vm)
+            vm.load()
+            advanceUntilIdle()
+            shown.cancel()
+            advanceUntilIdle()
+
+            provider.current = ProviderAccount.SignedIn("account-1")
+            advanceUntilIdle()
+
+            assertThat(fetches).isEqualTo(1)
+            assertThat(vm.titles).isEmpty()
+
+            show(vm)
+            vm.load()
+            advanceUntilIdle()
+
+            assertThat(fetches).isEqualTo(2)
             assertThat(vm.titles).containsExactly("Mine")
         }
 
@@ -234,6 +264,7 @@ class MusicHomeFeedViewModelTest {
                 if (provider.current is ProviderAccount.SignedIn) Result.success(page("Mine")) else Result.success(page("Anonymous"))
             }
             val vm = viewModel()
+            show(vm)
             backgroundScope.launch { vm.isAccountExpired.collect {} }
             vm.load()
             advanceUntilIdle()
@@ -284,6 +315,7 @@ class MusicHomeFeedViewModelTest {
             provider.pages =
                 { if (indexed) Result.success(page("Recently added")) else Result.failure(LocalLibraryEmptyException("Indexing")) }
             val vm = viewModel()
+            show(vm)
             vm.load()
             advanceUntilIdle()
             assertThat(vm.state.value.libraryEmpty).isTrue()

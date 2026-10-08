@@ -56,8 +56,8 @@ data class CatalogPageState(
 class CatalogPageViewModel
     internal constructor(
         savedStateHandle: SavedStateHandle,
-        defaultProvider: MetadataProvider,
-        defaultPlayback: CatalogPlayback,
+        defaultProvider: MetadataProvider = NoCatalog,
+        defaultPlayback: CatalogPlayback = NoCatalog,
         private val subscriptions: SubscriptionRepository,
         pluginCatalog: PluginMetadataProvider? = null,
         private val mirrors: io.github.aedev.flow.plugin.mirror.PlaylistMirrorCoordinator? = null,

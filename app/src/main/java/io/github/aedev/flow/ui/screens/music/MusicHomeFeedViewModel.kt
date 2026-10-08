@@ -97,11 +97,19 @@ class MusicHomeFeedViewModel internal constructor(
     private var loadedAtMs = 0L
 
     init {
-        // A sign-in, sign-out or expiry swaps whose home this is; never keep showing the old one.
+        // A sign-in, sign-out or expiry swaps whose home this is; never keep showing the old one. A tab not
+        // shown drops it and loads the new account's home on its next visit, so hidden tabs fetch nothing.
         viewModelScope.launch {
             account.collect { account ->
                 val loaded = loadedKey ?: return@collect
-                if (loaded.account != account) load(filterId = null, force = true)
+                if (loaded.account == account) return@collect
+                if (_state.subscriptionCount.value > 0) {
+                    load(filterId = null, force = true)
+                } else {
+                    job?.cancel()
+                    loadedKey = null
+                    _state.update { it.copy(blocks = emptyList(), isLoading = true, isLoadingMore = false, error = null) }
+                }
             }
         }
     }

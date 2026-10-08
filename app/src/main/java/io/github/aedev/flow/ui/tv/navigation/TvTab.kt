@@ -17,3 +17,23 @@ sealed interface TvTab {
         override val destination: TvDestination,
     ) : TvTab
 }
+
+/**
+ * The tab the rail shows as current: a top-level route's own tab, Settings for the folders settings
+ * detail, else the tab a detail page was opened from while the rail still has it, else [music].
+ */
+internal fun shownRailTab(
+    routeTab: TvTab?,
+    settingsDetail: Boolean,
+    detailOwner: TvTab,
+    railTabs: List<TvTab>,
+    music: TvTab.Music,
+): TvTab =
+    routeTab
+        ?: if (settingsDetail) TvTab.Fixed(TvDestination.SETTINGS) else detailOwner.takeIf { it in railTabs } ?: music
+
+/** The rail item focus enters on: the shown tab, or the first item while no item is the shown tab. */
+internal fun railFocusTab(
+    railTabs: List<TvTab>,
+    shown: TvTab?,
+): TvTab? = shown?.takeIf { it in railTabs } ?: railTabs.firstOrNull()

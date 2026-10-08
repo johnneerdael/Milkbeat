@@ -34,9 +34,10 @@ internal sealed interface Remembered {
 }
 
 /**
- * The tab shown: the one picked while it still exists, else the last one used once it exists, else,
- * when every account has answered, the first. Opening another tab while the remembered one is still
- * being checked would show the wrong provider for a moment.
+ * The tab shown: the one picked while it still exists, else the last one used once it exists and its
+ * account has answered, else, when every account has answered, the first. Opening another tab while
+ * the remembered one is still being checked would show the wrong provider for a moment, and opening
+ * the remembered one before its account answers would load its home twice.
  */
 internal fun resolveMusicTabs(
     tabs: MusicTabs,
@@ -45,11 +46,12 @@ internal fun resolveMusicTabs(
 ): TvMusicTabsState {
     val available = tabs.tabs.map { it.source }
     val last = (remembered as? Remembered.Known)?.source
+    val lastTab = tabs.tabs.firstOrNull { it.source == last }
     val selected =
         when {
             chosen != null && chosen in available -> chosen
             remembered == Remembered.Unknown -> null
-            last != null && last in available -> last
+            lastTab != null -> lastTab.source.takeUnless { lastTab.accountPending }
             !tabs.settled -> null
             else -> available.firstOrNull()
         }

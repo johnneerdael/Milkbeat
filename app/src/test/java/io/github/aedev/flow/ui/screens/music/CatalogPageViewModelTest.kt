@@ -95,6 +95,27 @@ class CatalogPageViewModelTest {
         collectors += CoroutineScope(dispatcher).launch { vm.state.collect {} }
     }
 
+    @Test
+    fun `a route without its provider shows an error instead of another provider's page`() =
+        runTest(dispatcher) {
+            val vm =
+                CatalogPageViewModel(
+                    SavedStateHandle(
+                        mapOf(CatalogPageViewModel.KIND_ARG to playlist.kind.name, CatalogPageViewModel.ID_ARG to playlist.providerId),
+                    ),
+                    subscriptions = mockk { every { isSubscribed(any()) } returns flowOf(false) },
+                )
+            stores += ViewModelStore().apply { put("catalog", vm) }
+            collectors += CoroutineScope(dispatcher).launch { vm.state.collect {} }
+
+            vm.load()
+            advanceUntilIdle()
+
+            assertThat(vm.state.value.blocks).isEmpty()
+            assertThat(vm.state.value.isLoading).isFalse()
+            assertThat(vm.state.value.error).isNotNull()
+        }
+
     @Before
     fun setUp() {
         Dispatchers.setMain(dispatcher)
