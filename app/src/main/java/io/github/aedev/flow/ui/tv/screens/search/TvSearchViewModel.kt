@@ -134,15 +134,15 @@ class TvSearchViewModel internal constructor(
         val changed = identities.filter { (key, identity) -> key in sources && sources[key] != identity }.keys
         identities.clear()
         identities.putAll(sources)
-        if (lastMusic?.key?.let { it !in sources || it in changed } == true) {
+        val lastKey = lastMusic?.key
+        if (lastKey != null && (lastKey !in sources || lastKey in changed)) {
             // A typeahead already asking the old account or installation must not answer for the new one.
             val combinedPending = suggestJob?.isActive == true
             suggestJob?.cancel()
-            lastMusic = null
             musicSuggestJob?.cancel()
             _state.update { it.copy(musicSuggestions = emptyList()) }
-            // The chip on screen, still offered under its new identity, answers typeahead again at once.
-            (source as? TvSearchSource.Music)?.takeIf { it.key in sources }?.let { lastMusic = it.source }
+            // A chip still offered under its new identity stays the music typeahead, whichever chip shows.
+            if (lastKey !in sources) lastMusic = null
             _state.value.query
                 .trim()
                 .takeIf { it.isNotEmpty() }
