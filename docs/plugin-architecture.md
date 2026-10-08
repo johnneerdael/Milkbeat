@@ -71,6 +71,10 @@ authorize a replacement source. Refreshing an unrelated provider does not retire
 catalog and preparation caches still observe the broader provider revision. HLS-only VOD
 preloads preserve their accepted manifest during promotion and cleared-media recovery.
 
+Initialization and media SABR POSTs include the accepted presentation's visitor cookie together
+with the protobuf/UMP protocol headers. Read the current manifest binding for each request;
+cookies are not taken from a shared browser or another provider's cookie jar.
+
 `BrowserOpenRequest.userAgent` lets a provider couple its browser generator to its attestation
 HTTP profile. Existing requests retain the default browser user agent. Playback artwork is
 accepted-source metadata: prefetch or late prior-item callbacks cannot replace the current

@@ -12,6 +12,8 @@ import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import java.io.IOException
 
+private val PROTOCOL_REQUEST_HEADERS = setOf("content-type", "accept", "cookie")
+
 /** Redact signed URLs, cookies and attestation when a transport grant is rejected. */
 internal fun checkedPluginMediaUrl(
     value: String,
@@ -64,8 +66,18 @@ internal fun pluginSabrDataSourceFactory(
             val protocolHeaders =
                 request.httpRequestHeaders.filterKeys { name ->
                     !name.equals("Range", ignoreCase = true) &&
-                        acceptedHeaders.keys.none { it.equals(name, ignoreCase = true) }
-                } + acceptedHeaders.filterKeys { !it.equals("Range", ignoreCase = true) }
+                        (
+                            name.lowercase() in PROTOCOL_REQUEST_HEADERS ||
+                                acceptedHeaders.keys.none { it.equals(name, ignoreCase = true) }
+                        )
+                } +
+                    acceptedHeaders.filterKeys { name ->
+                        !name.equals("Range", ignoreCase = true) &&
+                            !(
+                                name.lowercase() in PROTOCOL_REQUEST_HEADERS &&
+                                    request.httpRequestHeaders.keys.any { it.equals(name, ignoreCase = true) }
+                            )
+                    }
             request
                 .buildUpon()
                 .setHttpRequestHeaders(

@@ -19,6 +19,69 @@ import java.io.IOException
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 class PluginSabrDataSourceTest {
     @Test
+    fun `real HTTPS POST retains protocol headers and dedicated visitor cookie over accepted conflicts`() {
+        val tls = loopbackTls()
+        mockwebserver3.MockWebServer().use { server ->
+            server.useHttps(tls.first.socketFactory)
+            server.start()
+            val client = OkHttpClient.Builder().sslSocketFactory(tls.first.socketFactory, tls.second).build()
+            val accepted =
+                mapOf(
+                    "cookie" to "account=fake-accepted",
+                    "content-TYPE" to "application/json",
+                    "ACCEPT" to "text/html",
+                    "User-Agent" to "accepted-client",
+                    "Origin" to "https://accepted.example",
+                    "Referer" to "https://accepted.example/tv",
+                    "Authorization" to "fake-accepted-auth",
+                    "Range" to "bytes=999-",
+                )
+            for (dedicatedVisitor in listOf(true, false)) {
+                server.enqueue(
+                    mockwebserver3.MockResponse
+                        .Builder()
+                        .body("fixture-envelope")
+                        .build(),
+                )
+                val source = pluginSabrDataSourceFactory(client, accepted, {}, { listOf("localhost") }).createDataSource()
+                val protocol =
+                    mapOf(
+                        "Content-Type" to "application/x-protobuf",
+                        "Accept" to "application/vnd.yt-ump",
+                        "user-agent" to "obsolete-client",
+                        "origin" to "https://obsolete.example",
+                        "referer" to "https://obsolete.example/tv",
+                        "authorization" to "fake-obsolete-auth",
+                        "range" to "bytes=10-",
+                    ) + if (dedicatedVisitor) mapOf("Cookie" to "VISITOR_INFO1_LIVE=fake-dedicated") else emptyMap()
+                source.open(
+                    DataSpec
+                        .Builder()
+                        .setUri(server.url("/post").toString())
+                        .setHttpMethod(DataSpec.HTTP_METHOD_POST)
+                        .setHttpBody(byteArrayOf(0, 1, -1))
+                        .setHttpRequestHeaders(protocol)
+                        .build(),
+                )
+                source.close()
+                val wire = server.takeRequest()
+                assertThat(wire.method).isEqualTo("POST")
+                assertThat(wire.headers["Content-Type"]).isEqualTo("application/x-protobuf")
+                assertThat(wire.headers["Accept"]).isEqualTo("application/vnd.yt-ump")
+                assertThat(wire.headers["Cookie"]).isEqualTo(
+                    if (dedicatedVisitor) "VISITOR_INFO1_LIVE=fake-dedicated" else "account=fake-accepted",
+                )
+                assertThat(wire.headers.values("Cookie")).hasSize(1)
+                assertThat(wire.headers["User-Agent"]).isEqualTo("accepted-client")
+                assertThat(wire.headers["Origin"]).isEqualTo("https://accepted.example")
+                assertThat(wire.headers["Referer"]).isEqualTo("https://accepted.example/tv")
+                assertThat(wire.headers["Authorization"]).isEqualTo("fake-accepted-auth")
+                assertThat(wire.headers["Range"]).isNull()
+            }
+        }
+    }
+
+    @Test
     fun `raw POST preserves envelope and headers while discarding byte cache identity`() {
         val observed = mutableListOf<okhttp3.Request>()
         val bodies = mutableListOf<ByteArray>()

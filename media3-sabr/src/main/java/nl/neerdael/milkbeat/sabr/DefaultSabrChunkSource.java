@@ -470,6 +470,12 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
         }
     }
 
+    private Map<String, String> getSabrRequestHeaders() {
+        Map<String, String> headers = new HashMap<>(sabrHeaders);
+        if (manifest.visitorCookie != null) headers.put("Cookie", manifest.visitorCookie);
+        return headers;
+    }
+
     protected Chunk newInitializationChunk(
             RepresentationHolder representationHolder,
             DataSource dataSource,
@@ -480,7 +486,7 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
             RangedUri indexUri) {
         DataSpec dataSpec = new DataSpec.Builder().setUri(Uri.parse(manifest.getRequestUrl(trackType))).setHttpMethod(DataSpec.HTTP_METHOD_POST).setHttpBody(manifest.createVideoPlaybackAbrRequest(trackType, true).toByteArray())
                 .setPosition(0).setLength(C.LENGTH_UNSET).setKey(representationHolder.representation.getCacheKey())
-                .setFlags(0).setHttpRequestHeaders(sabrHeaders).build();
+                .setFlags(0).setHttpRequestHeaders(getSabrRequestHeaders()).build();
         return new InitializationChunk(dataSource, dataSpec, trackFormat,
                 trackSelectionReason, trackSelectionData, representationHolder.extractorWrapper);
     }
@@ -529,7 +535,7 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
 
         DataSpec dataSpec = new DataSpec.Builder().setUri(Uri.parse(manifest.getRequestUrl(trackType))).setHttpMethod(DataSpec.HTTP_METHOD_POST).setHttpBody(manifest.createVideoPlaybackAbrRequest(trackType, false, loadPositionUs).toByteArray())
                 .setPosition(0).setLength(C.LENGTH_UNSET).setKey(representation.getCacheKey())
-                .setFlags(0).setHttpRequestHeaders(sabrHeaders).build();
+                .setFlags(0).setHttpRequestHeaders(getSabrRequestHeaders()).build();
         long sampleOffsetUs = -representation.presentationTimeOffsetUs;
         return new ContainerMediaChunk(
                 dataSource,

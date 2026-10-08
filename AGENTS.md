@@ -280,6 +280,14 @@ A legitimate hand-rolled component must therefore:
 
 - **Never fork, vendor, or copy-paste a library's source** into the app to change one thing.
   Configure it, wrap it, or file the constraint — do not clone it.
+  **Explicit exception for the requested SmartTube integration:** the user authorized adapting
+  SmartTube's SABR playback pieces for the separate YouTube Video provider. The pinned protocol
+  schemas and required native transport/presentation adaptation may live in `:media3-sabr-protocol`
+  and `:media3-sabr`, with upstream licenses and provenance. This is the scope-specific source
+  adaptation requested by the user, not permission to vendor unrelated dependencies. Media3
+  1.11.0 has no SABR implementation; the local upstream implementation targets the older
+  ExoPlayer API. Keep the existing Media3 engine, maintained MP4/WebM extractors, track selection,
+  DRM, session and notifications. Authentication and provider discovery remain private.
 - **Never add a new dependency that overlaps one already on the list.** Use what is there. A new
   dependency needs a stated reason that an existing one cannot cover.
 - **Never hand-roll security-relevant code** — crypto, signing, token handling, TLS. The app has
