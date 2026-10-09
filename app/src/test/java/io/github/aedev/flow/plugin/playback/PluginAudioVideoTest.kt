@@ -9,6 +9,7 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -93,6 +94,7 @@ class PluginAudioVideoTest : PluginAudioFixture() {
                 )
             coEvery { host.call("youtube", PluginOperations.matchAudio, any()) } returns AudioMatches(listOf(candidate))
             coEvery { host.call("youtube", PluginOperations.resolveAudio, any()) } returns prepared.copy(expiresInMs = 0)
+            coEvery { host.call("beatport", PluginOperations.matchAudio, any()) } coAnswers { awaitCancellation() }
             val capabilities = mutableListOf<Set<String>>()
             backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
                 audio.videoCapablePlaybackIds.collect { capabilities += it }
@@ -341,6 +343,7 @@ class PluginAudioVideoTest : PluginAudioFixture() {
                     PluginRegistryState(listOf(plugin, beatport), ProviderSelection(audio = listOf("youtube", "beatport"))),
                 )
             coEvery { host.call("youtube", PluginOperations.matchAudio, any()) } returns AudioMatches(listOf(candidate))
+            coEvery { host.call("beatport", PluginOperations.matchAudio, any()) } coAnswers { awaitCancellation() }
             val accepted = audio.resolve(original, null)
             matcher.invalidate(original, "youtube")
             audio.failed(original.ref.providerId, accepted.stream.url, 403)

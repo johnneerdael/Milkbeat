@@ -79,5 +79,4 @@ internal fun Media3MusicService.finalizeListenSession() {
     // Engine-scoped, NOT lifecycleScope: the finalize from onDestroy runs after
     // this service's scope is already cancelled, and the session must still land.
     musicBrain.onListenSessionAsync(track, playedMs.toDouble() / durationMs, pinnedGenre, playedMs)
-    accountPlayHistory.onListened(track, playedMs, durationMs)
 }

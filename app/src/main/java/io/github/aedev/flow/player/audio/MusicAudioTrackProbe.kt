@@ -9,6 +9,9 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.common.util.Util
 import androidx.media3.exoplayer.audio.AudioSink
 import androidx.media3.exoplayer.audio.DefaultAudioSink
+import io.github.aedev.flow.player.diagnostics.PlaybackTrace
+import io.github.aedev.flow.player.diagnostics.TraceEvent
+import io.github.aedev.flow.player.diagnostics.TraceField
 import kotlinx.coroutines.flow.MutableStateFlow
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
@@ -43,6 +46,14 @@ internal class MusicAudioTrackProbe(
         val offloaded = Build.VERSION.SDK_INT >= 29 && track.isOffloadedPlayback
         output.set(Output(id, track, Util.isEncodingLinearPcm(audioTrackConfig.encoding) && !offloaded))
         changes.value = id
+        PlaybackTrace.event(
+            TraceEvent.AUDIO_TRACK_CREATED,
+            TraceField.GENERATION to id,
+            TraceField.SESSION_ID to track.audioSessionId.toLong(),
+            TraceField.SAMPLE_RATE to audioTrackConfig.sampleRate.toLong(),
+            TraceField.ENCODING to audioTrackConfig.encoding.toLong(),
+            TraceField.OFFLOAD to if (offloaded) 1L else 0L,
+        )
         return track
     }
 

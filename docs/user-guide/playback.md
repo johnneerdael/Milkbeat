@@ -19,7 +19,7 @@ The controls hide on their own after a few seconds. With them hidden, **Left** a
 
 ## Visualizer, music video or artwork
 
-The view button steps through three views while the audio carries on. Milkbeat remembers the view you leave it on for later tracks and later sessions.
+The view button steps through three views while the audio carries on. Video hides the corner cover, artist and title; the visualizer and artwork views keep them visible. Milkbeat remembers the view you leave it on for later tracks and later sessions.
 
 === "Visualizer"
 
@@ -41,7 +41,7 @@ The view button steps through three views while the audio carries on. Milkbeat r
 
 YouTube matching finds recorded videos when needed and reuses validated saved matches, whichever view you use, but the picture only loads when you select the video view. A confirmed YouTube match can offer video even for Spotify, SoundCloud or Beatport tracks. A track without a usable video skips from the visualizer straight to the artwork; with the video view chosen, such a track shows the visualizer instead. With visualizations turned off, the button moves between video and artwork. A video that cannot play falls back to audio with the visuals.
 
-Compatible API 7 providers prepare audio and optional video rendition metadata together. Selecting video changes the existing presentation’s track selection without replacing the media item or seeking the audio. Metadata preparation does not enable video playback. A completed audio download keeps its offline cache path without requiring a downloaded picture or a provider lookup. Older providers keep audio playback; a separate progressive picture without the metadata needed for a prepared presentation stays unavailable. An unavailable optional picture is retried as audio before moving to another provider. Lyrics are not fetched or displayed.
+Compatible API 7 providers prepare audio and optional video rendition metadata together. Selecting video changes the existing presentation’s track selection without replacing the media item or seeking the audio. For prepared network music videos, the initial switch buffers about two seconds of video while audio keeps advancing, then attaches the picture at the current audio position. A loading indicator stays visible until the first frame. After that initial join, normal ongoing buffering remains unchanged. The indicator stops animating while paused or hidden. Metadata preparation does not enable video playback. A completed audio download keeps its offline cache path without requiring a downloaded picture or a provider lookup. Older providers keep audio playback; a separate progressive picture without the metadata needed for a prepared presentation stays unavailable. An unavailable optional picture is retried as audio before moving to another provider. Lyrics are not fetched or displayed.
 
 For streamed music, the Video choice appears after the current presentation supplies a supported video track. Audio-only HLS and completed audio downloads keep the visualizer or artwork even if a previous resolution offered video.
 
@@ -76,7 +76,7 @@ In the **Local library** tab, selecting a track on an artist, release, playlist,
 
 ## Queue preparation and matching
 
-When a track from one catalog plays through another provider's audio, Milkbeat has to find the same recording there. It prepares the entire remaining queue one track at a time, in playback order, while music plays; jumping elsewhere gives the new position priority. Tracks with native audio IDs need no matching.
+When a track from one catalog plays through another provider's audio, Milkbeat has to find the same recording there. It prepares the entire remaining queue one track at a time, in playback order, while music plays; jumping elsewhere gives the new position priority. Tracks with native audio IDs need no matching and try their own enabled audio provider first. Spotify races enabled audio providers through the same recording checks and stream validation; prepared YouTube copies retain their known IDs.
 
 Matching checks recording identity: title, performers and any named remix or edit must agree. For long sets uploaded by a venue or label, the known performer can be credited at the start of the video title rather than as its channel. This requires closely matching titles and durations, the same stated event years, and no tribute/cover uploader. Remixer credits may appear in the title or the artist list. Full versions are preferred over mixed excerpts, and a longer recording is accepted without a duration cap when everything else agrees; shorter conflicting excerpts are rejected. Video-capable audio providers match against recorded videos for ordinary playback, queue preparation and playlist indexing. Successful matches are cached and reused; confirmed unmatched tracks can be removed from the future queue, while temporary failures stay retryable.
 
@@ -86,7 +86,7 @@ Preparation reduces the work at each transition but cannot guarantee gapless pla
 
 ## Buffering and recovery
 
-Streamed music loads well ahead of the playing position: Milkbeat keeps loading until about 16 MB is buffered (roughly 13 minutes of typical audio, usually the whole song) and loads more once less than 30 seconds remain. A music video's picture shares that buffer, and a slow network or low memory keeps it shorter. If a stream fails, Milkbeat asks its provider for a fresh link to the same recording and resumes where it stopped. A second media failure within a minute tries the next configured audio provider for that track. Audio-only providers remain eligible, so a failed YouTube video can fall back to the original SoundCloud audio. This does not change your configured provider order.
+Streamed music loads well ahead of the playing position: Milkbeat keeps loading until about 16 MB is buffered (roughly 13 minutes of typical audio, usually the whole song) and loads more once less than 30 seconds remain. A music video's picture shares that buffer, and a slow network or low memory keeps it shorter. If a stream fails, Milkbeat asks its provider for a fresh link to the same recording and resumes where it stopped. A second media failure within a minute tries the next configured audio provider for that track. Audio-only providers remain eligible, so a failed YouTube video can fall back to the original SoundCloud audio. Native playback starts with its own enabled audio provider; recovery then uses the configured fallback order.
 
 Audio failures while picture is hidden use ordinary audio/network recovery and retain the Video choice. A playback failure while video is active can retry as audio; an explicitly unavailable picture also uses audio fallback. Refreshing an expired audio URL preserves optional picture preparation.
 
@@ -95,3 +95,14 @@ If normal decoded TV audio (PCM) stops advancing for about five seconds while th
 ## Encrypted provider audio
 
 Compatible plugins can supply Widevine-protected audio through the device's DRM implementation. Milkbeat fetches licenses separately from the audio and only from destinations the plugin is allowed to reach. Availability depends on the account, the recording and the device. SoundCloud previews are never treated as full tracks. The offline downloader supports clear progressive audio only; HLS, DRM and native SABR streams cannot be downloaded.
+
+## Signed-in listening history
+
+When **Report plays to** the provider is enabled in its plugin details, compatible API 8 providers receive qualified listening
+updates while music is playing, about every 30 seconds, as well as pause, seek and final updates.
+A listen qualifies after 30 seconds, or half of a shorter track. Skipped sections do not count as
+listened time. Signed-in YouTube Video uses these updates for your account history and recommendations;
+anonymous playback does not update an account. Older providers receive a report when the listen ends.
+Reporting reuses the recording that actually played and does not delay startup by resolving it again.
+If the final update of a listen fails because of a network problem, a timeout or rate limiting, Milkbeat
+tries it again up to three times over about a minute, while the app keeps running.

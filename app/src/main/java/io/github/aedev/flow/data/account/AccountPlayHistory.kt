@@ -10,12 +10,20 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.aedev.flow.data.local.safePreferencesDataStore
 import io.github.aedev.flow.data.music.model.MusicTrack
 import io.github.aedev.flow.player.MusicVideoItems
+import io.github.aedev.flow.player.diagnostics.PlaybackTrace
+import io.github.aedev.flow.player.diagnostics.TraceCategory
+import io.github.aedev.flow.player.diagnostics.TraceEvent
+import io.github.aedev.flow.player.diagnostics.TraceField
 import io.github.aedev.flow.plugin.playback.PluginAudio
 import io.github.aedev.flow.plugin.playback.PluginVideo
+import io.github.aedev.flow.plugin.playback.ResolvedAudio
 import io.github.aedev.flow.plugin.runtime.PluginCallException
+import io.github.aedev.flow.plugin.runtime.retryingTransient
 import io.github.aedev.flow.utils.PerformanceDispatcher
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -34,7 +42,9 @@ private const val PLAY_THRESHOLD_MS = 30_000L
 internal fun countsAsPlay(
     playedMs: Long,
     durationMs: Long,
-): Boolean = playedMs > 0 && playedMs >= minOf(PLAY_THRESHOLD_MS, durationMs / 2)
+): Boolean = playedMs > 0 && playedMs >= playThresholdMs(durationMs)
+
+internal fun playThresholdMs(durationMs: Long): Long = if (durationMs > 0) minOf(PLAY_THRESHOLD_MS, durationMs / 2) else PLAY_THRESHOLD_MS
 
 /**
  * Reports listens to the plugin that played them, so a provider's history and recommendations learn
@@ -42,16 +52,74 @@ internal fun countsAsPlay(
  */
 @Singleton
 class AccountPlayHistory
-    @Inject
-    constructor(
-        @ApplicationContext context: Context,
+    internal constructor(
+        private val dataStore: DataStore<Preferences>,
         private val pluginAudio: PluginAudio,
         private val pluginVideo: PluginVideo,
+        private val scope: CoroutineScope,
     ) {
-        private val dataStore = context.applicationContext.accountPlayHistoryDataStore
-
         // Outlives the music service: a listen is often finalized from its onDestroy.
-        private val scope = CoroutineScope(SupervisorJob() + PerformanceDispatcher.networkIO)
+        @Inject
+        constructor(
+            @ApplicationContext context: Context,
+            pluginAudio: PluginAudio,
+            pluginVideo: PluginVideo,
+        ) : this(
+            context.applicationContext.accountPlayHistoryDataStore,
+            pluginAudio,
+            pluginVideo,
+            CoroutineScope(SupervisorJob() + PerformanceDispatcher.networkIO),
+        )
+
+        private data class ListenReport(
+            val track: MusicTrack,
+            val played: ResolvedAudio,
+            val playedMs: Long,
+            val durationMs: Long,
+            val positionMs: Long?,
+            val progress: Boolean,
+            val playbackSessionId: String?,
+        )
+
+        // A seek flush followed by its new baseline must retain order across suspended plugin calls.
+        private val listens = Channel<ListenReport>(Channel.UNLIMITED)
+
+        init {
+            scope.launch {
+                for (listen in listens) {
+                    try {
+                        if (!enabled.first()) {
+                            PlaybackTrace.event(TraceEvent.HISTORY_DISABLED, category = TraceCategory.HISTORY)
+                            continue
+                        }
+                        val send: suspend () -> Unit = {
+                            pluginAudio.reportPinnedListen(
+                                listen.played,
+                                listen.playedMs,
+                                listen.durationMs.takeIf { it > 0 },
+                                listen.positionMs,
+                                listen.progress,
+                                listen.playbackSessionId,
+                            )
+                        }
+                        // A dropped cadence sample is recovered by the next cumulative one; nothing
+                        // follows a final report, so it waits out transient failures in queue order.
+                        if (listen.progress) {
+                            send()
+                        } else {
+                            retryingTransient(beforeRetry = { check(enabled.first()) { "History was switched off" } }) { send() }
+                        }
+                        Log.d(TAG, "Play of ${listen.track.videoId} reported")
+                    } catch (e: PluginCallException) {
+                        Log.w(TAG, "Play of ${listen.track.videoId} not reported: ${e.error.message}")
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Play of ${listen.track.videoId} not reported: ${e.javaClass.simpleName}")
+                    }
+                }
+            }
+        }
 
         val enabled: Flow<Boolean> = dataStore.data.map { it[ENABLED] ?: true }
 
@@ -59,22 +127,26 @@ class AccountPlayHistory
             dataStore.edit { it[ENABLED] = enabled }
         }
 
-        /** Called once per finished listen; reports it when it counts as a play and the setting is on. */
+        /** Reports qualified playing progress or the finished listen, when the setting is on. */
         fun onListened(
             track: MusicTrack,
             playedMs: Long,
             durationMs: Long,
+            positionMs: Long? = null,
+            progress: Boolean = false,
+            playbackSessionId: String? = null,
         ) {
             if (!countsAsPlay(playedMs, durationMs)) return
-            scope.launch {
-                if (!enabled.first()) return@launch
-                try {
-                    pluginAudio.reportListen(MusicVideoItems.descriptor(track), playedMs, durationMs)
-                    Log.d(TAG, "Play of ${track.videoId} reported")
-                } catch (e: PluginCallException) {
-                    Log.w(TAG, "Play of ${track.videoId} not reported: ${e.error.message}")
-                }
-            }
+            // Pinned now: an account or quality change before the send or a retry must not redirect it.
+            val played = pluginAudio.acceptedListen(MusicVideoItems.descriptor(track)) ?: return
+            PlaybackTrace.event(
+                TraceEvent.HISTORY_QUEUED,
+                TraceField.PLAYED_MS to playedMs,
+                TraceField.POSITION_MS to (positionMs ?: -1L),
+                TraceField.PROGRESS to if (progress) 1L else 0L,
+                category = TraceCategory.HISTORY,
+            )
+            listens.trySend(ListenReport(track, played, playedMs, durationMs, positionMs, progress, playbackSessionId))
         }
 
         /**
@@ -86,7 +158,7 @@ class AccountPlayHistory
             watchedMs: Long,
             durationMs: Long,
         ) {
-            if (!countsAsPlay(watchedMs, durationMs.takeIf { it > 0 } ?: Long.MAX_VALUE)) return
+            if (!countsAsPlay(watchedMs, durationMs)) return
             scope.launch {
                 if (!enabled.first()) return@launch
                 try {

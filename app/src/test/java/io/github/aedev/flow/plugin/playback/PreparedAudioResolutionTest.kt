@@ -7,6 +7,7 @@ import io.github.aedev.flow.plugin.runtime.PluginCallException
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
 import nl.neerdael.milkbeat.plugin.ApiRange
@@ -48,14 +49,15 @@ class PreparedAudioResolutionTest : PluginAudioFixture() {
             val selected = ProviderSelection(audio = listOf("youtube", "spotify"))
             every { registry.state } returns MutableStateFlow(PluginRegistryState(listOf(videoProvider, source), selected))
             coEvery { host.call("youtube", PluginOperations.matchAudio, any()) } returns AudioMatches(listOf(candidate))
-            coEvery { host.call("spotify", PluginOperations.resolveAudio, any()) } returns stream
+            coEvery { host.call("spotify", PluginOperations.resolveAudio, any()) } coAnswers { awaitCancellation() }
             audio.resolve(original, null, preparePicture = limits)
+            coEvery { host.call("spotify", PluginOperations.resolveAudio, any()) } returns stream
             audio.failed(original.ref.providerId, stream.url, 403)
             assertThat(audio.resolve(original, null, preparePicture = limits).pluginId).isEqualTo("youtube")
             audio.failed(original.ref.providerId, stream.url, 403)
             assertThat(audio.resolve(original, null, preparePicture = limits).pluginId).isEqualTo("spotify")
             coVerify(exactly = 2) { host.call("youtube", PluginOperations.resolveAudio, any()) }
-            coVerify(exactly = 1) {
+            coVerify(exactly = 2) {
                 host.call(
                     "spotify",
                     PluginOperations.resolveAudio,
