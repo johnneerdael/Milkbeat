@@ -38,9 +38,24 @@ catalog writes. Pull main before registering entries and resolve competing
 branch changes by registering against the latest catalog.
 
 Commit `app/src/main/assets/plugin-download-catalog.json` with the change.
-The app's next build delivers new entries; existing installations need an app
-update to recognize them. A code maps to a URL, not to an automatically updated
-plugin version. Changing hosting URLs requires a new registration.
+Stable builds read the catalog and `plugins/published.json` from `main`, so a
+merged entry works without an app update; offline, and in the Preview app, the
+bundled copy answers. A code resolves to its plugin's current release in
+`plugins/published.json`. This tool only adds codes; the private publisher's
+copy also has `update <plugin-id> <name> <url> <code>`, which repoints an
+existing code when the same release moves.
+
+## Restore a missing archive
+
+When a published code's Buzzheavier page reports the file is gone, re-upload the
+exact signed archive that `plugins/published.json` names (same SHA-256 and size),
+never a rebuild: a rebuild is signed anew. The publisher's `publication-state`
+history keeps past archives. Upload it into the publishing account folder under its
+provider, versionCode and SHA-256 file name, check that the downloaded bytes match,
+then repoint only that code in the stable catalog with the publisher's `update`
+command. `plugins/published.json` stays unchanged. Run
+`node plugins/scripts/verify-published-plugins.mjs` and
+`node .github/scripts/plugin-codes.mjs check` before opening the PR.
 
 ## URL protection
 
