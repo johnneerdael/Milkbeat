@@ -1,6 +1,5 @@
 package io.github.aedev.flow.plugin.smoke
 
-import android.os.ParcelFileDescriptor
 import android.os.SystemClock
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
@@ -8,7 +7,6 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.analytics.AnalyticsListener
 import androidx.media3.session.MediaController
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import androidx.test.platform.app.InstrumentationRegistry
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
 import io.github.aedev.flow.data.download.DownloadUtil
@@ -128,6 +126,7 @@ class SmartTubeKnownIdStartupDeviceTest {
             var controller: MediaController? = null
             var engine: ExoPlayer? = null
             var snapshot: SmartTubePlaybackSnapshot? = null
+            var traceCapture: SmartTubeLiveTrace? = null
             val firstOutputMs = AtomicLong(-1L)
             var requestedMs = Long.MAX_VALUE
             val analytics =
@@ -183,6 +182,8 @@ class SmartTubeKnownIdStartupDeviceTest {
                             descriptor = PluginJson.encodeToString(TrackDescriptor.serializer(), descriptor),
                             playbackContext = MusicPlaybackContext("known-id-startup", "", SmartTubeSmoke.PROVIDER),
                         )
+                    traceCapture = SmartTubeLiveTrace()
+                    SmartTubeSmoke.await(5000) { requireNotNull(traceCapture).ready }
                     withContext(Dispatchers.Main) {
                         requestedMs = SystemClock.elapsedRealtime()
                         manager.playTrack(track, "", listOf(track))
@@ -216,7 +217,7 @@ class SmartTubeKnownIdStartupDeviceTest {
                             player.currentPosition
                         }
                     delay(250)
-                    val traces = traceLines(requestedMs, SystemClock.elapsedRealtime())
+                    val traces = requireNotNull(traceCapture).linesBetween(requestedMs, SystemClock.elapsedRealtime())
                     assertTrue("Known-ID routing bypass was not observed", traces.any { "event=known_id_bypass " in it })
                     assertTrue("A known YouTube ID must never cross-match", traces.none { "event=cross_provider_search " in it })
                     assertTrue(
@@ -264,35 +265,16 @@ class SmartTubeKnownIdStartupDeviceTest {
                         withContext(Dispatchers.Main) { snapshot?.restore(controller, manager) }
                     } finally {
                         try {
-                            preferences.setEnabled(savedPreference)
+                            withContext(Dispatchers.IO) { traceCapture?.close() }
                         } finally {
-                            PlaybackTrace.setEnabled(savedTraceEnabled)
+                            try {
+                                preferences.setEnabled(savedPreference)
+                            } finally {
+                                PlaybackTrace.setEnabled(savedTraceEnabled)
+                            }
                         }
                     }
                 }
             }
         }
-
-    private fun traceLines(
-        startMs: Long,
-        endMs: Long,
-    ): List<String> {
-        val descriptor =
-            InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand(
-                "logcat -d -v raw -s MilkbeatTrace:I '*:S'",
-            )
-        return ParcelFileDescriptor.AutoCloseInputStream(descriptor).bufferedReader().use { reader ->
-            reader
-                .lineSequence()
-                .filter { line ->
-                    val time =
-                        Regex("^t_ms=([0-9]+) ")
-                            .find(line)
-                            ?.groupValues
-                            ?.get(1)
-                            ?.toLongOrNull()
-                    time != null && time in startMs..endMs
-                }.toList()
-        }
-    }
 }
