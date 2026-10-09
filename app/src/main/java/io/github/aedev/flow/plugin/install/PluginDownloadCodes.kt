@@ -96,6 +96,9 @@ internal fun pluginDownloadSource(
         val entry =
             live?.catalog?.get(input) ?: catalog()[input]
                 ?: throw PluginInstallException(messageResource = R.string.tv_plugins_code_unknown)
+        val current = live?.currentRelease(entry.id)
+        // The current release would be refused after downloading it; say so before fetching anything.
+        if (current?.requiresNewerApp == true) throw PluginRequiresAppUpdateException(entry.name, current.apiMin, current.format)
         return PluginDownloadSource(live?.currentUrl(entry.id) ?: entry.url, entry.id)
     }
     if (input.matches(Regex("[+-]?[0-9]+"))) throw PluginInstallException(messageResource = R.string.tv_plugins_input_invalid)
@@ -113,7 +116,8 @@ internal fun decodePluginDownloadCatalog(raw: String): Map<String, PluginDownloa
     require(key.size == 32 && nonce.size == SyncCrypto.NONCE_LEN && payload.size >= SyncCrypto.TAG_LEN)
     // The bundled key makes this protection against casual inspection, not a secret vault.
     val plaintext = SyncCrypto.open(key, nonce, payload, CATALOG_AAD.toByteArray())
-    val entries = Json.decodeFromString<List<PluginDownloadCode>>(plaintext.toString(Charsets.UTF_8))
+    // Builds before this one reject unknown entry fields, so the publisher cannot add any until those are retired.
+    val entries = PublishedJson.decodeFromString<List<PluginDownloadCode>>(plaintext.toString(Charsets.UTF_8))
     require(
         entries.size <= 1000 && entries.map { it.code }.toSet().size == entries.size && entries.map { it.url }.toSet().size == entries.size,
     )

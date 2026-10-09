@@ -91,7 +91,7 @@ class PluginAutoUpdaterTest {
     @Test
     fun `an update that asks for nothing new installs by itself`() =
         runTest {
-            coEvery { checker.check(any()) } returns listOf(update("yt", 5))
+            coEvery { checker.check(any()) } returns PluginUpdates(listOf(update("yt", 5)))
             val ytPending = pending(yt, 5)
             coEvery { installer.fetch("https://buzzheavier.com/yt", update("yt", 5)) } returns ytPending
             coEvery { installer.install(ytPending) } returns installed("yt", 5)
@@ -107,7 +107,7 @@ class PluginAutoUpdaterTest {
     @Test
     fun `an update that wants new hosts or browser pages waits for the listener`() =
         runTest {
-            coEvery { checker.check(any()) } returns listOf(update("yt", 5), update("spotify", 3))
+            coEvery { checker.check(any()) } returns PluginUpdates(listOf(update("yt", 5), update("spotify", 3)))
             coEvery { installer.fetch(any(), update("yt", 5)) } returns pending(yt, 5, network = listOf("music.youtube.com", "new.example"))
             coEvery { installer.fetch(any(), update("spotify", 3)) } returns pending(spotify, 3, browser = listOf("accounts.spotify.com"))
 
@@ -121,7 +121,7 @@ class PluginAutoUpdaterTest {
     @Test
     fun `a browser check waits for review, a failed download is retried, and the others still install`() =
         runTest {
-            coEvery { checker.check(any()) } returns listOf(update("yt", 5), update("spotify", 3))
+            coEvery { checker.check(any()) } returns PluginUpdates(listOf(update("yt", 5), update("spotify", 3)))
             coEvery { installer.fetch(any(), update("yt", 5)) } throws
                 BrowserVerificationRequiredException(mockk(relaxed = true))
             val spotifyPending = pending(spotify, 3)
@@ -134,7 +134,7 @@ class PluginAutoUpdaterTest {
             assertThat(withChallenge.installed).containsExactly(update("spotify", 3))
 
             coEvery { installer.fetch(any(), update("yt", 5)) } throws IOException("offline")
-            coEvery { checker.check(any()) } returns listOf(update("yt", 5))
+            coEvery { checker.check(any()) } returns PluginUpdates(listOf(update("yt", 5)))
 
             val offline = updater().updateAll() as PluginUpdatesState.Checked
 
@@ -145,7 +145,7 @@ class PluginAutoUpdaterTest {
     @Test
     fun `a failed download is tried again next run and is never reported as needing review`() =
         runTest {
-            coEvery { checker.check(any()) } returns listOf(update("yt", 5))
+            coEvery { checker.check(any()) } returns PluginUpdates(listOf(update("yt", 5)))
             coEvery { installer.fetch(any(), update("yt", 5)) } throws IOException("offline")
             val updater = updater()
             backgroundScope.launch { updater.checkWhileForeground() }
@@ -160,7 +160,7 @@ class PluginAutoUpdaterTest {
     @Test
     fun `an update the listener already saw waiting in Settings is not announced by the background check`() =
         runTest {
-            coEvery { checker.check(any()) } returns listOf(update("yt", 5))
+            coEvery { checker.check(any()) } returns PluginUpdates(listOf(update("yt", 5)))
             coEvery { installer.fetch(any(), update("yt", 5)) } returns pending(yt, 5, network = listOf("new.example"))
             val updater = updater()
             updater.updateAll()
@@ -177,7 +177,7 @@ class PluginAutoUpdaterTest {
             val release = CompletableDeferred<Unit>()
             coEvery { checker.check(any()) } coAnswers {
                 release.await()
-                listOf(update("spotify", 3))
+                PluginUpdates(listOf(update("spotify", 3)))
             }
             val spotifyPending = pending(spotify, 3)
             coEvery { installer.fetch(any(), update("spotify", 3)) } returns spotifyPending
@@ -198,7 +198,7 @@ class PluginAutoUpdaterTest {
     @Test
     fun `marking a report shown keeps what a later run added to it`() =
         runTest {
-            coEvery { checker.check(any()) } returns listOf(update("spotify", 3))
+            coEvery { checker.check(any()) } returns PluginUpdates(listOf(update("spotify", 3)))
             val spotifyPending = pending(spotify, 3)
             coEvery { installer.fetch(any(), update("spotify", 3)) } returns spotifyPending
             coEvery { installer.install(spotifyPending) } returns installed("spotify", 3)
@@ -207,7 +207,7 @@ class PluginAutoUpdaterTest {
             advanceTimeBy(AUTO_UPDATE_FIRST_CHECK_MS + 1)
             val shown = updater.report.value!!
 
-            coEvery { checker.check(any()) } returns listOf(update("yt", 5))
+            coEvery { checker.check(any()) } returns PluginUpdates(listOf(update("yt", 5)))
             coEvery { installer.fetch(any(), update("yt", 5)) } returns pending(yt, 5, network = listOf("new.example"))
             advanceTimeBy(AUTO_UPDATE_INTERVAL_MS)
             updater.markReported(shown)
@@ -229,7 +229,7 @@ class PluginAutoUpdaterTest {
             val release = CompletableDeferred<Unit>()
             coEvery { checker.check(any()) } coAnswers {
                 release.await()
-                emptyList()
+                PluginUpdates()
             }
             val updater = updater()
 
@@ -246,7 +246,7 @@ class PluginAutoUpdaterTest {
     @Test
     fun `installing an offered update by hand drops it from what is left`() =
         runTest {
-            coEvery { checker.check(any()) } returns listOf(update("yt", 5))
+            coEvery { checker.check(any()) } returns PluginUpdates(listOf(update("yt", 5)))
             coEvery { installer.fetch(any<String>(), any<PluginUpdate>()) } returns pending(yt, 5, network = listOf("new.example"))
             val updater = updater()
             updater.updateAll()
@@ -259,7 +259,7 @@ class PluginAutoUpdaterTest {
     @Test
     fun `the background check reports what it installed and each update needing review once`() =
         runTest {
-            coEvery { checker.check(any()) } returns listOf(update("yt", 5), update("spotify", 3))
+            coEvery { checker.check(any()) } returns PluginUpdates(listOf(update("yt", 5), update("spotify", 3)))
             coEvery { installer.fetch(any(), update("yt", 5)) } returns pending(yt, 5, network = listOf("new.example"))
             val spotifyPending = pending(spotify, 3)
             coEvery { installer.fetch(any(), update("spotify", 3)) } returns spotifyPending
@@ -274,7 +274,7 @@ class PluginAutoUpdaterTest {
             ).isEqualTo(PluginUpdateReport(installed = listOf(update("spotify", 3)), needsReview = listOf(update("yt", 5))))
             updater.markReported(report!!)
 
-            coEvery { checker.check(any()) } returns listOf(update("yt", 5))
+            coEvery { checker.check(any()) } returns PluginUpdates(listOf(update("yt", 5)))
             advanceTimeBy(AUTO_UPDATE_INTERVAL_MS)
             assertThat(updater.report.value).isNull()
             coVerify(exactly = 2) { checker.check(any()) }
@@ -296,7 +296,7 @@ class PluginAutoUpdaterTest {
     @Test
     fun `an update held for review is not downloaded again on the next run`() =
         runTest {
-            coEvery { checker.check(any()) } returns listOf(update("yt", 5))
+            coEvery { checker.check(any()) } returns PluginUpdates(listOf(update("yt", 5)))
             coEvery { installer.fetch(any(), update("yt", 5)) } returns pending(yt, 5, network = listOf("new.example"))
             val updater = updater()
 
@@ -311,7 +311,7 @@ class PluginAutoUpdaterTest {
     fun `an installed update of a plugin with sign-in refreshes its account`() =
         runTest {
             val withSignIn = installed("yt", 5).let { it.copy(manifest = it.manifest.copy(signIn = listOf(mockk<SignInMethod>()))) }
-            coEvery { checker.check(any()) } returns listOf(update("yt", 5))
+            coEvery { checker.check(any()) } returns PluginUpdates(listOf(update("yt", 5)))
             val ytPending = pending(yt, 5)
             coEvery { installer.fetch(any(), update("yt", 5)) } returns ytPending
             coEvery { installer.install(ytPending) } returns withSignIn
@@ -330,7 +330,7 @@ class PluginAutoUpdaterTest {
             val writing = CompletableDeferred<Unit>()
             val finish = CompletableDeferred<Unit>()
             var finished = false
-            coEvery { checker.check(any()) } returns listOf(update("yt", 5))
+            coEvery { checker.check(any()) } returns PluginUpdates(listOf(update("yt", 5)))
             val ytPending = pending(yt, 5)
             coEvery { installer.fetch(any(), update("yt", 5)) } returns ytPending
             coEvery { installer.install(ytPending) } coAnswers {
@@ -350,6 +350,69 @@ class PluginAutoUpdaterTest {
 
             assertThat(finished).isTrue()
             assertThat(updater.state.first()).isNotEqualTo(PluginUpdatesState.Checking)
+        }
+
+    @Test
+    fun `an update that needs a newer Milkbeat is never downloaded, failed or retried`() =
+        runTest {
+            coEvery { checker.check(any()) } returns PluginUpdates(requiresAppUpdate = listOf(update("yt", 5)))
+            val updater = updater()
+
+            val first = updater.updateAll() as PluginUpdatesState.Checked
+            val again = updater.updateAll() as PluginUpdatesState.Checked
+
+            assertThat(first.requiresAppUpdate).containsExactly(update("yt", 5))
+            assertThat(first.failed).isEmpty()
+            assertThat(first.updates).isEmpty()
+            assertThat(again).isEqualTo(first)
+            coVerify(exactly = 0) { installer.fetch(any<String>(), any()) }
+        }
+
+    @Test
+    fun `the background check announces an update needing a newer Milkbeat once per process`() =
+        runTest {
+            coEvery { checker.check(any()) } returns PluginUpdates(requiresAppUpdate = listOf(update("yt", 5)))
+            val updater = updater()
+            backgroundScope.launch { updater.checkWhileForeground() }
+
+            advanceTimeBy(AUTO_UPDATE_FIRST_CHECK_MS + 1)
+            val report = updater.report.value
+            assertThat(report).isEqualTo(PluginUpdateReport(emptyList(), emptyList(), requiresAppUpdate = listOf(update("yt", 5))))
+            updater.markReported(report!!)
+
+            advanceTimeBy(AUTO_UPDATE_INTERVAL_MS)
+            assertThat(updater.report.value).isNull()
+            coVerify(exactly = 2) { checker.check(any()) }
+            coVerify(exactly = 0) { installer.fetch(any<String>(), any()) }
+        }
+
+    @Test
+    fun `a package refused as too new for this Milkbeat waits for an app update instead of failing`() =
+        runTest {
+            coEvery { checker.check(any()) } returns PluginUpdates(listOf(update("yt", 5)))
+            coEvery { installer.fetch(any(), update("yt", 5)) } throws
+                PluginRequiresAppUpdateException("Plugin yt", apiMin = 99, format = 1)
+            val updater = updater()
+
+            val first = updater.updateAll() as PluginUpdatesState.Checked
+            val again = updater.updateAll() as PluginUpdatesState.Checked
+
+            assertThat(first.requiresAppUpdate).containsExactly(update("yt", 5))
+            assertThat(first.failed).isEmpty()
+            assertThat(again.requiresAppUpdate).containsExactly(update("yt", 5))
+            coVerify(exactly = 1) { installer.fetch(any(), update("yt", 5)) }
+        }
+
+    @Test
+    fun `installing the waiting version after an app update withdraws it`() =
+        runTest {
+            coEvery { checker.check(any()) } returns PluginUpdates(requiresAppUpdate = listOf(update("yt", 5)))
+            val updater = updater()
+            updater.updateAll()
+
+            registryState.value = PluginRegistryState(plugins = listOf(installed("yt", 5), spotify))
+
+            assertThat((updater.state.first() as PluginUpdatesState.Checked).requiresAppUpdate).isEmpty()
         }
 
     private companion object {

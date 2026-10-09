@@ -4,7 +4,8 @@ import {createHash,createPublicKey,verify} from 'node:crypto';
 const digest=bytes=>createHash('sha256').update(bytes).digest('hex');
 const decoder=new TextDecoder('utf-8',{fatal:true});
 const validPath=path=>path && !path.startsWith('/') && !path.includes('\\') && !path.split('/').some(part=>part==='..' || part==='.');
-export function verifyPackage(bytes,{id,fingerprint}={}) {
+// apiMin and format are what a published.json row states for this package; Milkbeat skips updates it would refuse.
+export function verifyPackage(bytes,{id,fingerprint,apiMin,format}={}) {
   if(!bytes?.length || bytes.length>64*1024*1024)throw new Error('Package size is invalid');
   let total=0,count=0;const names=new Set();
   const files=unzipSync(bytes,{filter:entry=>{
@@ -39,5 +40,9 @@ export function verifyPackage(bytes,{id,fingerprint}={}) {
   if(manifest.format!==1 || !/^[a-z][a-z0-9_]*(\.[a-z0-9_-]+)+$/.test(manifest.id) || !Number.isInteger(manifest.versionCode))throw new Error('Package manifest is invalid');
   if(id && manifest.id!==id)throw new Error('Package ID does not match');
   if(!files[manifest.entry??'plugin.js'])throw new Error('Package entry point is missing');
-  return {manifest,fingerprint:actual,sha256:digest(bytes),contentDigest:digest(listing)};
+  const requirements={apiMin:manifest.api?.min,format:manifest.format};
+  if(!Number.isInteger(requirements.apiMin) || requirements.apiMin<1)throw new Error('Package API minimum is invalid');
+  if(apiMin!==undefined && apiMin!==requirements.apiMin)throw new Error('Published API minimum does not match the package');
+  if(format!==undefined && format!==requirements.format)throw new Error('Published format does not match the package');
+  return {manifest,fingerprint:actual,sha256:digest(bytes),contentDigest:digest(listing),...requirements};
 }

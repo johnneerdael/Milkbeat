@@ -7,8 +7,10 @@ import com.google.common.truth.Truth.assertThat
 import io.github.aedev.flow.R
 import io.github.aedev.flow.plugin.pkg.PluginPackage
 import io.github.aedev.flow.plugin.pkg.PluginPackageReader
+import io.github.aedev.flow.plugin.pkg.signedTestPackage
 import io.github.aedev.flow.plugin.registry.PluginRegistry
 import kotlinx.coroutines.runBlocking
+import nl.neerdael.milkbeat.plugin.PLUGIN_API_VERSION
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Protocol
@@ -27,7 +29,12 @@ import java.security.MessageDigest
 class PluginInstallerCodeTest {
     private val fixture = checkNotNull(javaClass.getResourceAsStream("/plugins/fixture-signed.mbplugin")).use { it.readBytes() }
 
-    private fun serveFixture(request: Request): Response {
+    private fun serveFixture(request: Request): Response = serve(request, fixture)
+
+    private fun serve(
+        request: Request,
+        bytes: ByteArray,
+    ): Response {
         val response =
             Response
                 .Builder()
@@ -37,7 +44,7 @@ class PluginInstallerCodeTest {
                 .message("OK")
         return when {
             request.url.host == "ts.buzzheavier.com" -> {
-                response.body(fixture.toResponseBody("application/octet-stream".toMediaType()))
+                response.body(bytes.toResponseBody("application/octet-stream".toMediaType()))
             }
 
             request.url.encodedPath.endsWith("/download") -> {
@@ -81,6 +88,24 @@ class PluginInstallerCodeTest {
             val failure = assertThrows(PluginInstallException::class.java) { runBlocking { installer.fetch("102") } }
             assertThat(failure.messageResource).isEqualTo(R.string.tv_plugins_code_package_mismatch)
         }
+
+    @Test
+    fun `a package for a newer Milkbeat is refused with the API it needs rather than as a broken download`() {
+        val api = PLUGIN_API_VERSION + 1
+        val manifest =
+            """{"format":1,"api":{"min":$api,"target":$api},"id":"dev.example.future","name":"Future","version":"2.0.0",""" +
+                """"versionCode":2,"roles":{"audio":{"idSpaces":["future"]}}}"""
+        val future = signedTestPackage(mapOf("manifest.json" to manifest, "plugin.js" to "definePlugin({})")).readBytes()
+        withInstaller({ serve(it, future) }) { installer ->
+            val failure =
+                assertThrows(PluginRequiresAppUpdateException::class.java) {
+                    runBlocking { installer.fetch("https://buzzheavier.com/future123456") }
+                }
+            assertThat(failure.pluginName).isEqualTo("Future")
+            assertThat(failure.apiMin).isEqualTo(api)
+            assertThat(failure.format).isEqualTo(1)
+        }
+    }
 
     @Test
     fun `an update installs only the exact release it offered`() =

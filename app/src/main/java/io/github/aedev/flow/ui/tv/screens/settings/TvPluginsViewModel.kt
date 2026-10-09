@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.aedev.flow.data.account.AccountPlayHistory
+import io.github.aedev.flow.data.update.AutoUpdater
 import io.github.aedev.flow.plugin.catalog.PluginAccounts
 import io.github.aedev.flow.plugin.install.BrowserVerification
 import io.github.aedev.flow.plugin.install.BrowserVerificationRequiredException
@@ -13,6 +14,7 @@ import io.github.aedev.flow.plugin.install.PluginAutoUpdater
 import io.github.aedev.flow.plugin.install.PluginInstallException
 import io.github.aedev.flow.plugin.install.PluginInstaller
 import io.github.aedev.flow.plugin.install.PluginLinks
+import io.github.aedev.flow.plugin.install.PluginRequiresAppUpdateException
 import io.github.aedev.flow.plugin.install.PluginUpdate
 import io.github.aedev.flow.plugin.install.PluginUpdatesState
 import io.github.aedev.flow.plugin.preload.PlaylistPreloadJobs
@@ -31,7 +33,7 @@ import kotlinx.coroutines.launch
 import nl.neerdael.milkbeat.catalog.ProviderAccount
 import javax.inject.Inject
 
-/** Where adding a plugin stands: nothing, fetching it, waiting on a browser check or for consent, or failed. */
+/** Where adding a plugin stands: nothing, fetching it, waiting on a browser check or for consent, needing a newer app, or failed. */
 sealed interface AddPluginState {
     data object Idle : AddPluginState
 
@@ -43,6 +45,10 @@ sealed interface AddPluginState {
 
     data class Consent(
         val pending: PendingInstall,
+    ) : AddPluginState
+
+    data class RequiresAppUpdate(
+        val pluginName: String,
     ) : AddPluginState
 
     data class Failed(
@@ -70,12 +76,16 @@ class TvPluginsViewModel
         private val pluginUpdater: PluginAutoUpdater,
         private val accounts: PluginAccounts,
         private val playHistory: AccountPlayHistory,
+        autoUpdater: AutoUpdater,
         links: PluginLinks,
         val preloadJobs: PlaylistPreloadJobs,
         private val savedState: SavedStateHandle,
         val mirrors: io.github.aedev.flow.plugin.mirror.PlaylistMirrorCoordinator,
     ) : ViewModel() {
         private val adding = MutableStateFlow<AddPluginState>(AddPluginState.Idle)
+
+        /** Whether this build installs Milkbeat updates itself, so a plugin needing a newer app can point there. */
+        val appUpdatesAvailable: Boolean = autoUpdater.isAvailable
         private var fetchJob: Job? = null
 
         val state: StateFlow<TvPluginsState> =
@@ -143,6 +153,8 @@ class TvPluginsViewModel
                             AddPluginState.Consent(fetch())
                         } catch (e: BrowserVerificationRequiredException) {
                             AddPluginState.Verifying(e.verification)
+                        } catch (e: PluginRequiresAppUpdateException) {
+                            AddPluginState.RequiresAppUpdate(e.pluginName)
                         } catch (e: PluginInstallException) {
                             AddPluginState.Failed(e.message.orEmpty(), e.messageResource)
                         }

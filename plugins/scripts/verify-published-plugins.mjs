@@ -14,6 +14,8 @@ export function verifyPublishedPlugins({descriptor,catalog,expectedAuthor=AUTHOR
   if(typeof row.version!=='string' || !row.version)throw new Error('Invalid published plugin version');
   if(channel==='stable' && row.version.includes('-'))throw new Error('Prerelease plugin cannot appear in stable publication');
   if(!expectedIds.includes(row.id) || ids.has(row.id) || row.fingerprint!==expectedAuthor || !/^[a-f0-9]{64}$/.test(row.sha256) || !Number.isInteger(row.size) || row.size<=0 || row.size>64*1024*1024 || !Number.isInteger(row.versionCode) || !/^[0-9]{3}$/.test(row.code))throw new Error('Invalid published plugin identity');
+  // Optional so lists written before them stay valid; the app reads a missing value as 1.
+  for(const field of ['apiMin','format'])if(row[field]!==undefined && (!Number.isInteger(row[field]) || row[field]<1))throw new Error(`Invalid published plugin ${field}`);
   ids.add(row.id);
   const entry=catalog.find(entry=>entry.code===row.code);
   if(!entry || entry.id!==row.id)throw new Error('Published code does not match the plugin catalog');

@@ -63,3 +63,12 @@ test('stable and preview both publish YouTube Video, and stable rejects a list w
  const withoutVideo={...stable,plugins:stable.plugins.filter(row=>row.id!=='nl.neerdael.youtube-video')};
  assert.throws(()=>verifyPublishedPlugins({descriptor:withoutVideo,catalog}),/Invalid published plugin descriptor/);
 });
+
+test('a published row may state the API minimum and format Milkbeat needs, as positive integers',()=>{
+ const stated=fixture();Object.assign(stated.descriptor.plugins[0],{apiMin:8,format:1});
+ assert.equal(verifyPublishedPlugins(stated)[0].apiMin,8);
+ for(const [field,value] of [['apiMin',0],['apiMin','8'],['format',1.5]]){
+  const x=fixture();x.descriptor.plugins[0][field]=value;
+  assert.throws(()=>verifyPublishedPlugins(x),new RegExp(field),`${field}=${value}`);
+ }
+});

@@ -59,6 +59,7 @@ private enum class ProviderRole { AUDIO, VIDEO }
 @Composable
 fun TvPluginsSettingsPane(
     onSignIn: (pluginId: String, methodId: String) -> Unit,
+    onOpenAppUpdates: () -> Unit,
     modifier: Modifier = Modifier,
     homeRevision: Int = 0,
     viewModel: TvPluginsViewModel = hiltViewModel(),
@@ -188,6 +189,7 @@ fun TvPluginsSettingsPane(
                         onAutomaticUpdatesChange = viewModel::setAutomaticUpdates,
                         onUpdateAll = viewModel::updateAll,
                         onUpdate = viewModel::update,
+                        onUpdateApp = onOpenAppUpdates.takeIf { viewModel.appUpdatesAvailable },
                     )
                 }
             }
@@ -221,6 +223,7 @@ private fun LazyListScope.overviewItems(
     onAutomaticUpdatesChange: (Boolean) -> Unit,
     onUpdateAll: () -> Unit,
     onUpdate: (PluginUpdate) -> Unit,
+    onUpdateApp: (() -> Unit)?,
 ) {
     item(key = "providers-header") { TvSectionHeader(stringResource(R.string.tv_plugins_providers)) }
     ProviderRole.entries.forEach { role ->
@@ -260,6 +263,7 @@ private fun LazyListScope.overviewItems(
             onAutomaticChange = onAutomaticUpdatesChange,
             onUpdateAll = onUpdateAll,
             onUpdate = onUpdate,
+            onUpdateApp = onUpdateApp,
         )
     }
     item(key = "add-header") { TvSectionHeader(stringResource(R.string.tv_plugins_add), modifier = Modifier.padding(top = 12.dp)) }
@@ -285,12 +289,16 @@ private fun LazyListScope.overviewItems(
     }
     when (val adding = state.adding) {
         AddPluginState.Fetching -> {
-            item(key = "add-status") { StatusText(stringResource(R.string.tv_plugins_fetching)) }
+            item(key = "add-status") { PluginStatusText(stringResource(R.string.tv_plugins_fetching)) }
+        }
+
+        is AddPluginState.RequiresAppUpdate -> {
+            requiresAppUpdateItems(adding.pluginName, onUpdateApp)
         }
 
         is AddPluginState.Failed -> {
             item(key = "add-status") {
-                StatusText(adding.messageResource?.let { stringResource(it) } ?: adding.message, error = true)
+                PluginStatusText(adding.messageResource?.let { stringResource(it) } ?: adding.message, error = true)
             }
         }
 
@@ -319,19 +327,19 @@ private fun LazyListScope.consentItems(
             ),
         )
     }
-    manifest.author?.let { item(key = "consent-author") { StatusText(stringResource(R.string.tv_plugins_by, it.name)) } }
-    manifest.description?.let { item(key = "consent-description") { StatusText(it) } }
-    item(key = "consent-roles") { StatusText(stringResource(R.string.tv_plugins_provides, rolesLabel(manifest))) }
+    manifest.author?.let { item(key = "consent-author") { PluginStatusText(stringResource(R.string.tv_plugins_by, it.name)) } }
+    manifest.description?.let { item(key = "consent-description") { PluginStatusText(it) } }
+    item(key = "consent-roles") { PluginStatusText(stringResource(R.string.tv_plugins_provides, rolesLabel(manifest))) }
     val network = if (pending.isUpdate) pending.newNetwork else manifest.permissions.network
     if (network.isNotEmpty()) {
         item(key = "consent-network") {
-            StatusText(stringResource(R.string.tv_plugins_network, network.joinToString(", ")))
+            PluginStatusText(stringResource(R.string.tv_plugins_network, network.joinToString(", ")))
         }
     }
     val browser = if (pending.isUpdate) pending.newBrowser else manifest.permissions.browser
     if (browser.isNotEmpty()) {
         item(key = "consent-browser") {
-            StatusText(stringResource(R.string.tv_plugins_browser, browser.joinToString(", ")))
+            PluginStatusText(stringResource(R.string.tv_plugins_browser, browser.joinToString(", ")))
         }
     }
     item(key = "consent-actions") {
@@ -393,64 +401,8 @@ private fun LazyListScope.chooserItems(
     }
 }
 
-private fun LazyListScope.detailItems(
-    plugin: InstalledPlugin,
-    account: ProviderAccount?,
-    playHistory: Boolean,
-    onPlayHistoryChange: (Boolean) -> Unit,
-    onSignIn: (String) -> Unit,
-    onSignOut: () -> Unit,
-    onRemove: () -> Unit,
-) {
-    item(key = "detail-title") { TvSectionHeader(plugin.manifest.name) }
-    item(key = "detail-version") { StatusText(stringResource(R.string.tv_plugins_version, plugin.manifest.version)) }
-    plugin.manifest.description?.let { item(key = "detail-description") { StatusText(it) } }
-    if (plugin.manifest.signIn.isNotEmpty()) {
-        item(key = "detail-account") {
-            StatusText(
-                when (account) {
-                    is ProviderAccount.SignedIn -> {
-                        account.name?.let { stringResource(R.string.tv_plugins_signed_in_as, it) }
-                            ?: stringResource(R.string.tv_plugins_signed_in)
-                    }
-
-                    ProviderAccount.Expired -> {
-                        stringResource(R.string.tv_plugins_sign_in_expired)
-                    }
-
-                    else -> {
-                        stringResource(R.string.tv_plugins_not_signed_in)
-                    }
-                },
-            )
-        }
-        if (account is ProviderAccount.SignedIn) {
-            val reportsPlays =
-                plugin.manifest.roles.audio
-                    ?.reportPlayback == true || plugin.manifest.roles.video
-                    ?.reportPlayback == true
-            if (reportsPlays) {
-                item(key = "detail-play-history") {
-                    TvToggleRow(
-                        label = stringResource(R.string.tv_account_play_history, plugin.manifest.name),
-                        supportingText = stringResource(R.string.tv_account_play_history_summary, plugin.manifest.name),
-                        checked = playHistory,
-                        onCheckedChange = onPlayHistoryChange,
-                    )
-                }
-            }
-            item(key = "detail-sign-out") { TvNavRow(label = stringResource(R.string.tv_plugins_sign_out), onClick = onSignOut) }
-        } else {
-            items(plugin.manifest.signIn, key = { "detail-sign-in-${it.id}" }) { method ->
-                TvNavRow(label = method.label, onClick = { onSignIn(method.id) })
-            }
-        }
-    }
-    item(key = "detail-remove") { TvNavRow(label = stringResource(R.string.remove), onClick = onRemove) }
-}
-
 @Composable
-private fun StatusText(
+internal fun PluginStatusText(
     text: String,
     error: Boolean = false,
 ) {
