@@ -28,8 +28,8 @@ Capabilities depend on the installed plugin version, the account and its subscri
 
 ## YouTube Video
 
-**YouTube Video 0.1.0** is available in stable Milkbeat with downloader code **932**. It requires
-a Milkbeat build with plugin API 6; update the app before installing if your build is older. It keeps its own
+**YouTube Video 0.1.1** is available in stable Milkbeat with downloader code **932**. It requires
+a Milkbeat build with plugin API 7; update the app before installing if your build is older. It keeps its own
 account alongside YouTube Music and supplies SmartTube's regular YouTube TV Music section:
 recommended music, charts, new videos and the other rows supplied for your region or account.
 Signing in adds Liked Music before those rows. Show More includes the original row and its
@@ -136,7 +136,7 @@ Completed indexing matches are kept when you cancel. Index again after changing 
 ## Sign-in and account requirements
 
 - **YouTube Music:** sign-in is optional. Signing in turns Home into a personalized feed and makes your library available. Free YouTube accounts are supported; Premium is not required for personalization.
-- **YouTube Video:** sign-in is optional. Pair it with a TV code from any phone for a personalized Home and your library; signed out, it browses YouTube's TV Music feeds. YouTube Video 0.1.0 needs a Milkbeat build with plugin API 6.
+- **YouTube Video:** sign-in is optional. Pair it with a TV code from any phone for a personalized Home and your library; signed out, it browses YouTube's TV Music feeds. YouTube Video 0.1.1 needs a Milkbeat build with plugin API 7.
 - **Spotify:** a catalog with **no audio source**. Its value is your personalized feed, playlists, Liked Songs and library after signing in. Keep at least one audio provider enabled.
 - **Beatport:** sign in for the catalog and your library. Beatport's own full-length audio needs an active streaming subscription; otherwise SoundCloud or YouTube Music can match the recording. A free account does not guarantee a match.
 - **SoundCloud:** sign in for personalized Home, playlists, Liked Songs, history and Artists. Public search and catalog pages can work anonymously. Full-track availability depends on the recording and your listening subscription; Artist Pro does not grant Go+ listening rights. Preview-only or restricted recordings can appear but cannot supply full-track audio, so keep another audio provider as a fallback. SoundCloud plugin 0.2.0 needs a Milkbeat build with plugin API 5. TV-paired accounts currently play clear HLS streams only; protected-only recordings cannot play with this session, and plays from a TV-paired account are not reported to SoundCloud. Existing web sessions keep their Widevine playback path where the account and device allow it.
