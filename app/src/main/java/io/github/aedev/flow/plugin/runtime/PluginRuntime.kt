@@ -68,8 +68,8 @@ class PluginCallException(
  * Runs one plugin: its QuickJS context on a thread of its own, created on the first call and closed
  * after five idle minutes unless something holds it warm. Calls go in through the SDK's dispatcher,
  * at most four at a time, each with a time limit; five internal failures in a row disable the plugin
- * until the app restarts. Warm-up runs in a second, short-lived context and thread, so its long
- * synchronous work never holds up page loads.
+ * until the app restarts. API 8 warm-up retains preparation on the same owner as playback. Older
+ * providers keep their separate warm-up context and its larger, longer-lived compilation budget.
  */
 internal class PluginRuntime(
     val plugin: InstalledPlugin,
@@ -131,10 +131,19 @@ internal class PluginRuntime(
         }
     }
 
-    /** Runs the plugin's warm-up, if it has one, in a context of its own that is gone afterwards. */
+    /** API 8 retains prepared browser/worker state; older providers keep isolated compilation warm-up. */
     suspend fun warmUp() {
         if (disabled) return
         val startedMs = SystemClock.elapsedRealtime()
+        if (plugin.manifest.api.target >= 8) {
+            try {
+                call(PluginOperations.warmUp, Unit)
+                Log.i(TAG, "Persistent warm-up of ${plugin.id} took ${SystemClock.elapsedRealtime() - startedMs} ms")
+            } catch (e: PluginCallException) {
+                if (e.error.code != PluginErrorCode.UNSUPPORTED) Log.w(TAG, "Warm-up of ${plugin.id} failed: ${e.error.code}")
+            }
+            return
+        }
         val warm = start(WARM_UP_MEMORY_LIMIT, WARM_UP_TIMEOUT_MS)
         try {
             invoke(warm, PluginOperations.warmUp, Unit, WARM_UP_TIMEOUT_MS)

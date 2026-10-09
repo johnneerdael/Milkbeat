@@ -255,6 +255,7 @@ class SmartTubeKnownIdStartupDeviceTest {
                 }
             } finally {
                 withContext(NonCancellable) {
+                    SmartTubeSmoke.report("KNOWN_ID_CLEANUP", mapOf("step" to "playback"))
                     try {
                         withContext(Dispatchers.Main) {
                             engine?.removeAnalyticsListener(analytics)
@@ -262,15 +263,19 @@ class SmartTubeKnownIdStartupDeviceTest {
                             controller?.clearMediaItems()
                         }
                         registry.select(savedSelection)
+                        SmartTubeSmoke.report("KNOWN_ID_CLEANUP", mapOf("step" to "snapshot"))
                         withContext(Dispatchers.Main) { snapshot?.restore(controller, manager) }
                     } finally {
                         try {
+                            SmartTubeSmoke.report("KNOWN_ID_CLEANUP", mapOf("step" to "trace"))
                             withContext(Dispatchers.IO) { traceCapture?.close() }
+                            SmartTubeSmoke.report("KNOWN_ID_CLEANUP", mapOf("step" to "preferences"))
                         } finally {
                             try {
                                 preferences.setEnabled(savedPreference)
                             } finally {
                                 PlaybackTrace.setEnabled(savedTraceEnabled)
+                                SmartTubeSmoke.report("KNOWN_ID_CLEANUP", mapOf("step" to "finished"))
                             }
                         }
                     }

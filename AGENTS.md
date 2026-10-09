@@ -905,3 +905,7 @@ run that occupies a physical device, and the resulting diff is thousands of line
   listening credit, and each new listen gets a new identity. `AccountPlayHistory` preserves report
   order and its default-on user preference. API <8 stays finish-only. Reuse the accepted cached
   resolution; never re-extract streams for progress reporting. Do not log session IDs or credentials.
+
+- API 8 lifecycle warm-up uses the persistent runtime through the same call/context ownership,
+  memory limit, timeout and grants as playback; earlier APIs retain their isolated compilation
+  warm-up. Deduplicate provider preparation and do not invent account-independent token caches.
