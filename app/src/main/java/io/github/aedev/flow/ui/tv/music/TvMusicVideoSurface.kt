@@ -1,9 +1,17 @@
 package io.github.aedev.flow.ui.tv.music
 
 import androidx.annotation.OptIn
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.viewinterop.AndroidView
@@ -27,6 +35,11 @@ fun TvMusicVideoSurface(
     modifier: Modifier = Modifier,
 ) {
     val lifecycle = LocalLifecycleOwner.current.lifecycle
+    var showJoinIndicator by remember(lifecycle) { mutableStateOf(false) }
+    val joining = remember(lifecycle) { TvMusicVideoJoinObserver(lifecycle) { showJoinIndicator = it } }
+    DisposableEffect(joining) {
+        onDispose { joining.close() }
+    }
     DisposableEffect(lifecycle) {
         var acquired = false
 
@@ -51,16 +64,27 @@ fun TvMusicVideoSurface(
         }
     }
     val shutter = MaterialTheme.colorScheme.scrim.toArgb()
-    AndroidView(
-        factory = { context ->
-            PlayerView(context).apply {
-                useController = false
-                resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
-                setShutterBackgroundColor(shutter)
-            }
-        },
-        update = { it.player = player },
-        onRelease = { it.player = null },
-        modifier = modifier,
-    )
+    Box(modifier = modifier) {
+        AndroidView(
+            factory = { context ->
+                PlayerView(context).apply {
+                    useController = false
+                    resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+                    setShutterBackgroundColor(shutter)
+                }
+            },
+            update = {
+                joining.bind(it, player)
+                it.player = player
+            },
+            onRelease = {
+                joining.releaseSurface(it)
+                it.player = null
+            },
+            modifier = Modifier.fillMaxSize(),
+        )
+        if (showJoinIndicator) {
+            CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+        }
+    }
 }
