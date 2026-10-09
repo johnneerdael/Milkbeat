@@ -1,5 +1,7 @@
 package io.github.aedev.flow.plugin.install
 
+import android.content.Context
+import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.aedev.flow.R
 import io.github.aedev.flow.plugin.registry.InstalledPlugin
 import kotlinx.coroutines.CancellationException
@@ -26,8 +28,12 @@ class PluginUpdateChecker
     @Inject
     constructor(
         private val publication: PluginPublication,
+        @ApplicationContext context: Context,
     ) {
+        private val preview = context.packageName.endsWith(".nightly")
+
         suspend fun check(installed: List<InstalledPlugin>): List<PluginUpdate> {
+            if (preview) return emptyList()
             val current =
                 try {
                     publication.current()

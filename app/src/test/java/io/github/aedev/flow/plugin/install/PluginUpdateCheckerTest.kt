@@ -1,7 +1,13 @@
 package io.github.aedev.flow.plugin.install
 
+import android.content.Context
 import com.google.common.truth.Truth.assertThat
 import io.github.aedev.flow.plugin.registry.InstalledPlugin
+import io.mockk.coEvery
+import io.mockk.coVerify
+import io.mockk.every
+import io.mockk.mockk
+import kotlinx.coroutines.test.runTest
 import nl.neerdael.milkbeat.plugin.ApiRange
 import nl.neerdael.milkbeat.plugin.AudioRole
 import nl.neerdael.milkbeat.plugin.PluginManifest
@@ -43,6 +49,41 @@ class PluginUpdateCheckerTest {
             "494" to PluginDownloadCode("494", "yt", "YouTube Music", "https://buzzheavier.com/zd643kjppfeu"),
             "981" to PluginDownloadCode("981", "spotify", "Spotify", "https://buzzheavier.com/dr3519gvljk0"),
         )
+
+    @Test
+    fun `Preview never reads stable publication or replaces its pinned preview provider`() =
+        runTest {
+            val context = mockk<Context>()
+            every { context.packageName } returns "nl.neerdael.milkbeat.nightly"
+            val publication = mockk<PluginPublication>()
+            val id = "nl.neerdael.youtube-video"
+            coEvery { publication.current() } returns
+                Publication(
+                    PublishedPlugins(listOf(published(id, 7, "932").copy(version = "0.1.0"))),
+                    mapOf("932" to PluginDownloadCode("932", id, "YouTube Video", "https://fixture.example/stable")),
+                )
+            val preview = installed(id, 6).let { it.copy(manifest = it.manifest.copy(version = "0.1.0-preview.6")) }
+            assertThat(PluginUpdateChecker(publication, context).check(listOf(preview))).isEmpty()
+            coVerify(exactly = 0) { publication.current() }
+        }
+
+    @Test
+    fun `stable Milkbeat can upgrade the same author's preview provider to its normal release`() =
+        runTest {
+            val context = mockk<Context>()
+            every { context.packageName } returns "nl.neerdael.milkbeat"
+            val publication = mockk<PluginPublication>()
+            val id = "nl.neerdael.youtube-video"
+            coEvery { publication.current() } returns
+                Publication(
+                    PublishedPlugins(listOf(published(id, 7, "932").copy(version = "0.1.0"))),
+                    mapOf("932" to PluginDownloadCode("932", id, "YouTube Video", "https://fixture.example/stable")),
+                )
+            val preview = installed(id, 6).let { it.copy(manifest = it.manifest.copy(version = "0.1.0-preview.6")) }
+            assertThat(PluginUpdateChecker(publication, context).check(listOf(preview)))
+                .containsExactly(PluginUpdate(id, "Plugin $id", "0.1.0", 7, "https://fixture.example/stable", "sha-$id"))
+            coVerify(exactly = 1) { publication.current() }
+        }
 
     @Test
     fun `a newer version by the same author is offered with its download`() {

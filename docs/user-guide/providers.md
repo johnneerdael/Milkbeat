@@ -24,15 +24,18 @@ There is no metadata provider to choose: every installed, enabled catalog you ca
 
 Capabilities depend on the installed plugin version, the account and its subscription. YouTube Video shares the YouTube tab with YouTube Music: with both installed the tab shows YouTube Music's catalog, and YouTube Video's catalog appears, also without sign-in, when it is the only one. Sign-in with a TV code is optional. The [Preview app](preview-testing.md#youtube-video-plugin) installs its prerelease versions with code **304**.
 
-## YouTube Video preview
+<span id="youtube-video-preview"></span>
 
-**YouTube Video** is a separate provider for a compatible API 6 Preview app. It keeps its own
+## YouTube Video
+
+**YouTube Video 0.1.0** is available in stable Milkbeat with downloader code **932**. It requires
+a Milkbeat build with plugin API 6; update the app before installing if your build is older. It keeps its own
 account alongside YouTube Music and supplies SmartTube's regular YouTube TV Music section:
 recommended music, charts, new videos and the other rows supplied for your region or account.
 Signing in adds Liked Music before those rows. Show More includes the original row and its
 continuations; playlist and mix pages retain track order.
 
-To browse these feeds, disable YouTube Music while testing YouTube Video; the shared YouTube
+To browse these feeds, disable YouTube Music when using YouTube Video for your catalog; the shared YouTube
 tab, Search and Library then show YouTube Video's catalog. YouTube Music's installed package
 and account remain independent. Choose the audio and video sources under Settings → Plugins.
 
@@ -50,8 +53,9 @@ catalog title, artist and recording identity.
 
 The paired host handles SABR through Media3. SABR streams support playback, not offline
 downloads. Audio-only HLS needs an independent audio rendition; a combined audio/video stream
-cannot silently fetch video bytes in audio-only mode. Install the paired provider package for
-your compatible Preview build; app and plugin packages are distributed separately.
+cannot silently fetch video bytes in audio-only mode. App and plugin packages are distributed
+separately. The optional Preview app retains its historical prerelease packages and codes; it
+is not needed to install the released YouTube Video provider.
 
 ## Install a plugin
 
