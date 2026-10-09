@@ -1,5 +1,6 @@
 package io.github.aedev.flow.ui.tv.screens.settings
 
+import android.os.Build
 import androidx.activity.compose.BackHandler
 import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
@@ -23,6 +24,7 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -47,12 +49,18 @@ fun TvVisualizerSettingsPane(
     val timingOffsetMs by viewModel.timingOffsetMs.collectAsStateWithLifecycle()
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val skippedPresets by viewModel.skippedPresets.collectAsStateWithLifecycle()
+    val exitRecords by viewModel.exitRecords.collectAsStateWithLifecycle()
+    var exitReportOpen by remember { mutableStateOf(false) }
+    val exitReportFocus = remember { FocusRequester() }
     var picker by remember { mutableStateOf<VisualizerPicker?>(null) }
     var shownPicker by remember { mutableStateOf<VisualizerPicker?>(null) }
     val rowFocus = remember { VisualizerPicker.entries.associateWith { FocusRequester() } }
     val engineSettings = settings?.takeIf { enabled && viewModel.supported }
 
-    LaunchedEffect(Unit) { viewModel.refreshSkippedPresets() }
+    LaunchedEffect(Unit) {
+        viewModel.refreshSkippedPresets()
+        viewModel.refreshExitRecords()
+    }
     // The panel keeps focus until it has closed, so the row that opened it takes focus back a frame later.
     LaunchedEffect(picker) {
         if (picker != null) return@LaunchedEffect
@@ -61,6 +69,19 @@ fun TvVisualizerSettingsPane(
         runCatching { rowFocus.getValue(returnTo).requestFocus() }
     }
     BackHandler(enabled = picker != null) { picker = null }
+    BackHandler(enabled = exitReportOpen) { exitReportOpen = false }
+    var exitReportShown by remember { mutableStateOf(false) }
+    // As with the pickers: the Last exit row takes focus back once the report has closed.
+    LaunchedEffect(exitReportOpen) {
+        if (exitReportOpen) {
+            exitReportShown = true
+            return@LaunchedEffect
+        }
+        if (!exitReportShown) return@LaunchedEffect
+        exitReportShown = false
+        withFrameNanos { }
+        runCatching { exitReportFocus.requestFocus() }
+    }
 
     Box(modifier = modifier.fillMaxSize()) {
         LazyColumn(
@@ -84,6 +105,9 @@ fun TvVisualizerSettingsPane(
                     timingOffsetMs = timingOffsetMs,
                     diagnostics = diagnostics,
                     skippedPresets = skippedPresets,
+                    exitRecords = exitRecords,
+                    exitReportFocus = exitReportFocus,
+                    onOpenExitReport = { exitReportOpen = true },
                     viewModel = viewModel,
                     rowFocus = rowFocus,
                     onOpen = {
@@ -117,6 +141,34 @@ fun TvVisualizerSettingsPane(
                 }
             }
         }
+
+        val records = exitRecords
+        TvSidePanel(
+            visible = exitReportOpen && records != null && engineSettings != null,
+            title = stringResource(R.string.visualizer_exit_report_title),
+            onClose = { exitReportOpen = false },
+        ) {
+            if (records != null && engineSettings != null) {
+                val resources = LocalContext.current.resources
+                val report =
+                    remember(records, engineSettings, resources) {
+                        VisualizerExitReportFormatter(resources).report(
+                            records,
+                            ExitReportDevice(
+                                manufacturer = Build.MANUFACTURER,
+                                model = Build.MODEL,
+                                release = Build.VERSION.RELEASE,
+                                sdk = Build.VERSION.SDK_INT,
+                                gpu = viewModel.gpu,
+                                backgroundCompile = engineSettings.backgroundCompile,
+                                shaderBinaryCache = engineSettings.shaderBinaryCache,
+                            ),
+                            System.currentTimeMillis(),
+                        )
+                    }
+                VisualizerExitReportList(report)
+            }
+        }
     }
 }
 
@@ -125,6 +177,9 @@ private fun LazyListScope.engineSettingsItems(
     timingOffsetMs: Int,
     diagnostics: Boolean,
     skippedPresets: Int,
+    exitRecords: ExitRecords?,
+    exitReportFocus: FocusRequester,
+    onOpenExitReport: () -> Unit,
     viewModel: TvVisualizerSettingsViewModel,
     rowFocus: Map<VisualizerPicker, FocusRequester>,
     onOpen: (VisualizerPicker) -> Unit,
@@ -222,6 +277,37 @@ private fun LazyListScope.engineSettingsItems(
         )
     }
     pickerRow(VisualizerPicker.TIMING, label = R.string.visualizer_timing_offset)
+
+    sectionHeader("troubleshooting", R.string.visualizer_section_troubleshooting)
+    item(key = "visualizer-troubleshooting-hint") {
+        Text(
+            text = stringResource(R.string.visualizer_troubleshooting_hint),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+    toggleRow("background-compile", R.string.visualizer_background_compile, settings.backgroundCompile, {
+        stringResource(R.string.visualizer_background_compile_subtitle)
+    }) {
+        setBackgroundCompile(it)
+    }
+    toggleRow("shader-binary-cache", R.string.visualizer_shader_binary_cache, settings.shaderBinaryCache, {
+        stringResource(R.string.visualizer_shader_binary_cache_subtitle)
+    }) {
+        setShaderBinaryCache(it)
+    }
+    item(key = "visualizer-last-exit") {
+        val resources = LocalContext.current.resources
+        TvNavRow(
+            label = stringResource(R.string.visualizer_last_exit),
+            value =
+                exitRecords?.let {
+                    VisualizerExitReportFormatter(resources).summary(it.exits, Build.VERSION.SDK_INT, System.currentTimeMillis())
+                },
+            onClick = { if (exitRecords != null) onOpenExitReport() },
+            modifier = Modifier.focusRequester(exitReportFocus),
+        )
+    }
 }
 
 private fun LazyListScope.sectionHeader(
