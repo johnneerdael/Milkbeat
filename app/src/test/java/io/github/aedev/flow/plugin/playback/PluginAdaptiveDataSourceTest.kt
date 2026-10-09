@@ -2,6 +2,8 @@ package io.github.aedev.flow.plugin.playback
 
 import android.app.Application
 import androidx.media3.datasource.DataSpec
+import androidx.media3.datasource.cache.NoOpCacheEvictor
+import androidx.media3.datasource.cache.SimpleCache
 import com.google.common.truth.Truth.assertThat
 import nl.neerdael.milkbeat.catalog.EntityKind
 import nl.neerdael.milkbeat.catalog.EntityRef
@@ -17,11 +19,54 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.io.IOException
+import java.nio.file.Files
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28], application = Application::class)
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 class PluginAdaptiveDataSourceTest {
+    @Test
+    fun `expired adaptive URLs do not prevent an offline cached range`() {
+        val initial = resolved("https://cdn.example/old-audio", "https://cdn.example/old-video", 0)
+        var renewals = 0
+        val binding =
+            BoundPluginAudio(initial, {
+                renewals++
+                throw IOException("Offline")
+            })
+        val directory = Files.createTempDirectory("adaptive-offline-cache").toFile()
+
+        @Suppress("DEPRECATION")
+        val cache = SimpleCache(directory, NoOpCacheEvictor())
+        try {
+            val key = "youtube:matched:251:123"
+            val hole = cache.startReadWrite(key, 0, 4)
+            val file = cache.startFile(key, 0, 4)
+            file.writeBytes(byteArrayOf(1, 2, 3, 4))
+            cache.commitFile(file, 4)
+            cache.releaseHoleSpan(hole)
+            val source = pluginAdaptiveDataSourceFactory(OkHttpClient(), binding, cache, {}, { listOf("cdn.example") }).createDataSource()
+            try {
+                source.open(
+                    DataSpec
+                        .Builder()
+                        .setUri(initial.stream.audioFormat!!.url)
+                        .setLength(4)
+                        .build(),
+                )
+                val bytes = ByteArray(4)
+                assertThat(source.read(bytes, 0, 4)).isEqualTo(4)
+                assertThat(bytes).isEqualTo(byteArrayOf(1, 2, 3, 4))
+                assertThat(renewals).isEqualTo(0)
+            } finally {
+                source.close()
+            }
+        } finally {
+            cache.release()
+            directory.deleteRecursively()
+        }
+    }
+
     private fun resolved(
         audioUrl: String,
         videoUrl: String,

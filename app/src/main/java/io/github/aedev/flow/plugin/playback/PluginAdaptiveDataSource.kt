@@ -25,6 +25,7 @@ internal fun pluginAdaptiveDataSourceFactory(
 ): DataSource.Factory {
     val initial = binding.initial
     val formats = listOfNotNull(initial.stream.audioFormat, initial.stream.video).associateBy { it.url }
+    val keyed = formats.values.associateBy { "${initial.pluginId}:${initial.stream.cacheKey}:${it.id}" }
     val client =
         base
             .newBuilder()
@@ -37,22 +38,11 @@ internal fun pluginAdaptiveDataSourceFactory(
                     chain.proceed(chain.request())
                 },
             ).build()
-    val network = OkHttpDataSource.Factory(client)
-    val upstream: DataSource.Factory =
-        if (cache == null) {
-            network
-        } else {
-            CacheDataSource
-                .Factory()
-                .setCache(cache)
-                .setUpstreamDataSourceFactory(network)
-                .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
-        }
-    return DataSource.Factory {
-        ResolvingDataSource(upstream.createDataSource()) { request ->
+    val renewingNetwork =
+        ResolvingDataSource.Factory(OkHttpDataSource.Factory(client)) { request ->
             if (request.httpMethod != DataSpec.HTTP_METHOD_GET) throw IOException("Adaptive media requires a GET")
             verifyCurrent(initial)
-            val original = formats[request.uri.toString()] ?: throw IOException("Unknown adaptive rendition")
+            val original = keyed[request.key] ?: throw IOException("Unknown adaptive rendition")
             val current = runBlocking(Dispatchers.IO) { binding.current() }
             verifyCurrent(current)
             val format =
@@ -75,6 +65,24 @@ internal fun pluginAdaptiveDataSourceFactory(
                 .setHttpRequestHeaders(headers.filterKeys { !it.equals("Range", ignoreCase = true) })
                 .setKey("${current.pluginId}:${current.stream.cacheKey}:${format.id}")
                 .build()
+        }
+    val upstream: DataSource.Factory =
+        if (cache == null) {
+            renewingNetwork
+        } else {
+            CacheDataSource
+                .Factory()
+                .setCache(cache)
+                .setUpstreamDataSourceFactory(renewingNetwork)
+                .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
+        }
+    return DataSource.Factory {
+        ResolvingDataSource(upstream.createDataSource()) { request ->
+            if (request.httpMethod != DataSpec.HTTP_METHOD_GET) throw IOException("Adaptive media requires a GET")
+            verifyCurrent(initial)
+            val original = formats[request.uri.toString()] ?: throw IOException("Unknown adaptive rendition")
+            checkedPluginMediaUrl(original.url, allowedHosts())
+            request.buildUpon().setKey("${initial.pluginId}:${initial.stream.cacheKey}:${original.id}").build()
         }
     }
 }
