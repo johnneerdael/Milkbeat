@@ -22,7 +22,7 @@ There is no metadata provider to choose: every installed, enabled catalog you ca
 | SoundCloud | **089** | Discover, Stream, Search, Artists, albums, playlists, Liked Songs, history | Available full tracks, matching and stations | — |
 | YouTube Video | **932** | YouTube's TV Music Home, Search, artists, albums, playlists, library | Streams, cross-provider matching and radio | YouTube videos and playlists |
 
-Capabilities depend on the installed plugin version, the account and its subscription. YouTube Video shares the YouTube tab with YouTube Music: with both installed the tab shows YouTube Music's catalog, and YouTube Video's catalog appears, also without sign-in, when it is the only one. Sign-in with a TV code is optional. The [Preview app](preview-testing.md#youtube-video-plugin) installs its prerelease versions with code **304**.
+Capabilities depend on the installed plugin version, the account and its subscription. YouTube Video shares the YouTube tab with YouTube Music: with both installed the tab shows YouTube Music's catalog, and YouTube Video's catalog appears, also without sign-in, when it is the only one. Sign-in with a TV code is optional. The [Preview app](preview-testing.md#youtube-video-plugin) installs the same release with code **932**.
 
 <span id="youtube-video-preview"></span>
 
@@ -54,8 +54,8 @@ catalog title, artist and recording identity.
 The paired host handles SABR through Media3. SABR streams support playback, not offline
 downloads. Audio-only HLS needs an independent audio rendition; a combined audio/video stream
 cannot silently fetch video bytes in audio-only mode. App and plugin packages are distributed
-separately. The optional Preview app retains its historical prerelease packages and codes; it
-is not needed to install the released YouTube Video provider.
+separately. The optional Preview app installs the released YouTube Video provider with the same code;
+its retired prerelease codes stay pinned to their original packages.
 
 ## Install a plugin
 

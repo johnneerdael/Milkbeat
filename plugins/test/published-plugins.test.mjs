@@ -72,3 +72,17 @@ test('a published row may state the API minimum and format Milkbeat needs, as po
   assert.throws(()=>verifyPublishedPlugins(x),new RegExp(field),`${field}=${value}`);
  }
 });
+
+test('every stable and preview row states its package compatibility, and preview offers the released YouTube Video',()=>{
+ const read=path=>JSON.parse(readFileSync(new URL(path,import.meta.url)));
+ const stable=read('../published.json'),preview=read('../published-preview.json');
+ for(const row of [...stable.plugins,...preview.plugins]){
+  assert.ok(Number.isInteger(row.apiMin),`${row.id} ${row.version} states apiMin`);
+  assert.ok(Number.isInteger(row.format),`${row.id} ${row.version} states format`);
+ }
+ const video=descriptor=>descriptor.plugins.find(row=>row.id==='nl.neerdael.youtube-video');
+ assert.deepEqual(video(preview),video(stable));
+ const previewCatalog=readCatalog(new URL('../../app/src/nightly/assets/plugin-preview-download-catalog.json',import.meta.url)).entries;
+ const catalog=readCatalog(new URL('../../app/src/main/assets/plugin-download-catalog.json',import.meta.url)).entries;
+ assert.equal(previewCatalog.find(entry=>entry.code==='932').url,catalog.find(entry=>entry.code==='932').url);
+});
