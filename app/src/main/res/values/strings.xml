@@ -486,6 +486,7 @@
     <string name="tv_plugins_audio_match_others">%1$s: play other services\' tracks</string>
     <string name="tv_plugins_audio_match_others_on">In the order above for every track</string>
     <string name="tv_plugins_audio_match_others_off">Plays only its own tracks, before the order above</string>
+    <string name="tv_plugins_audio_own_tracks_value">%1$s (own tracks only)</string>
     <string name="tv_plugins_video">Video</string>
     <string name="tv_plugins_none">None</string>
     <string name="tv_plugins_install_title">Install %1$s %2$s?</string>

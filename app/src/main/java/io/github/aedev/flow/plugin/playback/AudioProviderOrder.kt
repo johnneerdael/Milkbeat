@@ -2,6 +2,7 @@ package io.github.aedev.flow.plugin.playback
 
 import io.github.aedev.flow.plugin.registry.InstalledPlugin
 import io.github.aedev.flow.plugin.registry.PluginRegistryState
+import io.github.aedev.flow.plugin.registry.ownTracksOnlyAudio
 import nl.neerdael.milkbeat.catalog.TrackDescriptor
 import nl.neerdael.milkbeat.plugin.AudioMatchStrategy
 
@@ -15,7 +16,7 @@ internal data class AudioProviderAttempt(
 
 /**
  * The providers to try for [track], in order: the playback context's [preferredProviderId], then
- * enabled audio plugins outside the listener's order (these play only tracks carrying their own id),
+ * enabled audio plugins outside the listener's order (these play only tracks whose source they are),
  * then the listener's order, which every track follows, including tracks from the providers in it.
  */
 internal fun audioProviderAttempts(
@@ -25,14 +26,17 @@ internal fun audioProviderAttempts(
     preferredProviderId: String? = null,
 ): List<AudioProviderAttempt> {
     val sortable = state.selection.audio.distinct()
-    val ownTracksOnly = state.plugins.filter { it.manifest.roles.audio != null && it.id !in sortable }.map { it.id }
+    val ownTracksOnly = ownTracksOnlyAudio(state.plugins, state.selection).map { it.id }
     return (listOfNotNull(preferredProviderId) + ownTracksOnly + sortable).distinct().mapNotNull { id ->
         val plugin = state.plugin(id) ?: return@mapNotNull null
         val role = plugin.manifest.roles.audio ?: return@mapNotNull null
         if (withPicture && !role.musicVideo) return@mapNotNull null
         val direct = directAudioTrack(track, plugin)
-        val matchesOthers = id in sortable || id == preferredProviderId
-        if (direct == null && (!matchesOthers || !role.match || track.title.isBlank())) return@mapNotNull null
+        if (id !in sortable && id != preferredProviderId) {
+            // An alias in another service's track must not let an own-tracks provider jump the order.
+            return@mapNotNull AudioProviderAttempt(plugin, direct).takeIf { direct?.ref == track.ref }
+        }
+        if (direct == null && (!role.match || track.title.isBlank())) return@mapNotNull null
         AudioProviderAttempt(plugin, direct)
     }
 }

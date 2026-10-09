@@ -88,6 +88,16 @@ class PluginSourceRoutingTest : PluginAudioFixture() {
         }
 
     @Test
+    fun `own-tracks-only Beatport does not jump the order for another service's track carrying its id`() =
+        runTest {
+            ownTracksOnly(listOf(plugin), provider("beatport"))
+            val aliased = candidate.copy(ids = candidate.ids + ("beatport" to "bp-alias"))
+            assertThat(audio.resolve(aliased, null).pluginId).isEqualTo("youtube")
+            coVerify(exactly = 0) { host.call("beatport", PluginOperations.matchAudio, any()) }
+            coVerify(exactly = 0) { host.call("beatport", PluginOperations.resolveAudio, any()) }
+        }
+
+    @Test
     fun `own-tracks-only Beatport that cannot stream continues down the listener's order`() =
         runTest {
             ownTracksOnly(listOf(plugin), provider("beatport"))

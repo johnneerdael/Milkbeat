@@ -175,7 +175,7 @@ Under **Audio**, use **Move earlier** and **Move later** to order the providers,
 Each provider's **play other services' tracks** switch decides whether it is in the order:
 
 - **On:** the provider is in the order above and is used for every track in its turn.
-- **Off:** the provider plays only its own tracks. It is tried first for those, and if it cannot play one, such as Beatport without a streaming subscription, the track continues down the order. It never searches for other services' tracks.
+- **Off:** the provider plays only its own tracks. It is tried first for those, and if it cannot play one, such as Beatport without a streaming subscription, the track continues down the order. It never searches for other services' tracks, even when one of them carries its ID. The **Audio** row in Settings → Plugins lists it after the order as *provider* (own tracks only).
 
 Beatport starts with the switch off, and updating Milkbeat switches it off once for an existing setup; switch it on to add it to the order again. Updating a plugin keeps your choice.
 
