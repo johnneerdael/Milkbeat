@@ -9,6 +9,10 @@ When a provider's Home has nothing to show, select **Retry** to ask for it again
 
 ## A music tab says Couldn't load content
 
+YouTube Video 0.2.0 could fail to load Home when Liked Music had no songs. Update that plugin
+to 0.2.1 or later in Settings → Plugins → Update all plugins, then retry Home. An empty Liked
+Music page is normal and does not require another sign-in.
+
 The message below the title is the provider's reason. A temporary failure, such as a dropped connection, a rate limit or a one-off server error, is retried automatically up to three times over about a minute, or later if the provider asks to wait. Select **Retry** to try again at once; the button reads **Trying again…** while it does. Other failures, such as a missing sign-in, are not retried automatically: press Left to reach the navigation rail and open Settings → Plugins.
 
 Automatic retries wait while you are on another tab or screen, or the app is in the background, then resume when you return to that tab. This only pauses requests for the Home feed; music playback and queue preparation continue.

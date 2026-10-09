@@ -16,7 +16,7 @@ Install a new Preview build or use its documented code to test a newer preview p
 
 ## YouTube Video plugin
 
-The Preview app no longer uses a prerelease **YouTube Video**. It installs the released **YouTube Video 0.2.0** with downloader code **932**, the same code as stable Milkbeat. Like YouTube Music it provides metadata, audio and video, and it browses YouTube's TV Music feeds.
+The Preview app no longer uses a prerelease **YouTube Video**. It installs the released **YouTube Video 0.2.1** with downloader code **932**, the same code as stable Milkbeat. Like YouTube Music it provides metadata, audio and video, and it browses YouTube's TV Music feeds.
 
 Older codes **304** (preview 6) and **744** (preview 4) remain pinned to those retired prerelease packages; do not use them for new installs. If your Preview build does not recognize code **932**, update the Preview app first.
 

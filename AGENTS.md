@@ -753,11 +753,12 @@ revision must pass the configured ktlint rules.
   Stable descriptors reject prerelease versions. Keep `plugins/published-preview.json` aligned
   with `app/src/nightly/assets/plugin-preview-download-catalog.json`; preserve each distributed
   preview version's original archive hash/URL, including harmless signature-envelope rebuilds.
-  Stable and Preview publish YouTube Video 0.2.0 / versionCode 11, code 932, requiring API 8;
+  Stable and Preview publish YouTube Video 0.2.1 / versionCode 12, code 932, requiring API 8;
   Preview no longer carries a prerelease YouTube Video. Its catalog keeps the retired, immutable
   preview 6/code 304 and preview 4/code 744 entries. Every descriptor row states the package's
   verified `apiMin` and `format`.
-  Deezer 0.2.0 / versionCode 2 uses code 734 and requires
+  YouTube Video 0.2.1 accepts valid empty TV Liked Music results without a WEB request; Home
+  continues with the regular TV Music feed. Deezer 0.2.0 / versionCode 2 uses code 734 and requires
   API 9 for its encrypted audio. Preserve both original signed archives when retrying publication.
   Preview (`.nightly`) update checks return no stable-publication candidates; automatic updates
   and Update all plugins must not replace its pinned packages. Stable hosts retain normal lookup.

@@ -29,11 +29,12 @@ Capabilities depend on the installed plugin version, the account and its subscri
 
 ## YouTube Video
 
-**YouTube Video 0.2.0** is available in stable Milkbeat with downloader code **932**. It requires
+**YouTube Video 0.2.1** is available in stable Milkbeat with downloader code **932**. It requires
 a Milkbeat build with plugin API 8; update the app before installing if your build is older. It keeps its own
 account alongside YouTube Music and supplies SmartTube's regular YouTube TV Music section:
 recommended music, charts, new videos and the other rows supplied for your region or account.
-Signing in adds Liked Music before those rows. Show More includes the original row and its
+Signing in adds Liked Music before those rows when it has songs. An empty Liked Music library
+does not prevent Home from loading. Show More includes the original row and its
 continuations; playlist and mix pages retain track order.
 
 To browse these feeds, disable YouTube Music when using YouTube Video for your catalog; the shared YouTube
@@ -147,7 +148,7 @@ Completed indexing matches are kept when you cancel. Index again after changing 
 ## Sign-in and account requirements
 
 - **YouTube Music:** sign-in is optional. Signing in turns Home into a personalized feed and makes your library available. Free YouTube accounts are supported; Premium is not required for personalization.
-- **YouTube Video:** sign-in is optional. Pair it with a TV code from any phone for a personalized Home and your library; signed out, it browses YouTube's TV Music feeds. YouTube Video 0.2.0 needs a Milkbeat build with plugin API 8.
+- **YouTube Video:** sign-in is optional. Pair it with a TV code from any phone for a personalized Home and your library; signed out, it browses YouTube's TV Music feeds. YouTube Video 0.2.1 needs a Milkbeat build with plugin API 8.
 - **Deezer:** sign in through the phone web viewer for your catalog, Flow and read-only library. Audio availability and quality depend on the account and recording. Deezer 0.2.0 needs a Milkbeat build with plugin API 9.
 - **Spotify:** a catalog with **no audio source**. Its value is your personalized feed, playlists, Liked Songs and library after signing in. Keep at least one audio provider enabled.
 - **Beatport:** sign in for the catalog and your library. Beatport's own full-length audio needs an active streaming subscription; otherwise SoundCloud or YouTube Music can match the recording. A free account does not guarantee a match.
