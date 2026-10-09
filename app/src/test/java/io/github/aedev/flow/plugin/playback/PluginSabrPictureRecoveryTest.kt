@@ -105,6 +105,8 @@ class PluginSabrPictureRecoveryTest : PluginAudioFixture() {
     fun `online typed renewal reasons retain protocol priority and reload context`() =
         runTest {
             for (reason in nl.neerdael.milkbeat.sabr.SabrPlaybackException.Reason.entries) {
+                // Each reason is an independent recovery episode with its own service retry budget.
+                audio.forgetAll()
                 audio.resolve(original, null, playbackId = mediaId)
                 val (service, _) = service()
                 val context =

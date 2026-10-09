@@ -54,3 +54,23 @@ internal val ResolvedAudio.hasPreparedPicture: Boolean
         stream.video != null ||
             stream.serverAbr?.formats?.any { it.format.type == nl.neerdael.milkbeat.plugin.FormatType.VIDEO } == true ||
             (isHlsStream(stream) && !stream.requireAudioOnlyHls && (withPicture || request?.prepareVideo == true))
+
+internal fun ResolvedAudio.coversResolution(
+    context: Any,
+    order: List<String>,
+    quality: nl.neerdael.milkbeat.plugin.AudioQuality,
+    picture: PictureLimits?,
+    preparation: PictureLimits?,
+    videoProvider: Boolean,
+): Boolean {
+    if (preparationContext != context || providerOrder != order ||
+        !isValidAt(System.currentTimeMillis(), android.os.SystemClock.elapsedRealtime()) ||
+        runtimeReceipt?.isCurrent() == false || request?.quality != quality
+    ) {
+        return false
+    }
+    if (picture == null && (preparation == null || !videoProvider)) return true
+    val limits = picture ?: preparation ?: return true
+    return (withPicture || request?.prepareVideo == true) && request?.maxVideoHeight == limits.maxHeight &&
+        request?.videoCodecs == limits.codecs
+}

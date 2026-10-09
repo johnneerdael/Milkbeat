@@ -785,4 +785,7 @@
     <string name="tv_device_code_expired">This code expired. Request a new code to sign in.</string>
     <string name="tv_device_code_denied">Sign-in was declined. Request a new code to try again.</string>
     <string name="tv_device_code_failed">Unable to sign in. Request a new code to try again.</string>
+    <string name="music_matching_provider">Finding a match on %1$s…</string>
+    <string name="music_loading_provider">Loading audio from %1$s…</string>
+    <string name="music_loading_saved_match">Loading saved %1$s match…</string>
 </resources>

@@ -51,6 +51,10 @@ class PluginAudio
         private val playbackIds = ConcurrentHashMap<String, AudioIdentity>()
         private val cacheGeneration = AtomicLong()
         private val resolvedRevision = MutableStateFlow(0L)
+        private val resolutionProgress = MusicResolutionProgress()
+        val resolutionStatus get() = resolutionProgress.state
+
+        fun selectForegroundPlayback(playbackId: String?) = resolutionProgress.select(playbackId)
 
         val videoCapablePlaybackIds: Flow<Set<String>>
             get() =
@@ -112,7 +116,12 @@ class PluginAudio
             if (playbackIds.put(playbackId, identity) != identity) {
                 resolvedRevision.update { revision -> revision + 1 }
             }
-            return resolveLocked(track, picture, quality, strict = false, preferredProviderId, preparePicture)
+            val ticket = resolutionProgress.begin(playbackId)
+            try {
+                return resolveLocked(track, picture, quality, strict = false, preferredProviderId, preparePicture, ticket)
+            } finally {
+                resolutionProgress.finish(ticket)
+            }
         }
 
         suspend fun prepare(
@@ -130,10 +139,11 @@ class PluginAudio
             strict: Boolean,
             preferredProviderId: String?,
             preparePicture: PictureLimits?,
+            ticket: MusicResolutionProgress.Ticket? = null,
         ): ResolvedAudio {
             val key = track.audioIdentity()
             return resolutionLocks.getOrPut(key) { Mutex() }.withLock {
-                resolveStream(track, picture, quality, strict, preferredProviderId, preparePicture)
+                resolveStream(track, picture, quality, strict, preferredProviderId, preparePicture, ticket)
             }
         }
 
@@ -144,6 +154,7 @@ class PluginAudio
             strict: Boolean,
             preferredProviderId: String?,
             preparePicture: PictureLimits?,
+            ticket: MusicResolutionProgress.Ticket?,
         ): ResolvedAudio {
             val context = streamContext()
             val generation = cacheGeneration.get()
@@ -183,26 +194,19 @@ class PluginAudio
             val order = (if (picture != null) attempts else providers).map { "${it.plugin.id}:${it.plugin.manifest.versionCode}" }
             resolved[key]
                 ?.takeIf {
-                    it.preparationContext == context && it.providerOrder == order &&
-                        it.isValidAt(System.currentTimeMillis(), SystemClock.elapsedRealtime()) &&
-                        it.runtimeReceipt?.isCurrent() != false && it.request?.quality == quality && (
-                            (
-                                picture == null &&
-                                    (
-                                        preparePicture == null || state
-                                            .plugin(it.pluginId)
-                                            ?.manifest
-                                            ?.roles
-                                            ?.audio
-                                            ?.musicVideo != true
-                                    )
-                            ) ||
-                                (
-                                    (it.withPicture || it.request?.prepareVideo == true) &&
-                                        it.request?.maxVideoHeight == (picture ?: preparePicture)?.maxHeight &&
-                                        it.request?.videoCodecs == (picture ?: preparePicture)?.codecs
-                                )
-                        )
+                    it.coversResolution(
+                        context,
+                        order,
+                        quality,
+                        picture,
+                        preparePicture,
+                        state
+                            .plugin(it.pluginId)
+                            ?.manifest
+                            ?.roles
+                            ?.audio
+                            ?.musicVideo == true,
+                    )
                 }?.let { return it }
             if (attempts.isEmpty()) {
                 throw PluginCallException("none", PluginError(PluginErrorCode.UNAVAILABLE, "No audio plugin plays ${track.title}"))
@@ -210,13 +214,21 @@ class PluginAudio
             var last: PluginCallException? = null
             var lastPictureUnavailable: PictureUnavailable? = null
             for ((plugin, known) in attempts) {
+                val matchProgress: (TrackMatchProgress) -> Unit = { phase ->
+                    resolutionProgress.update(
+                        ticket,
+                        plugin.manifest.name,
+                        if (phase == TrackMatchProgress.SAVED_MATCH) MusicResolutionStage.SAVED_MATCH else MusicResolutionStage.MATCHING,
+                    )
+                }
                 var legacyPicture =
                     preparePicture != null && picture == null &&
                         plugin.manifest.roles.audio
                             ?.musicVideo == true && plugin.manifest.api.target < 7
                 var playable =
                     try {
-                        known ?: match(track, plugin.id, strict, strategy = plugin.audioMatchStrategy()) ?: continue
+                        known ?: match(track, plugin.id, strict, strategy = plugin.audioMatchStrategy(), onProgress = matchProgress)
+                            ?: continue
                     } catch (
                         error: PluginCallException,
                     ) {
@@ -237,6 +249,7 @@ class PluginAudio
                                     ?.musicVideo == true,
                         )
                     try {
+                        resolutionProgress.update(ticket, plugin.manifest.name, MusicResolutionStage.LOADING_STREAM)
                         val acceptedContext = nativeContext(plugin.id)
                         val (stream, receipt) =
                             host.withPlaybackReceipt(
@@ -317,7 +330,14 @@ class PluginAudio
                         matcher.invalidate(track, plugin.id)
                         if (attempt != 0) break
                         playable =
-                            match(track, plugin.id, strict, excludedId = playable.ref.providerId, strategy = plugin.audioMatchStrategy())
+                            match(
+                                track,
+                                plugin.id,
+                                strict,
+                                excludedId = playable.ref.providerId,
+                                strategy = plugin.audioMatchStrategy(),
+                                onProgress = matchProgress,
+                            )
                                 ?: break
                     } catch (e: IOException) {
                         if (context != streamContext() || generation != cacheGeneration.get()) throw e
@@ -347,6 +367,7 @@ class PluginAudio
             strict: Boolean,
             excludedId: String? = null,
             strategy: nl.neerdael.milkbeat.plugin.AudioMatchStrategy,
+            onProgress: (TrackMatchProgress) -> Unit = {},
         ): TrackDescriptor? =
             if (strict) {
                 matcher.matchForIndexing(
@@ -356,7 +377,7 @@ class PluginAudio
                     strategy,
                 )
             } else {
-                matcher.match(track, pluginId, excludedId, strategy)
+                matcher.match(track, pluginId, excludedId, strategy, onProgress)
             }
 
         suspend fun refreshBound(audio: ResolvedAudio): ResolvedAudio {

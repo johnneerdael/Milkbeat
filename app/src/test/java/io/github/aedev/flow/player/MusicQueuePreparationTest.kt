@@ -140,7 +140,7 @@ class MusicQueuePreparationTest {
         load(listOf("same", "same", "same"), 2)
         explicit += "window-0"
         assertThat(manager.preparationTargets()).hasSize(1)
-        assertThat(Uri.parse(manager.preparationTargets().single().uri).scheme).isEqualTo("music")
+        assertThat(Uri.parse(manager.preparationTargets().single().uri).scheme).isEqualTo(MusicVideoItems.SCHEME)
         val target = manager.preparationTargets().single()
         explicit += "window-1"
         manager.removePreparedQueueItem(target)

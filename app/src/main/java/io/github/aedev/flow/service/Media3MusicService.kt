@@ -46,6 +46,7 @@ import io.github.aedev.flow.player.audio.visualizer.VisualizerEngine
 import io.github.aedev.flow.player.audio.visualizer.VisualizerTapProcessor
 import io.github.aedev.flow.player.audio.visualizer.followPlayerClock
 import io.github.aedev.flow.player.factory.LoadControlFactory
+import io.github.aedev.flow.player.musicResolutionStatusState
 import io.github.aedev.flow.player.setVideoCapablePlaybackIds
 import io.github.aedev.flow.plugin.catalog.PluginAccounts
 import io.github.aedev.flow.plugin.playback.PluginAudio
@@ -267,6 +268,10 @@ class Media3MusicService : MediaLibraryService() {
         }
 
         initializePlayer()
+        lifecycleScope.launch {
+            EnhancedMusicPlayerManager.currentTrack.collect { pluginAudio.selectForegroundPlayback(it?.videoId) }
+        }
+        lifecycleScope.launch { pluginAudio.resolutionStatus.collect { musicResolutionStatusState.value = it } }
         lifecycleScope.launch {
             combine(pluginAudio.videoCapablePlaybackIds, EnhancedMusicPlayerManager.currentTrack) { ids, _ -> ids }
                 .collect(EnhancedMusicPlayerManager::setVideoCapablePlaybackIds)
@@ -543,6 +548,7 @@ class Media3MusicService : MediaLibraryService() {
     }
 
     override fun onDestroy() {
+        musicResolutionStatusState.value = null
         EnhancedMusicPlayerManager.prefetcher = null
         EnhancedMusicPlayerManager.setVideoCapablePlaybackIds(emptySet())
         EnhancedMusicPlayerManager.playbackArtworkState.value = null

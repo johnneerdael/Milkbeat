@@ -351,6 +351,10 @@ class DownloadUtil
             val prepared = if (preparePicture) PictureLimits(maxVideoHeight, pictureCodecs(VideoCodecUtils.NO_PREFERENCE)) else null
             val quality = playerPreferences.musicAudioQuality.first()
             val descriptor = MusicVideoItems.descriptor(uri)
+            pluginAudio.selectForegroundPlayback(
+                io.github.aedev.flow.player.EnhancedMusicPlayerManager.currentTrack.value
+                    ?.videoId,
+            )
             return pluginAudio.resolve(
                 descriptor,
                 limits,

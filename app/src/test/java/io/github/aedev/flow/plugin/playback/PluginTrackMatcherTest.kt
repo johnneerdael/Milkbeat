@@ -38,6 +38,16 @@ class PluginTrackMatcherTest {
     }
 
     @Test
+    fun `progress reports actual search then cached match without a second request`() =
+        runTest {
+            val progress = mutableListOf<TrackMatchProgress>()
+            matcher.match(original, "youtube", onProgress = progress::add)
+            matcher.match(original, "youtube", onProgress = progress::add)
+            assertThat(progress).containsExactly(TrackMatchProgress.SEARCHING, TrackMatchProgress.SAVED_MATCH).inOrder()
+            coVerify(exactly = 1) { host.call("youtube", PluginOperations.matchAudio, any()) }
+        }
+
+    @Test
     fun `successful and negative results reuse their persisted cache`() =
         runTest {
             assertThat(matcher.match(original, "youtube")).isEqualTo(candidate)
