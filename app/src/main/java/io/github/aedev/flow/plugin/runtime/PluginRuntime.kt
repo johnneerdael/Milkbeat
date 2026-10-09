@@ -5,6 +5,11 @@ import android.util.Log
 import com.dokar.quickjs.QuickJs
 import com.dokar.quickjs.QuickJsException
 import com.dokar.quickjs.binding.FunctionBinding
+import io.github.aedev.flow.player.diagnostics.PlaybackTrace
+import io.github.aedev.flow.player.diagnostics.TraceCategory
+import io.github.aedev.flow.player.diagnostics.TraceEvent
+import io.github.aedev.flow.player.diagnostics.TraceField
+import io.github.aedev.flow.player.diagnostics.TraceSpan
 import io.github.aedev.flow.plugin.host.CallEnvelope
 import io.github.aedev.flow.plugin.host.PluginBrowser
 import io.github.aedev.flow.plugin.host.PluginHostApi
@@ -98,19 +103,31 @@ internal class PluginRuntime(
         request: Request,
     ): Response {
         if (disabled) throw PluginCallException(plugin.id, PluginError(PluginErrorCode.UNAVAILABLE, "Disabled after repeated failures"))
-        return inFlight.withPermit {
-            running.incrementAndGet()
-            try {
-                contexts.call(CALL_TIMEOUT_MS) { active -> invoke(active, operation, request, CALL_TIMEOUT_MS) }
-            } catch (e: TimeoutCancellationException) {
-                throw PluginCallException(
-                    plugin.id,
-                    PluginError(PluginErrorCode.TIMEOUT, "${operation.path} took longer than $CALL_TIMEOUT_MS ms"),
-                )
-            } finally {
-                running.decrementAndGet()
-                scheduleIdleStop()
+        val trace = PlaybackTrace.start(TraceEvent.RUNTIME_QUEUED, traceCategory(operation.path))
+        val queuedMs = if (PlaybackTrace.enabled) SystemClock.elapsedRealtime() else 0L
+        var success = false
+        try {
+            return inFlight.withPermit {
+                trace.event(TraceEvent.RUNTIME_PERMIT_ACQUIRED)
+                running.incrementAndGet()
+                try {
+                    contexts
+                        .call(CALL_TIMEOUT_MS) { active ->
+                            trace.event(TraceEvent.RUNTIME_CONTEXT_ACQUIRED, TraceField.GENERATION to contextGeneration)
+                            invoke(active, operation, request, CALL_TIMEOUT_MS, trace, queuedMs)
+                        }.also { success = true }
+                } catch (e: TimeoutCancellationException) {
+                    throw PluginCallException(
+                        plugin.id,
+                        PluginError(PluginErrorCode.TIMEOUT, "${operation.path} took longer than $CALL_TIMEOUT_MS ms"),
+                    )
+                } finally {
+                    running.decrementAndGet()
+                    scheduleIdleStop()
+                }
             }
+        } finally {
+            trace.event(TraceEvent.RUNTIME_FINISHED, TraceField.SUCCESS to if (success) 1L else 0L)
         }
     }
 
@@ -150,9 +167,31 @@ internal class PluginRuntime(
         operation: PluginOperation<Request, Response>,
         request: Request,
         timeoutMs: Long,
+        trace: TraceSpan = PlaybackTrace.start(TraceEvent.RUNTIME_QUEUED, traceCategory(operation.path)),
+        queuedMs: Long = if (PlaybackTrace.enabled) SystemClock.elapsedRealtime() else 0L,
     ): Response =
         withContext(context.thread) {
-            invokeOnOwner(context, operation, request, timeoutMs)
+            val startedMs = if (PlaybackTrace.enabled) SystemClock.elapsedRealtime() else 0L
+            trace.event(TraceEvent.RUNTIME_EXECUTION_STARTED, TraceField.QUEUE_WAIT_MS to (startedMs - queuedMs))
+            var success = false
+            try {
+                invokeOnOwner(context, operation, request, timeoutMs).also { success = true }
+            } finally {
+                trace.event(
+                    TraceEvent.RUNTIME_EXECUTION_FINISHED,
+                    TraceField.EXECUTION_MS to if (startedMs != 0L) SystemClock.elapsedRealtime() - startedMs else 0L,
+                    TraceField.SUCCESS to if (success) 1L else 0L,
+                )
+            }
+        }
+
+    private fun traceCategory(path: String): TraceCategory =
+        when (path) {
+            "audio.resolve" -> TraceCategory.AUDIO_RESOLVE
+            "video.resolve" -> TraceCategory.VIDEO_RESOLVE
+            "metadata.search" -> TraceCategory.SEARCH
+            "lifecycle.warmUp" -> TraceCategory.WARM_UP
+            else -> TraceCategory.OTHER_OPERATION
         }
 
     private suspend fun <Request, Response> invokeOnOwner(

@@ -9,9 +9,11 @@ import coil3.ImageLoader
 import coil3.PlatformContext
 import coil3.SingletonImageLoader
 import dagger.hilt.android.HiltAndroidApp
+import io.github.aedev.flow.data.local.DebugLoggingPreferences
 import io.github.aedev.flow.data.local.PlayerPreferences
 import io.github.aedev.flow.network.AppProxyManager
 import io.github.aedev.flow.notification.NotificationHelper
+import io.github.aedev.flow.player.diagnostics.PlaybackTrace
 import io.github.aedev.flow.utils.AppLanguageManager
 import io.github.aedev.flow.utils.FlowCrashHandler
 import io.github.aedev.flow.utils.PerformanceDispatcher
@@ -101,6 +103,9 @@ class FlowApplication :
             runCatching { libraryScans.get().scanIfStale() }.onFailure { Log.w(TAG, "Library scan check failed", it) }
         }
         val playerPreferences = PlayerPreferences(this)
+        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+            DebugLoggingPreferences(this@FlowApplication).enabled.collect(PlaybackTrace::setEnabled)
+        }
 
         // Injects modern TLS/SSL certificates so OkHttp and Ktor don't crash
         if (android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.N_MR1) {

@@ -10,6 +10,9 @@ import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import io.github.aedev.flow.data.localmedia.LocalMediaIds
 import io.github.aedev.flow.data.music.model.MusicTrack
+import io.github.aedev.flow.player.diagnostics.PlaybackTrace
+import io.github.aedev.flow.player.diagnostics.TraceEvent
+import io.github.aedev.flow.player.diagnostics.TraceField
 import kotlinx.coroutines.flow.MutableStateFlow
 
 @Volatile
@@ -87,12 +90,14 @@ fun EnhancedMusicPlayerManager.setVideoCapablePlaybackIds(ids: Set<String>) {
 @OptIn(UnstableApi::class)
 internal fun EnhancedMusicPlayerManager.performAcquireVideoSurface() {
     videoSurfaces++
+    PlaybackTrace.event(TraceEvent.VIDEO_SURFACE_ACQUIRED, TraceField.SURFACES to videoSurfaces.toLong())
     player?.let(::applyVideoMode)
 }
 
 @OptIn(UnstableApi::class)
 internal fun EnhancedMusicPlayerManager.performReleaseVideoSurface() {
     videoSurfaces = (videoSurfaces - 1).coerceAtLeast(0)
+    PlaybackTrace.event(TraceEvent.VIDEO_SURFACE_RELEASED, TraceField.SURFACES to videoSurfaces.toLong())
     player?.let(::applyVideoMode)
 }
 
@@ -113,6 +118,15 @@ internal fun EnhancedMusicPlayerManager.applyVideoMode(controller: Player) {
     val play = videoShownState.value && videoSurfaces > 0
     val disabled = androidx.media3.common.C.TRACK_TYPE_VIDEO in controller.trackSelectionParameters.disabledTrackTypes
     if (disabled != play) return
+    PlaybackTrace.event(
+        TraceEvent.VIDEO_SELECTION,
+        TraceField.SHOW_VIDEO to if (showVideo) 1L else 0L,
+        TraceField.VIDEO_AVAILABLE to if (musicVideoAvailableState.value) 1L else 0L,
+        TraceField.VIDEO_ENABLED to if (play) 1L else 0L,
+        TraceField.SURFACES to videoSurfaces.toLong(),
+        TraceField.POSITION_MS to controller.currentPosition,
+        TraceField.STATE to controller.playbackState.toLong(),
+    )
     controller.trackSelectionParameters =
         controller.trackSelectionParameters
             .buildUpon()

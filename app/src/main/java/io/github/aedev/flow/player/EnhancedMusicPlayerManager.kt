@@ -509,16 +509,7 @@ object EnhancedMusicPlayerManager {
         }
     }
 
-    fun seekTo(position: Long) {
-        scope.launch {
-            val duration = player?.duration?.takeIf { it > 0 } ?: playbackState.value.duration.takeIf { it > 0 }
-            val target = duration?.let { position.coerceIn(0L, it) } ?: position.coerceAtLeast(0L)
-
-            currentPositionState.value = target
-            playbackState.value = playbackState.value.copy(position = target)
-            player?.seekTo(target)
-        }
-    }
+    fun seekTo(position: Long) = performSeekTo(position)
 
     fun getCurrentPosition(): Long =
         try {
@@ -546,27 +537,11 @@ object EnhancedMusicPlayerManager {
         scope.launch { eventFlow.emit(PlayerEvent.RequestToggleLike) }
     }
 
-    fun play() {
-        scope.launch { player?.play() }
-    }
+    fun play() = performPlay()
 
-    fun pause() {
-        scope.launch { player?.pause() }
-    }
+    fun pause() = performPause()
 
-    fun stop() {
-        scope.launch {
-            player?.stop()
-            playbackState.value =
-                playbackState.value.copy(
-                    isPlaying = false,
-                    isBuffering = false,
-                    isPreparing = false,
-                    position = 0L,
-                )
-            currentPositionState.value = 0L
-        }
-    }
+    fun stop() = performStop()
 
     fun setPlaybackSpeed(speed: Float) {
         _playbackSpeed.value = speed

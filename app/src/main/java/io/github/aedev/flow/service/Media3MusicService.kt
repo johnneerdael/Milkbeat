@@ -45,6 +45,7 @@ import io.github.aedev.flow.player.audio.visualizer.VisualizerClockListener
 import io.github.aedev.flow.player.audio.visualizer.VisualizerEngine
 import io.github.aedev.flow.player.audio.visualizer.VisualizerTapProcessor
 import io.github.aedev.flow.player.audio.visualizer.followPlayerClock
+import io.github.aedev.flow.player.diagnostics.PlaybackOutputTrace
 import io.github.aedev.flow.player.factory.LoadControlFactory
 import io.github.aedev.flow.player.musicResolutionStatusState
 import io.github.aedev.flow.player.setVideoCapablePlaybackIds
@@ -386,6 +387,7 @@ class Media3MusicService : MediaLibraryService() {
                 .setSeekBackIncrementMs(5000)
                 .setSeekForwardIncrementMs(5000)
                 .build()
+        player.addAnalyticsListener(PlaybackOutputTrace(audioOutputProbe))
         player.trackSelectionParameters =
             player.trackSelectionParameters
                 .buildUpon()
