@@ -93,6 +93,12 @@ class MusicMediaSourceFactoryTest {
     }
 
     @Test
+    fun `completed unbound audio does not ask for a missing downloaded picture`() {
+        val cached = item.buildUpon().setUri("musicvideo://spotify-song").build()
+        assertThat(factory.resolvedSource(cached, null)).isInstanceOf(ProgressiveMediaSource::class.java)
+    }
+
+    @Test
     fun `a Beatport fallback chooses HLS from the resolved stream`() {
         assertThat(factory.resolvedSource(item, audio("application/x-mpegURL"))).isInstanceOf(HlsMediaSource::class.java)
         assertThat(

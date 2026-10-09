@@ -116,6 +116,12 @@ internal fun Media3MusicService.handlePlayerError(
         return
     }
 
+    val progressiveHttp =
+        io.github.aedev.flow.player.error.StreamHttpFailure
+            .of(error)
+    if (progressiveHttp != null && (progressiveHttp.second in setOf(403, 404, 410) || progressiveHttp.second >= 500)) {
+        pluginAudio.failed(mediaId, progressiveHttp.first, progressiveHttp.second)
+    }
     if (fallBackToSong(failed)) {
         Log.w(TAG, "Music video of $mediaId failed (${error.errorCodeName}), playing its song instead", error)
         return
@@ -400,8 +406,6 @@ internal fun Media3MusicService.handleExpiredUrlError(
         lifecycleScope.launch {
             delay(BASE_RETRY_DELAY_MS)
             try {
-                // Tell the plugin which stream was refused before the cache forgets it.
-                pluginAudio.current(mediaId)?.let { pluginAudio.failed(mediaId, it.stream.url, status = 403) }
                 downloadUtil.invalidateUrlCache(mediaId)
                 player.stop()
                 if (refreshStreamMediaItem(failed)) {

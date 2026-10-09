@@ -295,7 +295,7 @@ class DownloadUtil
                     val id = MusicVideoItems.descriptor(uri).ref.providerId
                     val cached =
                         runCatching {
-                            completeDownload(id) && (!picture || completeDownload(MusicVideoItems.videoKey(id)))
+                            completeDownload(id)
                         }.getOrDefault(false)
                     if (cached) null else resolveForPlayback(uri, picture = false, preparePicture = picture)
                 },

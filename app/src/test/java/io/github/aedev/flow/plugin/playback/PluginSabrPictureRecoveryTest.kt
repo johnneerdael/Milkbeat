@@ -102,6 +102,56 @@ class PluginSabrPictureRecoveryTest : PluginAudioFixture() {
     }
 
     @Test
+    fun `progressive 404 and 500 media failures reach ordered provider fallback`() =
+        runTest {
+            for (status in listOf(404, 500)) {
+                audio.forgetAll()
+                val source =
+                    plugin.copy(
+                        manifest =
+                            plugin.manifest.copy(
+                                id = "spotify",
+                                roles =
+                                    nl.neerdael.milkbeat.plugin
+                                        .Roles(
+                                            audio =
+                                                nl.neerdael.milkbeat.plugin
+                                                    .AudioRole(setOf("spotify")),
+                                        ),
+                            ),
+                    )
+                val selection = ProviderSelection(audio = listOf("youtube", "spotify"))
+                every { registry.state } returns
+                    kotlinx.coroutines.flow.MutableStateFlow(PluginRegistryState(listOf(plugin, source), selection))
+                coEvery { host.call("youtube", PluginOperations.matchAudio, any()) } returns
+                    nl.neerdael.milkbeat.plugin
+                        .AudioMatches(listOf(candidate))
+                coEvery { host.call("youtube", PluginOperations.resolveAudio, any()) } returns stream
+                coEvery { host.call("spotify", PluginOperations.resolveAudio, any()) } returns stream
+                audio.resolve(original, null, playbackId = mediaId)
+                repeat(2) {
+                    val (service, _) = service()
+                    val http =
+                        androidx.media3.datasource.HttpDataSource.InvalidResponseCodeException(
+                            status,
+                            "fixture",
+                            null,
+                            emptyMap(),
+                            androidx.media3.datasource.DataSpec
+                                .Builder()
+                                .setUri(stream.url)
+                                .build(),
+                            byteArrayOf(),
+                        )
+                    service.handlePlayerError(PlaybackException("fixture", http, PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS), 0)
+                    service.pendingRetryJob?.cancel()
+                    val replacement = audio.resolve(original, null, playbackId = mediaId)
+                    assertThat(replacement.pluginId).isEqualTo(if (it == 0) "youtube" else "spotify")
+                }
+            }
+        }
+
+    @Test
     fun `online typed renewal reasons retain protocol priority and reload context`() =
         runTest {
             for (reason in nl.neerdael.milkbeat.sabr.SabrPlaybackException.Reason.entries) {

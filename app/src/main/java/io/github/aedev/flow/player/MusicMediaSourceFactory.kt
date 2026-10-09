@@ -166,7 +166,7 @@ class MusicMediaSourceFactory(
             } else {
                 progressive.createMediaSource(soundItem)
             }
-        if (!withPicture || sound is HlsMediaSource || (audio != null && audio.stream.video == null)) return sound
+        if (!withPicture || sound is HlsMediaSource || audio?.stream?.video == null) return sound
         val videoId = mediaItem.mediaId
         val picture =
             progressive.createMediaSource(
