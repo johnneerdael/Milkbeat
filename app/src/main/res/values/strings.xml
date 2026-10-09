@@ -788,4 +788,6 @@
     <string name="music_matching_provider">Finding a match on %1$s…</string>
     <string name="music_loading_provider">Loading audio from %1$s…</string>
     <string name="music_loading_saved_match">Loading saved %1$s match…</string>
+    <string name="player_settings_debug_logging">Debug playback logging</string>
+    <string name="player_settings_debug_logging_subtitle">Write local actions, stream timings and audio/video output events to logcat (MilkbeatTrace). Off by default.</string>
 </resources>

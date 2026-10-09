@@ -7,6 +7,9 @@ import androidx.media3.common.util.UnstableApi
 import io.github.aedev.flow.data.localmedia.LocalMediaIds
 import io.github.aedev.flow.data.music.model.MusicTrack
 import io.github.aedev.flow.player.EnhancedMusicPlayerManager.PlayerEvent
+import io.github.aedev.flow.player.diagnostics.PlaybackTrace
+import io.github.aedev.flow.player.diagnostics.TraceEvent
+import io.github.aedev.flow.player.diagnostics.TraceField
 import io.github.aedev.flow.service.Media3MusicService
 import kotlinx.coroutines.launch
 import org.schabi.newpipe.extractor.stream.AudioStream
@@ -16,6 +19,7 @@ internal fun EnhancedMusicPlayerManager.performSetPendingTrack(
     track: MusicTrack,
     sourceName: String? = null,
 ) {
+    PlaybackTrace.event(TraceEvent.PLAY_TRACK_REQUESTED)
     clearPendingPlayNext()
     player?.stop()
     player?.clearMediaItems()
@@ -54,6 +58,7 @@ internal fun EnhancedMusicPlayerManager.performPlayTrack(
     sourceName: String? = null,
     localUriOverrides: Map<String, Uri> = emptyMap(),
 ) {
+    PlaybackTrace.event(TraceEvent.PLAY_TRACK, TraceField.POSITION_MS to startPositionMs, TraceField.COUNT to queue.size.toLong())
     player?.stop()
     player?.clearMediaItems()
     clearPendingPlayNext()
@@ -160,6 +165,7 @@ internal fun EnhancedMusicPlayerManager.performRemoveAutomixItem(videoId: String
 
 @OptIn(UnstableApi::class)
 internal fun EnhancedMusicPlayerManager.performTogglePlayPause() {
+    PlaybackTrace.event(TraceEvent.TOGGLE_PLAY_PAUSE)
     scope.launch {
         player?.let { p ->
             if (p.mediaItemCount == 0 && currentTrackState.value != null) {
@@ -221,6 +227,7 @@ internal fun EnhancedMusicPlayerManager.performAddToQueue(track: MusicTrack) {
 
 @OptIn(UnstableApi::class)
 internal fun EnhancedMusicPlayerManager.performPlayNext() {
+    PlaybackTrace.event(TraceEvent.PLAY_NEXT)
     val queue = queueState.value
     val idx = currentPlaybackQueueIndex()
 
@@ -233,6 +240,7 @@ internal fun EnhancedMusicPlayerManager.performPlayNext() {
 
 @OptIn(UnstableApi::class)
 internal fun EnhancedMusicPlayerManager.performPlayPrevious() {
+    PlaybackTrace.event(TraceEvent.PLAY_PREVIOUS)
     scope.launch {
         val queue = queueState.value
         val idx = currentPlaybackQueueIndex()
@@ -252,6 +260,7 @@ internal fun EnhancedMusicPlayerManager.performPlayPrevious() {
 
 @OptIn(UnstableApi::class)
 internal fun EnhancedMusicPlayerManager.performPlayFromQueue(index: Int) {
+    PlaybackTrace.event(TraceEvent.PLAY_FROM_QUEUE, TraceField.WINDOW_INDEX to index.toLong())
     val queue = queueState.value
     if (index in queue.indices) {
         clearPendingPlayNext()

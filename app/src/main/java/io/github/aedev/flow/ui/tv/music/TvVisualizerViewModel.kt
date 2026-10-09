@@ -9,6 +9,9 @@ import io.github.aedev.flow.data.local.VisualizerPreferences
 import io.github.aedev.flow.player.audio.visualizer.VisualizerAudioTap
 import io.github.aedev.flow.player.audio.visualizer.VisualizerEngine
 import io.github.aedev.flow.player.audio.visualizer.VisualizerSettings
+import io.github.aedev.flow.player.diagnostics.PlaybackTrace
+import io.github.aedev.flow.player.diagnostics.TraceEvent
+import io.github.aedev.flow.player.diagnostics.TraceField
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
@@ -43,6 +46,10 @@ class TvVisualizerViewModel
             preferences.nowPlayingView.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
         fun setNowPlayingView(view: NowPlayingView) {
+            PlaybackTrace.event(
+                TraceEvent.VIEW_SWITCH,
+                TraceField.VIEW_MODE to view.ordinal.toLong(),
+            )
             viewModelScope.launch { preferences.setNowPlayingView(view) }
         }
 

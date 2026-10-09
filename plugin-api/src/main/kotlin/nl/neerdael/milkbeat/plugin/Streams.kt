@@ -151,6 +151,10 @@ data class ReportPlaybackRequest(
     val trackingToken: String? = null,
     val playedMs: Long,
     val durationMs: Long? = null,
+    /** Actual position in the accepted recording, distinct from elapsed listening time after a seek. */
+    val positionMs: Long? = null,
+    /** Opaque host listen identity; changes when the same recording starts a new listen. */
+    val playbackSessionId: String? = null,
 )
 
 /** A video to play in the video player. */

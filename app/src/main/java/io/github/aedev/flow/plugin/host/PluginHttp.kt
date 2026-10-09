@@ -2,21 +2,30 @@ package io.github.aedev.flow.plugin.host
 
 import android.util.Log
 import io.github.aedev.flow.BuildConfig
+import io.github.aedev.flow.player.diagnostics.PlaybackTrace
+import io.github.aedev.flow.player.diagnostics.TraceEvent
+import io.github.aedev.flow.player.diagnostics.TraceField
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.jsonObject
 import nl.neerdael.milkbeat.plugin.HttpBodyEncoding
 import nl.neerdael.milkbeat.plugin.HttpRequest
 import nl.neerdael.milkbeat.plugin.HttpResponse
 import nl.neerdael.milkbeat.plugin.PluginJson
+import okhttp3.Call
+import okhttp3.Callback
 import okhttp3.Interceptor
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.Response
 import java.io.IOException
 import java.util.Base64
 import java.util.concurrent.TimeUnit
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 
 private const val DEFAULT_TIMEOUT_MS = 20_000L
 private const val MAX_TIMEOUT_MS = 60_000L
@@ -79,45 +88,60 @@ internal class PluginHttp(
                             .method(method, body ?: if (method in BODYLESS_METHODS) null else ByteArray(0).toRequestBody())
                             .build(),
                     )
-            call.execute().use { response ->
-                val length = response.body.contentLength()
-                if (length > MAX_RESPONSE_BYTES) throw PluginHttpException("Response of $length bytes is too large")
-                val source = response.body.source()
-                if (source.request(MAX_RESPONSE_BYTES + 1)) throw PluginHttpException("Response is too large")
-                val bytes = source.buffer.readByteArray()
-                val responseText =
-                    if (request.responseEncoding == HttpBodyEncoding.BASE64) {
-                        Base64.getEncoder().encodeToString(bytes)
-                    } else {
-                        bytes.toString(Charsets.UTF_8)
+            val trace = PlaybackTrace.start(TraceEvent.HTTP_STARTED, pluginHttpTraceCategory(url))
+            var status = 0L
+            var size = 0L
+            var success = false
+            try {
+                call.readResponse { response ->
+                    status = response.code.toLong()
+                    val length = response.body.contentLength()
+                    if (length > MAX_RESPONSE_BYTES) throw PluginHttpException("Response of $length bytes is too large")
+                    val source = response.body.source()
+                    if (source.request(MAX_RESPONSE_BYTES + 1)) throw PluginHttpException("Response is too large")
+                    val bytes = source.buffer.readByteArray()
+                    size = bytes.size.toLong()
+                    val responseText =
+                        if (request.responseEncoding == HttpBodyEncoding.BASE64) {
+                            Base64.getEncoder().encodeToString(bytes)
+                        } else {
+                            bytes.toString(Charsets.UTF_8)
+                        }
+                    if (BuildConfig.DEBUG && url.host == "music.youtube.com" && url.encodedPath.endsWith("/browse") &&
+                        request.body?.contains("\"browseId\":\"VL") == true
+                    ) {
+                        Log.i(
+                            "PlaylistMirrorHttp",
+                            "Playlist response: " +
+                                "status=${response.code}, keys=${runCatching {
+                                    PluginJson
+                                        .parseToJsonElement(
+                                            responseText,
+                                        ).jsonObject.keys
+                                }.getOrNull()}, " +
+                                "editable=${responseText.contains("musicEditablePlaylistDetailHeaderRenderer")}, " +
+                                "marker=${responseText.contains("[milkbeat-mirror:")}, " +
+                                "legacyHeader=${responseText.contains("musicDetailHeaderRenderer")}, " +
+                                "responsiveHeader=${responseText.contains("musicResponsiveHeaderRenderer")}",
+                        )
                     }
-                if (BuildConfig.DEBUG && url.host == "music.youtube.com" && url.encodedPath.endsWith("/browse") &&
-                    request.body?.contains("\"browseId\":\"VL") == true
-                ) {
-                    Log.i(
-                        "PlaylistMirrorHttp",
-                        "Playlist response: " +
-                            "status=${response.code}, keys=${runCatching {
-                                PluginJson
-                                    .parseToJsonElement(
-                                        responseText,
-                                    ).jsonObject.keys
-                            }.getOrNull()}, " +
-                            "editable=${responseText.contains("musicEditablePlaylistDetailHeaderRenderer")}, " +
-                            "marker=${responseText.contains("[milkbeat-mirror:")}, " +
-                            "legacyHeader=${responseText.contains("musicDetailHeaderRenderer")}, " +
-                            "responsiveHeader=${responseText.contains("musicResponsiveHeaderRenderer")}",
-                    )
+                    HttpResponse(
+                        status = response.code,
+                        url = response.request.url.toString(),
+                        headers =
+                            response.headers.names().associate { name ->
+                                val lower = name.lowercase()
+                                lower to response.headers.values(name).joinToString(if (lower == "set-cookie") "\n" else ", ")
+                            },
+                        body = responseText,
+                    ).also { success = true }
                 }
-                HttpResponse(
-                    status = response.code,
-                    url = response.request.url.toString(),
-                    headers =
-                        response.headers.names().associate { name ->
-                            val lower = name.lowercase()
-                            lower to response.headers.values(name).joinToString(if (lower == "set-cookie") "\n" else ", ")
-                        },
-                    body = responseText,
+            } finally {
+                trace.event(
+                    TraceEvent.HTTP_FINISHED,
+                    TraceField.STATUS to status,
+                    TraceField.BYTES to size,
+                    TraceField.SUCCESS to if (success) 1L else 0L,
                 )
             }
         }
@@ -129,3 +153,35 @@ internal class PluginHttp(
         return request
     }
 }
+
+// Keep cancellation attached while consuming the body; a header-only await detaches too early.
+private suspend fun <T> Call.readResponse(read: (Response) -> T): T =
+    suspendCancellableCoroutine { continuation ->
+        continuation.invokeOnCancellation { cancel() }
+        enqueue(
+            object : Callback {
+                override fun onFailure(
+                    call: Call,
+                    e: IOException,
+                ) {
+                    if (continuation.isActive) continuation.resumeWithException(e)
+                }
+
+                override fun onResponse(
+                    call: Call,
+                    response: Response,
+                ) {
+                    try {
+                        val result =
+                            response.use {
+                                if (!continuation.isActive) return
+                                read(it)
+                            }
+                        continuation.resume(result)
+                    } catch (error: Exception) {
+                        if (continuation.isActive) continuation.resumeWithException(error)
+                    }
+                }
+            },
+        )
+    }

@@ -69,6 +69,7 @@ class MusicPlaybackVideoTest {
         every { player.currentMediaItem } answers { items.firstOrNull() }
         every { player.currentTracks } returns preparedMusicPictureTracks()
         every { player.currentPosition } returns 12_345L
+        every { player.playbackState } returns androidx.media3.common.Player.STATE_READY
         every { player.mediaItemCount } answers { items.size }
         every { player.getMediaItemAt(any()) } answers { items[firstArg()] }
         every { player.replaceMediaItem(any(), any()) } answers { items[firstArg()] = secondArg() }
@@ -78,6 +79,7 @@ class MusicPlaybackVideoTest {
 
     @After
     fun cleanup() {
+        musicVideoJoinGate.bind(null)
         manager.showVideo = false
         manager.videoSurfaces = 0
         manager.streamItemIds.clear()
@@ -93,6 +95,50 @@ class MusicPlaybackVideoTest {
     }
 
     private fun capability(ids: Set<String>) = manager.setVideoCapablePlaybackIds(ids)
+
+    @Test
+    fun `join readiness is installed before VIDEO selection reaches the renderer`() {
+        capability(setOf(track.videoId))
+        val timeline =
+            androidx.media3.exoplayer.source
+                .SinglePeriodTimeline(3_600_000_000, true, false, false, null, items.single())
+        every { player.currentTimeline } returns timeline
+        every { player.currentPeriodIndex } returns 0
+        musicVideoJoinGate.bind(player)
+        manager.acquireVideoSurface()
+        every { player.trackSelectionParameters = any() } answers {
+            val next = firstArg<TrackSelectionParameters>()
+            if (C.TRACK_TYPE_VIDEO !in next.disabledTrackTypes) assertThat(musicVideoJoinGate.waiting).isTrue()
+            selection = next
+        }
+        manager.setVideoMode(true)
+        assertThat(musicVideoJoinGate.waiting).isTrue()
+        manager.setVideoMode(false)
+        assertThat(musicVideoJoinGate.waiting).isFalse()
+    }
+
+    @Test
+    fun `a new buffering item waits for audio READY while later video buffering stays selected`() {
+        capability(setOf(track.videoId))
+        val timeline =
+            androidx.media3.exoplayer.source
+                .SinglePeriodTimeline(3_600_000_000, true, false, false, null, items.single())
+        every { player.currentTimeline } returns timeline
+        every { player.currentPeriodIndex } returns 0
+        every { player.playbackState } returns androidx.media3.common.Player.STATE_BUFFERING
+        musicVideoJoinGate.bind(player)
+        manager.acquireVideoSurface()
+        manager.setVideoMode(true)
+        assertThat(selection.disabledTrackTypes).contains(C.TRACK_TYPE_VIDEO)
+        assertThat(musicVideoJoinGate.waiting).isFalse()
+        every { player.playbackState } returns androidx.media3.common.Player.STATE_READY
+        manager.applyVideoMode(player)
+        assertThat(selection.disabledTrackTypes).doesNotContain(C.TRACK_TYPE_VIDEO)
+        assertThat(musicVideoJoinGate.waiting).isTrue()
+        every { player.playbackState } returns androidx.media3.common.Player.STATE_BUFFERING
+        manager.applyVideoMode(player)
+        assertThat(selection.disabledTrackTypes).doesNotContain(C.TRACK_TYPE_VIDEO)
+    }
 
     @Test
     fun `local file and content videos switch picture without remote streaming ids`() {

@@ -3489,6 +3489,20 @@
                     ],
                     "minimum": -9223372036854775808,
                     "maximum": 9223372036854775807
+                },
+                "positionMs": {
+                    "type": [
+                        "integer",
+                        "null"
+                    ],
+                    "minimum": -9223372036854775808,
+                    "maximum": 9223372036854775807
+                },
+                "playbackSessionId": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
                 }
             },
             "title": "ReportPlaybackRequest"

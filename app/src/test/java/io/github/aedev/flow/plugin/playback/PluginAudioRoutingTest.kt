@@ -10,6 +10,7 @@ import io.mockk.coVerify
 import io.mockk.every
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -79,7 +80,7 @@ class PluginAudioRoutingTest : PluginAudioFixture() {
         }
 
     @Test
-    fun `native session delivery follows its preferred provider before global HLS choice`() {
+    fun `native session delivery follows its own provider before global HLS choice`() {
         val beatport =
             plugin.copy(
                 manifest =
@@ -91,7 +92,7 @@ class PluginAudioRoutingTest : PluginAudioFixture() {
         every { registry.state } returns
             MutableStateFlow(PluginRegistryState(listOf(beatport, plugin), ProviderSelection(audio = listOf("beatport", "youtube"))))
         assertThat(audio.deliveryFor(candidate, "youtube")).isEqualTo(AudioDelivery.PROGRESSIVE)
-        assertThat(audio.deliveryFor(candidate)).isEqualTo(AudioDelivery.HLS)
+        assertThat(audio.deliveryFor(candidate)).isEqualTo(AudioDelivery.PROGRESSIVE)
     }
 
     @Test
@@ -136,7 +137,7 @@ class PluginAudioRoutingTest : PluginAudioFixture() {
         }
 
     @Test
-    fun `the preferred matching provider runs before a lower priority direct id`() =
+    fun `Spotify known alias may resolve before a higher priority matching provider`() =
         runTest {
             val beatport =
                 plugin.copy(
@@ -150,11 +151,11 @@ class PluginAudioRoutingTest : PluginAudioFixture() {
                 MutableStateFlow(
                     PluginRegistryState(listOf(plugin, beatport), ProviderSelection(audio = listOf("youtube", "beatport"))),
                 )
-            coEvery { host.call("youtube", PluginOperations.matchAudio, any()) } returns AudioMatches(listOf(candidate))
+            coEvery { host.call("youtube", PluginOperations.matchAudio, any()) } coAnswers { awaitCancellation() }
             coEvery { host.call("beatport", PluginOperations.resolveAudio, any()) } returns stream
             val described = original.copy(ids = original.ids + ("beatport" to "123"))
-            assertThat(audio.resolve(described, null).pluginId).isEqualTo("youtube")
-            coVerify(exactly = 0) { host.call("beatport", PluginOperations.resolveAudio, any()) }
+            assertThat(audio.resolve(described, null).pluginId).isEqualTo("beatport")
+            coVerify(exactly = 1) { host.call("beatport", PluginOperations.resolveAudio, any()) }
         }
 
     @Test

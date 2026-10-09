@@ -48,8 +48,9 @@ and sign-in method, playback and radio, the visualizer, every Settings page and 
 - **Your own music first.** Local folders, USB drives and SMB 2/3, WebDAV, SFTP and NFS (v3, 4.0,
   4.1) servers, read-only. Their tags build a **Local library** tab of genres, artists, releases,
   playlists, labels and years.
-- **Catalog and audio are separate.** Browse Spotify or Beatport and let YouTube Music, SoundCloud
-  or Beatport supply the audio, tried in the order you choose. Recording identity is checked, so a
+- **Catalog and audio are separate.** YouTube tracks use their known recording IDs; SoundCloud
+  and Beatport try their own audio first. Spotify races enabled audio providers and plays the first
+  acceptable, playable match. Recording identity is checked, so a
   cover, another remix or a short excerpt is rejected.
 - **Every queue continues as a radio,** steered by YouTube Music's presets (Discover, Popular,
   Deep cuts, moods and decades) pinned above the queue. Local music seeds a radio too while the
@@ -165,7 +166,8 @@ native SABR playback through Milkbeat's existing Media3 player.
   Library.
 
 Under **Audio**, enable providers and put them in priority order; under **Video**, choose the video
-plugin. **Update plugins automatically** (on by default) installs new plugin versions at start and
+plugin. Native tracks try their own enabled audio provider before ordered fallback; Spotify races
+enabled providers. **Update plugins automatically** (on by default) installs new plugin versions at start and
 every six hours; **Update all plugins** checks now. Each plugin's details offer sign-in, play
 reporting, **Index playlists** and, for Spotify, **Prepare private playlists in YouTube Music**.
 [Providers and sign-in](https://johnneerdael.github.io/Milkbeat/providers/).
@@ -178,11 +180,12 @@ play/pause, next, repeat, like, the view button and the queue.
 - **The view button** steps through the visualizer, the matched music video (up to the TV's physical
   resolution, capped at 2160p, in a hardware-decoded codec) and the artwork. Milkbeat remembers your choice; video only loads when
   you pick it.
-- **Prepared video playback:** API 7 providers can supply audio and optional picture metadata together. Switching views selects the video track in the existing Media3 presentation; it does not replace or seek the playing audio. Video is offered only when the current presentation contains a supported video track. Older providers with separate progressive picture URLs remain audio-only unless they supply a prepared presentation. Lyrics are not fetched or displayed.
+- **Prepared video playback:** API 7 providers can supply audio and optional picture metadata together. Switching views selects the video track in the existing Media3 presentation; it does not replace or seek the playing audio. Prepared network video buffers briefly behind a loading indicator before joining the current audio position. The indicator stops animating while paused or hidden. Video is offered only when the current presentation contains a supported video track. Older providers with separate progressive picture URLs remain audio-only unless they supply a prepared presentation. Lyrics are not fetched or displayed.
 - **The queue** shows what is coming. Every queue continues as a radio; press Right on a track to
   reach the radio presets and switch the mix without losing your own tracks.
 - **Queue preparation** matches the remaining queue one track at a time in playback order and
   caches matches.
+- **Listening history:** compatible API 8 providers report qualified signed-in listens during playback, including long sets, while respecting the play-reporting setting and skipped sections.
 - **Recovery:** about 16 MB of a stream buffers ahead. Failed links get one provider refresh; repeated media failures try the next configured audio provider for that track. Decoded PCM output that stalls for five seconds is reconnected up to twice.
 
 [Playback, queue and radio](https://johnneerdael.github.io/Milkbeat/playback/).
@@ -205,7 +208,7 @@ overview; [ProjectM TV's guide](https://johnneerdael.github.io/ProjectM-TV/) cov
 | --- | --- |
 | **Plugins** | Audio priority, video provider, installed plugins and their details, automatic plugin updates, Add a plugin |
 | **Music folders** | Local folder browser, Android folder picker, SMB, WebDAV, SFTP and NFS editors, Rescan library, saved sources |
-| **Playback** | Background Play, Autoplay related videos, Subtitles, Skip Silence, Stable Voice, Ambient mode |
+| **Playback** | Background Play, Autoplay related videos, Subtitles, Skip Silence, Stable Voice, Ambient mode, Debug playback logging |
 | **Visualizations** | The ProjectM TV presets, transitions, picture quality, diagnostics and timing settings |
 | **About** | Version, automatic app updates (GitHub build), Changelog, GitHub and credits |
 

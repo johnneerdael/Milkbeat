@@ -54,7 +54,7 @@ Give visible tracks time to load their embedded metadata. Check that the file ac
 
 ## A Spotify track cannot play
 
-Spotify has no audio of its own. Enable at least one audio provider, check its account/subscription, and verify the priority order. Catalogs may not contain the same recording; an unavailable match can fall back to another provider. Temporary failures can be retried.
+Spotify has no audio of its own. Enable at least one audio provider, check its account/subscription. Milkbeat races acceptable matches across enabled providers. Catalogs may not contain the same recording; an unavailable match can fall back to another provider. Temporary failures can be retried.
 
 ## Music stops in the middle of a song
 
@@ -103,3 +103,16 @@ Milkbeat 0.9.55 and earlier could leave Settings on Back from a Plugins page, sh
 Check that both Spotify and YouTube Music are enabled, signed in and updated to versions that support playlist preparation. Milkbeat re-checks an expired sign-in in the background and resumes preparation when the account still works; YouTube Music 0.2.4 or later is needed so that one refused request does not sign the account out. If the provider confirms the sign-in expired, reopen that plugin's details and sign in through the phone viewer, then select **Retry preparation** on the playlist page.
 
 Interrupted preparation resumes from saved progress. Confirmed unavailable songs are omitted. When a provider briefly refuses or throttles requests, preparation and indexing pause (5, 15, then 45 seconds, or longer if the provider asks) and continue where they were; only if the refusals last does the run stop and try again later in the background. Your own playlists and Liked Songs can prepare in the background, while other playlists prepare when opened. Albums use normal playback and are not mirrored. See [Prepare private playlists](providers.md#prepare-private-playlists).
+
+## Capture slow startup or a gap when switching views
+
+Enable **Settings → Playback → Debug playback logging**, reproduce the issue, then collect
+`adb logcat -v threadtime -s MilkbeatTrace:I`. Turn logging off when finished. The setting is off
+by default and is not transferred to another device. Events include local play, pause, seek and
+view choices; known-ID bypass or matching; provider resolution; runtime queue time; HTTP timing;
+and Media3 buffering, decoder and AudioTrack output callbacks. Logs use fixed event names and
+numeric fields rather than URLs, credentials or track titles.
+
+A capture without a decoder restart or underrun does not prove that no brief audible gap occurred.
+Correlate the view switch with output events and the audible reproduction. Network captures show
+request timing; they do not contain the remote-control press or the first audible sample.

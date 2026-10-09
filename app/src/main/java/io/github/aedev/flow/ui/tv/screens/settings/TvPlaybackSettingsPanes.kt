@@ -5,12 +5,15 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.aedev.flow.R
+import io.github.aedev.flow.data.local.DebugLoggingPreferences
 import io.github.aedev.flow.data.local.PlayerPreferences
 import io.github.aedev.flow.ui.tv.components.TvToggleRow
 import kotlinx.coroutines.launch
@@ -21,6 +24,9 @@ fun TvPlaybackSettingsPane(
     modifier: Modifier = Modifier,
 ) {
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    val debugPreferences = remember(context) { DebugLoggingPreferences(context) }
+    val debugLogging by debugPreferences.enabled.collectAsStateWithLifecycle(initialValue = false)
     val backgroundPlay by playerPreferences.backgroundPlayEnabled.collectAsStateWithLifecycle(initialValue = true)
     val autoplay by playerPreferences.autoplayEnabled.collectAsStateWithLifecycle(initialValue = true)
     val skipSilence by playerPreferences.skipSilenceEnabled.collectAsStateWithLifecycle(initialValue = false)
@@ -77,6 +83,14 @@ fun TvPlaybackSettingsPane(
                 supportingText = stringResource(R.string.player_settings_ambient_mode_subtitle),
                 checked = ambientMode,
                 onCheckedChange = { scope.launch { playerPreferences.setVideoAmbientModeEnabled(it) } },
+            )
+        }
+        item(key = "debug-logging") {
+            TvToggleRow(
+                label = stringResource(R.string.player_settings_debug_logging),
+                supportingText = stringResource(R.string.player_settings_debug_logging_subtitle),
+                checked = debugLogging,
+                onCheckedChange = { scope.launch { debugPreferences.setEnabled(it) } },
             )
         }
     }

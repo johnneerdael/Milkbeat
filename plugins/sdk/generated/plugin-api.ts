@@ -643,6 +643,8 @@ export interface ReportPlaybackRequest {
   trackingToken?: string | null;
   playedMs: number;
   durationMs?: number | null;
+  positionMs?: number | null;
+  playbackSessionId?: string | null;
 }
 export interface ResolveVideoRequest {
   entity: EntityRef;

@@ -36,6 +36,8 @@ class ResolvedAudio(
     internal val nativeBinding: Any? = null,
     internal val nativeValidUntilElapsedMs: Long? = null,
 ) {
+    internal val playbackReports = PlaybackReportDeduplication()
+
     internal val preparedDashManifest: String? by lazy { buildPreparedDashManifest() }
 
     internal fun isValidAt(
