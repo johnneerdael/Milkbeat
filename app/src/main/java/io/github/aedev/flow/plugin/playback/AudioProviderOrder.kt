@@ -33,12 +33,24 @@ internal fun audioProviderAttempts(
         if (withPicture && !role.musicVideo) return@mapNotNull null
         val direct = directAudioTrack(track, plugin)
         if (id !in sortable && id != preferredProviderId) {
-            // An alias in another service's track must not let an own-tracks provider jump the order.
-            return@mapNotNull AudioProviderAttempt(plugin, direct).takeIf { direct?.ref == track.ref }
+            return@mapNotNull AudioProviderAttempt(plugin, direct).takeIf { track.isSourcedFrom(plugin) }
         }
         if (direct == null && (!role.match || track.title.isBlank())) return@mapNotNull null
         AudioProviderAttempt(plugin, direct)
     }
+}
+
+/**
+ * Whether [plugin] is this track's source: an alias of another service's track does not count, and
+ * neither does a ref whose value another service's id space holds too, since refs carry no namespace.
+ */
+private fun TrackDescriptor.isSourcedFrom(plugin: InstalledPlugin): Boolean {
+    val sourceSpaces = ids.filterValues { it == ref.providerId }.keys
+    val own =
+        plugin.manifest.roles.audio
+            ?.idSpaces
+            .orEmpty()
+    return sourceSpaces.isNotEmpty() && own.containsAll(sourceSpaces)
 }
 
 /** Whether no provider in [attempts] plays this track's own source, as for Spotify metadata. */

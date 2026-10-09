@@ -98,6 +98,16 @@ class PluginSourceRoutingTest : PluginAudioFixture() {
         }
 
     @Test
+    fun `own-tracks-only Beatport does not claim a track whose source id another service shares`() =
+        runTest {
+            ownTracksOnly(listOf(plugin, provider("soundcloud")), provider("beatport"))
+            coEvery { host.call("youtube", PluginOperations.matchAudio, any()) } returns AudioMatches(listOf(candidate))
+            val shared = matchTrack("123", "soundcloud").copy(ids = mapOf("soundcloud" to "123", "beatport" to "123"))
+            assertThat(audio.resolve(shared, null).pluginId).isEqualTo("youtube")
+            coVerify(exactly = 0) { host.call("beatport", PluginOperations.resolveAudio, any()) }
+        }
+
+    @Test
     fun `own-tracks-only Beatport that cannot stream continues down the listener's order`() =
         runTest {
             ownTracksOnly(listOf(plugin), provider("beatport"))
