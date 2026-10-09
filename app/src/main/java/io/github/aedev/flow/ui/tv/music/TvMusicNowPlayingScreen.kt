@@ -303,23 +303,25 @@ fun TvMusicNowPlayingScreen(
             }
         }
 
-        TvNowPlayingTrackCorner(
-            current = handOver.shown,
-            statusText = musicResolutionStatusText(resolution, track?.videoId),
-            next = handOver.incoming,
-            glitch = { handOver.glitch.value },
-            contentColor = MaterialTheme.colorScheme.onSurface,
-            maxWidth =
-                if (panel == TvMusicPanel.NONE) {
-                    screenWidth * CORNER_WIDTH_FRACTION
-                } else {
-                    screenWidth - dimens.sidePanelWidth - dimens.overscanHorizontal - PanelGap
-                },
-            modifier =
-                Modifier
-                    .align(Alignment.TopStart)
-                    .padding(horizontal = dimens.overscanHorizontal, vertical = dimens.overscanVertical),
-        )
+        if (shownView != NowPlayingView.VIDEO) {
+            TvNowPlayingTrackCorner(
+                current = handOver.shown,
+                statusText = musicResolutionStatusText(resolution, track?.videoId),
+                next = handOver.incoming,
+                glitch = { handOver.glitch.value },
+                contentColor = MaterialTheme.colorScheme.onSurface,
+                maxWidth =
+                    if (panel == TvMusicPanel.NONE) {
+                        screenWidth * CORNER_WIDTH_FRACTION
+                    } else {
+                        screenWidth - dimens.sidePanelWidth - dimens.overscanHorizontal - PanelGap
+                    },
+                modifier =
+                    Modifier
+                        .align(Alignment.TopStart)
+                        .padding(horizontal = dimens.overscanHorizontal, vertical = dimens.overscanVertical),
+            )
+        }
 
         AnimatedVisibility(
             visible = controlsVisible,

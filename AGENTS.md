@@ -909,3 +909,9 @@ run that occupies a physical device, and the resulting diff is thousands of line
 - API 8 lifecycle warm-up uses the persistent runtime through the same call/context ownership,
   memory limit, timeout and grants as playback; earlier APIs retain their isolated compilation
   warm-up. Deduplicate provider preparation and do not invent account-independent token caches.
+
+- Initial prepared-network video joins require current-video media coverage before attaching the
+  visible surface. Use Media3 ForwardingRenderer only for the finite initial readiness phase;
+  retain the normal audio renderer, clock, exceptions and ongoing buffering behavior. Do not
+  count stale audio-only buffer snapshots, headers, another item, or another period as video
+  prebuffer proof. Local file/content presentation keeps its existing path.

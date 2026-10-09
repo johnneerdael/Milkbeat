@@ -10,6 +10,10 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.analytics.AnalyticsListener
 import androidx.media3.exoplayer.source.LoadEventInfo
 import androidx.media3.exoplayer.source.MediaLoadData
+import io.github.aedev.flow.player.diagnostics.PlaybackTrace
+import io.github.aedev.flow.player.diagnostics.TraceCategory
+import io.github.aedev.flow.player.diagnostics.TraceEvent
+import io.github.aedev.flow.player.diagnostics.TraceField
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.io.IOException
@@ -81,9 +85,18 @@ internal class MusicVideoJoinGate :
             ?.uri
             ?.scheme == MusicVideoItems.SCHEME
         prepared.value = !waiting
+        if (waiting) {
+            PlaybackTrace.event(
+                TraceEvent.VIDEO_PREBUFFER_STARTED,
+                TraceField.POSITION_MS to current.currentPosition,
+                TraceField.DURATION_MS to INITIAL_VIDEO_BUFFER_MS,
+                category = TraceCategory.VIDEO_RESOLVE,
+            )
+        }
     }
 
     fun reset() {
+        if (waiting) PlaybackTrace.event(TraceEvent.VIDEO_PREBUFFER_ABORTED, category = TraceCategory.VIDEO_RESOLVE)
         requested = false
         waiting = false
         prepared.value = false
@@ -212,6 +225,14 @@ internal class MusicVideoJoinGate :
         val remaining = (current.duration - position).takeIf { current.duration > 0 && it > 0 }
         val required = minOf(INITIAL_VIDEO_BUFFER_MS, remaining ?: INITIAL_VIDEO_BUFFER_MS)
         if (videoStartMs <= position && videoEndMs - position >= required && current.totalBufferedDuration >= required) {
+            PlaybackTrace.event(
+                TraceEvent.VIDEO_PREBUFFER_READY,
+                TraceField.POSITION_MS to position,
+                TraceField.BUFFERED_MS to current.totalBufferedDuration,
+                TraceField.MEDIA_START_MS to videoStartMs,
+                TraceField.MEDIA_END_MS to videoEndMs,
+                category = TraceCategory.VIDEO_RESOLVE,
+            )
             waiting = false
             prepared.value = true
         }

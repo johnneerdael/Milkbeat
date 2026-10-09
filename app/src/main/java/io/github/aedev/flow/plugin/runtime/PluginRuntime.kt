@@ -198,7 +198,8 @@ internal class PluginRuntime(
         when (path) {
             "audio.resolve" -> TraceCategory.AUDIO_RESOLVE
             "video.resolve" -> TraceCategory.VIDEO_RESOLVE
-            "metadata.search" -> TraceCategory.SEARCH
+            "metadata.search", "audio.match", "audio.matchBatch", "video.search" -> TraceCategory.SEARCH
+            "audio.reportPlayback", "video.reportPlayback" -> TraceCategory.HISTORY
             "lifecycle.warmUp" -> TraceCategory.WARM_UP
             else -> TraceCategory.OTHER_OPERATION
         }
