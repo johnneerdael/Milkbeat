@@ -48,8 +48,9 @@ and sign-in method, playback and radio, the visualizer, every Settings page and 
 - **Your own music first.** Local folders, USB drives and SMB 2/3, WebDAV, SFTP and NFS (v3, 4.0,
   4.1) servers, read-only. Their tags build a **Local library** tab of genres, artists, releases,
   playlists, labels and years.
-- **Catalog and audio are separate.** Browse Spotify or Beatport and let YouTube Music, SoundCloud
-  or Beatport supply the audio, tried in the order you choose. Recording identity is checked, so a
+- **Catalog and audio are separate.** YouTube tracks use their known recording IDs; SoundCloud
+  and Beatport try their own audio first. Spotify races enabled audio providers and plays the first
+  acceptable, playable match. Recording identity is checked, so a
   cover, another remix or a short excerpt is rejected.
 - **Every queue continues as a radio,** steered by YouTube Music's presets (Discover, Popular,
   Deep cuts, moods and decades) pinned above the queue. Local music seeds a radio too while the
@@ -165,7 +166,8 @@ native SABR playback through Milkbeat's existing Media3 player.
   Library.
 
 Under **Audio**, enable providers and put them in priority order; under **Video**, choose the video
-plugin. **Update plugins automatically** (on by default) installs new plugin versions at start and
+plugin. Native tracks try their own enabled audio provider before ordered fallback; Spotify races
+enabled providers. **Update plugins automatically** (on by default) installs new plugin versions at start and
 every six hours; **Update all plugins** checks now. Each plugin's details offer sign-in, play
 reporting, **Index playlists** and, for Spotify, **Prepare private playlists in YouTube Music**.
 [Providers and sign-in](https://johnneerdael.github.io/Milkbeat/providers/).
@@ -205,7 +207,7 @@ overview; [ProjectM TV's guide](https://johnneerdael.github.io/ProjectM-TV/) cov
 | --- | --- |
 | **Plugins** | Audio priority, video provider, installed plugins and their details, automatic plugin updates, Add a plugin |
 | **Music folders** | Local folder browser, Android folder picker, SMB, WebDAV, SFTP and NFS editors, Rescan library, saved sources |
-| **Playback** | Background Play, Autoplay related videos, Subtitles, Skip Silence, Stable Voice, Ambient mode |
+| **Playback** | Background Play, Autoplay related videos, Subtitles, Skip Silence, Stable Voice, Ambient mode, Debug playback logging |
 | **Visualizations** | The ProjectM TV presets, transitions, picture quality, diagnostics and timing settings |
 | **About** | Version, automatic app updates (GitHub build), Changelog, GitHub and credits |
 

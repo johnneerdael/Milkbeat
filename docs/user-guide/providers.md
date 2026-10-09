@@ -151,7 +151,7 @@ When a provider reports an expired sign-in, Milkbeat asks the plugin again in th
 
 ![Audio provider priority: YouTube Music, Beatport, then SoundCloud, with the per-provider audio switches](images/settings-audio-priority.png)
 
-Under **Audio**, switch on the providers you want (**Use** *provider* **for audio**), use **Move earlier** and **Move later** to order them, then select **Done**. Milkbeat searches from top to bottom: if a provider cannot find or play a track, it tries the next one.
+Under **Audio**, switch on the providers you want (**Use** *provider* **for audio**), use **Move earlier** and **Move later** to order them, then select **Done**. YouTube tracks use their known recording IDs. SoundCloud and Beatport try their own enabled audio provider first, then fall back in your chosen order if it cannot play. Spotify starts bounded parallel searches across enabled audio providers and plays the first acceptable match with a validated stream; the remaining searches are cancelled. Explicitly prepared YouTube playlist copies keep their known YouTube recordings.
 
 YouTube matching searches recorded videos, including static Art Tracks and archived live sets, whichever now-playing view you use. It checks recording identity, so an unrelated performance, cover, different remix or short excerpt is rejected, and full versions are preferred over mixed excerpts. The picture loads only when you choose [the video view](playback.md#visualizer-music-video-or-artwork).
 

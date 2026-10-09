@@ -1,6 +1,10 @@
 package io.github.aedev.flow.plugin.playback
 
 import android.os.SystemClock
+import io.github.aedev.flow.player.diagnostics.PlaybackTrace
+import io.github.aedev.flow.player.diagnostics.TraceCategory
+import io.github.aedev.flow.player.diagnostics.TraceEvent
+import io.github.aedev.flow.player.diagnostics.TraceField
 import io.github.aedev.flow.plugin.PluginHost
 import io.github.aedev.flow.plugin.catalog.PluginAccounts
 import io.github.aedev.flow.plugin.registry.PluginRegistry
@@ -114,8 +118,14 @@ class PluginAudio
                 resolvedRevision.update { revision -> revision + 1 }
             }
             val ticket = resolutionProgress.begin(playbackId)
+            val trace = PlaybackTrace.start(TraceEvent.RESOLUTION_STARTED, TraceCategory.AUDIO_RESOLVE)
             try {
-                return resolveLocked(track, picture, quality, strict = false, preferredProviderId, preparePicture, ticket)
+                val audio = resolveLocked(track, picture, quality, strict = false, preferredProviderId, preparePicture, ticket)
+                trace.event(TraceEvent.RESOLUTION_FINISHED, TraceField.SUCCESS to 1L)
+                return audio
+            } catch (failure: Exception) {
+                trace.event(TraceEvent.RESOLUTION_FAILED)
+                throw failure
             } finally {
                 resolutionProgress.finish(ticket)
             }
@@ -204,13 +214,21 @@ class PluginAudio
                             ?.audio
                             ?.musicVideo == true,
                     )
-                }?.let { return it }
+                }?.let {
+                    PlaybackTrace.event(TraceEvent.SOURCE_PREPARED, category = TraceCategory.AUDIO_RESOLVE)
+                    return it
+                }
             if (attempts.isEmpty()) {
                 throw PluginCallException("none", PluginError(PluginErrorCode.UNAVAILABLE, "No audio plugin plays ${track.title}"))
             }
 
             suspend fun resolveAttempt(provider: AudioProviderAttempt): ResolvedAudio? {
                 val (plugin, known) = provider
+                val trace = PlaybackTrace.start(TraceEvent.PROVIDER_ATTEMPT, TraceCategory.AUDIO_RESOLVE)
+                trace.event(
+                    if (known != null) TraceEvent.KNOWN_ID_BYPASS else TraceEvent.CROSS_PROVIDER_SEARCH,
+                    TraceField.PROVIDER_INDEX to attempts.indexOf(provider).toLong(),
+                )
                 var last: PluginCallException? = null
                 var lastPictureUnavailable: PictureUnavailable? = null
                 val matchProgress: (TrackMatchProgress) -> Unit = { phase ->
@@ -285,6 +303,7 @@ class PluginAudio
                             throw IOException("The accepted playback account or provider changed")
                         }
                         val lifetime = stream.expiresInMs ?: DEFAULT_LIFETIME_MS
+                        trace.event(TraceEvent.PROVIDER_RESULT, TraceField.SUCCESS to 1L)
                         return ResolvedAudio(
                             plugin.id,
                             playable,
@@ -333,6 +352,7 @@ class PluginAudio
                         break
                     }
                 }
+                trace.event(TraceEvent.PROVIDER_RESULT, TraceField.SUCCESS to 0L)
                 lastPictureUnavailable?.let { throw it }
                 last?.let { throw it }
                 return null

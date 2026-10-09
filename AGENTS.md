@@ -883,3 +883,15 @@ run that occupies a physical device, and the resulting diff is thousands of line
 
 - Video-capable audio providers use `AudioMatchStrategy.VIDEOS` for ordinary matching, queue preparation, preloads and mirror batches. Keep successful matches, scope misses/in-flight work by strategy, and preserve source metadata/IDs. `PluginAudio.videoCapablePlaybackIds` is a cold event-driven Flow of candidate IDs derived from accepted caches and account/provider context. The current Media3 item must also report a supported video track; track-change events update Now Playing eligibility on main, preventing cached metadata from exposing Video for audio-only HLS or completed downloads. Matching alone must not load picture. API 7's prepared DASH manifest is shared by eligibility and source construction; native SABR and eligible HLS retain picture support. Separate progressive picture URLs stay audio-only in music playback rather than preparing a hidden child. Explicit Video selection uses the prepared presentation's track selection and existing Media3 surface gating without replacing or seeking audio.
 - The existing `githubNightly` build is the separate preview app (`nl.neerdael.milkbeat.nightly`, launcher label Milkbeat Preview), debug-signed with release-like shrinking. Use `:app:assembleGithubNightly` and build-property `milkbeatPatch` for an explicit test artifact; do not manually bump app version files. A test prerelease must remain unmerged until the maintainer tests it. Its optional signed provider package is distributed through Buzzheavier; stable publication checkpoints/catalogs remain separate. Nightly/Preview downloader codes are pinned to `app/src/nightly/assets/plugin-preview-download-catalog.json`; stable builds retain the main asset and live publication.
+
+### Playback startup diagnostics and source routing
+
+- Native YouTube tracks resolve known IDs without cross-provider matching. SoundCloud and Beatport
+  try their own enabled audio provider before serial fallback. Unbound Spotify metadata races
+  at most four enabled providers through recording-confidence checks and validated stream resolution;
+  cancel losers before storing the winner. Prepared or explicitly bound recordings keep their binding.
+- `player/diagnostics/PlaybackTrace` is opt-in, default OFF, controlled by per-device DataStore
+  `DebugLoggingPreferences` and Settings → Playback. Capture release-compatible INFO events with
+  `adb logcat -v threadtime -s MilkbeatTrace:I`. Use fixed enum names and numeric fields only;
+  never add tokens, headers, URLs, config or track titles to this log boundary. Output counters are
+  event-driven. No logged restart/underrun is insufficient evidence for absence of an audible gap.
