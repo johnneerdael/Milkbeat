@@ -40,7 +40,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import org.schabi.newpipe.extractor.stream.AudioStream
 import java.util.concurrent.ExecutionException
-import kotlin.math.pow
 
 @OptIn(UnstableApi::class)
 object EnhancedMusicPlayerManager {
@@ -275,6 +274,7 @@ object EnhancedMusicPlayerManager {
                     player: Player,
                     events: Player.Events,
                 ) {
+                    if (events.contains(Player.EVENT_TRACKS_CHANGED)) applyVideoMode(controller)
                     if (events.containsAny(
                             Player.EVENT_MEDIA_METADATA_CHANGED,
                             Player.EVENT_MEDIA_ITEM_TRANSITION,
@@ -355,12 +355,11 @@ object EnhancedMusicPlayerManager {
      */
     fun streamUri(track: MusicTrack): Uri =
         LocalMediaIds.audioUri(track.videoId)
-            ?: MusicVideoItems.uri(track, withPicture = carriesPicture(track))
+            ?: MusicVideoItems.uri(track, withPicture = track.videoId !in videoUnavailableIds)
 
     /**
      * Shows or hides music videos' pictures. Hiding turns the playing track's picture off while its sound
-     * plays on; showing gives it back, reloading the track once if it started as a song. Queued tracks
-     * are rebuilt either way, so a hidden picture is never fetched.
+     * plays on; showing selects the prepared picture track without reloading or seeking the audio.
      */
     fun setVideoMode(show: Boolean) = performSetVideoMode(show)
 
@@ -579,22 +578,8 @@ object EnhancedMusicPlayerManager {
         }
     }
 
-    private suspend fun restoreAudioSettings() {
-        try {
-            val settings = audioSettingsPersistence?.settingsFlow?.first() ?: return
-
-            Log.d("EnhancedMusicPlayer", "Restoring audio settings: $settings")
-
-            _playbackSpeed.value = settings.speed
-
-            player?.let { p ->
-                val pitch = 2.0.pow(settings.pitch.toDouble() / 12.0).toFloat()
-                p.playbackParameters = PlaybackParameters(settings.speed, pitch)
-            }
-        } catch (e: Exception) {
-            Log.e("EnhancedMusicPlayer", "Failed to restore audio settings", e)
-        }
-    }
+    private suspend fun restoreAudioSettings() =
+        restoreMusicAudioSettings(audioSettingsPersistence, { player }) { speed -> _playbackSpeed.value = speed }
 
     fun isPlaying(): Boolean = playbackState.value.isPlaying
 

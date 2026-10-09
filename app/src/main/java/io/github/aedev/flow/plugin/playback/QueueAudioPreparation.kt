@@ -19,11 +19,12 @@ internal suspend fun PluginAudio.prepareQueue(
     picture: PictureLimits?,
     quality: AudioQuality = AudioQuality.AUTO,
     preferredProviderId: String? = null,
+    preparePicture: PictureLimits? = null,
 ): QueuePreparationResult {
     if (!needsQueueMatching(track, preferredProviderId)) return QueuePreparationResult.Ready
     val version = preparationVersion()
     return try {
-        prepare(track, picture, quality, preferredProviderId)
+        prepare(track, picture, quality, preferredProviderId, preparePicture)
         QueuePreparationResult.Ready
     } catch (_: AudioCatalogMiss) {
         QueuePreparationResult.Unmatched { version == preparationVersion() }

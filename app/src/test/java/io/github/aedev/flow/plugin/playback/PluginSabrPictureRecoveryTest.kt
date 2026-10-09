@@ -102,9 +102,216 @@ class PluginSabrPictureRecoveryTest : PluginAudioFixture() {
     }
 
     @Test
+    fun `hidden prepared audio network failure keeps its view and normal connectivity recovery`() =
+        runTest {
+            coEvery { host.call("youtube", PluginOperations.resolveAudio, any()) } returns stream
+            audio.resolve(original, null, playbackId = mediaId)
+            val (service, items) = service()
+            val uri = items.single().localConfiguration!!.uri
+            every { service.player.currentTracks } returns androidx.media3.common.Tracks.EMPTY
+            every { service.connectivityObserver.checkCurrentConnectivity() } returns false
+            val manager = io.github.aedev.flow.player.EnhancedMusicPlayerManager
+            manager.videoUnavailableIds.remove(mediaId)
+            try {
+                service.handlePlayerError(
+                    PlaybackException("fixture", java.io.IOException("offline"), PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED),
+                    0,
+                )
+                assertThat(service.waitingForNetwork).isTrue()
+                assertThat(service.pendingNetworkRetry?.mediaId).isEqualTo(mediaId)
+                assertThat(items.single().localConfiguration!!.uri).isEqualTo(uri)
+                assertThat(manager.videoUnavailableIds).doesNotContain(mediaId)
+                verify(exactly = 0) { service.player.replaceMediaItem(any(), any()) }
+            } finally {
+                manager.videoUnavailableIds.remove(mediaId)
+                service.pendingRetryJob?.cancel()
+            }
+        }
+
+    @Test
+    fun `hidden prepared audio decoder failure does not disable picture capability`() =
+        runTest {
+            coEvery { host.call("youtube", PluginOperations.resolveAudio, any()) } returns stream
+            audio.resolve(original, null, playbackId = mediaId)
+            val (service, items) = service()
+            val uri = items.single().localConfiguration!!.uri
+            every { service.player.currentTracks } returns androidx.media3.common.Tracks.EMPTY
+            val manager = io.github.aedev.flow.player.EnhancedMusicPlayerManager
+            manager.videoUnavailableIds.remove(mediaId)
+            try {
+                service.handlePlayerError(PlaybackException("fixture", null, PlaybackException.ERROR_CODE_DECODING_FAILED), 0)
+                assertThat(service.retryCountMap[mediaId]).isEqualTo(1)
+                assertThat(items.single().localConfiguration!!.uri).isEqualTo(uri)
+                assertThat(manager.videoUnavailableIds).doesNotContain(mediaId)
+                verify(exactly = 0) { service.player.replaceMediaItem(any(), any()) }
+            } finally {
+                manager.videoUnavailableIds.remove(mediaId)
+                service.pendingRetryJob?.cancel()
+            }
+        }
+
+    @Test
+    fun `hidden prepared audio expiry refresh preserves optional picture preparation`() =
+        runTest {
+            coEvery { host.call("youtube", PluginOperations.resolveAudio, any()) } returns stream
+            audio.resolve(original, null, playbackId = mediaId)
+            val (service, items) = service()
+            val uri = items.single().localConfiguration!!.uri
+            every { service.player.currentTracks } returns androidx.media3.common.Tracks.EMPTY
+            val manager = io.github.aedev.flow.player.EnhancedMusicPlayerManager
+            manager.videoUnavailableIds.remove(mediaId)
+            try {
+                val http =
+                    androidx.media3.datasource.HttpDataSource.InvalidResponseCodeException(
+                        403,
+                        "expired",
+                        null,
+                        emptyMap(),
+                        androidx.media3.datasource.DataSpec
+                            .Builder()
+                            .setUri(stream.url)
+                            .build(),
+                        byteArrayOf(),
+                    )
+                service.handlePlayerError(PlaybackException("fixture", http, PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS), 0)
+                org.robolectric.Shadows
+                    .shadowOf(android.os.Looper.getMainLooper())
+                    .idleFor(java.time.Duration.ofSeconds(3))
+                assertThat(items.single().localConfiguration!!.uri).isEqualTo(uri)
+                assertThat(manager.videoUnavailableIds).doesNotContain(mediaId)
+                verify(exactly = 1) { service.player.replaceMediaItem(0, any()) }
+            } finally {
+                manager.videoUnavailableIds.remove(mediaId)
+                service.pendingRetryJob?.cancel()
+            }
+        }
+
+    @Test
+    fun `an actually selected video still receives picture fallback`() =
+        runTest {
+            coEvery { host.call("youtube", PluginOperations.resolveAudio, any()) } returns stream
+            audio.resolve(original, null, playbackId = mediaId)
+            val (service, items) = service()
+            every { service.player.currentTracks } returns
+                androidx.media3.common.Tracks(
+                    listOf(
+                        androidx.media3.common.Tracks.Group(
+                            androidx.media3.common.TrackGroup(
+                                "picture",
+                                androidx.media3.common.Format
+                                    .Builder()
+                                    .setSampleMimeType("video/avc")
+                                    .build(),
+                            ),
+                            false,
+                            intArrayOf(androidx.media3.common.C.FORMAT_HANDLED),
+                            booleanArrayOf(true),
+                        ),
+                    ),
+                )
+            val manager = io.github.aedev.flow.player.EnhancedMusicPlayerManager
+            manager.videoUnavailableIds.remove(mediaId)
+            try {
+                service.handlePlayerError(PlaybackException("fixture", null, PlaybackException.ERROR_CODE_DECODING_FAILED), 0)
+                assertThat(
+                    items
+                        .single()
+                        .localConfiguration!!
+                        .uri
+                        ?.scheme,
+                ).isEqualTo("music")
+                assertThat(manager.videoUnavailableIds).contains(mediaId)
+                verify(exactly = 1) { service.player.replaceMediaItem(0, any()) }
+            } finally {
+                manager.videoUnavailableIds.remove(mediaId)
+                service.pendingRetryJob?.cancel()
+            }
+        }
+
+    @Test
+    fun `progressive 404 and 500 media failures reach ordered provider fallback`() =
+        runTest {
+            for (status in listOf(404, 500)) {
+                audio.forgetAll()
+                val source =
+                    plugin.copy(
+                        manifest =
+                            plugin.manifest.copy(
+                                id = "spotify",
+                                roles =
+                                    nl.neerdael.milkbeat.plugin
+                                        .Roles(
+                                            audio =
+                                                nl.neerdael.milkbeat.plugin
+                                                    .AudioRole(setOf("spotify")),
+                                        ),
+                            ),
+                    )
+                val selection = ProviderSelection(audio = listOf("youtube", "spotify"))
+                every { registry.state } returns
+                    kotlinx.coroutines.flow.MutableStateFlow(PluginRegistryState(listOf(plugin, source), selection))
+                coEvery { host.call("youtube", PluginOperations.matchAudio, any()) } returns
+                    nl.neerdael.milkbeat.plugin
+                        .AudioMatches(listOf(candidate))
+                coEvery { host.call("youtube", PluginOperations.resolveAudio, any()) } returns stream
+                coEvery { host.call("spotify", PluginOperations.resolveAudio, any()) } returns stream
+                audio.resolve(original, null, playbackId = mediaId)
+                repeat(2) {
+                    val (service, _) = service()
+                    val http =
+                        androidx.media3.datasource.HttpDataSource.InvalidResponseCodeException(
+                            status,
+                            "fixture",
+                            null,
+                            emptyMap(),
+                            androidx.media3.datasource.DataSpec
+                                .Builder()
+                                .setUri(stream.url)
+                                .build(),
+                            byteArrayOf(),
+                        )
+                    service.handlePlayerError(PlaybackException("fixture", http, PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS), 0)
+                    service.pendingRetryJob?.cancel()
+                    val replacement = audio.resolve(original, null, playbackId = mediaId)
+                    assertThat(replacement.pluginId).isEqualTo(if (it == 0) "youtube" else "spotify")
+                }
+            }
+        }
+
+    @Test
+    fun `song only progressive HTTP retry replaces the bound media source`() =
+        runTest {
+            audio.forgetAll()
+            coEvery { host.call("youtube", PluginOperations.resolveAudio, any()) } returns stream
+            audio.resolve(original, null, playbackId = mediaId)
+            val (service, items) = service()
+            items[0] = items[0].buildUpon().setUri("music://$mediaId").build()
+            val http =
+                androidx.media3.datasource.HttpDataSource.InvalidResponseCodeException(
+                    404,
+                    "fixture",
+                    null,
+                    emptyMap(),
+                    androidx.media3.datasource.DataSpec
+                        .Builder()
+                        .setUri(stream.url)
+                        .build(),
+                    byteArrayOf(),
+                )
+            service.handlePlayerError(PlaybackException("fixture", http, PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS), 0)
+            org.robolectric.Shadows
+                .shadowOf(android.os.Looper.getMainLooper())
+                .idleFor(java.time.Duration.ofSeconds(6))
+            verify(exactly = 1) { service.player.replaceMediaItem(0, any()) }
+            service.pendingRetryJob?.cancel()
+        }
+
+    @Test
     fun `online typed renewal reasons retain protocol priority and reload context`() =
         runTest {
             for (reason in nl.neerdael.milkbeat.sabr.SabrPlaybackException.Reason.entries) {
+                // Each reason is an independent recovery episode with its own service retry budget.
+                audio.forgetAll()
                 audio.resolve(original, null, playbackId = mediaId)
                 val (service, _) = service()
                 val context =

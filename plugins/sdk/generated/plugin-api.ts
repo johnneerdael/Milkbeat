@@ -37,7 +37,7 @@ export type HashAlgorithm = 'SHA1' | 'SHA256';
 export type LogLevel = 'DEBUG' | 'INFO' | 'WARN' | 'ERROR';
 
 /**
- * Plugin API v6, generated from the plugin-api module. Do not edit.
+ * Plugin API v7, generated from the plugin-api module. Do not edit.
  */
 export interface MilkbeatPluginApi {
   manifest: PluginManifest;
@@ -510,6 +510,7 @@ export interface ResolveAudioRequest {
   videoCodecs?: string[];
   language?: string | null;
   failure?: null | StreamFailure;
+  prepareVideo?: boolean;
 }
 export interface StreamFailure {
   url: string;
@@ -536,6 +537,7 @@ export interface AudioStream {
   serverAbr?: null | ServerAbrPlayback;
   artwork?: null | Artwork;
   requireAudioOnlyHls?: boolean;
+  audioFormat?: null | MediaFormat;
 }
 export interface MediaFormat {
   id: string;

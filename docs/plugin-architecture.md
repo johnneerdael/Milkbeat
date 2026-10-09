@@ -518,13 +518,13 @@ Play album (metadata M)
 
 ### 7.3 Music videos
 
-- **Optional stream:** a music video is an optional `video` stream of a track, resolved when the
-  listener has video on (today's Video/Visualizer switch).
-- **Any audio provider:** it asks for it by passing `video: true` to `resolve`.
+- **Optional presentation:** music preparation asks for optional picture metadata using
+  `prepareVideo: true`; audio-only fallback remains valid. `video: true` is a hard picture request.
 - **Picture limits:** music uses the active `Display.Mode` physical short side, capped at 2160p;
   an unknown mode retains 1080p. Codec requests retain the device's hardware-supported keys.
-  Audio-only playback supplies no picture limits or video codec request.
-- **Where it applies:** accepted sources from providers declaring `musicVideo` offer a Video choice for the original playback ID, including static Art Tracks. Eligibility is event-driven from accepted resolution and current account/provider context; original catalog IDs and metadata remain intact. Discovery never reloads playback. Explicit view selection requests picture using the accepted recording and preserves position; unavailable picture uses the existing audio recovery. Providers without `musicVideo` keep the visualizer or artwork.
+  Optional presentation preparation supplies these limits even when picture is hidden; an audio
+  request without picture preparation supplies neither.
+- **Where it applies:** usable prepared sources from providers declaring `musicVideo` offer a Video choice for the original playback ID, including static Art Tracks. Eligibility is event-driven from accepted resolution and current account/provider context; original catalog IDs and metadata remain intact. Discovery never reloads playback. Explicit view selection enables the prepared video track in the accepted presentation without replacing or seeking audio. Sources without prepared picture keep the visualizer or artwork.
 - **Playback artwork:** optional `AudioStream.artwork` carries the best available playback thumbnail. The accepted source's Media3 timeline publishes it as artwork metadata while preserving the original media ID, title, artist and cache key. The music manager observes selected-source metadata events; queued preparation cannot publish wallpaper for another playing item. TV Artwork view requests this URL through Coil and uses the original catalog cover if it is missing, blank or fails to load. It makes no extra resolution or video-media request.
 
 ## 8. Sign-in
@@ -633,3 +633,17 @@ catalogs through the existing `PluginAccounts` flow. Existing web sign-in method
 `crypto.randomBytes` uses `SecureRandom` with a request bounded to 1–256 bytes. It exposes no system
 identifier. A provider can store its generated installation identity in its own secret namespace.
 `env.get` optionally includes OS version and device model for provider protocol headers.
+
+### Additive API 7 music presentations
+
+Separate progressive picture URLs are not merged into the music presentation: preparing that child would fetch hidden picture bytes. Without usable DASH metadata, native SABR or eligible HLS, the accepted source remains audio-only and does not advertise a Video choice. The same prepared DASH manifest determines both picture eligibility and source construction.
+
+Cached provider metadata identifies candidate presentations, not the final Video choice. The current Media3 item must also report a supported video track. Track-change events reevaluate eligibility; an audio-only HLS response or completed audio download cannot reuse a cached A/V resolution to expose an empty picture surface.
+
+The `musicvideo://` URI marks a prepared presentation, not an active video track. Generic picture fallback requires the failing current item to have video selected; hidden-audio errors follow normal recovery. Expired audio URL refresh retains the presentation URI. Explicit picture-unavailable errors retain their audio fallback path.
+
+Adaptive rendition keys are associated with the original Media3 playback ID in player-cache metadata, including across restarts and provider/quality variants. Aggressive recovery removes those audio/video resources as well as the legacy playback-ID resource. The association retains at most 32 keys, evicting older associated resources when necessary. Completed downloads use their separate cache.
+
+`ResolveAudioRequest.prepareVideo` requests optional picture metadata while keeping audio-only fallback valid. `AudioStream.audioFormat` identifies the chosen audio rendition, including its original DASH byte ranges; its ID, URL and MIME must agree with the primary audio descriptor. Direct A/V metadata becomes one Media3 DASH presentation through the existing NewPipe adapters and `AdaptiveDashManifest`; a single video rendition is sufficient. SABR retains one native presentation. Track-selection changes hide/show video without replacing the media item, seeking or rebuilding the audio source. The music service starts with video disabled. Bound adaptive transport checks current grants on initial and redirected HTTPS GETs, applies accepted headers, refreshes only the same rendition/ranges, and uses separate per-format cache keys. Cached ranges are read before URL renewal; only network reads renew an expired descriptor, so offline cached bytes remain playable while account and network grants are still checked.
+
+A provider resolution failure permits the next configured provider. Two media failures in one minute temporarily exhaust that provider for the track and account; URL expiry and an explicit SABR playback-context reload do not exhaust it. A replacement provider never receives another provider’s failure context. Optional preparation does not filter audio-only providers out of the order. Lyrics implementations and automatic fetch consumers are removed; ordinary video captions remain independent.

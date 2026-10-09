@@ -46,6 +46,7 @@ import io.github.aedev.flow.player.audio.visualizer.VisualizerEngine
 import io.github.aedev.flow.player.audio.visualizer.VisualizerTapProcessor
 import io.github.aedev.flow.player.audio.visualizer.followPlayerClock
 import io.github.aedev.flow.player.factory.LoadControlFactory
+import io.github.aedev.flow.player.musicResolutionStatusState
 import io.github.aedev.flow.player.setVideoCapablePlaybackIds
 import io.github.aedev.flow.plugin.catalog.PluginAccounts
 import io.github.aedev.flow.plugin.playback.PluginAudio
@@ -268,6 +269,10 @@ class Media3MusicService : MediaLibraryService() {
 
         initializePlayer()
         lifecycleScope.launch {
+            EnhancedMusicPlayerManager.currentTrack.collect { pluginAudio.selectForegroundPlayback(it?.videoId) }
+        }
+        lifecycleScope.launch { pluginAudio.resolutionStatus.collect { musicResolutionStatusState.value = it } }
+        lifecycleScope.launch {
             combine(pluginAudio.videoCapablePlaybackIds, EnhancedMusicPlayerManager.currentTrack) { ids, _ -> ids }
                 .collect(EnhancedMusicPlayerManager::setVideoCapablePlaybackIds)
         }
@@ -381,6 +386,11 @@ class Media3MusicService : MediaLibraryService() {
                 .setSeekBackIncrementMs(5000)
                 .setSeekForwardIncrementMs(5000)
                 .build()
+        player.trackSelectionParameters =
+            player.trackSelectionParameters
+                .buildUpon()
+                .setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, true)
+                .build()
 
         // Expose audio session ID for external audio processors (James DSP, etc.)
         currentAudioSessionId = player.audioSessionId
@@ -414,8 +424,6 @@ class Media3MusicService : MediaLibraryService() {
 
                     mediaItem?.let { item ->
                         val videoId = item.mediaId
-                        val title = item.mediaMetadata.title?.toString()
-                        val artist = item.mediaMetadata.artist?.toString()
 
                         if (!videoId.isNullOrBlank()) {
                             // Desktop radio semantics: only a genuinely NEW queue seeds a
@@ -426,20 +434,6 @@ class Media3MusicService : MediaLibraryService() {
                                 onQueueContextChanged(videoId)
                             } else {
                                 maybeExtendRadio()
-                            }
-                        }
-
-                        if (!videoId.isNullOrBlank() && !title.isNullOrBlank() && !artist.isNullOrBlank()) {
-                            lifecycleScope.launch(Dispatchers.IO) {
-                                try {
-                                    Log.d(TAG, "Pre-warming lyrics cache in background for: $videoId - \"$title\"")
-                                    val helper =
-                                        io.github.aedev.flow.data.lyrics
-                                            .LyricsHelper(this@Media3MusicService)
-                                    helper.getLyrics(videoId, title, artist, 180, null, this@Media3MusicService)
-                                } catch (e: Exception) {
-                                    Log.w(TAG, "Lyrics pre-warm background task encountered error: ${e.message}")
-                                }
                             }
                         }
                     }
@@ -554,6 +548,7 @@ class Media3MusicService : MediaLibraryService() {
     }
 
     override fun onDestroy() {
+        musicResolutionStatusState.value = null
         EnhancedMusicPlayerManager.prefetcher = null
         EnhancedMusicPlayerManager.setVideoCapablePlaybackIds(emptySet())
         EnhancedMusicPlayerManager.playbackArtworkState.value = null

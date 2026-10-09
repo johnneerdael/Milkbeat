@@ -5,7 +5,7 @@ Thank you for your interest in contributing to Milkbeat! We welcome contribution
 Milkbeat (`nl.neerdael.milkbeat`, sources under `io.github.aedev.flow`) is an Android TV music app forked from [Flow](https://github.com/A-EDev/Flow), an Android music/video app written in Kotlin with Jetpack Compose,
 Hilt, and Media3/ExoPlayer. It plays YouTube content via a native InnerTube client with a
 NewPipe-based fallback extraction path, and supports local media playback, offline downloads,
-casting, lyrics, device-to-device sync, and an on-device recommendation engine (FlowNeuroEngine).
+casting, device-to-device sync, and an on-device recommendation engine (FlowNeuroEngine).
 
 **Read this file before opening a pull request.** Most review round-trips on this project come from
 one of the rules below, not from the feature itself. `AGENTS.md` in the repository root carries the
@@ -202,8 +202,8 @@ real shipped regression that had to be found and fixed on-device.
 ### Frame discipline — nothing animates that the user cannot see
 
 1. **The invisible-animation rule.** Several player surfaces deliberately stay composed while hidden
-   (the full player sheet is kept warm behind the mini player; the lyrics panel is retained after
-   first open; the mini bar stays composed under the expanded player). Anything animating inside a
+   (the full player sheet is kept warm behind the mini player; the mini bar stays composed under
+   the expanded player). Anything animating inside a
    hidden layer burns a full frame budget at 60–120 Hz for entire listening sessions — this exact
    pattern caused a 30%-battery-in-90-minutes overheating regression. **Every continuous animation
    must be gated on its own layer's visibility and pause when the layer is hidden.** Gate on anchor

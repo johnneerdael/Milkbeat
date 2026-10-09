@@ -27,7 +27,9 @@ import io.github.aedev.flow.player.MusicVideoItems
 import io.github.aedev.flow.player.datasource.BoundPluginMusicDataSourceFactory
 import io.github.aedev.flow.player.datasource.MusicFolderDataSourceFactory
 import io.github.aedev.flow.player.datasource.PluginMusicDataSourceFactory
+import io.github.aedev.flow.player.datasource.bindAdaptiveMusicRenditions
 import io.github.aedev.flow.player.datasource.bindCachedMusicRendition
+import io.github.aedev.flow.player.datasource.clearCachedMusicResources
 import io.github.aedev.flow.player.datasource.hasCompleteMusicDownload
 import io.github.aedev.flow.player.stream.VideoCodecUtils
 import io.github.aedev.flow.plugin.playback.BoundPluginAudio
@@ -35,7 +37,11 @@ import io.github.aedev.flow.plugin.playback.PictureLimits
 import io.github.aedev.flow.plugin.playback.PluginAudio
 import io.github.aedev.flow.plugin.playback.QueuePreparationResult
 import io.github.aedev.flow.plugin.playback.ResolvedAudio
+import io.github.aedev.flow.plugin.playback.adaptiveCacheKey
+import io.github.aedev.flow.plugin.playback.adaptiveDataSourceFactory
+import io.github.aedev.flow.plugin.playback.drmDataSourceFactory
 import io.github.aedev.flow.plugin.playback.prepareQueue
+import io.github.aedev.flow.plugin.playback.serverAbrDataSourceFactory
 import io.github.aedev.flow.service.ExoDownloadService
 import io.github.aedev.flow.utils.MusicVideoFormats
 import kotlinx.coroutines.CoroutineScope
@@ -292,17 +298,32 @@ class DownloadUtil
                     val id = MusicVideoItems.descriptor(uri).ref.providerId
                     val cached =
                         runCatching {
-                            completeDownload(id) && (!picture || completeDownload(MusicVideoItems.videoKey(id)))
+                            completeDownload(id)
                         }.getOrDefault(false)
-                    if (cached) null else resolveForPlayback(uri, picture)
+                    if (cached) null else resolveForPlayback(uri, picture = false, preparePicture = picture)
                 },
-                bind = { audio ->
+                bind = { audio, mediaId ->
                     val binding = BoundPluginAudio(audio, pluginAudio::refreshBound)
+                    if (audio.stream.audioFormat != null) {
+                        bindAdaptiveMusicRenditions(
+                            playerCache,
+                            mediaId,
+                            listOfNotNull(audio.stream.audioFormat, audio.stream.video).map(audio::adaptiveCacheKey),
+                        )
+                    }
                     BoundPluginMusicDataSourceFactory(
                         resolvingFactory(binding),
                         audio.stream.drm?.let { pluginAudio.drmDataSourceFactory(binding, okHttpClient) },
                         audio.stream.serverAbr?.let { pluginAudio.serverAbrDataSourceFactory(audio, okHttpClient) },
                         audio.stream.serverAbr?.let { { pluginAudio.acquirePlaybackLease(audio) } },
+                        adaptive =
+                            audio.stream.audioFormat?.let {
+                                pluginAudio.adaptiveDataSourceFactory(
+                                    binding,
+                                    okHttpClient,
+                                    playerCache,
+                                )
+                            },
                     )
                 },
             )
@@ -328,22 +349,29 @@ class DownloadUtil
             val picture = uri.scheme == MusicVideoItems.SCHEME
             val limits = if (picture) PictureLimits(maxVideoHeight, pictureCodecs(VideoCodecUtils.NO_PREFERENCE)) else null
             val quality = AudioQuality.valueOf(playerPreferences.musicAudioQuality.first().name)
-            return pluginAudio.prepareQueue(descriptor, limits, quality, MusicVideoItems.preferredProvider(uri))
+            return pluginAudio.prepareQueue(descriptor, null, quality, MusicVideoItems.preferredProvider(uri), preparePicture = limits)
         }
 
         private suspend fun resolveForPlayback(
             uri: Uri,
             picture: Boolean,
+            preparePicture: Boolean = false,
         ): ResolvedAudio {
             val limits = if (picture) PictureLimits(maxVideoHeight, pictureCodecs(VideoCodecUtils.NO_PREFERENCE)) else null
+            val prepared = if (preparePicture) PictureLimits(maxVideoHeight, pictureCodecs(VideoCodecUtils.NO_PREFERENCE)) else null
             val quality = playerPreferences.musicAudioQuality.first()
             val descriptor = MusicVideoItems.descriptor(uri)
+            pluginAudio.selectForegroundPlayback(
+                io.github.aedev.flow.player.EnhancedMusicPlayerManager.currentTrack.value
+                    ?.videoId,
+            )
             return pluginAudio.resolve(
                 descriptor,
                 limits,
                 AudioQuality.valueOf(quality.name),
                 uri.authority ?: descriptor.ref.providerId,
                 MusicVideoItems.preferredProvider(uri),
+                preparePicture = prepared,
             )
         }
 
@@ -423,7 +451,7 @@ class DownloadUtil
             songUrlCache.remove(mediaId)
 
             try {
-                playerCache.removeResource(mediaId)
+                clearCachedMusicResources(playerCache, mediaId)
             } catch (e: Exception) {
                 Log.w(TAG, "Error clearing playerCache for $mediaId: ${e.message}")
             }

@@ -19,6 +19,9 @@ import nl.neerdael.milkbeat.catalog.EntityRef
 import nl.neerdael.milkbeat.plugin.AudioMatchStrategy
 import nl.neerdael.milkbeat.plugin.AudioMatches
 import nl.neerdael.milkbeat.plugin.AudioRole
+import nl.neerdael.milkbeat.plugin.ByteRange
+import nl.neerdael.milkbeat.plugin.FormatType
+import nl.neerdael.milkbeat.plugin.MediaFormat
 import nl.neerdael.milkbeat.plugin.PluginError
 import nl.neerdael.milkbeat.plugin.PluginErrorCode
 import nl.neerdael.milkbeat.plugin.PluginOperations
@@ -26,12 +29,50 @@ import nl.neerdael.milkbeat.plugin.Roles
 import org.junit.Test
 
 class PluginAudioVideoTest : PluginAudioFixture() {
+    private val grantedPlugin = plugin.copy(grantedNetwork = listOf("example.invalid"))
+    private val prepared =
+        stream.copy(
+            renditionId = "140",
+            codecs = "mp4a.40.2",
+            video =
+                MediaFormat(
+                    "137",
+                    FormatType.VIDEO,
+                    "https://example.invalid/picture",
+                    "video/mp4",
+                    codecs = "avc1",
+                    width = 1920,
+                    height = 1080,
+                    durationMs = 120000,
+                    initRange = ByteRange(0, 200),
+                    indexRange = ByteRange(201, 1000),
+                ),
+            audioFormat =
+                MediaFormat(
+                    "140",
+                    FormatType.AUDIO,
+                    stream.url,
+                    stream.mimeType,
+                    codecs = "mp4a.40.2",
+                    durationMs = 120000,
+                    initRange = ByteRange(0, 200),
+                    indexRange = ByteRange(201, 1000),
+                ),
+        )
+    private val limits = PictureLimits(2160, listOf("h264"))
+
+    init {
+        coEvery { host.call("youtube", PluginOperations.resolveAudio, match { it.track.ref == candidate.ref }) } answers {
+            if (thirdArg<nl.neerdael.milkbeat.plugin.ResolveAudioRequest>().prepareVideo) prepared else stream
+        }
+    }
+
     @Test
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     fun `repreparing a registered playback id revokes video eligibility after provider fallback`() =
         runTest {
             val videoProvider =
-                plugin.copy(
+                grantedPlugin.copy(
                     manifest =
                         plugin.manifest.copy(
                             roles =
@@ -43,7 +84,7 @@ class PluginAudioVideoTest : PluginAudioFixture() {
                         ),
                 )
             val beatport =
-                plugin.copy(
+                grantedPlugin.copy(
                     manifest = plugin.manifest.copy(id = "beatport", roles = Roles(audio = AudioRole(setOf("beatport"), match = true))),
                 )
             every { registry.state } returns
@@ -51,12 +92,12 @@ class PluginAudioVideoTest : PluginAudioFixture() {
                     PluginRegistryState(listOf(videoProvider, beatport), ProviderSelection(audio = listOf("youtube", "beatport"))),
                 )
             coEvery { host.call("youtube", PluginOperations.matchAudio, any()) } returns AudioMatches(listOf(candidate))
-            coEvery { host.call("youtube", PluginOperations.resolveAudio, any()) } returns stream.copy(expiresInMs = 0)
+            coEvery { host.call("youtube", PluginOperations.resolveAudio, any()) } returns prepared.copy(expiresInMs = 0)
             val capabilities = mutableListOf<Set<String>>()
             backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
                 audio.videoCapablePlaybackIds.collect { capabilities += it }
             }
-            audio.resolve(original, null, playbackId = "source")
+            audio.resolve(original, null, playbackId = "source", preparePicture = limits)
             runCurrent()
             assertThat(capabilities.last()).containsExactly("source")
             coEvery { host.call("youtube", PluginOperations.resolveAudio, any()) } throws
@@ -74,7 +115,7 @@ class PluginAudioVideoTest : PluginAudioFixture() {
     fun `remapping a playback id to a failed source revokes the previous video capability`() =
         runTest {
             val videoProvider =
-                plugin.copy(
+                grantedPlugin.copy(
                     manifest =
                         plugin.manifest.copy(
                             roles =
@@ -92,7 +133,7 @@ class PluginAudioVideoTest : PluginAudioFixture() {
             backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
                 audio.videoCapablePlaybackIds.collect { capabilities += it }
             }
-            audio.resolve(original, null, playbackId = "source")
+            audio.resolve(original, null, playbackId = "source", preparePicture = limits)
             runCurrent()
             assertThat(capabilities.last()).containsExactly("source")
             coEvery { host.call("youtube", PluginOperations.matchAudio, any()) } throws
@@ -108,7 +149,7 @@ class PluginAudioVideoTest : PluginAudioFixture() {
     fun `cached audio publishes original-id video capability and provider changes revoke it`() =
         runTest {
             val videoProvider =
-                plugin.copy(
+                grantedPlugin.copy(
                     manifest =
                         plugin.manifest.copy(
                             roles =
@@ -126,10 +167,10 @@ class PluginAudioVideoTest : PluginAudioFixture() {
             backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
                 audio.videoCapablePlaybackIds.collect { capabilities += it }
             }
-            audio.prepare(original, null)
+            audio.prepare(original, null, preparePicture = limits)
             runCurrent()
             assertThat(capabilities.last()).isEmpty()
-            audio.resolve(original, null, playbackId = "source")
+            audio.resolve(original, null, playbackId = "source", preparePicture = limits)
             runCurrent()
             assertThat(capabilities.last()).containsExactly("source")
             coVerify(exactly = 1) { host.call("youtube", PluginOperations.resolveAudio, any()) }
@@ -142,7 +183,7 @@ class PluginAudioVideoTest : PluginAudioFixture() {
     fun `failed picture recovery refreshes the accepted recording after matching cache invalidation`() =
         runTest {
             val videoProvider =
-                plugin.copy(
+                grantedPlugin.copy(
                     manifest =
                         plugin.manifest.copy(
                             roles =
@@ -186,7 +227,7 @@ class PluginAudioVideoTest : PluginAudioFixture() {
     fun `audio-only playback searches video candidates for a video-capable preferred provider`() =
         runTest {
             val videoProvider =
-                plugin.copy(
+                grantedPlugin.copy(
                     manifest =
                         plugin.manifest.copy(
                             roles =
@@ -213,7 +254,7 @@ class PluginAudioVideoTest : PluginAudioFixture() {
     fun `a saved Songs-only miss does not suppress the new video search`() =
         runTest {
             val videoProvider =
-                plugin.copy(
+                grantedPlugin.copy(
                     manifest =
                         plugin.manifest.copy(
                             roles =
@@ -292,7 +333,7 @@ class PluginAudioVideoTest : PluginAudioFixture() {
     fun `refused URL refresh falls back to another provider when accepted recording is unavailable`() =
         runTest {
             val beatport =
-                plugin.copy(
+                grantedPlugin.copy(
                     manifest = plugin.manifest.copy(id = "beatport", roles = Roles(audio = AudioRole(setOf("beatport"), match = true))),
                 )
             every { registry.state } returns

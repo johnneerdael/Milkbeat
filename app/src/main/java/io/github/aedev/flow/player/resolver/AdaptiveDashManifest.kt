@@ -20,7 +20,7 @@ object AdaptiveDashManifest {
         durationSeconds: Long,
     ): String? {
         val videos = videoStreams.filter { it.isVideoOnly && it.hasRanges() }
-        if (videos.size < 2 || durationSeconds <= 0) return null
+        if (videos.isEmpty() || durationSeconds <= 0) return null
         val audio = audioStream?.takeIf { it.hasRanges() }
         val duration = "PT${durationSeconds}S"
         val sets = videos.groupBy { mimeOf(it) to VideoCodecUtils.codecKeyFromStream(it) }.values

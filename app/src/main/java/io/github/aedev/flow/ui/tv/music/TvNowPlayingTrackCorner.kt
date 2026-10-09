@@ -57,6 +57,7 @@ internal fun TvNowPlayingTrackCorner(
     contentColor: Color,
     maxWidth: Dp,
     modifier: Modifier = Modifier,
+    statusText: String? = null,
 ) {
     val fringe = rememberFringePaints(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.secondary)
     val coverBands = { glitch()?.cover }
@@ -108,6 +109,9 @@ internal fun TvNowPlayingTrackCorner(
                         Modifier.glitchLayer(showsNext, titleBands, split, fringe),
                     )
                 }
+            }
+            statusText?.let { text ->
+                CornerLine(text, MaterialTheme.typography.bodyMedium, contentColor, scrolls = false, modifier = Modifier)
             }
         }
     }

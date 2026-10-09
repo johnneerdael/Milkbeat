@@ -45,7 +45,7 @@ class MusicPlaybackArtworkTest {
             PluginMusicDataSourceFactory(
                 delegate,
                 resolve = { uri, _ -> if (uri.authority == first.videoId) oldResolution.await() else audio(second.videoId) },
-                bind = { delegate },
+                bind = { _, _ -> delegate },
             )
         val player =
             ExoPlayer

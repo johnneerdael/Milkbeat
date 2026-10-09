@@ -1,6 +1,6 @@
 # Working with Milkbeat as an AI agent
 
-Milkbeat (application id `nl.neerdael.milkbeat`; Kotlin sources and namespace stay `io.github.aedev.flow`) is an Android TV music app forked from [Flow](https://github.com/A-EDev/Flow), an Android music/video app written in Kotlin with Jetpack Compose, Hilt, and Media3/ExoPlayer. It plays YouTube content via a native InnerTube client with a NewPipe-based fallback extraction path, supports local media playback, offline downloads, casting, lyrics, a device-to-device sync feature, and an on-device recommendation engine (FlowNeuroEngine). It follows Material 3 design guidelines closely.
+Milkbeat (application id `nl.neerdael.milkbeat`; Kotlin sources and namespace stay `io.github.aedev.flow`) is an Android TV music app forked from [Flow](https://github.com/A-EDev/Flow), an Android music/video app written in Kotlin with Jetpack Compose, Hilt, and Media3/ExoPlayer. It plays YouTube content via a native InnerTube client with a NewPipe-based fallback extraction path, supports local media playback, offline downloads, casting, a device-to-device sync feature, and an on-device recommendation engine (FlowNeuroEngine). It follows Material 3 design guidelines closely.
 
 Product flavors: `github` (default, in-app updater enabled) and `foss` (no updater). Always use flavor-prefixed Gradle tasks — e.g. `assembleGithubDebug`, `compileFossDebugKotlin` — never bare `assembleDebug`/`compileDebugKotlin`.
 
@@ -307,8 +307,7 @@ hard constraints, not suggestions.
 ### Frame discipline — nothing animates that the user cannot see
 
 1. **The invisible-animation rule.** Several player surfaces deliberately stay composed while
-   hidden (the full player sheet is kept warm behind the mini player; the lyrics panel is
-   retained after first open; the mini bar stays composed under the expanded player). Anything
+   hidden (the full player sheet is kept warm behind the mini player; the mini bar stays composed under the expanded player). Anything
    animating inside a hidden layer burns a full frame budget at 60–120 Hz for entire listening
    sessions — this exact pattern caused a 30%-battery-in-90-minutes overheating regression.
    EVERY continuous animation MUST be gated on its own layer's visibility and pause when the
@@ -708,6 +707,7 @@ revision must pass the configured ktlint rules.
   protobuf classes from pinned upstream schemas. Generation uses a JVM module because protobuf
   Gradle 0.9.5 does not support AGP 9.3's Android library DSL. Validate this module with
   `./gradlew :media3-sabr:testDebugUnitTest :media3-sabr:assembleDebug`.
+- Plugin API 7 adds optional `ResolveAudioRequest.prepareVideo` and `AudioStream.audioFormat`. Keep picture metadata preparation separate from rendered video and hard picture requirements. Music toggles change native track selection only; never replace the playing media item or seek its audio. Direct prepared A/V uses the existing DASH adapters and bound permission-checked GET transport. Lyrics fetchers and consumers are removed; do not reintroduce lyrics network calls.
 - Plugin API 6 adds optional SABR presentation data and audio playback artwork. Keep SABR's
   unsigned last-modified values as strings on the JavaScript wire, then preserve the complete
   itag/last-modified/xTags tuple in Media3 format metadata. Do not interpret a SABR endpoint as
@@ -881,5 +881,5 @@ run that occupies a physical device, and the resulting diff is thousands of line
 - Reuse `ui/components/shared/QrCodeImage.kt` for QR presentation across features; its existing
   ZXing rendering and quiet zone remain shared by device pairing and the web sign-in viewer.
 
-- Video-capable audio providers use `AudioMatchStrategy.VIDEOS` for ordinary matching, queue preparation, preloads and mirror batches. Keep successful matches, scope misses/in-flight work by strategy, and preserve source metadata/IDs. `PluginAudio.videoCapablePlaybackIds` is a cold event-driven Flow derived from accepted caches and account/provider context; the music service updates Now Playing eligibility on main. Matching alone must not load picture. Explicit Video selection pins the accepted recording, keeps position, and uses the existing Media3 surface gating/audio fallback.
+- Video-capable audio providers use `AudioMatchStrategy.VIDEOS` for ordinary matching, queue preparation, preloads and mirror batches. Keep successful matches, scope misses/in-flight work by strategy, and preserve source metadata/IDs. `PluginAudio.videoCapablePlaybackIds` is a cold event-driven Flow of candidate IDs derived from accepted caches and account/provider context. The current Media3 item must also report a supported video track; track-change events update Now Playing eligibility on main, preventing cached metadata from exposing Video for audio-only HLS or completed downloads. Matching alone must not load picture. API 7's prepared DASH manifest is shared by eligibility and source construction; native SABR and eligible HLS retain picture support. Separate progressive picture URLs stay audio-only in music playback rather than preparing a hidden child. Explicit Video selection uses the prepared presentation's track selection and existing Media3 surface gating without replacing or seeking audio.
 - The existing `githubNightly` build is the separate preview app (`nl.neerdael.milkbeat.nightly`, launcher label Milkbeat Preview), debug-signed with release-like shrinking. Use `:app:assembleGithubNightly` and build-property `milkbeatPatch` for an explicit test artifact; do not manually bump app version files. A test prerelease must remain unmerged until the maintainer tests it. Its optional signed provider package is distributed through Buzzheavier; stable publication checkpoints/catalogs remain separate. Nightly/Preview downloader codes are pinned to `app/src/nightly/assets/plugin-preview-download-catalog.json`; stable builds retain the main asset and live publication.

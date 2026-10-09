@@ -39,7 +39,13 @@ The view button steps through three views while the audio carries on. Milkbeat r
 
     The accepted audio provider's best available playback thumbnail fills the screen, even when Spotify or SoundCloud supplies the catalog entry. Missing or failed images use the original catalog cover. The title, artist, queue identity and playing recording stay the same. Local files and providers without playback artwork retain their cover. Loading the thumbnail does not start video playback.
 
-YouTube matching searches recorded videos for every track while you listen, whichever view you use, but the picture only loads when you select the video view. A confirmed YouTube match can offer video even for Spotify, SoundCloud or Beatport tracks. A track without a usable video skips from the visualizer straight to the artwork; with the video view chosen, such a track shows the visualizer instead. With visualizations turned off, the button moves between video and artwork. A video that cannot play falls back to audio with the visuals.
+YouTube matching finds recorded videos when needed and reuses validated saved matches, whichever view you use, but the picture only loads when you select the video view. A confirmed YouTube match can offer video even for Spotify, SoundCloud or Beatport tracks. A track without a usable video skips from the visualizer straight to the artwork; with the video view chosen, such a track shows the visualizer instead. With visualizations turned off, the button moves between video and artwork. A video that cannot play falls back to audio with the visuals.
+
+Compatible API 7 providers prepare audio and optional video rendition metadata together. Selecting video changes the existing presentation’s track selection without replacing the media item or seeking the audio. Metadata preparation does not enable video playback. A completed audio download keeps its offline cache path without requiring a downloaded picture or a provider lookup. Older providers keep audio playback; a separate progressive picture without the metadata needed for a prepared presentation stays unavailable. An unavailable optional picture is retried as audio before moving to another provider. Lyrics are not fetched or displayed.
+
+For streamed music, the Video choice appears after the current presentation supplies a supported video track. Audio-only HLS and completed audio downloads keep the visualizer or artwork even if a previous resolution offered video.
+
+Local music-video files keep their original file or content URI. Selecting Video enables their picture track in the same presentation; hiding it keeps audio playing without replacing or seeking the file.
 
 ## The queue
 
@@ -72,18 +78,20 @@ In the **Local library** tab, selecting a track on an artist, release, playlist,
 
 When a track from one catalog plays through another provider's audio, Milkbeat has to find the same recording there. It prepares the entire remaining queue one track at a time, in playback order, while music plays; jumping elsewhere gives the new position priority. Tracks with native audio IDs need no matching.
 
-Matching checks recording identity: title, performers and any named remix or edit must agree. Remixer credits may appear in the title or the artist list. Full versions are preferred over mixed excerpts, and a longer recording is accepted without a duration cap when everything else agrees; shorter conflicting excerpts are rejected. Video-capable audio providers match against recorded videos for ordinary playback, queue preparation and playlist indexing. Successful matches are cached and reused; confirmed unmatched tracks can be removed from the future queue, while temporary failures stay retryable.
+Matching checks recording identity: title, performers and any named remix or edit must agree. For long sets uploaded by a venue or label, the known performer can be credited at the start of the video title rather than as its channel. This requires closely matching titles and durations, the same stated event years, and no tribute/cover uploader. Remixer credits may appear in the title or the artist list. Full versions are preferred over mixed excerpts, and a longer recording is accepted without a duration cap when everything else agrees; shorter conflicting excerpts are rejected. Video-capable audio providers match against recorded videos for ordinary playback, queue preparation and playlist indexing. Successful matches are cached and reused; confirmed unmatched tracks can be removed from the future queue, while temporary failures stay retryable.
+
+During a foreground lookup, the player shows **Finding a match on …** under the track title. A validated cached match instead shows **Loading saved … match** while its stream is resolved; a direct recording shows **Loading audio from …**. Background queue preparation does not replace the playing track’s status, and changing tracks cancels stale status updates.
 
 Preparation reduces the work at each transition but cannot guarantee gapless playback under every network, format or provider condition.
 
 ## Buffering and recovery
 
-Streamed music loads well ahead of the playing position: Milkbeat keeps loading until about 16 MB is buffered (roughly 13 minutes of typical audio, usually the whole song) and loads more once less than 30 seconds remain. A music video's picture shares that buffer, and a slow network or low memory keeps it shorter. If a stream fails, Milkbeat asks the audio provider for a fresh link to the same recording and resumes where it stopped.
+Streamed music loads well ahead of the playing position: Milkbeat keeps loading until about 16 MB is buffered (roughly 13 minutes of typical audio, usually the whole song) and loads more once less than 30 seconds remain. A music video's picture shares that buffer, and a slow network or low memory keeps it shorter. If a stream fails, Milkbeat asks its provider for a fresh link to the same recording and resumes where it stopped. A second media failure within a minute tries the next configured audio provider for that track. Audio-only providers remain eligible, so a failed YouTube video can fall back to the original SoundCloud audio. This does not change your configured provider order.
+
+Audio failures while picture is hidden use ordinary audio/network recovery and retain the Video choice. A playback failure while video is active can retry as audio; an explicitly unavailable picture also uses audio fallback. Refreshing an expired audio URL preserves optional picture preparation.
 
 If normal decoded TV audio (PCM) stops advancing for about five seconds while the player still reports playback, Milkbeat freezes the displayed progress and reconnects the output from the last position where audio was advancing, keeping the same track and queue. It tries twice before leaving the track paused with **Audio output stopped. Press Play to retry.** Pause, seeking, choosing another track or Stop cancels a pending restart. Quiet passages do not trigger recovery, though a recovery may repeat a short stretch of the song. Hardware-offloaded audio and encoded HDMI passthrough are outside this check.
 
 ## Encrypted provider audio
 
 Compatible plugins can supply Widevine-protected audio through the device's DRM implementation. Milkbeat fetches licenses separately from the audio and only from destinations the plugin is allowed to reach. Availability depends on the account, the recording and the device. SoundCloud previews are never treated as full tracks. The offline downloader supports clear progressive audio only; HLS, DRM and native SABR streams cannot be downloaded.
-
-The [video-matching preview](preview-testing.md) runs beside the stable app for testing upcoming playback changes.
