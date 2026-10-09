@@ -18,6 +18,8 @@ internal class TvMusicVideoJoinObserver(
     private val state = TvMusicVideoJoinState()
     private var player: Player? = null
     private var holder: SurfaceHolder? = null
+    private var view: PlayerView? = null
+    private var picturePrepared = false
     private var observingLifecycle = false
     private val lifecycleObserver = LifecycleEventObserver { _, _ -> refreshVisibility() }
 
@@ -25,7 +27,11 @@ internal class TvMusicVideoJoinObserver(
     fun bind(
         view: PlayerView,
         nextPlayer: Player?,
+        prepared: Boolean = true,
     ) {
+        this.view = view
+        if (!prepared && picturePrepared) state.itemChanged()
+        picturePrepared = prepared
         if (!observingLifecycle) {
             observingLifecycle = true
             lifecycle.addObserver(lifecycleObserver)
@@ -84,7 +90,7 @@ internal class TvMusicVideoJoinObserver(
     }
 
     override fun onRenderedFirstFrame() {
-        if (holder?.surface?.isValid != true) return
+        if (!picturePrepared || view?.player !== player || holder?.surface?.isValid != true) return
         state.onRenderedFirstFrame()
         publish()
     }
@@ -101,6 +107,7 @@ internal class TvMusicVideoJoinObserver(
         if (holder !== released) return
         holder?.removeCallback(this)
         holder = null
+        this.view = null
         state.surfaceChanged(false)
     }
 
@@ -109,6 +116,7 @@ internal class TvMusicVideoJoinObserver(
         player = null
         holder?.removeCallback(this)
         holder = null
+        view = null
         lifecycle.removeObserver(lifecycleObserver)
         observingLifecycle = false
     }

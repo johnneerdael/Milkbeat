@@ -18,6 +18,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.AspectRatioFrameLayout
@@ -35,6 +36,7 @@ fun TvMusicVideoSurface(
     modifier: Modifier = Modifier,
 ) {
     val lifecycle = LocalLifecycleOwner.current.lifecycle
+    val videoPrepared by EnhancedMusicPlayerManager.videoPrepared.collectAsStateWithLifecycle()
     var showJoinIndicator by remember(lifecycle) { mutableStateOf(false) }
     val joining = remember(lifecycle) { TvMusicVideoJoinObserver(lifecycle) { showJoinIndicator = it } }
     DisposableEffect(joining) {
@@ -74,8 +76,8 @@ fun TvMusicVideoSurface(
                 }
             },
             update = {
-                joining.bind(it, player)
-                it.player = player
+                joining.bind(it, player, videoPrepared)
+                it.player = player.takeIf { videoPrepared }
             },
             onRelease = {
                 joining.releaseSurface(it)

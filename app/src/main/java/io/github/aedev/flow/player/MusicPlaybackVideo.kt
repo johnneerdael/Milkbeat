@@ -115,9 +115,11 @@ internal fun EnhancedMusicPlayerManager.applyVideoMode(controller: Player) {
     musicVideoAvailableState.value = track?.let(::canShowVideo) == true
     videoShownState.value = showVideo && musicVideoAvailableState.value && track != null &&
         (track.videoId in videoItemIds || (LocalMediaIds.isLocal(track.videoId) && track.isVideoSong))
-    val play = videoShownState.value && videoSurfaces > 0
+    val play = videoShownState.value && videoSurfaces > 0 && !musicVideoJoinGate.awaitingAudio
+    if (!play) musicVideoJoinGate.reset()
     val disabled = androidx.media3.common.C.TRACK_TYPE_VIDEO in controller.trackSelectionParameters.disabledTrackTypes
     if (disabled != play) return
+    if (play) musicVideoJoinGate.begin()
     PlaybackTrace.event(
         TraceEvent.VIDEO_SELECTION,
         TraceField.SHOW_VIDEO to if (showVideo) 1L else 0L,

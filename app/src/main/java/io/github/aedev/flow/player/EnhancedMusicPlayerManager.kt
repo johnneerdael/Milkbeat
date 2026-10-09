@@ -173,6 +173,7 @@ object EnhancedMusicPlayerManager {
     internal var videoSurfaces = 0
 
     val videoAvailable: StateFlow<Boolean> = musicVideoAvailableState.asStateFlow()
+    val videoPrepared: StateFlow<Boolean> = musicVideoJoinGate.ready
 
     internal val videoShownState = MutableStateFlow(false)
 
@@ -274,7 +275,14 @@ object EnhancedMusicPlayerManager {
                     player: Player,
                     events: Player.Events,
                 ) {
-                    if (events.contains(Player.EVENT_TRACKS_CHANGED)) applyVideoMode(controller)
+                    if (events.containsAny(
+                            Player.EVENT_TRACKS_CHANGED,
+                            Player.EVENT_PLAYBACK_STATE_CHANGED,
+                            Player.EVENT_IS_PLAYING_CHANGED,
+                        )
+                    ) {
+                        applyVideoMode(controller)
+                    }
                     if (events.containsAny(
                             Player.EVENT_MEDIA_METADATA_CHANGED,
                             Player.EVENT_MEDIA_ITEM_TRANSITION,

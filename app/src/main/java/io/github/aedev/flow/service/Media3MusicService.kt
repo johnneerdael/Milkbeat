@@ -359,20 +359,13 @@ class Media3MusicService : MediaLibraryService() {
             }
 
         val renderersFactory =
-            object : androidx.media3.exoplayer.DefaultRenderersFactory(this) {
-                @Suppress("DEPRECATION")
-                override fun buildAudioSink(
-                    context: android.content.Context,
-                    enableFloatOutput: Boolean,
-                    enableAudioTrackPlaybackParams: Boolean,
-                ): androidx.media3.exoplayer.audio.AudioSink? =
-                    androidx.media3.exoplayer.audio.DefaultAudioSink
-                        .Builder(context)
-                        .setAudioTrackProvider(audioOutputProbe)
-                        .setAudioProcessors(
-                            arrayOf<androidx.media3.common.audio.AudioProcessor>(equalizer, VisualizerTapProcessor(visualizerTap)),
-                        ).build()
-            }.setExtensionRendererMode(androidx.media3.exoplayer.DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
+            io.github.aedev.flow.player.renderer
+                .MusicRenderersFactory(
+                    this,
+                    audioOutputProbe,
+                    arrayOf<androidx.media3.common.audio.AudioProcessor>(equalizer, VisualizerTapProcessor(visualizerTap)),
+                    io.github.aedev.flow.player.musicVideoJoinGate,
+                ).setExtensionRendererMode(androidx.media3.exoplayer.DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
 
         val loadControl = LoadControlFactory.forMusic()
 
@@ -388,6 +381,8 @@ class Media3MusicService : MediaLibraryService() {
                 .setSeekBackIncrementMs(5000)
                 .setSeekForwardIncrementMs(5000)
                 .build()
+        io.github.aedev.flow.player.musicVideoJoinGate
+            .bind(player)
         player.addAnalyticsListener(PlaybackOutputTrace(audioOutputProbe))
         player.trackSelectionParameters =
             player.trackSelectionParameters
@@ -558,6 +553,8 @@ class Media3MusicService : MediaLibraryService() {
     }
 
     override fun onDestroy() {
+        io.github.aedev.flow.player.musicVideoJoinGate
+            .bind(null)
         musicResolutionStatusState.value = null
         EnhancedMusicPlayerManager.prefetcher = null
         EnhancedMusicPlayerManager.setVideoCapablePlaybackIds(emptySet())
