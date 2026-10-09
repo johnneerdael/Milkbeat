@@ -6,6 +6,7 @@ import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.datasource.DataSource
+import androidx.media3.exoplayer.dash.DashMediaSource
 import androidx.media3.exoplayer.hls.HlsMediaSource
 import androidx.media3.exoplayer.source.MediaSource
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
@@ -20,6 +21,7 @@ import nl.neerdael.milkbeat.catalog.TrackDescriptor
 import nl.neerdael.milkbeat.plugin.AudioDrm
 import nl.neerdael.milkbeat.plugin.AudioDrmScheme
 import nl.neerdael.milkbeat.plugin.AudioStream
+import nl.neerdael.milkbeat.plugin.ByteRange
 import nl.neerdael.milkbeat.plugin.FormatType
 import nl.neerdael.milkbeat.plugin.MediaFormat
 import nl.neerdael.milkbeat.plugin.ServerAbrClientInfo
@@ -42,6 +44,53 @@ class MusicMediaSourceFactoryTest {
             .setUri(Uri.parse("music://spotify-song"))
             .setMediaId("spotify-song")
             .build()
+
+    @Test
+    fun `prepared direct audio and picture share one DASH source`() {
+        val sound =
+            MediaFormat(
+                "251:123",
+                FormatType.AUDIO,
+                "https://cdn.example/audio",
+                "audio/webm",
+                codecs = "opus",
+                bitrate = 128000,
+                durationMs = 120000,
+                initRange = ByteRange(0, 258),
+                indexRange = ByteRange(259, 14537),
+            )
+        val picture =
+            MediaFormat(
+                "313:124",
+                FormatType.VIDEO,
+                "https://cdn.example/video",
+                "video/webm",
+                codecs = "vp9",
+                width = 3840,
+                height = 2160,
+                bitrate = 12000000,
+                durationMs = 120000,
+                initRange = ByteRange(0, 220),
+                indexRange = ByteRange(221, 27854),
+            )
+        val resolution =
+            ResolvedAudio(
+                "youtube",
+                TrackDescriptor(EntityRef(EntityKind.TRACK, "matched"), "Matched"),
+                AudioStream(sound.url, "matched", sound.id, sound.mimeType, codecs = sound.codecs, video = picture, audioFormat = sound),
+                Long.MAX_VALUE,
+                false,
+            )
+        val source = factory.resolvedSource(item.buildUpon().setUri("musicvideo://spotify-song").build(), resolution)
+        assertThat(source).isInstanceOf(DashMediaSource::class.java)
+        assertThat(source.mediaItem.mediaId).isEqualTo(item.mediaId)
+    }
+
+    @Test
+    fun `prepared audio only fallback does not construct a missing picture source`() {
+        val source = factory.resolvedSource(item.buildUpon().setUri("musicvideo://spotify-song").build(), audio("audio/mp4"))
+        assertThat(source).isInstanceOf(ProgressiveMediaSource::class.java)
+    }
 
     @Test
     fun `a Beatport fallback chooses HLS from the resolved stream`() {

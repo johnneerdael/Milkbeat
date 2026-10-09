@@ -633,3 +633,9 @@ catalogs through the existing `PluginAccounts` flow. Existing web sign-in method
 `crypto.randomBytes` uses `SecureRandom` with a request bounded to 1–256 bytes. It exposes no system
 identifier. A provider can store its generated installation identity in its own secret namespace.
 `env.get` optionally includes OS version and device model for provider protocol headers.
+
+### Additive API 7 music presentations
+
+`ResolveAudioRequest.prepareVideo` requests optional picture metadata while keeping audio-only fallback valid. `AudioStream.audioFormat` identifies the chosen audio rendition, including its original DASH byte ranges; its ID, URL and MIME must agree with the primary audio descriptor. Direct A/V metadata becomes one Media3 DASH presentation through the existing NewPipe adapters and `AdaptiveDashManifest`; a single video rendition is sufficient. SABR retains one native presentation. Track-selection changes hide/show video without replacing the media item, seeking or rebuilding the audio source. The music service starts with video disabled. Bound adaptive transport checks current grants on initial and redirected HTTPS GETs, applies accepted headers, refreshes only the same rendition/ranges, and uses separate per-format cache keys.
+
+A provider resolution failure permits the next configured provider. Two media failures in one minute temporarily exhaust that provider for the track and account; URL expiry and an explicit SABR playback-context reload do not exhaust it. A replacement provider never receives another provider’s failure context. Optional preparation does not filter audio-only providers out of the order. Lyrics implementations and automatic fetch consumers are removed; ordinary video captions remain independent.

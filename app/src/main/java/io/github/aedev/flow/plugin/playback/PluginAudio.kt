@@ -1,7 +1,6 @@
 package io.github.aedev.flow.plugin.playback
 
 import android.os.SystemClock
-import androidx.media3.datasource.DataSource
 import io.github.aedev.flow.plugin.PluginHost
 import io.github.aedev.flow.plugin.catalog.PluginAccounts
 import io.github.aedev.flow.plugin.registry.PluginRegistry
@@ -13,7 +12,6 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import nl.neerdael.milkbeat.catalog.EntityRef
 import nl.neerdael.milkbeat.catalog.TrackDescriptor
 import nl.neerdael.milkbeat.plugin.AudioDelivery
 import nl.neerdael.milkbeat.plugin.AudioQuality
@@ -25,7 +23,6 @@ import nl.neerdael.milkbeat.plugin.ReportPlaybackRequest
 import nl.neerdael.milkbeat.plugin.ResolveAudioRequest
 import nl.neerdael.milkbeat.plugin.ServerAbrFailure
 import nl.neerdael.milkbeat.plugin.StreamFailure
-import okhttp3.OkHttpClient
 import java.io.IOException
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
@@ -34,48 +31,6 @@ import javax.inject.Singleton
 
 private const val EXPIRY_MARGIN_MS = 60_000L
 private const val DEFAULT_LIFETIME_MS = 5 * 60 * 60_000L
-
-internal class AudioCatalogMiss : Exception()
-
-/** The recording still has audio; only its requested picture delivery is unavailable. */
-internal class PictureUnavailable : IOException("The accepted source has no picture")
-
-internal fun Throwable.isPictureUnavailable(): Boolean = generateSequence(this) { it.cause }.any { it is PictureUnavailable }
-
-private data class AudioIdentity(
-    val ref: EntityRef,
-    val ids: Map<String, String>,
-)
-
-private fun TrackDescriptor.audioIdentity() = AudioIdentity(ref, ids.toMap())
-
-/** A stream an audio plugin handed out, with the plugin and when to ask again. */
-class ResolvedAudio(
-    val pluginId: String,
-    /** The track as the plugin knows it: the listener's own, or the plugin's match for it. */
-    val track: TrackDescriptor,
-    val stream: AudioStream,
-    val validUntilMs: Long,
-    /** Whether the plugin was asked for the picture too. */
-    val withPicture: Boolean,
-    internal val providerOrder: List<String> = emptyList(),
-    internal val request: ResolveAudioRequest? = null,
-    internal val preparationContext: Any? = null,
-    internal val runtimeReceipt: PluginPlaybackReceipt? = null,
-    internal val nativeBinding: Any? = null,
-    internal val nativeValidUntilElapsedMs: Long? = null,
-) {
-    internal fun isValidAt(
-        wallTimeMs: Long,
-        elapsedTimeMs: Long,
-    ): Boolean = nativeValidUntilElapsedMs?.let { it > elapsedTimeMs } ?: (validUntilMs > wallTimeMs)
-}
-
-/** What the picture of a music video is resolved against: what this TV decodes, best first. */
-class PictureLimits(
-    val maxHeight: Int,
-    val codecs: List<String>,
-)
 
 /**
  * Plays tracks through the listener's audio plugins in their selected order. Each plugin uses its
@@ -110,7 +65,7 @@ class PluginAudio
                                         ?.manifest
                                         ?.roles
                                         ?.audio
-                                        ?.musicVideo == true
+                                        ?.musicVideo == true && audio.hasPreparedPicture
                             } == true
                         }.map { it.key }
                         .toSet()
@@ -141,6 +96,8 @@ class PluginAudio
         private val resolutionLocks = ConcurrentHashMap<AudioIdentity, Mutex>()
         private val failures = ConcurrentHashMap<AudioIdentity, StreamFailure>()
         private val failureContexts = ConcurrentHashMap<AudioIdentity, Any>()
+        private val failureProviders = ConcurrentHashMap<AudioIdentity, String>()
+        private val mediaFailures = PlaybackProviderFailures()
 
         /** The stream for [track], resolving it unless a still-valid one covers what is asked. */
         suspend fun resolve(
@@ -149,12 +106,13 @@ class PluginAudio
             quality: AudioQuality = AudioQuality.AUTO,
             playbackId: String = track.ref.providerId,
             preferredProviderId: String? = null,
+            preparePicture: PictureLimits? = null,
         ): ResolvedAudio {
             val identity = track.audioIdentity()
             if (playbackIds.put(playbackId, identity) != identity) {
                 resolvedRevision.update { revision -> revision + 1 }
             }
-            return resolveLocked(track, picture, quality, strict = false, preferredProviderId)
+            return resolveLocked(track, picture, quality, strict = false, preferredProviderId, preparePicture)
         }
 
         suspend fun prepare(
@@ -162,7 +120,8 @@ class PluginAudio
             picture: PictureLimits?,
             quality: AudioQuality = AudioQuality.AUTO,
             preferredProviderId: String? = null,
-        ): ResolvedAudio = resolveLocked(track, picture, quality, strict = true, preferredProviderId)
+            preparePicture: PictureLimits? = null,
+        ): ResolvedAudio = resolveLocked(track, picture, quality, strict = true, preferredProviderId, preparePicture)
 
         private suspend fun resolveLocked(
             track: TrackDescriptor,
@@ -170,10 +129,11 @@ class PluginAudio
             quality: AudioQuality,
             strict: Boolean,
             preferredProviderId: String?,
+            preparePicture: PictureLimits?,
         ): ResolvedAudio {
             val key = track.audioIdentity()
             return resolutionLocks.getOrPut(key) { Mutex() }.withLock {
-                resolveStream(track, picture, quality, strict, preferredProviderId)
+                resolveStream(track, picture, quality, strict, preferredProviderId, preparePicture)
             }
         }
 
@@ -183,6 +143,7 @@ class PluginAudio
             quality: AudioQuality,
             strict: Boolean,
             preferredProviderId: String?,
+            preparePicture: PictureLimits?,
         ): ResolvedAudio {
             val context = streamContext()
             val generation = cacheGeneration.get()
@@ -199,7 +160,10 @@ class PluginAudio
             }
             val state = registry.state.value
             val previous = resolved[key]?.takeIf { it.preparationContext == context || ownsNativeSource(it) }
-            val providers = audioProviderAttempts(state, track, withPicture = picture != null, preferredProviderId = preferredProviderId)
+            val pendingFailure = failures[key]
+            val providers =
+                audioProviderAttempts(state, track, withPicture = picture != null, preferredProviderId = preferredProviderId)
+                    .filterNot { mediaFailures.exhausted(key, it.plugin.id, nativeContext(it.plugin.id)) }
             val pinned =
                 previous
                     ?.takeIf {
@@ -211,7 +175,7 @@ class PluginAudio
             val protocolRecovery = failures[key]?.serverAbrFailure != null || acceptedSabrFailure
             val attempts =
                 when {
-                    protocolRecovery && pinned != null -> listOf(pinned)
+                    protocolRecovery && pinned != null -> listOf(pinned) + providers.filterNot { it.plugin.id == pinned.plugin.id }
                     pinned == null -> providers
                     picture != null -> listOf(pinned)
                     else -> listOf(pinned) + providers.filterNot { it.plugin.id == pinned.plugin.id }
@@ -222,10 +186,22 @@ class PluginAudio
                     it.preparationContext == context && it.providerOrder == order &&
                         it.isValidAt(System.currentTimeMillis(), SystemClock.elapsedRealtime()) &&
                         it.runtimeReceipt?.isCurrent() != false && it.request?.quality == quality && (
-                            picture == null || (
-                                it.withPicture &&
-                                    it.request.maxVideoHeight == picture.maxHeight && it.request.videoCodecs == picture.codecs
-                            )
+                            (
+                                picture == null &&
+                                    (
+                                        preparePicture == null || state
+                                            .plugin(it.pluginId)
+                                            ?.manifest
+                                            ?.roles
+                                            ?.audio
+                                            ?.musicVideo != true
+                                    )
+                            ) ||
+                                (
+                                    (it.withPicture || it.request?.prepareVideo == true) &&
+                                        it.request?.maxVideoHeight == (picture ?: preparePicture)?.maxHeight &&
+                                        it.request?.videoCodecs == (picture ?: preparePicture)?.codecs
+                                )
                         )
                 }?.let { return it }
             if (attempts.isEmpty()) {
@@ -234,16 +210,31 @@ class PluginAudio
             var last: PluginCallException? = null
             var lastPictureUnavailable: PictureUnavailable? = null
             for ((plugin, known) in attempts) {
-                var playable = known ?: match(track, plugin.id, strict, strategy = plugin.audioMatchStrategy()) ?: continue
+                var legacyPicture =
+                    preparePicture != null && picture == null &&
+                        plugin.manifest.roles.audio
+                            ?.musicVideo == true && plugin.manifest.api.target < 7
+                var playable =
+                    try {
+                        known ?: match(track, plugin.id, strict, strategy = plugin.audioMatchStrategy()) ?: continue
+                    } catch (
+                        error: PluginCallException,
+                    ) {
+                        last = error
+                        continue
+                    }
                 for (attempt in 0..1) {
                     val request =
                         ResolveAudioRequest(
                             track = playable,
                             quality = quality,
-                            video = picture != null,
-                            maxVideoHeight = picture?.maxHeight,
-                            videoCodecs = picture?.codecs.orEmpty(),
-                            failure = failures[key],
+                            video = picture != null || legacyPicture,
+                            maxVideoHeight = (picture ?: preparePicture)?.maxHeight,
+                            videoCodecs = (picture ?: preparePicture)?.codecs.orEmpty(),
+                            failure = pendingFailure?.takeIf { failureProviders[key] == plugin.id },
+                            prepareVideo =
+                                preparePicture != null && plugin.manifest.roles.audio
+                                    ?.musicVideo == true,
                         )
                     try {
                         val acceptedContext = nativeContext(plugin.id)
@@ -258,12 +249,13 @@ class PluginAudio
                                 PluginError(PluginErrorCode.UNAVAILABLE, "The audio provider has no picture for this recording"),
                             )
                         }
-                        if (protocolRecovery && previous?.stream?.serverAbr != null && stream.serverAbr != null &&
+                        if (protocolRecovery && previous?.pluginId == plugin.id && previous.stream.serverAbr != null &&
+                            stream.serverAbr != null &&
                             previous.stream.serverAbr?.videoId != stream.serverAbr?.videoId
                         ) {
                             throw IOException("The provider changed the accepted recording")
                         }
-                        validateDrm(plugin.id, stream)
+                        validateAudioStream(plugin.id, stream, playbackGrants(plugin.id))
                         requireNativeSabrMarker(stream.mimeType, stream.serverAbr)
                         validateServerAbr(
                             stream.serverAbr,
@@ -272,8 +264,10 @@ class PluginAudio
                                 .plugin(plugin.id)
                                 ?.grantedNetwork
                                 .orEmpty(),
+                            allowPicture = request.video || request.prepareVideo,
                         )
-                        if (stream.serverAbr != null &&
+                        val boundPresentation = stream.serverAbr != null || stream.audioFormat != null
+                        if (boundPresentation &&
                             (acceptedContext != nativeContext(plugin.id) || generation != cacheGeneration.get())
                         ) {
                             throw IOException("The accepted playback account or provider changed")
@@ -289,10 +283,15 @@ class PluginAudio
                             request,
                             context,
                             if (stream.serverAbr != null) receipt else null,
-                            if (stream.serverAbr != null) acceptedContext else null,
-                            if (stream.serverAbr != null) SystemClock.elapsedRealtime() + lifetime - EXPIRY_MARGIN_MS else null,
+                            if (boundPresentation) acceptedContext else null,
+                            if (boundPresentation) SystemClock.elapsedRealtime() + lifetime - EXPIRY_MARGIN_MS else null,
                         ).also {
-                            request.failure?.let { failure -> failures.remove(key, failure) }
+                            pendingFailure?.let { failure ->
+                                if (failures.remove(key, failure)) {
+                                    failureProviders.remove(key)
+                                    failureContexts.remove(key)
+                                }
+                            }
                             synchronized(resolved) {
                                 if (generation == cacheGeneration.get() &&
                                     (version == preparationVersion() || (stream.serverAbr != null && ownsNativeSource(it)))
@@ -307,13 +306,27 @@ class PluginAudio
                         break
                     } catch (e: PluginCallException) {
                         last = e
-                        if (e.error.code != PluginErrorCode.UNAVAILABLE && e.error.code != PluginErrorCode.NOT_FOUND) throw e
+                        if (legacyPicture && attempt == 0 &&
+                            e.error.code in setOf(PluginErrorCode.UNAVAILABLE, PluginErrorCode.NOT_FOUND)
+                        ) {
+                            legacyPicture = false
+                            continue
+                        }
+                        if (e.error.code !in setOf(PluginErrorCode.UNAVAILABLE, PluginErrorCode.NOT_FOUND)) break
                         if (known != null) break
                         matcher.invalidate(track, plugin.id)
                         if (attempt != 0) break
                         playable =
                             match(track, plugin.id, strict, excludedId = playable.ref.providerId, strategy = plugin.audioMatchStrategy())
                                 ?: break
+                    } catch (e: IOException) {
+                        if (context != streamContext() || generation != cacheGeneration.get()) throw e
+                        last =
+                            PluginCallException(
+                                plugin.id,
+                                PluginError(PluginErrorCode.UNAVAILABLE, "The provider returned unusable playback metadata"),
+                            )
+                        break
                     }
                 }
             }
@@ -360,7 +373,7 @@ class PluginAudio
                 throw IOException("The provider changed the accepted recording")
             }
             rejectAudioOnlyHlsPicture(stream, audio.withPicture)
-            validateDrm(audio.pluginId, stream)
+            validateAudioStream(audio.pluginId, stream, playbackGrants(audio.pluginId))
             requireNativeSabrMarker(stream.mimeType, stream.serverAbr)
             validateServerAbr(
                 stream.serverAbr,
@@ -369,6 +382,7 @@ class PluginAudio
                     .plugin(audio.pluginId)
                     ?.grantedNetwork
                     .orEmpty(),
+                allowPicture = request.video || request.prepareVideo,
             )
             val previousHls =
                 audio.stream.mimeType
@@ -396,9 +410,7 @@ class PluginAudio
                 audio.preparationContext,
                 if (stream.serverAbr != null) receipt else null,
                 audio.nativeBinding,
-                if (stream.serverAbr !=
-                    null
-                ) {
+                if (stream.serverAbr != null || stream.audioFormat != null) {
                     SystemClock.elapsedRealtime() + (stream.expiresInMs ?: DEFAULT_LIFETIME_MS) - EXPIRY_MARGIN_MS
                 } else {
                     null
@@ -428,71 +440,12 @@ class PluginAudio
             }
         }
 
-        internal fun serverAbrDataSourceFactory(
-            audio: ResolvedAudio,
-            base: OkHttpClient,
-        ): DataSource.Factory =
-            pluginSabrDataSourceFactory(base, audio.stream.headers, {
-                verifyBound(audio)
-                if (!audio.isValidAt(System.currentTimeMillis(), SystemClock.elapsedRealtime())) {
-                    throw nl.neerdael.milkbeat.sabr.SabrPlaybackException(
-                        nl.neerdael.milkbeat.sabr.SabrPlaybackException.Reason.URL_EXPIRED,
-                        audio.stream.serverAbr?.url ?: audio.stream.url,
-                        null,
-                    )
-                }
-            }) {
-                registry.state.value
-                    .plugin(audio.pluginId)
-                    ?.takeIf { it.enabled }
-                    ?.grantedNetwork
-                    .orEmpty()
-            }
-
-        private fun rejectAudioOnlyHlsPicture(
-            stream: AudioStream,
-            picture: Boolean,
-        ) {
-            if (picture && stream.serverAbr == null && isHlsStream(stream) && stream.requireAudioOnlyHls) {
-                throw PictureUnavailable()
-            }
-        }
-
-        private fun validateDrm(
-            pluginId: String,
-            stream: AudioStream,
-        ) {
-            val drm = stream.drm ?: return
-            try {
-                checkedPluginDrmUrl(
-                    drm.licenseUrl,
-                    registry.state.value
-                        .plugin(pluginId)
-                        ?.grantedNetwork
-                        .orEmpty(),
-                )
-            } catch (error: IOException) {
-                throw PluginCallException(
-                    pluginId,
-                    PluginError(
-                        PluginErrorCode.UNSUPPORTED,
-                        error.message ?: "Invalid plugin DRM destination",
-                    ),
-                )
-            }
-        }
-
-        /** A dedicated license transport; media caches and media headers never carry license data. */
-        internal fun drmDataSourceFactory(
-            binding: BoundPluginAudio,
-            base: OkHttpClient,
-        ): DataSource.Factory =
-            pluginDrmDataSourceFactory(base, binding) {
-                registry.state.value
-                    .plugin(binding.initial.pluginId)
-                    ?.grantedNetwork
-                    .orEmpty()
-            }
+        internal fun playbackGrants(pluginId: String): List<String> =
+            registry.state.value
+                .plugin(pluginId)
+                ?.takeIf { it.enabled }
+                ?.grantedNetwork
+                .orEmpty()
 
         /** How the first audio plugin that would play [track] delivers its streams. */
         fun deliveryFor(
@@ -528,6 +481,10 @@ class PluginAudio
         ) {
             val key = playbackIds[id] ?: return
             resolved[key]?.let { audio ->
+                failureProviders[key] = audio.pluginId
+                if (serverAbrFailure !in setOf(ServerAbrFailure.URL_EXPIRED, ServerAbrFailure.PLAYBACK_CONTEXT_RELOAD)) {
+                    mediaFailures.record(key, audio.pluginId, nativeContext(audio.pluginId))
+                }
                 (audio.nativeBinding ?: audio.preparationContext)?.let { failureContexts[key] = it }
             }
             failures[key] = StreamFailure(url, status, reloadPlaybackContext, serverAbrFailure)
@@ -586,6 +543,8 @@ class PluginAudio
                 resolved.clear()
                 failures.clear()
                 failureContexts.clear()
+                failureProviders.clear()
+                mediaFailures.clear()
             }
             resolvedRevision.update { it + 1 }
         }
@@ -610,9 +569,3 @@ class PluginAudio
             )
         }
     }
-
-private fun isHlsStream(stream: AudioStream): Boolean =
-    stream.mimeType
-        .substringBefore(';')
-        .trim()
-        .lowercase() in setOf("application/x-mpegurl", "application/vnd.apple.mpegurl")

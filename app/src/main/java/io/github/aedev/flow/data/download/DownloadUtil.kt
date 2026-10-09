@@ -35,7 +35,10 @@ import io.github.aedev.flow.plugin.playback.PictureLimits
 import io.github.aedev.flow.plugin.playback.PluginAudio
 import io.github.aedev.flow.plugin.playback.QueuePreparationResult
 import io.github.aedev.flow.plugin.playback.ResolvedAudio
+import io.github.aedev.flow.plugin.playback.adaptiveDataSourceFactory
+import io.github.aedev.flow.plugin.playback.drmDataSourceFactory
 import io.github.aedev.flow.plugin.playback.prepareQueue
+import io.github.aedev.flow.plugin.playback.serverAbrDataSourceFactory
 import io.github.aedev.flow.service.ExoDownloadService
 import io.github.aedev.flow.utils.MusicVideoFormats
 import kotlinx.coroutines.CoroutineScope
@@ -294,7 +297,7 @@ class DownloadUtil
                         runCatching {
                             completeDownload(id) && (!picture || completeDownload(MusicVideoItems.videoKey(id)))
                         }.getOrDefault(false)
-                    if (cached) null else resolveForPlayback(uri, picture)
+                    if (cached) null else resolveForPlayback(uri, picture = false, preparePicture = picture)
                 },
                 bind = { audio ->
                     val binding = BoundPluginAudio(audio, pluginAudio::refreshBound)
@@ -303,6 +306,14 @@ class DownloadUtil
                         audio.stream.drm?.let { pluginAudio.drmDataSourceFactory(binding, okHttpClient) },
                         audio.stream.serverAbr?.let { pluginAudio.serverAbrDataSourceFactory(audio, okHttpClient) },
                         audio.stream.serverAbr?.let { { pluginAudio.acquirePlaybackLease(audio) } },
+                        adaptive =
+                            audio.stream.audioFormat?.let {
+                                pluginAudio.adaptiveDataSourceFactory(
+                                    binding,
+                                    okHttpClient,
+                                    playerCache,
+                                )
+                            },
                     )
                 },
             )
@@ -328,14 +339,16 @@ class DownloadUtil
             val picture = uri.scheme == MusicVideoItems.SCHEME
             val limits = if (picture) PictureLimits(maxVideoHeight, pictureCodecs(VideoCodecUtils.NO_PREFERENCE)) else null
             val quality = AudioQuality.valueOf(playerPreferences.musicAudioQuality.first().name)
-            return pluginAudio.prepareQueue(descriptor, limits, quality, MusicVideoItems.preferredProvider(uri))
+            return pluginAudio.prepareQueue(descriptor, null, quality, MusicVideoItems.preferredProvider(uri), preparePicture = limits)
         }
 
         private suspend fun resolveForPlayback(
             uri: Uri,
             picture: Boolean,
+            preparePicture: Boolean = false,
         ): ResolvedAudio {
             val limits = if (picture) PictureLimits(maxVideoHeight, pictureCodecs(VideoCodecUtils.NO_PREFERENCE)) else null
+            val prepared = if (preparePicture) PictureLimits(maxVideoHeight, pictureCodecs(VideoCodecUtils.NO_PREFERENCE)) else null
             val quality = playerPreferences.musicAudioQuality.first()
             val descriptor = MusicVideoItems.descriptor(uri)
             return pluginAudio.resolve(
@@ -344,6 +357,7 @@ class DownloadUtil
                 AudioQuality.valueOf(quality.name),
                 uri.authority ?: descriptor.ref.providerId,
                 MusicVideoItems.preferredProvider(uri),
+                preparePicture = prepared,
             )
         }
 

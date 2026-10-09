@@ -381,6 +381,11 @@ class Media3MusicService : MediaLibraryService() {
                 .setSeekBackIncrementMs(5000)
                 .setSeekForwardIncrementMs(5000)
                 .build()
+        player.trackSelectionParameters =
+            player.trackSelectionParameters
+                .buildUpon()
+                .setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, true)
+                .build()
 
         // Expose audio session ID for external audio processors (James DSP, etc.)
         currentAudioSessionId = player.audioSessionId
@@ -414,8 +419,6 @@ class Media3MusicService : MediaLibraryService() {
 
                     mediaItem?.let { item ->
                         val videoId = item.mediaId
-                        val title = item.mediaMetadata.title?.toString()
-                        val artist = item.mediaMetadata.artist?.toString()
 
                         if (!videoId.isNullOrBlank()) {
                             // Desktop radio semantics: only a genuinely NEW queue seeds a
@@ -426,20 +429,6 @@ class Media3MusicService : MediaLibraryService() {
                                 onQueueContextChanged(videoId)
                             } else {
                                 maybeExtendRadio()
-                            }
-                        }
-
-                        if (!videoId.isNullOrBlank() && !title.isNullOrBlank() && !artist.isNullOrBlank()) {
-                            lifecycleScope.launch(Dispatchers.IO) {
-                                try {
-                                    Log.d(TAG, "Pre-warming lyrics cache in background for: $videoId - \"$title\"")
-                                    val helper =
-                                        io.github.aedev.flow.data.lyrics
-                                            .LyricsHelper(this@Media3MusicService)
-                                    helper.getLyrics(videoId, title, artist, 180, null, this@Media3MusicService)
-                                } catch (e: Exception) {
-                                    Log.w(TAG, "Lyrics pre-warm background task encountered error: ${e.message}")
-                                }
                             }
                         }
                     }

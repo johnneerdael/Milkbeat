@@ -40,7 +40,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import org.schabi.newpipe.extractor.stream.AudioStream
 import java.util.concurrent.ExecutionException
-import kotlin.math.pow
 
 @OptIn(UnstableApi::class)
 object EnhancedMusicPlayerManager {
@@ -355,7 +354,7 @@ object EnhancedMusicPlayerManager {
      */
     fun streamUri(track: MusicTrack): Uri =
         LocalMediaIds.audioUri(track.videoId)
-            ?: MusicVideoItems.uri(track, withPicture = carriesPicture(track))
+            ?: MusicVideoItems.uri(track, withPicture = track.videoId !in videoUnavailableIds)
 
     /**
      * Shows or hides music videos' pictures. Hiding turns the playing track's picture off while its sound
@@ -579,22 +578,8 @@ object EnhancedMusicPlayerManager {
         }
     }
 
-    private suspend fun restoreAudioSettings() {
-        try {
-            val settings = audioSettingsPersistence?.settingsFlow?.first() ?: return
-
-            Log.d("EnhancedMusicPlayer", "Restoring audio settings: $settings")
-
-            _playbackSpeed.value = settings.speed
-
-            player?.let { p ->
-                val pitch = 2.0.pow(settings.pitch.toDouble() / 12.0).toFloat()
-                p.playbackParameters = PlaybackParameters(settings.speed, pitch)
-            }
-        } catch (e: Exception) {
-            Log.e("EnhancedMusicPlayer", "Failed to restore audio settings", e)
-        }
-    }
+    private suspend fun restoreAudioSettings() =
+        restoreMusicAudioSettings(audioSettingsPersistence, { player }) { speed -> _playbackSpeed.value = speed }
 
     fun isPlaying(): Boolean = playbackState.value.isPlaying
 

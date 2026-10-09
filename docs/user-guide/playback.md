@@ -39,7 +39,9 @@ The view button steps through three views while the audio carries on. Milkbeat r
 
     The accepted audio provider's best available playback thumbnail fills the screen, even when Spotify or SoundCloud supplies the catalog entry. Missing or failed images use the original catalog cover. The title, artist, queue identity and playing recording stay the same. Local files and providers without playback artwork retain their cover. Loading the thumbnail does not start video playback.
 
-YouTube matching searches recorded videos for every track while you listen, whichever view you use, but the picture only loads when you select the video view. A confirmed YouTube match can offer video even for Spotify, SoundCloud or Beatport tracks. A track without a usable video skips from the visualizer straight to the artwork; with the video view chosen, such a track shows the visualizer instead. With visualizations turned off, the button moves between video and artwork. A video that cannot play falls back to audio with the visuals.
+YouTube matching finds recorded videos when needed and reuses validated saved matches, whichever view you use, but the picture only loads when you select the video view. A confirmed YouTube match can offer video even for Spotify, SoundCloud or Beatport tracks. A track without a usable video skips from the visualizer straight to the artwork; with the video view chosen, such a track shows the visualizer instead. With visualizations turned off, the button moves between video and artwork. A video that cannot play falls back to audio with the visuals.
+
+Compatible API 7 providers prepare audio and optional video rendition metadata together. Selecting video changes the existing presentation’s track selection without replacing the media item or seeking the audio. Metadata preparation does not enable video playback. Older video providers remain supported; an unavailable optional picture is retried as audio before moving to another provider. Lyrics are not fetched or displayed.
 
 ## The queue
 
@@ -78,12 +80,10 @@ Preparation reduces the work at each transition but cannot guarantee gapless pla
 
 ## Buffering and recovery
 
-Streamed music loads well ahead of the playing position: Milkbeat keeps loading until about 16 MB is buffered (roughly 13 minutes of typical audio, usually the whole song) and loads more once less than 30 seconds remain. A music video's picture shares that buffer, and a slow network or low memory keeps it shorter. If a stream fails, Milkbeat asks the audio provider for a fresh link to the same recording and resumes where it stopped.
+Streamed music loads well ahead of the playing position: Milkbeat keeps loading until about 16 MB is buffered (roughly 13 minutes of typical audio, usually the whole song) and loads more once less than 30 seconds remain. A music video's picture shares that buffer, and a slow network or low memory keeps it shorter. If a stream fails, Milkbeat asks its provider for a fresh link to the same recording and resumes where it stopped. A second media failure within a minute tries the next configured audio provider for that track. Audio-only providers remain eligible, so a failed YouTube video can fall back to the original SoundCloud audio. This does not change your configured provider order.
 
 If normal decoded TV audio (PCM) stops advancing for about five seconds while the player still reports playback, Milkbeat freezes the displayed progress and reconnects the output from the last position where audio was advancing, keeping the same track and queue. It tries twice before leaving the track paused with **Audio output stopped. Press Play to retry.** Pause, seeking, choosing another track or Stop cancels a pending restart. Quiet passages do not trigger recovery, though a recovery may repeat a short stretch of the song. Hardware-offloaded audio and encoded HDMI passthrough are outside this check.
 
 ## Encrypted provider audio
 
 Compatible plugins can supply Widevine-protected audio through the device's DRM implementation. Milkbeat fetches licenses separately from the audio and only from destinations the plugin is allowed to reach. Availability depends on the account, the recording and the device. SoundCloud previews are never treated as full tracks. The offline downloader supports clear progressive audio only; HLS, DRM and native SABR streams cannot be downloaded.
-
-The [video-matching preview](preview-testing.md) runs beside the stable app for testing upcoming playback changes.

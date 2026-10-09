@@ -90,18 +90,36 @@ class MusicPlaybackVideoTest {
     private fun capability(ids: Set<String>) = manager.setVideoCapablePlaybackIds(ids)
 
     @Test
+    fun `switching picture repeatedly never replaces or seeks the playing audio`() {
+        capability(setOf(track.videoId))
+        manager.acquireVideoSurface()
+        val original = items.single()
+        repeat(3) {
+            manager.setVideoMode(true)
+            assertThat(selection.disabledTrackTypes).doesNotContain(C.TRACK_TYPE_VIDEO)
+            manager.setVideoMode(false)
+            assertThat(selection.disabledTrackTypes).contains(C.TRACK_TYPE_VIDEO)
+        }
+        assertThat(items.single()).isSameInstanceAs(original)
+        verify(exactly = 0) { player.replaceMediaItem(any(), any()) }
+        verify(exactly = 0) { player.seekTo(any<Int>(), any<Long>()) }
+        verify(exactly = 0) { player.prepare() }
+        verify(exactly = 0) { player.stop() }
+    }
+
+    @Test
     fun `confirmed capability keeps initial playback audio-only until the viewer switches`() {
         capability(setOf(track.videoId))
 
         assertThat(manager.videoAvailable.value).isTrue()
-        assertThat(manager.streamUri(track).scheme).isEqualTo(MusicVideoItems.SONG_SCHEME)
+        assertThat(manager.streamUri(track).scheme).isEqualTo(MusicVideoItems.SCHEME)
         verify(exactly = 0) { player.replaceMediaItem(any(), any()) }
         manager.setVideoMode(true)
         val switched = items.single()
         assertThat(switched.localConfiguration!!.uri.scheme).isEqualTo(MusicVideoItems.SCHEME)
         assertThat(switched.mediaId).isEqualTo(track.videoId)
         assertThat(MusicVideoItems.descriptor(switched.localConfiguration!!.uri)).isEqualTo(descriptor)
-        verify(exactly = 1) { player.seekTo(0, 12_345L) }
+        verify(exactly = 0) { player.seekTo(0, 12_345L) }
     }
 
     @Test
@@ -111,7 +129,7 @@ class MusicPlaybackVideoTest {
         assertThat(manager.videoAvailable.value).isFalse()
         manager.setVideoMode(true)
 
-        assertThat(manager.streamUri(track).scheme).isEqualTo(MusicVideoItems.SONG_SCHEME)
+        assertThat(manager.streamUri(track).scheme).isEqualTo(MusicVideoItems.SCHEME)
         verify(exactly = 0) { player.replaceMediaItem(any(), any()) }
     }
 
@@ -157,13 +175,13 @@ class MusicPlaybackVideoTest {
         assertThat(MusicVideoItems.descriptor(recovered.localConfiguration!!.uri)).isEqualTo(descriptor)
         assertThat(manager.videoAvailable.value).isFalse()
         assertThat(manager.videoShown.value).isFalse()
-        verify(exactly = 2) { player.seekTo(0, 12_345L) }
+        verify(exactly = 1) { player.seekTo(0, 12_345L) }
         verify(exactly = 1) { player.prepare() }
         verify(exactly = 1) { player.play() }
     }
 
     @Test
-    fun `an explicit Video selection rebinds newly confirmed audio even when Video was remembered`() {
+    fun `an explicit Video selection reuses the prepared item even when Video was remembered`() {
         manager.setVideoMode(true)
         capability(setOf(track.videoId))
         assertThat(
@@ -171,7 +189,7 @@ class MusicPlaybackVideoTest {
                 .single()
                 .localConfiguration!!
                 .uri.scheme,
-        ).isEqualTo(MusicVideoItems.SONG_SCHEME)
+        ).isEqualTo(MusicVideoItems.SCHEME)
 
         manager.setVideoMode(true)
         manager.setVideoMode(true)
@@ -182,8 +200,8 @@ class MusicPlaybackVideoTest {
                 .localConfiguration!!
                 .uri.scheme,
         ).isEqualTo(MusicVideoItems.SCHEME)
-        verify(exactly = 1) { player.replaceMediaItem(0, any()) }
-        verify(exactly = 1) { player.seekTo(0, 12_345L) }
+        verify(exactly = 0) { player.replaceMediaItem(0, any()) }
+        verify(exactly = 0) { player.seekTo(0, 12_345L) }
     }
 
     @Test

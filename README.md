@@ -178,12 +178,12 @@ play/pause, next, repeat, like, the view button and the queue.
 - **The view button** steps through the visualizer, the matched music video (up to the TV's physical
   resolution, capped at 2160p, in a hardware-decoded codec) and the artwork. Milkbeat remembers your choice; video only loads when
   you pick it.
+- **Prepared video playback:** API 7 providers can supply audio and optional picture metadata together. Switching views selects the video track in the existing Media3 presentation; it does not replace or seek the playing audio. Lyrics are not fetched or displayed.
 - **The queue** shows what is coming. Every queue continues as a radio; press Right on a track to
   reach the radio presets and switch the mix without losing your own tracks.
 - **Queue preparation** matches the remaining queue one track at a time in playback order and
   caches matches.
-- **Recovery:** about 16 MB of a stream buffers ahead, failed links are renewed for the same
-  recording, and decoded PCM output that stalls for five seconds is reconnected up to twice.
+- **Recovery:** about 16 MB of a stream buffers ahead. Failed links get one provider refresh; repeated media failures try the next configured audio provider for that track. Decoded PCM output that stalls for five seconds is reconnected up to twice.
 
 [Playback, queue and radio](https://johnneerdael.github.io/Milkbeat/playback/).
 

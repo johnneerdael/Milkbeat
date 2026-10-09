@@ -1,6 +1,6 @@
 # Working with Milkbeat as an AI agent
 
-Milkbeat (application id `nl.neerdael.milkbeat`; Kotlin sources and namespace stay `io.github.aedev.flow`) is an Android TV music app forked from [Flow](https://github.com/A-EDev/Flow), an Android music/video app written in Kotlin with Jetpack Compose, Hilt, and Media3/ExoPlayer. It plays YouTube content via a native InnerTube client with a NewPipe-based fallback extraction path, supports local media playback, offline downloads, casting, lyrics, a device-to-device sync feature, and an on-device recommendation engine (FlowNeuroEngine). It follows Material 3 design guidelines closely.
+Milkbeat (application id `nl.neerdael.milkbeat`; Kotlin sources and namespace stay `io.github.aedev.flow`) is an Android TV music app forked from [Flow](https://github.com/A-EDev/Flow), an Android music/video app written in Kotlin with Jetpack Compose, Hilt, and Media3/ExoPlayer. It plays YouTube content via a native InnerTube client with a NewPipe-based fallback extraction path, supports local media playback, offline downloads, casting, a device-to-device sync feature, and an on-device recommendation engine (FlowNeuroEngine). It follows Material 3 design guidelines closely.
 
 Product flavors: `github` (default, in-app updater enabled) and `foss` (no updater). Always use flavor-prefixed Gradle tasks — e.g. `assembleGithubDebug`, `compileFossDebugKotlin` — never bare `assembleDebug`/`compileDebugKotlin`.
 
@@ -307,8 +307,7 @@ hard constraints, not suggestions.
 ### Frame discipline — nothing animates that the user cannot see
 
 1. **The invisible-animation rule.** Several player surfaces deliberately stay composed while
-   hidden (the full player sheet is kept warm behind the mini player; the lyrics panel is
-   retained after first open; the mini bar stays composed under the expanded player). Anything
+   hidden (the full player sheet is kept warm behind the mini player; the mini bar stays composed under the expanded player). Anything
    animating inside a hidden layer burns a full frame budget at 60–120 Hz for entire listening
    sessions — this exact pattern caused a 30%-battery-in-90-minutes overheating regression.
    EVERY continuous animation MUST be gated on its own layer's visibility and pause when the
@@ -708,6 +707,7 @@ revision must pass the configured ktlint rules.
   protobuf classes from pinned upstream schemas. Generation uses a JVM module because protobuf
   Gradle 0.9.5 does not support AGP 9.3's Android library DSL. Validate this module with
   `./gradlew :media3-sabr:testDebugUnitTest :media3-sabr:assembleDebug`.
+- Plugin API 7 adds optional `ResolveAudioRequest.prepareVideo` and `AudioStream.audioFormat`. Keep picture metadata preparation separate from rendered video and hard picture requirements. Music toggles change native track selection only; never replace the playing media item or seek its audio. Direct prepared A/V uses the existing DASH adapters and bound permission-checked GET transport. Lyrics fetchers and consumers are removed; do not reintroduce lyrics network calls.
 - Plugin API 6 adds optional SABR presentation data and audio playback artwork. Keep SABR's
   unsigned last-modified values as strings on the JavaScript wire, then preserve the complete
   itag/last-modified/xTags tuple in Media3 format metadata. Do not interpret a SABR endpoint as
