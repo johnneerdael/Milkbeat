@@ -70,6 +70,19 @@ internal class PlaybackOutputTrace(
         )
     }
 
+    override fun onRendererReadyChanged(
+        eventTime: AnalyticsListener.EventTime,
+        rendererIndex: Int,
+        trackType: Int,
+        isReady: Boolean,
+    ) = emit(
+        TraceEvent.RENDERER_READY,
+        eventTime,
+        TraceField.RENDERER_INDEX to rendererIndex.toLong(),
+        TraceField.TRACK_TYPE to trackType.toLong(),
+        TraceField.READY to if (isReady) 1L else 0L,
+    )
+
     override fun onPlaybackStateChanged(
         eventTime: AnalyticsListener.EventTime,
         state: Int,

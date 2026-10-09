@@ -69,6 +69,18 @@ class PlaybackOutputTraceTest {
         assertThat(lines.joinToString()).doesNotContain("private-title")
     }
 
+    @Test
+    fun `renderer readiness identifies the stalled type alongside continuing PCM output`() {
+        val lines = mutableListOf<String>()
+        val logger = PlaybackTraceLogger({ 1_050L }, lines::add)
+        logger.setEnabled(true)
+        val listener = PlaybackOutputTrace(probe { AudioOutputSample(7L, 48_000L) }, logger)
+        listener.onRendererReadyChanged(time, 0, androidx.media3.common.C.TRACK_TYPE_VIDEO, false)
+        assertThat(lines[1]).contains("event=renderer_ready")
+        assertThat(lines[1]).contains("track_type=2 ready=0")
+        assertThat(lines[1]).contains("generation=7 head_frames=48000")
+    }
+
     private fun probe(read: () -> AudioOutputSample?): AudioOutputProbe =
         object : AudioOutputProbe {
             override val changes = MutableStateFlow(0L)
