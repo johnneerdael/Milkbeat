@@ -22,11 +22,14 @@ import androidx.media3.exoplayer.source.SinglePeriodTimeline
 import com.google.common.truth.Truth.assertThat
 import io.mockk.every
 import io.mockk.mockk
+import nl.neerdael.milkbeat.sabr.manifest.SabrManifest
+import nl.neerdael.milkbeat.sabr.protos.videostreaming.StreamerContext
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.io.IOException
+import nl.neerdael.milkbeat.sabr.manifest.Period as SabrPeriod
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28], application = Application::class)
@@ -173,6 +176,59 @@ class MusicVideoJoinGateTest {
     }
 
     @Test
+    fun `period-relative media chunks map into a nonzero live-window offset`() {
+        val f = VideoJoinFixture()
+        f.offsetWindow(600_000)
+        f.gate.begin()
+        f.load(610_000, 611_999)
+        assertThat(f.gate.ready.value).isFalse()
+        f.load(611_999, 614_000)
+        assertThat(f.gate.ready.value).isTrue()
+    }
+
+    @Test
+    fun `partial coverage follows the same live window when its offset moves`() {
+        val f = VideoJoinFixture()
+        f.offsetWindow(600_000)
+        f.gate.begin()
+        f.load(610_000, 611_500)
+        assertThat(f.gate.ready.value).isFalse()
+        f.slideWindow(601_000)
+        f.positionMs = 9_000
+        f.events()
+        f.load(611_500, 613_500)
+        assertThat(f.gate.ready.value).isTrue()
+    }
+
+    @Test
+    fun `SABR dispatcher offsets are removed before mapping the live window`() {
+        for (periodStart in listOf(0L, 120_000L)) {
+            val manifest =
+                SabrManifest(
+                    C.TIME_UNSET,
+                    C.TIME_UNSET,
+                    1_500,
+                    true,
+                    C.TIME_UNSET,
+                    C.TIME_UNSET,
+                    C.TIME_UNSET,
+                    C.TIME_UNSET,
+                    listOf(SabrPeriod("live", periodStart, emptyList())),
+                    "https://example.invalid/sabr",
+                    "",
+                    null,
+                    "live",
+                    StreamerContext.ClientInfo.getDefaultInstance(),
+                )
+            val f = VideoJoinFixture()
+            f.offsetWindow(600_000, manifest)
+            f.gate.begin()
+            f.load(periodStart + 610_000, periodStart + 614_000)
+            assertThat(f.gate.ready.value).isTrue()
+        }
+    }
+
+    @Test
     fun `local muxed sources keep their normal video startup behavior`() {
         val f = VideoJoinFixture("file:///storage/music.mp4")
         f.gate.begin()
@@ -236,6 +292,18 @@ internal class VideoJoinFixture(
         timeline = timeline(timeline.getWindow(0, Timeline.Window()).uid)
     }
 
+    fun offsetWindow(
+        offsetMs: Long,
+        presentation: SabrManifest? = null,
+    ) {
+        timeline = timeline(offsetMs = offsetMs, presentation = presentation)
+    }
+
+    fun slideWindow(offsetMs: Long) {
+        val window = timeline.getWindow(0, Timeline.Window())
+        timeline = timeline(window.uid, offsetMs, window.manifest as? SabrManifest, timeline.getUidOfPeriod(0))
+    }
+
     fun events() = gate.onEvents(player, Player.Events(FlagSet.Builder().add(Player.EVENT_TRACKS_CHANGED).build()))
 
     fun event(): AnalyticsListener.EventTime {
@@ -262,16 +330,33 @@ internal class VideoJoinFixture(
         gate.onLoadCompleted(event, loadInfo, mediaLoad(start, end, trackType, dataType, format))
     }
 
-    private fun timeline(windowUid: Any = Any()): Timeline {
-        val periodUid = Any()
-        return object : ForwardingTimeline(SinglePeriodTimeline(100_000_000, true, false, false, null, item)) {
+    private fun timeline(
+        windowUid: Any = Any(),
+        offsetMs: Long = 0,
+        presentation: SabrManifest? = null,
+        periodUid: Any = Any(),
+    ): Timeline =
+        object : ForwardingTimeline(
+            SinglePeriodTimeline(100_000_000 + offsetMs * 1_000, 100_000_000, offsetMs * 1_000, 0, true, false, false, null, item),
+        ) {
             override fun getUidOfPeriod(periodIndex: Int): Any = periodUid
+
+            override fun getIndexOfPeriod(uid: Any): Int = if (uid == periodUid) 0 else C.INDEX_UNSET
+
+            override fun getPeriod(
+                periodIndex: Int,
+                period: Timeline.Period,
+                setIds: Boolean,
+            ): Timeline.Period = super.getPeriod(periodIndex, period, setIds).apply { if (setIds) uid = periodUid }
 
             override fun getWindow(
                 windowIndex: Int,
                 window: Timeline.Window,
                 defaultPositionProjectionUs: Long,
-            ): Timeline.Window = super.getWindow(windowIndex, window, defaultPositionProjectionUs).apply { uid = windowUid }
+            ): Timeline.Window =
+                super.getWindow(windowIndex, window, defaultPositionProjectionUs).apply {
+                    uid = windowUid
+                    manifest = presentation
+                }
         }
-    }
 }

@@ -16,6 +16,7 @@ import io.github.aedev.flow.player.diagnostics.TraceEvent
 import io.github.aedev.flow.player.diagnostics.TraceField
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import nl.neerdael.milkbeat.sabr.manifest.SabrManifest
 import java.io.IOException
 
 /** The first visible picture joins only after current-source video media covers the audio clock. */
@@ -40,6 +41,7 @@ internal class MusicVideoJoinGate :
     private var requested = false
     private var videoStartMs = C.TIME_UNSET
     private var videoEndMs = C.TIME_UNSET
+    private var videoClockOffsetMs = C.TIME_UNSET
     private var audioReadyWindowUid: Any? = null
 
     val awaitingAudio: Boolean
@@ -142,9 +144,14 @@ internal class MusicVideoJoinGate :
         mediaLoadData: MediaLoadData,
     ) {
         if (!requested || prepared.value || !isCurrentVideo(eventTime, mediaLoadData)) return
-        val start = mediaLoadData.mediaStartTimeMs
-        val end = mediaLoadData.mediaEndTimeMs
-        if (start == C.TIME_UNSET || end == C.TIME_UNSET || end <= start) return
+        val mediaStart = mediaLoadData.mediaStartTimeMs
+        val mediaEnd = mediaLoadData.mediaEndTimeMs
+        if (mediaStart == C.TIME_UNSET || mediaEnd == C.TIME_UNSET || mediaEnd <= mediaStart) return
+        val periodUid = eventTime.mediaPeriodId?.periodUid ?: return
+        val offset = mediaTimeOffsetMs(eventTime.timeline, periodUid) ?: return
+        rebaseCoverage(offset)
+        val start = mediaStart + offset
+        val end = mediaEnd + offset
         if (videoEndMs == C.TIME_UNSET || start > videoEndMs || end < videoStartMs) {
             videoStartMs = start
             videoEndMs = end
@@ -225,6 +232,9 @@ internal class MusicVideoJoinGate :
         ) {
             return
         }
+        val periodUid = source?.periodUid ?: return
+        val offset = mediaTimeOffsetMs(current.currentTimeline, periodUid) ?: return
+        rebaseCoverage(offset)
         val position = current.currentPosition
         val remaining = (current.duration - position).takeIf { current.duration > 0 && it > 0 }
         val required = minOf(INITIAL_VIDEO_BUFFER_MS, remaining ?: INITIAL_VIDEO_BUFFER_MS)
@@ -240,6 +250,36 @@ internal class MusicVideoJoinGate :
             waiting = false
             prepared.value = true
         }
+    }
+
+    private fun mediaTimeOffsetMs(
+        timeline: Timeline,
+        periodUid: Any,
+    ): Long? {
+        val periodIndex = timeline.getIndexOfPeriod(periodUid)
+        if (periodIndex == C.INDEX_UNSET) return null
+        val period = timeline.getPeriodByUid(periodUid, Timeline.Period())
+        val window = timeline.getWindow(period.windowIndex, Timeline.Window())
+        val manifest = window.manifest as? SabrManifest
+        val dispatcherOffset =
+            if (manifest == null) {
+                0L
+            } else {
+                val index = periodIndex - window.firstPeriodIndex
+                if (index !in 0 until manifest.periodCount) return null
+                manifest.getPeriod(index).startMs
+            }
+        // SABR's dispatcher adds period.startMs; DASH/HLS media events stay period-relative.
+        return period.positionInWindowMs - dispatcherOffset
+    }
+
+    private fun rebaseCoverage(offsetMs: Long) {
+        if (videoEndMs != C.TIME_UNSET && videoClockOffsetMs != C.TIME_UNSET) {
+            val delta = offsetMs - videoClockOffsetMs
+            videoStartMs += delta
+            videoEndMs += delta
+        }
+        videoClockOffsetMs = offsetMs
     }
 
     private companion object {
