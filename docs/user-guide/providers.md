@@ -76,6 +76,7 @@ its retired prerelease codes stay pinned to their original packages.
 | **494** | YouTube Music |
 | **089** | SoundCloud |
 | **932** | YouTube Video |
+| **734** | Deezer |
 <!-- /plugin-codes -->
 
 Stable builds prefer the publisher's live catalog and fall back to the bundled one offline, so newly published codes work without an app update. The separate [Preview app](preview-testing.md) pins its codes to its own test catalog. The original codes **102** (Beatport), **772** (Spotify) and **416** (YouTube Music) still work. An unknown code reports an error; try the plugin's full URL or update Milkbeat.
