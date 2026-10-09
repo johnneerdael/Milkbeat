@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.emptyPreferences
 import io.github.aedev.flow.data.music.model.MusicTrack
 import io.github.aedev.flow.plugin.playback.PluginAudio
 import io.github.aedev.flow.plugin.playback.PluginVideo
+import io.github.aedev.flow.plugin.runtime.PluginCallException
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
@@ -18,8 +19,11 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import nl.neerdael.milkbeat.plugin.PluginError
+import nl.neerdael.milkbeat.plugin.PluginErrorCode
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -94,6 +98,47 @@ class AccountPlayHistoryReportingTest {
             runCurrent()
             coVerify(exactly = 1) { audio.reportListen(any(), 60_000, 600_000, 60_000, true, null) }
         }
+
+    @Test
+    fun `transiently failed final report is retried while progress and permanent failures are not`() =
+        runTest {
+            var finalAttempts = 0
+            coEvery { audio.reportListen(any(), 35_000, 600_000, 365_000, false, "final") } coAnswers {
+                if (++finalAttempts == 1) throw networkFailure(PluginErrorCode.NETWORK)
+            }
+            coEvery { audio.reportListen(any(), 30_000, 600_000, 30_000, true, "progress") } throws networkFailure(PluginErrorCode.NETWORK)
+            coEvery { audio.reportListen(any(), 40_000, 600_000, 40_000, false, "refused") } throws
+                networkFailure(PluginErrorCode.UNSUPPORTED)
+            val history = AccountPlayHistory(MemoryPreferences(), audio, video, backgroundScope)
+            history.onListened(track, 30_000, 600_000, 30_000, true, "progress")
+            history.onListened(track, 35_000, 600_000, 365_000, playbackSessionId = "final")
+            history.onListened(track, 40_000, 600_000, 40_000, playbackSessionId = "refused")
+            runCurrent()
+            coVerify(exactly = 1) { audio.reportListen(any(), 35_000, 600_000, 365_000, false, "final") }
+            coVerify(exactly = 0) { audio.reportListen(any(), 40_000, 600_000, 40_000, false, "refused") }
+            advanceTimeBy(5_001)
+            runCurrent()
+            coVerify(exactly = 2) { audio.reportListen(any(), 35_000, 600_000, 365_000, false, "final") }
+            coVerify(exactly = 1) { audio.reportListen(any(), 30_000, 600_000, 30_000, true, "progress") }
+            advanceTimeBy(60_000)
+            runCurrent()
+            coVerify(exactly = 1) { audio.reportListen(any(), 40_000, 600_000, 40_000, false, "refused") }
+        }
+
+    @Test
+    fun `switching history off stops a pending final retry`() =
+        runTest {
+            coEvery { audio.reportListen(any(), 35_000, 600_000, 365_000, false, null) } throws networkFailure(PluginErrorCode.TIMEOUT)
+            val history = AccountPlayHistory(MemoryPreferences(), audio, video, backgroundScope)
+            history.onListened(track, 35_000, 600_000, 365_000)
+            runCurrent()
+            history.setEnabled(false)
+            advanceTimeBy(70_000)
+            runCurrent()
+            coVerify(exactly = 1) { audio.reportListen(any(), 35_000, 600_000, 365_000, false, null) }
+        }
+
+    private fun networkFailure(code: PluginErrorCode) = PluginCallException("provider", PluginError(code, "fixture"))
 
     private class MemoryPreferences : DataStore<Preferences> {
         override val data = MutableStateFlow(emptyPreferences())

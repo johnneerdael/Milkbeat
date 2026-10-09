@@ -17,6 +17,7 @@ import io.github.aedev.flow.player.diagnostics.TraceField
 import io.github.aedev.flow.plugin.playback.PluginAudio
 import io.github.aedev.flow.plugin.playback.PluginVideo
 import io.github.aedev.flow.plugin.runtime.PluginCallException
+import io.github.aedev.flow.plugin.runtime.retryingTransient
 import io.github.aedev.flow.utils.PerformanceDispatcher
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -89,14 +90,23 @@ class AccountPlayHistory
                             PlaybackTrace.event(TraceEvent.HISTORY_DISABLED, category = TraceCategory.HISTORY)
                             continue
                         }
-                        pluginAudio.reportListen(
-                            MusicVideoItems.descriptor(listen.track),
-                            listen.playedMs,
-                            listen.durationMs.takeIf { it > 0 },
-                            listen.positionMs,
-                            listen.progress,
-                            listen.playbackSessionId,
-                        )
+                        val send: suspend () -> Unit = {
+                            pluginAudio.reportListen(
+                                MusicVideoItems.descriptor(listen.track),
+                                listen.playedMs,
+                                listen.durationMs.takeIf { it > 0 },
+                                listen.positionMs,
+                                listen.progress,
+                                listen.playbackSessionId,
+                            )
+                        }
+                        // A dropped cadence sample is recovered by the next cumulative one; nothing
+                        // follows a final report, so it waits out transient failures in queue order.
+                        if (listen.progress) {
+                            send()
+                        } else {
+                            retryingTransient(beforeRetry = { check(enabled.first()) { "History was switched off" } }) { send() }
+                        }
                         Log.d(TAG, "Play of ${listen.track.videoId} reported")
                     } catch (e: PluginCallException) {
                         Log.w(TAG, "Play of ${listen.track.videoId} not reported: ${e.error.message}")

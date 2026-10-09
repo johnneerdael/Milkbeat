@@ -104,3 +104,5 @@ A listen qualifies after 30 seconds, or half of a shorter track. Skipped section
 listened time. Signed-in YouTube Video uses these updates for your account history and recommendations;
 anonymous playback does not update an account. Older providers receive a report when the listen ends.
 Reporting reuses the recording that actually played and does not delay startup by resolving it again.
+If the final update of a listen fails because of a network problem, a timeout or rate limiting, Milkbeat
+tries it again up to three times over about a minute, while the app keeps running.
