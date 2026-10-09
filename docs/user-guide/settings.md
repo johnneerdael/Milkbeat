@@ -12,7 +12,7 @@ Settings has five categories on the left: **Plugins**, **Music folders**, **Play
 | **Video** | The plugin that supplies videos, or None |
 | **Installed** | Each plugin with its capabilities (metadata, audio, video) and version. Select one for its [details](providers.md#plugin-details): account, sign-in, play reporting, playlist indexing, private playlists and Remove |
 | **Update plugins automatically** | On by default: checks at start and every 6 hours and installs updates; updates asking for new permissions wait for review |
-| **Update all plugins** | Checks and installs updates now |
+| **Update all plugins** | Checks and installs updates now. An update that needs a newer Milkbeat waits; in the GitHub build its row opens [About](#about) to update the app. [Updates that need a newer Milkbeat](providers.md#updates-that-need-a-newer-milkbeat) |
 | **Add a plugin** | A three-digit code or plugin URL. [Install a plugin](providers.md#install-a-plugin) |
 
 There is no Metadata option: each catalog you can use has its own [music tab](library.md#a-tab-per-music-service).

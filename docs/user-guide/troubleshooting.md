@@ -94,6 +94,10 @@ The device needs OpenGL ES 3.0. For engine-level symptoms, see ProjectM TV's [tr
 
 App updates do not update plugins. With **Update plugins automatically** on, Milkbeat checks at start and every six hours; an update that asks for new permissions waits until you review it in Settings → Plugins. Select **Update all plugins** to check at once, or enter the plugin's code or link again. An update must keep its signing author and cannot be older than the installed version. Sign-ins are kept separately from the plugin code.
 
+## A plugin needs a newer version of Milkbeat
+
+The plugin was built for a newer plugin API than this Milkbeat supports. Milkbeat refuses the plugin before installing anything and keeps the version you have. Update Milkbeat first: in the GitHub build, select **Update Milkbeat** or the waiting update's row, or open [Settings → About](settings.md#about). Install the FOSS build's update through its store. Then enter the plugin's code again. A waiting plugin update installs on the next check after the app update. [Updates that need a newer Milkbeat](providers.md#updates-that-need-a-newer-milkbeat)
+
 ## The sidebar highlights the wrong tab or ignores a press
 
 Milkbeat 0.9.55 and earlier could leave Settings on Back from a Plugins page, show a music page with Settings still highlighted, and then ignore sidebar presses until a restart. Update Milkbeat: the highlighted tab now always follows the page on screen, and pressing the tab that owns the page returns to its first page.

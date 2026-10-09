@@ -726,6 +726,13 @@ revision must pass the configured ktlint rules.
   `npm run generate` and `npm run check` in `plugins/sdk/`. Existing clear-stream descriptors remain
   compatible. Provider source/build/signing lives in the separate private plugin repository;
   this repository owns the public SDK, generic host and verified publication catalog.
+- The plugin API compatibility gate: `PluginPackageReader.parseManifest` stays the authoritative
+  refusal (`Reason.INCOMPATIBLE`, carrying the manifest). `PluginInstaller` maps it to
+  `PluginRequiresAppUpdateException`. Optional `PublishedPlugin.apiMin`/`format` (default 1) let
+  `availableUpdates` hold such releases in `PluginUpdatesState.Checked.requiresAppUpdate` and let
+  `pluginDownloadSource` refuse a code before downloading. `PluginAutoUpdater` never downloads,
+  fails or retries them, and announces each once per process. The TV pane opens Settings → About only when
+  `AutoUpdater.isAvailable`. Catalog entries must not gain fields until builds with strict entry decoding are retired.
 - Publication updates keep `plugins/published.json`, the encrypted download catalog in
   `app/src/main/assets/` and `app/src/androidTest/assets/published-plugins.json` aligned. Keep
   the expected provider set in `plugins/scripts/verify-published-plugins.mjs` current. Render

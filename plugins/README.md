@@ -34,6 +34,15 @@ Compiled third-party packages are not kept in git; they download only from Buzzh
 
 Third-party plugin packages are distributed separately from Milkbeat. Milkbeat releases contain the app APKs and checksums; the app's README lists optional third-party downloader codes.
 
+Each `published.json` row may state `apiMin` (the package manifest's `api.min`) and `format` (its
+container format). Both default to 1 when absent, so older rows stay valid. The app neither offers nor
+downloads a release whose `apiMin` or `format` exceeds its own `PLUGIN_API_VERSION` or
+`PLUGIN_FORMAT_VERSION`. It reports that the update needs a newer Milkbeat instead. The publisher should
+write both fields for every release. `verifyPackage(bytes,{apiMin,format})` in
+`scripts/package-verification.mjs` returns the package's values and rejects a row that misstates them.
+Do not add fields to the encrypted download catalog's entries: builds before this change decode those
+entries strictly and would discard the whole live catalog.
+
 Stable publication is `published.json` with `app/src/main/assets/plugin-download-catalog.json`;
 its native acceptance fixture is `app/src/androidTest/assets/published-plugins.json`. Prerelease
 versions are rejected by the stable validator. `published-preview.json` records the signed

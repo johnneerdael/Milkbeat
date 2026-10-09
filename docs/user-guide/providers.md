@@ -87,6 +87,8 @@ Stable builds prefer the publisher's live catalog and fall back to the bundled o
 
 Milkbeat verifies a plugin's signature before offering installation. Buzzheavier sometimes asks to check the download in a browser; Milkbeat continues once the page lets it through.
 
+A plugin built for a newer Milkbeat cannot be installed: Milkbeat reports *needs a newer version of Milkbeat* instead of an install review. When the publisher lists that requirement, Milkbeat says so for a code before downloading anything. The GitHub build adds **Update Milkbeat**, which opens [Settings → About](settings.md#about); update the app there, then add the plugin again. The FOSS build shows only the message, so update Milkbeat through its store.
+
 ## Keep plugins up to date
 
 | Control | What it does |
@@ -95,6 +97,10 @@ Milkbeat verifies a plugin's signature before offering installation. Buzzheavier
 | **Update all plugins** | Checks now and installs every available update. It reads *All plugins are up to date* when there is nothing to install, and lists any update that needs your review as **Update** *plugin* |
 
 An update must come from the same signing author and cannot be older than the installed version. When updates were installed or need review, Milkbeat shows a short notice; reviews wait in Settings → Plugins. Entering a plugin's code or link again still works too. Plugin updates are separate from [app updates](settings.md#about).
+
+### Updates that need a newer Milkbeat
+
+A plugin version can require a newer Milkbeat than the one installed. Milkbeat does not download that version or retry it as a failed update. Instead, **Update all plugins** reads *1 update needs a newer version of Milkbeat* and lists the plugin as **Update** *plugin* with *Update Milkbeat first*. A background check shows a notice once each time Milkbeat starts. In the GitHub build, selecting the row opens [Settings → About](settings.md#about) to update the app. After the app is updated, the next plugin check installs that version as usual. The installed plugin version keeps working in the meantime.
 
 ## Plugin details
 
