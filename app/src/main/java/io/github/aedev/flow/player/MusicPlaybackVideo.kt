@@ -108,7 +108,8 @@ internal fun EnhancedMusicPlayerManager.performOnVideoUnavailable(videoId: Strin
 internal fun EnhancedMusicPlayerManager.applyVideoMode(controller: Player) {
     val track = currentTrackState.value
     musicVideoAvailableState.value = track?.let(::canShowVideo) == true
-    videoShownState.value = showVideo && musicVideoAvailableState.value && track != null && track.videoId in videoItemIds
+    videoShownState.value = showVideo && musicVideoAvailableState.value && track != null &&
+        (track.videoId in videoItemIds || (LocalMediaIds.isLocal(track.videoId) && track.isVideoSong))
     val play = videoShownState.value && videoSurfaces > 0
     val disabled = androidx.media3.common.C.TRACK_TYPE_VIDEO in controller.trackSelectionParameters.disabledTrackTypes
     if (disabled != play) return

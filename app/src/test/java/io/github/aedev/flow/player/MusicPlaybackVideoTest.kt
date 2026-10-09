@@ -95,6 +95,39 @@ class MusicPlaybackVideoTest {
     private fun capability(ids: Set<String>) = manager.setVideoCapablePlaybackIds(ids)
 
     @Test
+    fun `local file and content videos switch picture without remote streaming ids`() {
+        for (address in listOf("file:///storage/movie.mp4", "content://media/external/video/media/42")) {
+            val uri = android.net.Uri.parse(address)
+            val local =
+                track.copy(
+                    videoId =
+                        io.github.aedev.flow.data.localmedia.LocalMediaIds
+                            .of(uri),
+                    isVideoSong = true,
+                )
+            manager.currentTrackState.value = local
+            manager.queueState.value = listOf(local)
+            items.clear()
+            items += manager.buildMediaItem(local)
+            val original = items.single()
+            capability(emptySet())
+            manager.acquireVideoSurface()
+            manager.setVideoMode(true)
+            assertThat(manager.videoAvailable.value).isTrue()
+            assertThat(manager.videoShown.value).isTrue()
+            assertThat(selection.disabledTrackTypes).doesNotContain(C.TRACK_TYPE_VIDEO)
+            assertThat(items.single().localConfiguration!!.uri).isEqualTo(uri)
+            assertThat(manager.videoItemIds).doesNotContain(local.videoId)
+            manager.setVideoMode(false)
+            assertThat(selection.disabledTrackTypes).contains(C.TRACK_TYPE_VIDEO)
+            assertThat(items.single()).isSameInstanceAs(original)
+            manager.releaseVideoSurface()
+        }
+        verify(exactly = 0) { player.replaceMediaItem(any(), any()) }
+        verify(exactly = 0) { player.seekTo(any<Int>(), any<Long>()) }
+    }
+
+    @Test
     fun `audio only HLS cannot offer video from optional picture preparation`() {
         every { player.currentTracks } returns Tracks.EMPTY
         capability(setOf(track.videoId))
