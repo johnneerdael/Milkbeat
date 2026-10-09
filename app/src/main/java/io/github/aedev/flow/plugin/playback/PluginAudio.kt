@@ -33,9 +33,8 @@ private const val EXPIRY_MARGIN_MS = 60_000L
 private const val DEFAULT_LIFETIME_MS = 5 * 60 * 60_000L
 
 /**
- * Plays tracks through the listener's audio plugins in their selected order. Each plugin uses its
- * own id when present, otherwise searches for a match; the next plugin is tried when no suitable
- * recording is found or the recording is unavailable. One resolve serves a music video's sound and picture; it is kept until shortly
+ * Resolves native sources directly and races configured audio providers for Spotify metadata.
+ * Matches still require recording confidence and a validated stream before acceptance. One resolve serves a music video's sound and picture; it is kept until shortly
  * before it expires, and dropped when playback reports it failed, so the plugin is asked for another.
  */
 @Singleton
@@ -88,14 +87,10 @@ class PluginAudio
         internal fun needsQueueMatching(
             track: TrackDescriptor,
             preferredProviderId: String? = null,
-        ): Boolean {
-            val state = registry.state.value
-            val first =
-                (listOfNotNull(preferredProviderId) + state.selection.audio)
-                    .mapNotNull(state::plugin)
-                    .firstOrNull { it.enabled } ?: return false
-            return directAudioTrack(track, first) == null
-        }
+        ): Boolean =
+            audioProviderAttempts(registry.state.value, track, preferredProviderId = preferredProviderId)
+                .firstOrNull()
+                ?.let { it.direct == null } ?: false
 
         internal fun preparationVersion(): Any = streamContext() to cacheGeneration.get()
 
@@ -213,9 +208,11 @@ class PluginAudio
             if (attempts.isEmpty()) {
                 throw PluginCallException("none", PluginError(PluginErrorCode.UNAVAILABLE, "No audio plugin plays ${track.title}"))
             }
-            var last: PluginCallException? = null
-            var lastPictureUnavailable: PictureUnavailable? = null
-            for ((plugin, known) in attempts) {
+
+            suspend fun resolveAttempt(provider: AudioProviderAttempt): ResolvedAudio? {
+                val (plugin, known) = provider
+                var last: PluginCallException? = null
+                var lastPictureUnavailable: PictureUnavailable? = null
                 val matchProgress: (TrackMatchProgress) -> Unit = { phase ->
                     resolutionProgress.update(
                         ticket,
@@ -228,15 +225,15 @@ class PluginAudio
                         plugin.manifest.roles.audio
                             ?.musicVideo == true && plugin.manifest.api.target < 7
                 var playable =
-                    try {
-                        known ?: match(track, plugin.id, strict, strategy = plugin.audioMatchStrategy(), onProgress = matchProgress)
-                            ?: continue
-                    } catch (
-                        error: PluginCallException,
-                    ) {
-                        last = error
-                        continue
-                    }
+                    known
+                        ?: matcher.playbackMatch(
+                            track,
+                            plugin.id,
+                            strict,
+                            strategy = plugin.audioMatchStrategy(),
+                            onProgress = matchProgress,
+                        )
+                        ?: return null
                 for (attempt in 0..1) {
                     val request =
                         ResolveAudioRequest(
@@ -300,22 +297,7 @@ class PluginAudio
                             if (stream.serverAbr != null) receipt else null,
                             if (boundPresentation) acceptedContext else null,
                             if (boundPresentation) SystemClock.elapsedRealtime() + lifetime - EXPIRY_MARGIN_MS else null,
-                        ).also {
-                            pendingFailure?.let { failure ->
-                                if (failures.remove(key, failure)) {
-                                    failureProviders.remove(key)
-                                    failureContexts.remove(key)
-                                }
-                            }
-                            synchronized(resolved) {
-                                if (generation == cacheGeneration.get() &&
-                                    (version == preparationVersion() || (stream.serverAbr != null && ownsNativeSource(it)))
-                                ) {
-                                    resolved[key] = it
-                                    resolvedRevision.update { revision -> revision + 1 }
-                                }
-                            }
-                        }
+                        )
                     } catch (e: PictureUnavailable) {
                         lastPictureUnavailable = e
                         break
@@ -332,7 +314,7 @@ class PluginAudio
                         matcher.invalidate(track, plugin.id)
                         if (attempt != 0) break
                         playable =
-                            match(
+                            matcher.playbackMatch(
                                 track,
                                 plugin.id,
                                 strict,
@@ -351,8 +333,37 @@ class PluginAudio
                         break
                     }
                 }
+                lastPictureUnavailable?.let { throw it }
+                last?.let { throw it }
+                return null
             }
-            lastPictureUnavailable?.let { throw it }
+            val outcome =
+                resolveAudioAttempts(
+                    attempts,
+                    concurrent =
+                        track.isSpotifyMetadata && pinned == null && picture == null &&
+                            attempts.none { it.plugin.id == preferredProviderId && it.direct != null },
+                    resolve = ::resolveAttempt,
+                )
+            outcome.audio?.let { accepted ->
+                pendingFailure?.let { failure ->
+                    if (failures.remove(key, failure)) {
+                        failureProviders.remove(key)
+                        failureContexts.remove(key)
+                    }
+                }
+                synchronized(resolved) {
+                    if (generation == cacheGeneration.get() &&
+                        (version == preparationVersion() || (accepted.stream.serverAbr != null && ownsNativeSource(accepted)))
+                    ) {
+                        resolved[key] = accepted
+                        resolvedRevision.update { revision -> revision + 1 }
+                    }
+                }
+                return accepted
+            }
+            val last = outcome.error
+            outcome.pictureUnavailable?.let { throw it }
             if (strict && last?.error?.code == PluginErrorCode.NOT_FOUND) {
                 throw PluginCallException(
                     last.pluginId,
@@ -362,25 +373,6 @@ class PluginAudio
             if (strict && last == null) throw AudioCatalogMiss()
             throw last ?: PluginCallException("none", PluginError(PluginErrorCode.NOT_FOUND, "No audio plugin found ${track.title}"))
         }
-
-        private suspend fun match(
-            track: TrackDescriptor,
-            pluginId: String,
-            strict: Boolean,
-            excludedId: String? = null,
-            strategy: nl.neerdael.milkbeat.plugin.AudioMatchStrategy,
-            onProgress: (TrackMatchProgress) -> Unit = {},
-        ): TrackDescriptor? =
-            if (strict) {
-                matcher.matchForIndexing(
-                    track,
-                    pluginId,
-                    excludedId,
-                    strategy,
-                )
-            } else {
-                matcher.match(track, pluginId, excludedId, strategy, onProgress)
-            }
 
         suspend fun refreshBound(audio: ResolvedAudio): ResolvedAudio {
             verifyBound(audio)
