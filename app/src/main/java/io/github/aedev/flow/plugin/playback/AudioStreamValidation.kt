@@ -38,6 +38,18 @@ internal fun validateAudioStream(
             ?.takeIf { it.isNotBlank() }
             ?.let { checkedPluginMediaUrl(it, allowedHosts) }
     }
+    stream.cipher?.let { cipher ->
+        val reason =
+            when {
+                cipher.keyBytes() == null -> "The provider's stream key is malformed"
+
+                stream.drm != null || stream.serverAbr != null || stream.audioFormat != null || stream.video != null ||
+                    isHlsStream(stream) -> "Encrypted provider audio must be one progressive audio rendition"
+
+                else -> null
+            }
+        if (reason != null) throw PluginCallException(pluginId, PluginError(PluginErrorCode.UNSUPPORTED, reason))
+    }
     val drm = stream.drm ?: return
     try {
         checkedPluginDrmUrl(drm.licenseUrl, allowedHosts)

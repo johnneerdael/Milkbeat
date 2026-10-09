@@ -219,7 +219,8 @@ overview; [ProjectM TV's guide](https://johnneerdael.github.io/ProjectM-TV/) cov
 - The visualizer needs OpenGL ES 3.0 and is on by default with about 2 GB of RAM or more.
 - Streaming plugins are third-party downloads; what they can play depends on each account,
   subscription and catalog. Matching cannot guarantee the same recording exists elsewhere.
-- HLS, DRM and native SABR streams play but cannot be downloaded for offline use.
+- HLS, DRM, encrypted provider audio (plugin API 8 stream ciphers) and native SABR streams play but
+  cannot be downloaded for offline use.
 
 ## Install
 

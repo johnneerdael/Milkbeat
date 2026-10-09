@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Types and runtime glue for Milkbeat plugins (plugin API v6).",
+  "description": "Types and runtime glue for Milkbeat plugins (plugin API v8).",
   "main": "src/index.ts",
   "types": "src/index.ts",
   "scripts": {

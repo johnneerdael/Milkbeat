@@ -18,6 +18,7 @@ export type AudioQuality = 'AUTO' | 'HIGH' | 'MEDIUM' | 'LOW';
 export type ServerAbrFailure = 'ATTESTATION_REQUIRED' | 'PLAYBACK_CONTEXT_RELOAD' | 'NO_PROGRESS' | 'URL_EXPIRED';
 export type FormatType = 'AUDIO' | 'VIDEO';
 export type AudioDrmScheme = 'WIDEVINE';
+export type AudioCipherScheme = 'BF_CBC_STRIPE';
 export type AudioMatchStrategy = 'SONGS' | 'ALTERNATE_SONGS' | 'VIDEOS';
 export type PluginErrorCode =
   | 'NOT_FOUND'
@@ -33,11 +34,11 @@ export type VideoKind = 'VOD' | 'LIVE' | 'UPCOMING';
 export type DeviceCodeStatus = 'pending' | 'signedIn' | 'expired' | 'denied';
 export type ProviderAccount = ProviderAccountAnonymous | ProviderAccountExpired | ProviderAccountSignedIn;
 export type HttpBodyEncoding = 'UTF8' | 'BASE64';
-export type HashAlgorithm = 'SHA1' | 'SHA256';
+export type HashAlgorithm = 'SHA1' | 'SHA256' | 'MD5';
 export type LogLevel = 'DEBUG' | 'INFO' | 'WARN' | 'ERROR';
 
 /**
- * Plugin API v7, generated from the plugin-api module. Do not edit.
+ * Plugin API v8, generated from the plugin-api module. Do not edit.
  */
 export interface MilkbeatPluginApi {
   manifest: PluginManifest;
@@ -538,6 +539,7 @@ export interface AudioStream {
   artwork?: null | Artwork;
   requireAudioOnlyHls?: boolean;
   audioFormat?: null | MediaFormat;
+  cipher?: null | AudioCipher;
 }
 export interface MediaFormat {
   id: string;
@@ -606,6 +608,10 @@ export interface ServerAbrFormat {
   itag: number;
   lastModified: string;
   xTags?: string | null;
+}
+export interface AudioCipher {
+  scheme: AudioCipherScheme;
+  keyHex: string;
 }
 export interface MatchAudioRequest {
   track: TrackDescriptor;

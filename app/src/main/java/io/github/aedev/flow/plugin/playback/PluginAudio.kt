@@ -415,6 +415,7 @@ class PluginAudio
                 stream.mimeType.substringBefore(';').lowercase() in setOf("application/x-mpegurl", "application/vnd.apple.mpegurl")
             if ((audio.stream.serverAbr != null) != (stream.serverAbr != null) || previousHls != nextHls ||
                 audio.stream.drm?.scheme != stream.drm?.scheme ||
+                audio.stream.cipher?.scheme != stream.cipher?.scheme ||
                 (audio.withPicture && stream.video == null && stream.serverAbr == null && !isHlsStream(stream))
             ) {
                 throw PluginCallException(

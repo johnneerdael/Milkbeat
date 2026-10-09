@@ -38,6 +38,16 @@ internal class BoundPluginAudio(
                     throw IOException("The provider changed this protected recording's rendition")
                 }
             }
+            // The media transport keeps the first key; a later key would decrypt garbage.
+            if (initial.stream.cipher != null &&
+                (
+                    next.pluginId != initial.pluginId || next.track.ref != initial.track.ref ||
+                        next.stream.cipher != initial.stream.cipher || next.stream.renditionId != initial.stream.renditionId ||
+                        next.stream.cacheKey != initial.stream.cacheKey
+                )
+            ) {
+                throw IOException("The provider changed this encrypted recording's rendition")
+            }
             next.also { resolved = it }
         }
 }

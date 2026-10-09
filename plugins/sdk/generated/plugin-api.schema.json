@@ -1,7 +1,7 @@
 {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "title": "MilkbeatPluginApi",
-    "description": "Plugin API v7, generated from the plugin-api module. Do not edit.",
+    "description": "Plugin API v8, generated from the plugin-api module. Do not edit.",
     "type": "object",
     "properties": {
         "manifest": {
@@ -2206,6 +2206,28 @@
             },
             "title": "AssetText"
         },
+        "nl.neerdael.milkbeat.plugin.AudioCipher": {
+            "type": "object",
+            "required": [
+                "scheme",
+                "keyHex"
+            ],
+            "properties": {
+                "scheme": {
+                    "$ref": "#/$defs/nl.neerdael.milkbeat.plugin.AudioCipherScheme"
+                },
+                "keyHex": {
+                    "type": "string"
+                }
+            },
+            "title": "AudioCipher"
+        },
+        "nl.neerdael.milkbeat.plugin.AudioCipherScheme": {
+            "enum": [
+                "BF_CBC_STRIPE"
+            ],
+            "title": "AudioCipherScheme"
+        },
         "nl.neerdael.milkbeat.plugin.AudioDelivery": {
             "enum": [
                 "PROGRESSIVE",
@@ -2471,6 +2493,16 @@
                         },
                         {
                             "$ref": "#/$defs/nl.neerdael.milkbeat.plugin.MediaFormat"
+                        }
+                    ]
+                },
+                "cipher": {
+                    "oneOf": [
+                        {
+                            "type": "null"
+                        },
+                        {
+                            "$ref": "#/$defs/nl.neerdael.milkbeat.plugin.AudioCipher"
                         }
                     ]
                 }
@@ -2819,7 +2851,8 @@
         "nl.neerdael.milkbeat.plugin.HashAlgorithm": {
             "enum": [
                 "SHA1",
-                "SHA256"
+                "SHA256",
+                "MD5"
             ],
             "title": "HashAlgorithm"
         },

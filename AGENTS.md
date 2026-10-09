@@ -873,6 +873,14 @@ run that occupies a physical device, and the resulting diff is thousands of line
   `StartupBenchmark` (`:benchmark:connectedBenchmarkReleaseAndroidTest --no-configuration-cache`)
   to measure.
 
+- Plugin API 8 adds `AudioStream.cipher` (`BF_CBC_STRIPE`, used by Deezer-style providers) and
+  `MD5` in `crypto.hash`. `plugin/playback/PluginStripeCipherDataSource.kt` decrypts with the
+  platform `Blowfish/CBC/NoPadding` cipher above the bound player cache, which keeps encrypted bytes.
+  Every open aligns to a 2048-byte block, since the encrypted stripe depends on absolute block index.
+  The bound media transport keeps the first key, so `BoundPluginAudio` refuses a refresh that changes
+  the key, rendition or cache key. The unbound resolver and the offline downloader reject cipher
+  streams. Focused regressions: `./gradlew :app:testGithubDebugUnitTest --tests '*PluginStripeCipherDataSourceTest'`.
+
 - Plugin API 5 adds `DeviceCodeMethod` and `signIn.begin/poll/confirm/cancel`; keep the generic TV pairing
   controller in `ui/screens/account/DeviceCodeSignInViewModel.kt` and native presentation in
   `ui/tv/screens/account/TvDeviceCodeSignInScreen.kt`. Validate both activation URLs against current
