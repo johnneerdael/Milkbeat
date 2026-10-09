@@ -921,10 +921,16 @@ run that occupies a physical device, and the resulting diff is thousands of line
 
 ### Playback startup diagnostics and source routing
 
-- Native YouTube tracks resolve known IDs without cross-provider matching. SoundCloud and Beatport
-  try their own enabled audio provider before serial fallback. Unbound Spotify metadata races
-  at most four enabled providers through recording-confidence checks and validated stream resolution;
-  cancel losers before storing the winner. Prepared or explicitly bound recordings keep their binding.
+- `plugin/playback/AudioProviderOrder.kt` orders attempts: the playback context's preferred
+  provider, then enabled audio plugins outside `ProviderSelection.audio` ("own tracks only": direct
+  ids only, never matching), then the listener's order. Every track follows that order, including
+  tracks whose source is in it; a provider uses the track's own id when its turn comes. Tracks with
+  no playing source (Spotify metadata) resolve at most four providers concurrently but accept the
+  highest-ranked success only after every higher rank failed, then cancel the rest
+  (`AudioProviderResolution.kt`). Prepared or explicitly bound recordings keep their binding.
+- `plugin/registry/AudioOrderDefaults.kt` keeps Beatport out of the order on first install and
+  removes it once on upgrade, persisting `PluginRegistryState.migrations` in `registry.json` so a
+  listener can re-add it. Plugin updates never re-add a provider the listener left out.
 - `player/diagnostics/PlaybackTrace` is opt-in, default OFF, controlled by per-device DataStore
   `DebugLoggingPreferences` and Settings → Playback. Capture release-compatible INFO events with
   `adb logcat -v threadtime -s MilkbeatTrace:I`. Use fixed enum names and numeric fields only;

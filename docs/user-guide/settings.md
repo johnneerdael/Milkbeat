@@ -8,7 +8,7 @@ Settings has five categories on the left: **Plugins**, **Music folders**, **Play
 
 | Item | What it does |
 | --- | --- |
-| **Audio** | The providers that supply audio and the order Milkbeat tries them. [Set audio priority](providers.md#set-audio-priority) |
+| **Audio** | The order every track tries the audio providers, and which providers play only their own tracks. [Set audio priority](providers.md#set-audio-priority) |
 | **Video** | The plugin that supplies videos, or None |
 | **Installed** | Each plugin with its capabilities (metadata, audio, video) and version. Select one for its [details](providers.md#plugin-details): account, sign-in, play reporting, playlist indexing, private playlists and Remove |
 | **Update plugins automatically** | On by default: checks at start and every 6 hours and installs updates; updates asking for new permissions wait for review |
@@ -18,7 +18,7 @@ Settings has five categories on the left: **Plugins**, **Music folders**, **Play
 There is no Metadata option: each catalog you can use has its own [music tab](library.md#a-tab-per-music-service).
 
 <div class="mb-pair" markdown>
-![Audio provider priority with Move earlier, Move later and the Use for audio switches](images/settings-audio-priority.png)
+![Audio provider priority with Move earlier, Move later and the play other services' tracks switches](images/settings-audio-priority.png)
 ![The Video provider choice: None or YouTube Music](images/settings-video-provider.png)
 </div>
 

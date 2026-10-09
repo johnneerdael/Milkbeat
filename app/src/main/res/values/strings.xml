@@ -462,7 +462,7 @@
     <string name="tv_account_library_overview">Your library</string>
     <string name="tv_plugins_audio">Audio</string>
     <string name="tv_plugins_audio_priority">Audio provider priority</string>
-    <string name="tv_plugins_audio_priority_summary">Search from top to bottom. If a provider cannot find or play a track, try the next one.</string>
+    <string name="tv_plugins_audio_priority_summary">Every track tries these providers from top to bottom, including tracks that come from one of them. If a provider cannot find or play a track, the next one is tried.</string>
     <string name="tv_plugins_audio_priority_item">%1$d. %2$s</string>
     <string name="tv_plugins_audio_order_done">Done</string>
     <string name="playlist_preload_title">Index %1$s playlists</string>
@@ -483,7 +483,9 @@
     <string name="playlist_preload_notification_title">Indexing playlists</string>
     <string name="tv_plugins_move_earlier">Move earlier</string>
     <string name="tv_plugins_move_later">Move later</string>
-    <string name="tv_plugins_audio_use">Use %1$s for audio</string>
+    <string name="tv_plugins_audio_match_others">%1$s: play other services\' tracks</string>
+    <string name="tv_plugins_audio_match_others_on">In the order above for every track</string>
+    <string name="tv_plugins_audio_match_others_off">Plays only its own tracks, before the order above</string>
     <string name="tv_plugins_video">Video</string>
     <string name="tv_plugins_none">None</string>
     <string name="tv_plugins_install_title">Install %1$s %2$s?</string>

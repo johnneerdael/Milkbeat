@@ -53,10 +53,16 @@ internal suspend fun resolveAudioAttempts(
             }
         try {
             val completed = arrayOfNulls<AudioProviderResolution>(attempts.size)
-            repeat(attempts.size) {
+            var decided = 0
+            while (decided < attempts.size) {
                 val (index, result) = results.receive()
-                if (result.audio != null) return@coroutineScope result
                 completed[index] = result
+                // A lower-ranked success waits until every higher-ranked provider has failed.
+                while (decided < attempts.size) {
+                    val next = completed[decided] ?: break
+                    if (next.audio != null) return@coroutineScope next
+                    decided++
+                }
             }
             AudioProviderResolution(
                 error = completed.reversed().firstNotNullOfOrNull { it?.error },

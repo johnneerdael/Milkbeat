@@ -48,9 +48,10 @@ and sign-in method, playback and radio, the visualizer, every Settings page and 
 - **Your own music first.** Local folders, USB drives and SMB 2/3, WebDAV, SFTP and NFS (v3, 4.0,
   4.1) servers, read-only. Their tags build a **Local library** tab of genres, artists, releases,
   playlists, labels and years.
-- **Catalog and audio are separate.** YouTube tracks use their known recording IDs; SoundCloud
-  and Beatport try their own audio first. Spotify races enabled audio providers and plays the first
-  acceptable, playable match. Recording identity is checked, so a
+- **Catalog and audio are separate.** Every track tries your audio providers in your order, even
+  a track from one of them, so YouTube above SoundCloud plays SoundCloud tracks from YouTube first.
+  Providers left out of the order (Beatport by default) play only their own tracks. Spotify searches
+  several providers at once but keeps your order. Recording identity is checked, so a
   cover, another remix or a short excerpt is rejected.
 - **Every queue continues as a radio,** steered by YouTube Music's presets (Discover, Popular,
   Deep cuts, moods and decades) pinned above the queue. Local music seeds a radio too while the
@@ -169,9 +170,11 @@ native SABR playback through Milkbeat's existing Media3 player.
 - **Deezer:** sign in for Home, Flow and your library. Stream availability and FLAC/MP3 quality
   depend on the account and recording. Deezer 0.2.0 needs plugin API 9; update Milkbeat first.
 
-Under **Audio**, enable providers and put them in priority order; under **Video**, choose the video
-plugin. Native tracks try their own enabled audio provider before ordered fallback; Spotify races
-enabled providers. **Update plugins automatically** (on by default) installs new plugin versions at start and
+Under **Audio**, put providers in priority order and choose which ones play other services'
+tracks; under **Video**, choose the video plugin. Every track follows the order, including tracks
+from a provider in it. A provider switched off there plays only its own tracks, before the order;
+Beatport starts that way. Spotify searches up to four providers at once and plays the
+highest-ranked match. **Update plugins automatically** (on by default) installs new plugin versions at start and
 every six hours; **Update all plugins** checks now. A plugin version that needs a newer Milkbeat is
 not downloaded: Settings → Plugins says to update Milkbeat first and, in the GitHub build, opens the
 app updater. Each plugin's details offer sign-in, play

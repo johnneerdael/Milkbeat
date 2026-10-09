@@ -13,29 +13,32 @@ internal data class AudioProviderAttempt(
     val direct: TrackDescriptor?,
 )
 
+/**
+ * The providers to try for [track], in order: the playback context's [preferredProviderId], then
+ * enabled audio plugins outside the listener's order (these play only tracks carrying their own id),
+ * then the listener's order, which every track follows, including tracks from the providers in it.
+ */
 internal fun audioProviderAttempts(
     state: PluginRegistryState,
     track: TrackDescriptor,
     withPicture: Boolean = false,
     preferredProviderId: String? = null,
 ): List<AudioProviderAttempt> {
-    val attempts =
-        (listOfNotNull(preferredProviderId) + state.selection.audio).distinct().mapNotNull { id ->
-            val plugin = state.plugin(id) ?: return@mapNotNull null
-            val role = plugin.manifest.roles.audio ?: return@mapNotNull null
-            if (withPicture && !role.musicVideo) return@mapNotNull null
-            val direct = directAudioTrack(track, plugin)
-            if (direct == null && (!role.match || track.title.isBlank())) return@mapNotNull null
-            AudioProviderAttempt(plugin, direct)
-        }
-    val native = if (track.isSpotifyMetadata) emptyList() else attempts.filter { it.direct?.ref == track.ref }
-    val youtubeSource = track.ids.any { (space, id) -> space in setOf("yt", "ytm", "youtube") && id == track.ref.providerId }
-    if (youtubeSource && !track.isSpotifyMetadata) return native
-    return native + attempts.filterNot { it in native }
+    val sortable = state.selection.audio.distinct()
+    val ownTracksOnly = state.plugins.filter { it.manifest.roles.audio != null && it.id !in sortable }.map { it.id }
+    return (listOfNotNull(preferredProviderId) + ownTracksOnly + sortable).distinct().mapNotNull { id ->
+        val plugin = state.plugin(id) ?: return@mapNotNull null
+        val role = plugin.manifest.roles.audio ?: return@mapNotNull null
+        if (withPicture && !role.musicVideo) return@mapNotNull null
+        val direct = directAudioTrack(track, plugin)
+        val matchesOthers = id in sortable || id == preferredProviderId
+        if (direct == null && (!matchesOthers || !role.match || track.title.isBlank())) return@mapNotNull null
+        AudioProviderAttempt(plugin, direct)
+    }
 }
 
-internal val TrackDescriptor.isSpotifyMetadata: Boolean
-    get() = ids["spotify"] == ref.providerId
+/** Whether no provider in [attempts] plays this track's own source, as for Spotify metadata. */
+internal fun TrackDescriptor.hasNoPlayingSource(attempts: List<AudioProviderAttempt>): Boolean = attempts.none { it.direct?.ref == ref }
 
 internal fun directAudioTrack(
     track: TrackDescriptor,

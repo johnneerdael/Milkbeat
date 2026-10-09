@@ -232,6 +232,7 @@ private fun LazyListScope.overviewItems(
                 label = stringResource(role.label()),
                 value = providerNames(role, state.selection, state.plugins) ?: stringResource(R.string.tv_plugins_none),
                 onClick = { onChoose(role) },
+                scrollingValue = true,
             )
         }
     }

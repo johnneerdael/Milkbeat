@@ -168,9 +168,18 @@ When a provider reports an expired sign-in, Milkbeat asks the plugin again in th
 
 ## Set audio priority
 
-![Audio provider priority: YouTube Music, Beatport, then SoundCloud, with the per-provider audio switches](images/settings-audio-priority.png)
+![Audio provider priority with the per-provider switches for playing other services' tracks](images/settings-audio-priority.png)
 
-Under **Audio**, switch on the providers you want (**Use** *provider* **for audio**), use **Move earlier** and **Move later** to order them, then select **Done**. YouTube tracks use their known recording IDs. SoundCloud and Beatport try their own enabled audio provider first, then fall back in your chosen order if it cannot play. Spotify starts bounded parallel searches across enabled audio providers and plays the first acceptable match with a validated stream; the remaining searches are cancelled. Explicitly prepared YouTube playlist copies keep their known YouTube recordings.
+Under **Audio**, use **Move earlier** and **Move later** to order the providers, then select **Done**. Every track tries the providers in this order, including a track that comes from one of them: with YouTube above SoundCloud, a SoundCloud track is first looked up and played on YouTube, and its own SoundCloud stream is the fallback. When a provider's turn comes for one of its own tracks, it plays that track directly without a search.
+
+Each provider's **play other services' tracks** switch decides whether it is in the order:
+
+- **On:** the provider is in the order above and is used for every track in its turn.
+- **Off:** the provider plays only its own tracks. It is tried first for those, and if it cannot play one, such as Beatport without a streaming subscription, the track continues down the order. It never searches for other services' tracks.
+
+Beatport starts with the switch off, and updating Milkbeat switches it off once for an existing setup; switch it on to add it to the order again. Updating a plugin keeps your choice.
+
+Spotify has no audio of its own, so Milkbeat searches up to four providers at once. A faster match from a lower provider is used only once every higher provider has failed; the remaining searches are cancelled as soon as the result is decided. Explicitly prepared YouTube playlist copies keep their known YouTube recordings.
 
 YouTube matching searches recorded videos, including static Art Tracks and archived live sets, whichever now-playing view you use. It checks recording identity, so an unrelated performance, cover, different remix or short excerpt is rejected, and full versions are preferred over mixed excerpts. The picture loads only when you choose [the video view](playback.md#visualizer-music-video-or-artwork).
 

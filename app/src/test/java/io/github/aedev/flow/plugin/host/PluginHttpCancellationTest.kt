@@ -27,7 +27,7 @@ import java.util.concurrent.atomic.AtomicReference
 
 class PluginHttpCancellationTest : PluginAudioFixture() {
     @Test
-    fun `playable provider wins before a losing real HTTPS response sends headers`() =
+    fun `higher-ranked playable provider cancels a losing real HTTPS response before it sends headers`() =
         runBlocking {
             withServer { server, client, slowCall, _, failed ->
                 val blocked = CompletableDeferred<Unit>()
@@ -52,7 +52,7 @@ class PluginHttpCancellationTest : PluginAudioFixture() {
                     val winner =
                         withTimeout(2000) {
                             resolveAudioAttempts(
-                                listOf(AudioProviderAttempt(slow, null), AudioProviderAttempt(fast, null)),
+                                listOf(AudioProviderAttempt(fast, null), AudioProviderAttempt(slow, null)),
                                 concurrent = true,
                             ) { provider ->
                                 if (provider.plugin.id == "fast") blocked.await()
