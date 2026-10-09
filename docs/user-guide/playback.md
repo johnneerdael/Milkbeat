@@ -86,6 +86,8 @@ Preparation reduces the work at each transition but cannot guarantee gapless pla
 
 Streamed music loads well ahead of the playing position: Milkbeat keeps loading until about 16 MB is buffered (roughly 13 minutes of typical audio, usually the whole song) and loads more once less than 30 seconds remain. A music video's picture shares that buffer, and a slow network or low memory keeps it shorter. If a stream fails, Milkbeat asks its provider for a fresh link to the same recording and resumes where it stopped. A second media failure within a minute tries the next configured audio provider for that track. Audio-only providers remain eligible, so a failed YouTube video can fall back to the original SoundCloud audio. This does not change your configured provider order.
 
+Audio failures while picture is hidden use ordinary audio/network recovery and retain the Video choice. A playback failure while video is active can retry as audio; an explicitly unavailable picture also uses audio fallback. Refreshing an expired audio URL preserves optional picture preparation.
+
 If normal decoded TV audio (PCM) stops advancing for about five seconds while the player still reports playback, Milkbeat freezes the displayed progress and reconnects the output from the last position where audio was advancing, keeping the same track and queue. It tries twice before leaving the track paused with **Audio output stopped. Press Play to retry.** Pause, seeking, choosing another track or Stop cancels a pending restart. Quiet passages do not trigger recovery, though a recovery may repeat a short stretch of the song. Hardware-offloaded audio and encoded HDMI passthrough are outside this check.
 
 ## Encrypted provider audio

@@ -123,7 +123,9 @@ internal fun Media3MusicService.handlePlayerError(
         pluginAudio.failed(mediaId, progressiveHttp.first, progressiveHttp.second)
         failed = failed.copy(refreshNativeSource = true)
     }
-    if (fallBackToSong(failed)) {
+    if (player.currentMediaItem?.mediaId == mediaId &&
+        player.currentTracks.isTypeSelected(androidx.media3.common.C.TRACK_TYPE_VIDEO) && fallBackToSong(failed)
+    ) {
         Log.w(TAG, "Music video of $mediaId failed (${error.errorCodeName}), playing its song instead", error)
         return
     }
@@ -409,7 +411,7 @@ internal fun Media3MusicService.handleExpiredUrlError(
             try {
                 downloadUtil.invalidateUrlCache(mediaId)
                 player.stop()
-                if (refreshStreamMediaItem(failed)) {
+                if (refreshStreamMediaItem(failed, preservePicture = true)) {
                     player.prepare()
                     player.play()
                 }
