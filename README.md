@@ -150,8 +150,8 @@ distributed separately from Milkbeat releases, signature-checked and reviewed be
 | SoundCloud | Discover, Stream, Search, Artists, albums, playlists, Liked Songs, history | Available full tracks, matching and stations | — |
 | YouTube Video | YouTube's TV Music Home, Search, artists, albums, playlists, library | Streams, matching and radio | YouTube videos and playlists |
 
-**YouTube Video 0.1.1** is a separate provider for stable Milkbeat, installed with code **932**.
-It requires plugin API 7 and keeps its own account alongside
+**YouTube Video 0.2.0** is a separate provider for stable Milkbeat, installed with code **932**.
+It requires plugin API 8 and keeps its own account alongside
 YouTube Music. It supplies SmartTube's regular YouTube TV Music feeds, TV-code/QR sign-in and
 native SABR playback through Milkbeat's existing Media3 player.
 [Setup and limitations](docs/user-guide/providers.md#youtube-video).

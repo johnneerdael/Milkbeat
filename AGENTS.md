@@ -742,7 +742,7 @@ revision must pass the configured ktlint rules.
   Stable descriptors reject prerelease versions. Keep `plugins/published-preview.json` aligned
   with `app/src/nightly/assets/plugin-preview-download-catalog.json`; preserve each distributed
   preview version's original archive hash/URL, including harmless signature-envelope rebuilds.
-  Stable and Preview publish YouTube Video 0.1.1 / versionCode 8, code 932, requiring API 7;
+  Stable and Preview publish YouTube Video 0.2.0 / versionCode 11, code 932, requiring API 8;
   Preview no longer carries a prerelease YouTube Video. Its catalog keeps the retired, immutable
   preview 6/code 304 and preview 4/code 744 entries. Every descriptor row states the package's
   verified `apiMin` and `format`.
