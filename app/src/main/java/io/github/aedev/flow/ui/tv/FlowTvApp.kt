@@ -35,6 +35,7 @@ import io.github.aedev.flow.data.model.Video
 import io.github.aedev.flow.data.music.model.MusicTrack
 import io.github.aedev.flow.player.EnhancedMusicPlayerManager
 import io.github.aedev.flow.player.GlobalPlayerState
+import io.github.aedev.flow.plugin.install.PluginUpdateReport
 import io.github.aedev.flow.ui.screens.music.MusicPlayerViewModel
 import io.github.aedev.flow.ui.screens.player.VideoPlayerViewModel
 import io.github.aedev.flow.ui.tv.components.TvNoticeSnackbar
@@ -134,7 +135,7 @@ fun FlowTvApp(
                     if (report.installed.isNotEmpty()) {
                         val names = report.installed.joinToString { it.name }
                         snackbarHostState.showNotice(context.getString(R.string.tv_plugins_notice_updated, names), Icons.Outlined.Extension)
-                        updatesViewModel.markReported(report.copy(needsReview = emptyList()))
+                        updatesViewModel.markReported(PluginUpdateReport(installed = report.installed, needsReview = emptyList()))
                     }
                     if (report.needsReview.isNotEmpty()) {
                         val count = report.needsReview.size
@@ -142,7 +143,21 @@ fun FlowTvApp(
                             context.resources.getQuantityString(R.plurals.tv_plugins_notice_review, count, count),
                             Icons.Outlined.Extension,
                         )
-                        updatesViewModel.markReported(report.copy(installed = emptyList()))
+                        updatesViewModel.markReported(PluginUpdateReport(installed = emptyList(), needsReview = report.needsReview))
+                    }
+                    if (report.requiresAppUpdate.isNotEmpty()) {
+                        val names = report.requiresAppUpdate.joinToString { it.name }
+                        snackbarHostState.showNotice(
+                            context.getString(R.string.tv_plugins_notice_requires_app_update, names),
+                            Icons.Outlined.SystemUpdate,
+                        )
+                        updatesViewModel.markReported(
+                            PluginUpdateReport(
+                                installed = emptyList(),
+                                needsReview = emptyList(),
+                                requiresAppUpdate = report.requiresAppUpdate,
+                            ),
+                        )
                     }
                 }
             }

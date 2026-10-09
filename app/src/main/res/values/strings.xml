@@ -445,6 +445,15 @@
         <item quantity="other">Could not download %1$d updates. Select to try again</item>
     </plurals>
     <string name="tv_plugins_update_mismatch">The download is not the update that was offered. Check for updates again.</string>
+    <string name="tv_plugins_requires_app_update">%1$s needs a newer version of Milkbeat. Update Milkbeat, then install the plugin again.</string>
+    <plurals name="tv_plugins_updates_require_app_update">
+        <item quantity="one">%1$d update needs a newer version of Milkbeat</item>
+        <item quantity="other">%1$d updates need a newer version of Milkbeat</item>
+    </plurals>
+    <string name="tv_plugins_update_requires_app_update">Update Milkbeat first. This version installs after Milkbeat is updated</string>
+    <string name="tv_plugins_notice_requires_app_update">Update Milkbeat to install the newest %1$s</string>
+    <string name="tv_plugins_update_app">Update Milkbeat</string>
+    <string name="tv_plugins_update_app_subtitle">Opens Settings, About, where Milkbeat updates itself</string>
     <string name="tv_plugins_installed">Installed</string>
     <string name="tv_plugins_none_installed">No plugins yet. Add one to browse and play music and videos.</string>
     <string name="tv_plugins_providers">Where content comes from</string>

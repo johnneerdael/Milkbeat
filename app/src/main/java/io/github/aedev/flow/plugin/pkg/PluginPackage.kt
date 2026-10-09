@@ -35,6 +35,8 @@ class PluginPackage(
 class PluginPackageException(
     val reason: Reason,
     message: String,
+    /** For [Reason.INCOMPATIBLE]: the manifest whose container format or minimum API this Milkbeat is too old for. */
+    val incompatible: PluginManifest? = null,
 ) : Exception(message) {
     enum class Reason { MALFORMED, TOO_LARGE, TAMPERED, UNSIGNED, INCOMPATIBLE }
 }
@@ -172,6 +174,7 @@ object PluginPackageReader {
             throw PluginPackageException(
                 PluginPackageException.Reason.INCOMPATIBLE,
                 "${manifest.name} needs a newer Milkbeat (format ${manifest.format}, API ${manifest.api.min})",
+                incompatible = manifest,
             )
         }
         return manifest

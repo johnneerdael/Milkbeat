@@ -39,6 +39,17 @@ open class PluginInstallException(
     val messageResource: Int? = null,
 ) : Exception(message, cause)
 
+/**
+ * The plugin needs a newer Milkbeat than this one: its [apiMin] or container [format] is beyond what this
+ * build supports. Updating the app is the only remedy, so it is never retried as a failed download.
+ */
+class PluginRequiresAppUpdateException(
+    val pluginName: String,
+    val apiMin: Int,
+    val format: Int,
+    cause: Throwable? = null,
+) : PluginInstallException("$pluginName needs plugin API $apiMin and format $format", cause)
+
 /** The plugin's download page wants a browser check; the listener passes it on [page], then [PluginInstaller.fetch] continues. */
 class BrowserVerification internal constructor(
     val page: String,
@@ -96,6 +107,10 @@ class PluginInstaller
                     try {
                         PluginPackageReader.read(bytes.inputStream())
                     } catch (e: PluginPackageException) {
+                        val manifest = e.incompatible
+                        if (e.reason == PluginPackageException.Reason.INCOMPATIBLE && manifest != null) {
+                            throw PluginRequiresAppUpdateException(manifest.name, manifest.api.min, manifest.format, e)
+                        }
                         throw PluginInstallException(e.message ?: "Not a valid plugin", e)
                     }
                 }

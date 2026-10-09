@@ -13,6 +13,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import nl.neerdael.milkbeat.plugin.PLUGIN_API_VERSION
 import org.junit.Assert.assertThrows
 import org.junit.Test
 import java.io.File
@@ -76,6 +77,21 @@ class PluginDownloadCodesTest {
             assertThat(PluginDownloadCodes(context, publication).resolve("494").url).isEqualTo(stableUrl)
             coVerify(exactly = 1) { publication.current() }
         }
+
+    @Test
+    fun `a code whose current release needs a newer Milkbeat says so before downloading`() {
+        val id = "nl.neerdael.youtube-music"
+        val entry = PluginDownloadCode("494", id, "YouTube Music", "https://buzzheavier.com/current12345")
+        val release = PublishedPlugin(id, "0.3.0", 14, "f", "494", "sha")
+        val newer = Publication(PublishedPlugins(listOf(release.copy(apiMin = PLUGIN_API_VERSION + 1))), mapOf("494" to entry))
+
+        val failure = assertThrows(PluginRequiresAppUpdateException::class.java) { pluginDownloadSource("494", newer) { emptyMap() } }
+
+        assertThat(failure.pluginName).isEqualTo("YouTube Music")
+        assertThat(failure.apiMin).isEqualTo(PLUGIN_API_VERSION + 1)
+        val current = Publication(PublishedPlugins(listOf(release.copy(apiMin = PLUGIN_API_VERSION))), mapOf("494" to entry))
+        assertThat(pluginDownloadSource("494", current) { emptyMap() }.url).isEqualTo(entry.url)
+    }
 
     @Test
     fun `ordinary URLs do not require decrypting the catalog`() {

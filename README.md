@@ -168,7 +168,9 @@ native SABR playback through Milkbeat's existing Media3 player.
 Under **Audio**, enable providers and put them in priority order; under **Video**, choose the video
 plugin. Native tracks try their own enabled audio provider before ordered fallback; Spotify races
 enabled providers. **Update plugins automatically** (on by default) installs new plugin versions at start and
-every six hours; **Update all plugins** checks now. Each plugin's details offer sign-in, play
+every six hours; **Update all plugins** checks now. A plugin version that needs a newer Milkbeat is
+not downloaded: Settings → Plugins says to update Milkbeat first and, in the GitHub build, opens the
+app updater. Each plugin's details offer sign-in, play
 reporting, **Index playlists** and, for Spotify, **Prepare private playlists in YouTube Music**.
 [Providers and sign-in](https://johnneerdael.github.io/Milkbeat/providers/).
 

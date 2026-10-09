@@ -102,11 +102,32 @@ fun TvSettingsScreen(
                 modifier = Modifier.weight(1f).tvInitialFocus(paneFocusRequests, onFirstComposition = initiallyFocusPane).focusGroup(),
             ) {
                 when (selectedCategory) {
-                    TvSettingsCategory.PLUGINS -> TvPluginsSettingsPane(onSignIn = onOpenPluginSignIn, homeRevision = pluginHomeRevision)
-                    TvSettingsCategory.MUSIC_FOLDERS -> TvMusicFoldersSettingsPane()
-                    TvSettingsCategory.PLAYBACK -> TvPlaybackSettingsPane(playerPreferences)
-                    TvSettingsCategory.VISUALIZATIONS -> TvVisualizerSettingsPane()
-                    TvSettingsCategory.ABOUT -> TvAboutSettingsPane()
+                    TvSettingsCategory.PLUGINS -> {
+                        TvPluginsSettingsPane(
+                            onSignIn = onOpenPluginSignIn,
+                            onOpenAppUpdates = {
+                                selectedCategory = TvSettingsCategory.ABOUT
+                                paneFocusRequests++
+                            },
+                            homeRevision = pluginHomeRevision,
+                        )
+                    }
+
+                    TvSettingsCategory.MUSIC_FOLDERS -> {
+                        TvMusicFoldersSettingsPane()
+                    }
+
+                    TvSettingsCategory.PLAYBACK -> {
+                        TvPlaybackSettingsPane(playerPreferences)
+                    }
+
+                    TvSettingsCategory.VISUALIZATIONS -> {
+                        TvVisualizerSettingsPane()
+                    }
+
+                    TvSettingsCategory.ABOUT -> {
+                        TvAboutSettingsPane()
+                    }
                 }
             }
         }

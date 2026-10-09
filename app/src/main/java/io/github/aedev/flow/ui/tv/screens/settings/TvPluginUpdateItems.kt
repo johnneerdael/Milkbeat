@@ -15,8 +15,10 @@ import io.github.aedev.flow.ui.tv.components.TvNavRow
 import io.github.aedev.flow.ui.tv.components.TvToggleRow
 
 /**
- * Keeping plugins current: whether they update by themselves, updating them all now, and one row per
- * update left over (it asks for new permissions or a browser check, or its download failed) to install it by hand.
+ * Keeping plugins current: whether they update by themselves, updating them all now, one row per
+ * update left over (it asks for new permissions or a browser check, or its download failed) to install
+ * it by hand, and one per update that waits for a newer Milkbeat, which [onUpdateApp] opens when this
+ * build updates itself.
  */
 internal fun LazyListScope.pluginUpdateItems(
     state: PluginUpdatesState,
@@ -24,6 +26,7 @@ internal fun LazyListScope.pluginUpdateItems(
     onAutomaticChange: (Boolean) -> Unit,
     onUpdateAll: () -> Unit,
     onUpdate: (PluginUpdate) -> Unit,
+    onUpdateApp: (() -> Unit)?,
 ) {
     item(key = "updates-automatic") {
         TvToggleRow(
@@ -50,6 +53,36 @@ internal fun LazyListScope.pluginUpdateItems(
             onClick = { onUpdate(update) },
         )
     }
+    val waiting = (state as? PluginUpdatesState.Checked)?.requiresAppUpdate.orEmpty()
+    items(waiting, key = { "update-app-${it.pluginId}" }) { update ->
+        TvNavRow(
+            label = stringResource(R.string.tv_plugins_update_to, update.name),
+            value = update.version,
+            supportingText = stringResource(R.string.tv_plugins_update_requires_app_update),
+            leadingIcon = Icons.Outlined.SystemUpdate,
+            onClick = { onUpdateApp?.invoke() },
+        )
+    }
+}
+
+/** A plugin refused because it needs a newer Milkbeat, with the way to [onUpdateApp] when this build updates itself. */
+internal fun LazyListScope.requiresAppUpdateItems(
+    pluginName: String,
+    onUpdateApp: (() -> Unit)?,
+) {
+    item(key = "add-status") {
+        PluginStatusText(stringResource(R.string.tv_plugins_requires_app_update, pluginName), error = true)
+    }
+    if (onUpdateApp != null) {
+        item(key = "add-update-app") {
+            TvNavRow(
+                label = stringResource(R.string.tv_plugins_update_app),
+                supportingText = stringResource(R.string.tv_plugins_update_app_subtitle),
+                leadingIcon = Icons.Outlined.SystemUpdate,
+                onClick = onUpdateApp,
+            )
+        }
+    }
 }
 
 @Composable
@@ -71,6 +104,11 @@ private fun updatesStatus(state: PluginUpdatesState): String? =
 
                 state.failed.isNotEmpty() -> {
                     pluralStringResource(R.plurals.tv_plugins_updates_failed, state.failed.size, state.failed.size)
+                }
+
+                state.requiresAppUpdate.isNotEmpty() -> {
+                    val count = state.requiresAppUpdate.size
+                    pluralStringResource(R.plurals.tv_plugins_updates_require_app_update, count, count)
                 }
 
                 state.installed.isNotEmpty() -> {

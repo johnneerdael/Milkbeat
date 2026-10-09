@@ -29,13 +29,15 @@ sealed interface PluginUpdatesState {
 
     /**
      * [updates] wait for the listener's review (new permissions or a browser check); [failed] could not
-     * be downloaded or installed and are tried again next run; [installed] went in by themselves.
+     * be downloaded or installed and are tried again next run; [installed] went in by themselves;
+     * [requiresAppUpdate] need a newer Milkbeat and wait, undownloaded, until the app is updated.
      */
     data class Checked(
         val updates: List<PluginUpdate>,
         val checked: Set<String>,
         val installed: List<PluginUpdate> = emptyList(),
         val failed: List<PluginUpdate> = emptyList(),
+        val requiresAppUpdate: List<PluginUpdate> = emptyList(),
     ) : PluginUpdatesState
 
     data class Failed(
@@ -47,9 +49,10 @@ sealed interface PluginUpdatesState {
 data class PluginUpdateReport(
     val installed: List<PluginUpdate>,
     val needsReview: List<PluginUpdate>,
+    val requiresAppUpdate: List<PluginUpdate> = emptyList(),
 )
 
-private enum class UpdateOutcome { INSTALLED, NEEDS_REVIEW, FAILED }
+private enum class UpdateOutcome { INSTALLED, NEEDS_REVIEW, REQUIRES_APP_UPDATE, FAILED }
 
 /**
  * Keeps the installed plugins current: finds newer versions and installs each one that verifies and
@@ -75,6 +78,12 @@ class PluginAutoUpdater
 
         /** Updates that need the listener's review; their download is not fetched again while the app process lives. */
         private val heldForReview = ConcurrentHashMap.newKeySet<String>()
+
+        /** Updates that need a newer Milkbeat, announced once while the app process lives; updating the app starts a new one. */
+        private val seenAppUpdates = ConcurrentHashMap.newKeySet<String>()
+
+        /** Downloads the package check refused as too new for this Milkbeat; they are not fetched again while the app process lives. */
+        private val heldForAppUpdate = ConcurrentHashMap.newKeySet<String>()
 
         /** Elapsed-realtime of this process's last background run; null until the launch run. */
         private var lastCheckMs: Long? = null
@@ -123,11 +132,13 @@ class PluginAutoUpdater
             }
             val checked = result as? PluginUpdatesState.Checked ?: return result
             val newReviews = checked.updates.filter { seenReviews.add(it.key()) }
-            if (background && (checked.installed.isNotEmpty() || newReviews.isNotEmpty())) {
+            val newAppUpdates = checked.requiresAppUpdate.filter { seenAppUpdates.add(it.key()) }
+            if (background && (checked.installed.isNotEmpty() || newReviews.isNotEmpty() || newAppUpdates.isNotEmpty())) {
                 unreported.update { earlier ->
                     PluginUpdateReport(
                         installed = earlier?.installed.orEmpty() + checked.installed,
                         needsReview = earlier?.needsReview.orEmpty() + newReviews,
+                        requiresAppUpdate = earlier?.requiresAppUpdate.orEmpty() + newAppUpdates,
                     )
                 }
             }
@@ -142,7 +153,7 @@ class PluginAutoUpdater
                 } catch (e: PluginInstallException) {
                     return PluginUpdatesState.Failed(e.messageResource)
                 }
-            val outcomes = updates.associateWith { install(it) }
+            val outcomes = updates.installable.associateWith { install(it) }
 
             fun withOutcome(outcome: UpdateOutcome) = outcomes.filterValues { it == outcome }.keys.toList()
             return PluginUpdatesState.Checked(
@@ -150,12 +161,14 @@ class PluginAutoUpdater
                 checked = plugins.mapTo(HashSet()) { it.id },
                 installed = withOutcome(UpdateOutcome.INSTALLED),
                 failed = withOutcome(UpdateOutcome.FAILED),
+                requiresAppUpdate = updates.requiresAppUpdate + withOutcome(UpdateOutcome.REQUIRES_APP_UPDATE),
             )
         }
 
         private suspend fun install(update: PluginUpdate): UpdateOutcome {
             val key = update.key()
             if (key in heldForReview) return UpdateOutcome.NEEDS_REVIEW
+            if (key in heldForAppUpdate) return UpdateOutcome.REQUIRES_APP_UPDATE
             return try {
                 val pending = installer.fetch(update.url, update)
                 if (pending.needsConsent) {
@@ -171,6 +184,10 @@ class PluginAutoUpdater
             } catch (_: BrowserVerificationRequiredException) {
                 heldForReview += key
                 UpdateOutcome.NEEDS_REVIEW
+            } catch (_: PluginRequiresAppUpdateException) {
+                // A list that does not state the release's minimum API yet; the package check is the authority.
+                heldForAppUpdate += key
+                UpdateOutcome.REQUIRES_APP_UPDATE
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
@@ -182,8 +199,13 @@ class PluginAutoUpdater
 private fun PluginUpdate.key(): String = "$pluginId:$versionCode"
 
 private fun PluginUpdateReport.without(shown: PluginUpdateReport): PluginUpdateReport? {
-    val rest = PluginUpdateReport(installed - shown.installed.toSet(), needsReview - shown.needsReview.toSet())
-    return rest.takeIf { it.installed.isNotEmpty() || it.needsReview.isNotEmpty() }
+    val rest =
+        PluginUpdateReport(
+            installed - shown.installed.toSet(),
+            needsReview - shown.needsReview.toSet(),
+            requiresAppUpdate - shown.requiresAppUpdate.toSet(),
+        )
+    return rest.takeIf { it.installed.isNotEmpty() || it.needsReview.isNotEmpty() || it.requiresAppUpdate.isNotEmpty() }
 }
 
 /**
@@ -204,6 +226,10 @@ internal fun PluginUpdatesState.forInstalled(installed: List<InstalledPlugin>): 
             val versions = installed.associate { it.id to it.manifest.versionCode }
 
             fun stillNewer(update: PluginUpdate) = versions[update.pluginId]?.let { it < update.versionCode } == true
-            copy(updates = updates.filter(::stillNewer), failed = failed.filter(::stillNewer))
+            copy(
+                updates = updates.filter(::stillNewer),
+                failed = failed.filter(::stillNewer),
+                requiresAppUpdate = requiresAppUpdate.filter(::stillNewer),
+            )
         }
     }

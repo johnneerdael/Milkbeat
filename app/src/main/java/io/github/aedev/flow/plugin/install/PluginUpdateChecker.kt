@@ -18,6 +18,12 @@ data class PluginUpdate(
     val sha256: String,
 )
 
+/** What a check found: updates this Milkbeat can install, and newer releases that need a newer Milkbeat first. */
+data class PluginUpdates(
+    val installable: List<PluginUpdate> = emptyList(),
+    val requiresAppUpdate: List<PluginUpdate> = emptyList(),
+)
+
 /**
  * Finds newer versions of the installed plugins in the publisher's current list. Only finding is done
  * here: an update installs through [PluginInstaller], which verifies it is the release offered, its
@@ -32,8 +38,8 @@ class PluginUpdateChecker
     ) {
         private val preview = context.packageName.endsWith(".nightly")
 
-        suspend fun check(installed: List<InstalledPlugin>): List<PluginUpdate> {
-            if (preview) return emptyList()
+        suspend fun check(installed: List<InstalledPlugin>): PluginUpdates {
+            if (preview) return PluginUpdates()
             val current =
                 try {
                     publication.current()
@@ -46,16 +52,24 @@ class PluginUpdateChecker
         }
     }
 
-/** The installed plugins the publisher has a newer version of, by the same author, with a download for it. */
+/**
+ * The installed plugins the publisher has a newer version of, by the same author, with a download for it.
+ * A release whose minimum API or container format is beyond this build is set apart, never downloaded;
+ * the package reader refuses it regardless.
+ */
 internal fun availableUpdates(
     installed: List<InstalledPlugin>,
     published: PublishedPlugins,
     catalog: Map<String, PluginDownloadCode>,
-): List<PluginUpdate> =
-    installed.mapNotNull { plugin ->
-        val latest = published.plugins.firstOrNull { it.id == plugin.id } ?: return@mapNotNull null
-        if (latest.versionCode <= plugin.manifest.versionCode) return@mapNotNull null
-        if (!latest.fingerprint.equals(plugin.signerFingerprint, ignoreCase = true)) return@mapNotNull null
-        val download = catalog[latest.code]?.takeIf { it.id == plugin.id } ?: return@mapNotNull null
-        PluginUpdate(plugin.id, plugin.manifest.name, latest.version, latest.versionCode, download.url, latest.sha256)
-    }
+): PluginUpdates {
+    val found =
+        installed.mapNotNull { plugin ->
+            val latest = published.plugins.firstOrNull { it.id == plugin.id } ?: return@mapNotNull null
+            if (latest.versionCode <= plugin.manifest.versionCode) return@mapNotNull null
+            if (!latest.fingerprint.equals(plugin.signerFingerprint, ignoreCase = true)) return@mapNotNull null
+            val download = catalog[latest.code]?.takeIf { it.id == plugin.id } ?: return@mapNotNull null
+            latest to PluginUpdate(plugin.id, plugin.manifest.name, latest.version, latest.versionCode, download.url, latest.sha256)
+        }
+    val (blocked, installable) = found.partition { (latest, _) -> latest.requiresNewerApp }
+    return PluginUpdates(installable.map { it.second }, blocked.map { it.second })
+}

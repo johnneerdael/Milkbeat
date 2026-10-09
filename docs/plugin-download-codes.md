@@ -41,7 +41,10 @@ Commit `app/src/main/assets/plugin-download-catalog.json` with the change.
 Stable builds read the catalog and `plugins/published.json` from `main`, so a
 merged entry works without an app update; offline, and in the Preview app, the
 bundled copy answers. A code resolves to its plugin's current release in
-`plugins/published.json`. This tool only adds codes; the private publisher's
+`plugins/published.json`; when that release's `apiMin` or `format` is newer than
+the app supports, the app says Milkbeat needs updating instead of downloading it.
+Catalog entries keep exactly `code`, `id`, `name` and `url`: builds before the
+compatibility gate reject any other entry field. This tool only adds codes; the private publisher's
 copy also has `update <plugin-id> <name> <url> <code>`, which repoints an
 existing code when the same release moves.
 

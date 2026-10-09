@@ -18,14 +18,19 @@ import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.click
+import androidx.compose.ui.test.hasScrollToIndexAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isFocused
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.dp
 import com.google.common.truth.Truth.assertThat
+import io.github.aedev.flow.plugin.install.PluginUpdate
+import io.github.aedev.flow.plugin.install.PluginUpdatesState
 import io.github.aedev.flow.plugin.registry.InstalledPlugin
 import io.github.aedev.flow.plugin.registry.ProviderSelection
 import io.github.aedev.flow.ui.tv.screens.TvSettingsScreen
@@ -70,6 +75,7 @@ class TvPluginsFocusTest {
 
     private var back: OnBackPressedDispatcher? = null
     private var leftSettings = 0
+    private var openedAppUpdates = 0
 
     private fun pressBack() {
         compose.runOnIdle { back!!.onBackPressed() }
@@ -94,7 +100,12 @@ class TvPluginsFocusTest {
             TvTheme {
                 Row {
                     Button({}, Modifier.width(180.dp)) { Text("Left menu") }
-                    TvPluginsSettingsPane({ _, _ -> }, Modifier.width(650.dp), viewModel = viewModel)
+                    TvPluginsSettingsPane(
+                        onSignIn = { _, _ -> },
+                        onOpenAppUpdates = { openedAppUpdates++ },
+                        modifier = Modifier.width(650.dp),
+                        viewModel = viewModel,
+                    )
                 }
             }
         }
@@ -103,6 +114,45 @@ class TvPluginsFocusTest {
     private fun focus(text: String) {
         compose.onNodeWithText(text).performSemanticsAction(SemanticsActions.RequestFocus) { it() }
         compose.onNodeWithText(text).assertIsFocused()
+    }
+
+    private fun showNeedingAppUpdate(appUpdates: Boolean) {
+        val waiting = PluginUpdate("youtube", "YouTube Music", "2.0", 2, "https://example.test/new", "sha")
+        state.value =
+            state.value.copy(
+                adding = AddPluginState.RequiresAppUpdate("Deezer"),
+                updates = PluginUpdatesState.Checked(emptyList(), setOf("beatport", "youtube"), requiresAppUpdate = listOf(waiting)),
+            )
+        every { viewModel.appUpdatesAvailable } returns appUpdates
+        show()
+    }
+
+    private fun scrollTo(text: String) {
+        compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasText(text))
+    }
+
+    @Test
+    fun `a plugin needing a newer Milkbeat says so and opens the app updater`() {
+        showNeedingAppUpdate(appUpdates = true)
+        scrollTo("1 update needs a newer version of Milkbeat")
+        scrollTo("Update YouTube Music")
+        compose.onNodeWithText("Update YouTube Music").performClick()
+        scrollTo("Deezer needs a newer version of Milkbeat. Update Milkbeat, then install the plugin again.")
+        scrollTo("Update Milkbeat")
+        compose.onNodeWithText("Update Milkbeat").performClick()
+
+        assertThat(openedAppUpdates).isEqualTo(2)
+    }
+
+    @Test
+    fun `without the app updater a plugin needing a newer Milkbeat only says so`() {
+        showNeedingAppUpdate(appUpdates = false)
+        scrollTo("Deezer needs a newer version of Milkbeat. Update Milkbeat, then install the plugin again.")
+        compose.onNodeWithText("Update Milkbeat").assertDoesNotExist()
+        scrollTo("Update YouTube Music")
+        compose.onNodeWithText("Update YouTube Music").performClick()
+
+        assertThat(openedAppUpdates).isEqualTo(0)
     }
 
     @Test
