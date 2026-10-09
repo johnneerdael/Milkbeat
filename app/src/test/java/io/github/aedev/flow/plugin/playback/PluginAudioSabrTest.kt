@@ -108,12 +108,12 @@ class PluginAudioSabrTest : PluginAudioFixture() {
         }
 
     @Test
-    fun `conventional picture capability keeps broad preparation cache invalidation`() =
+    fun `eligible HLS picture capability keeps broad preparation cache invalidation`() =
         runTest {
             coEvery { host.call("youtube", PluginOperations.resolveAudio, match { it.track.ref == candidate.ref }) } returns
                 stream.copy(
                     url = "https://cdn.example/audio",
-                    video = MediaFormat("picture", FormatType.VIDEO, "https://cdn.example/picture", "video/mp4", codecs = "avc1"),
+                    mimeType = "application/x-mpegurl",
                 )
             val capable = capabilities()
             audio.resolve(original, PictureLimits(2160, listOf("av1")), playbackId = "catalog-id")

@@ -13,6 +13,7 @@ import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import com.google.common.truth.Truth.assertThat
 import io.github.aedev.flow.player.datasource.BoundPluginMusicDataSourceFactory
 import io.github.aedev.flow.plugin.playback.ResolvedAudio
+import io.github.aedev.flow.plugin.playback.hasPreparedPicture
 import io.mockk.mockk
 import nl.neerdael.milkbeat.catalog.Artwork
 import nl.neerdael.milkbeat.catalog.EntityKind
@@ -90,6 +91,22 @@ class MusicMediaSourceFactoryTest {
     fun `prepared audio only fallback does not construct a missing picture source`() {
         val source = factory.resolvedSource(item.buildUpon().setUri("musicvideo://spotify-song").build(), audio("audio/mp4"))
         assertThat(source).isInstanceOf(ProgressiveMediaSource::class.java)
+    }
+
+    @Test
+    fun `legacy separate progressive picture is not prepared behind hidden audio`() {
+        val legacy = audio("audio/mp4")
+        val resolved =
+            ResolvedAudio(
+                legacy.pluginId,
+                legacy.track,
+                legacy.stream.copy(video = MediaFormat("137", FormatType.VIDEO, "https://fixture/picture", "video/mp4")),
+                Long.MAX_VALUE,
+                true,
+            )
+        val source = factory.resolvedSource(item.buildUpon().setUri("musicvideo://spotify-song").build(), resolved)
+        assertThat(source).isInstanceOf(ProgressiveMediaSource::class.java)
+        assertThat(resolved.hasPreparedPicture).isFalse()
     }
 
     @Test

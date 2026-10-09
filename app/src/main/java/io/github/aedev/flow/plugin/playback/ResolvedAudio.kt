@@ -36,6 +36,8 @@ class ResolvedAudio(
     internal val nativeBinding: Any? = null,
     internal val nativeValidUntilElapsedMs: Long? = null,
 ) {
+    internal val preparedDashManifest: String? by lazy { buildPreparedDashManifest() }
+
     internal fun isValidAt(
         wallTimeMs: Long,
         elapsedTimeMs: Long,
@@ -51,7 +53,7 @@ class PictureLimits(
 /** Offer a view only after the accepted source actually supplies its picture metadata. */
 internal val ResolvedAudio.hasPreparedPicture: Boolean
     get() =
-        stream.video != null ||
+        preparedDashManifest != null ||
             stream.serverAbr?.formats?.any { it.format.type == nl.neerdael.milkbeat.plugin.FormatType.VIDEO } == true ||
             (isHlsStream(stream) && !stream.requireAudioOnlyHls && (withPicture || request?.prepareVideo == true))
 

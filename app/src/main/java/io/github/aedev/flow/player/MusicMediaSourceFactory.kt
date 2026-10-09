@@ -9,16 +9,13 @@ import androidx.media3.datasource.DataSource
 import androidx.media3.exoplayer.drm.DefaultDrmSessionManagerProvider
 import androidx.media3.exoplayer.hls.HlsMediaSource
 import androidx.media3.exoplayer.source.MediaSource
-import androidx.media3.exoplayer.source.MergingMediaSource
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import io.github.aedev.flow.player.config.PlayerConfig
 import io.github.aedev.flow.player.datasource.BoundPluginMusicDataSourceFactory
 import io.github.aedev.flow.player.datasource.PluginMusicDataSourceFactory
-import io.github.aedev.flow.player.resolver.AdaptiveDashManifest
 import io.github.aedev.flow.player.resolver.AudioOnlyHlsPlaylistParserFactory
 import io.github.aedev.flow.player.resolver.MediaSourceBuilder
 import io.github.aedev.flow.player.resolver.ResolvingMusicMediaSource
-import io.github.aedev.flow.plugin.playback.PluginVideoStreams
 import io.github.aedev.flow.plugin.playback.ResolvedAudio
 import nl.neerdael.milkbeat.plugin.AudioDrmScheme
 import nl.neerdael.milkbeat.sabr.SabrMediaSource
@@ -116,24 +113,15 @@ class MusicMediaSourceFactory(
                     .RuntimeHeldMediaSource(source, hold)
             }
         }
-        val stream = audio?.stream
-        if (stream?.drm == null && stream?.audioFormat != null && stream.video != null) {
-            val sound = PluginVideoStreams.audioStreams(listOf(stream.audioFormat!!)).singleOrNull()
-            val pictures = PluginVideoStreams.videoStreams(listOf(stream.video!!))
-            val durationMs =
-                listOfNotNull(stream.audioFormat?.durationMs, stream.video?.durationMs, audio.track.durationMs).maxOrNull() ?: 0L
-            if (sound != null && stream.audioFormat?.initRange != null && stream.audioFormat?.indexRange != null) {
-                AdaptiveDashManifest.build(pictures, sound, (durationMs + 999L) / 1000L)?.let { manifest ->
-                    val headers =
-                        StreamRequestHeaders(
-                            stream.headers,
-                            listOf(stream.audioFormat!!, stream.video!!).associate { it.url to it.headers },
-                        )
-                    val transport =
-                        (sourceFactory as? BoundPluginMusicDataSourceFactory)?.adaptive ?: sourceFactory.withRequestHeaders(headers)
-                    return MediaSourceBuilder.buildDashSource(transport, manifest, Uri.parse(stream.url), soundItem)
-                }
-            }
+        audio?.preparedDashManifest?.let { manifest ->
+            val headers =
+                StreamRequestHeaders(
+                    audio.stream.headers,
+                    listOf(audio.stream.audioFormat!!, audio.stream.video!!).associate { it.url to it.headers },
+                )
+            val transport =
+                (sourceFactory as? BoundPluginMusicDataSourceFactory)?.adaptive ?: sourceFactory.withRequestHeaders(headers)
+            return MediaSourceBuilder.buildDashSource(transport, manifest, Uri.parse(audio.stream.url), soundItem)
         }
         val progressive = ProgressiveMediaSource.Factory(sourceFactory)
         val hls = HlsMediaSource.Factory(sourceFactory)
@@ -166,18 +154,8 @@ class MusicMediaSourceFactory(
             } else {
                 progressive.createMediaSource(soundItem)
             }
-        if (!withPicture || sound is HlsMediaSource || audio?.stream?.video == null) return sound
-        val videoId = mediaItem.mediaId
-        val picture =
-            progressive.createMediaSource(
-                MediaItem
-                    .Builder()
-                    .setUri(mediaItem.localConfiguration!!.uri)
-                    .setMediaId(videoId)
-                    .setCustomCacheKey(MusicVideoItems.videoKey(videoId))
-                    .build(),
-            )
-        // The sound sets the length: a picture that ends early must not cut the song short.
-        return MergingMediaSource(true, false, sound, picture)
+        // Separate progressive picture URLs cannot be prepared without fetching hidden bytes.
+        // Audio remains available; picture needs a metadata-prepared DASH/HLS/SABR presentation.
+        return sound
     }
 }

@@ -358,8 +358,7 @@ object EnhancedMusicPlayerManager {
 
     /**
      * Shows or hides music videos' pictures. Hiding turns the playing track's picture off while its sound
-     * plays on; showing gives it back, reloading the track once if it started as a song. Queued tracks
-     * are rebuilt either way, so a hidden picture is never fetched.
+     * plays on; showing selects the prepared picture track without reloading or seeking the audio.
      */
     fun setVideoMode(show: Boolean) = performSetVideoMode(show)
 

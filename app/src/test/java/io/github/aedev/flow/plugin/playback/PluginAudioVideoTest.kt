@@ -19,6 +19,7 @@ import nl.neerdael.milkbeat.catalog.EntityRef
 import nl.neerdael.milkbeat.plugin.AudioMatchStrategy
 import nl.neerdael.milkbeat.plugin.AudioMatches
 import nl.neerdael.milkbeat.plugin.AudioRole
+import nl.neerdael.milkbeat.plugin.ByteRange
 import nl.neerdael.milkbeat.plugin.FormatType
 import nl.neerdael.milkbeat.plugin.MediaFormat
 import nl.neerdael.milkbeat.plugin.PluginError
@@ -28,9 +29,35 @@ import nl.neerdael.milkbeat.plugin.Roles
 import org.junit.Test
 
 class PluginAudioVideoTest : PluginAudioFixture() {
+    private val grantedPlugin = plugin.copy(grantedNetwork = listOf("example.invalid"))
     private val prepared =
         stream.copy(
-            video = MediaFormat("picture", FormatType.VIDEO, "https://example.invalid/picture", "video/mp4", codecs = "avc1"),
+            renditionId = "140",
+            codecs = "mp4a.40.2",
+            video =
+                MediaFormat(
+                    "137",
+                    FormatType.VIDEO,
+                    "https://example.invalid/picture",
+                    "video/mp4",
+                    codecs = "avc1",
+                    width = 1920,
+                    height = 1080,
+                    durationMs = 120000,
+                    initRange = ByteRange(0, 200),
+                    indexRange = ByteRange(201, 1000),
+                ),
+            audioFormat =
+                MediaFormat(
+                    "140",
+                    FormatType.AUDIO,
+                    stream.url,
+                    stream.mimeType,
+                    codecs = "mp4a.40.2",
+                    durationMs = 120000,
+                    initRange = ByteRange(0, 200),
+                    indexRange = ByteRange(201, 1000),
+                ),
         )
     private val limits = PictureLimits(2160, listOf("h264"))
 
@@ -45,7 +72,7 @@ class PluginAudioVideoTest : PluginAudioFixture() {
     fun `repreparing a registered playback id revokes video eligibility after provider fallback`() =
         runTest {
             val videoProvider =
-                plugin.copy(
+                grantedPlugin.copy(
                     manifest =
                         plugin.manifest.copy(
                             roles =
@@ -57,7 +84,7 @@ class PluginAudioVideoTest : PluginAudioFixture() {
                         ),
                 )
             val beatport =
-                plugin.copy(
+                grantedPlugin.copy(
                     manifest = plugin.manifest.copy(id = "beatport", roles = Roles(audio = AudioRole(setOf("beatport"), match = true))),
                 )
             every { registry.state } returns
@@ -88,7 +115,7 @@ class PluginAudioVideoTest : PluginAudioFixture() {
     fun `remapping a playback id to a failed source revokes the previous video capability`() =
         runTest {
             val videoProvider =
-                plugin.copy(
+                grantedPlugin.copy(
                     manifest =
                         plugin.manifest.copy(
                             roles =
@@ -122,7 +149,7 @@ class PluginAudioVideoTest : PluginAudioFixture() {
     fun `cached audio publishes original-id video capability and provider changes revoke it`() =
         runTest {
             val videoProvider =
-                plugin.copy(
+                grantedPlugin.copy(
                     manifest =
                         plugin.manifest.copy(
                             roles =
@@ -156,7 +183,7 @@ class PluginAudioVideoTest : PluginAudioFixture() {
     fun `failed picture recovery refreshes the accepted recording after matching cache invalidation`() =
         runTest {
             val videoProvider =
-                plugin.copy(
+                grantedPlugin.copy(
                     manifest =
                         plugin.manifest.copy(
                             roles =
@@ -200,7 +227,7 @@ class PluginAudioVideoTest : PluginAudioFixture() {
     fun `audio-only playback searches video candidates for a video-capable preferred provider`() =
         runTest {
             val videoProvider =
-                plugin.copy(
+                grantedPlugin.copy(
                     manifest =
                         plugin.manifest.copy(
                             roles =
@@ -227,7 +254,7 @@ class PluginAudioVideoTest : PluginAudioFixture() {
     fun `a saved Songs-only miss does not suppress the new video search`() =
         runTest {
             val videoProvider =
-                plugin.copy(
+                grantedPlugin.copy(
                     manifest =
                         plugin.manifest.copy(
                             roles =
@@ -306,7 +333,7 @@ class PluginAudioVideoTest : PluginAudioFixture() {
     fun `refused URL refresh falls back to another provider when accepted recording is unavailable`() =
         runTest {
             val beatport =
-                plugin.copy(
+                grantedPlugin.copy(
                     manifest = plugin.manifest.copy(id = "beatport", roles = Roles(audio = AudioRole(setOf("beatport"), match = true))),
                 )
             every { registry.state } returns
