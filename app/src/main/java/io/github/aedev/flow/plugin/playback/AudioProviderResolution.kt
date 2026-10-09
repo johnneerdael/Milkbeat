@@ -63,8 +63,9 @@ internal suspend fun resolveAudioAttempts(
                 pictureUnavailable = completed.reversed().firstNotNullOfOrNull { it?.pictureUnavailable },
             )
         } finally {
+            // Left open: a cancelled loser may already be past its last suspension point and still
+            // send. Nothing reads this local channel after the winner, so the late result is dropped.
             workers.forEach { it.cancel() }
-            results.close()
         }
     }
 

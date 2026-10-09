@@ -7,9 +7,11 @@ import androidx.datastore.preferences.core.emptyPreferences
 import io.github.aedev.flow.data.music.model.MusicTrack
 import io.github.aedev.flow.plugin.playback.PluginAudio
 import io.github.aedev.flow.plugin.playback.PluginVideo
+import io.github.aedev.flow.plugin.playback.ResolvedAudio
 import io.github.aedev.flow.plugin.runtime.PluginCallException
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -47,8 +49,8 @@ class AccountPlayHistoryReportingTest {
             history.onListened(track, 29_999, 0, 360_000, progress = true)
             history.onListened(track, 30_000, 0, 360_000, progress = true, playbackSessionId = "session")
             runCurrent()
-            coVerify(exactly = 1) { audio.reportListen(any(), 30_000, null, 360_000, true, "session") }
-            coVerify(exactly = 0) { audio.reportListen(any(), 29_999, any(), any(), any(), any()) }
+            coVerify(exactly = 1) { audio.reportPinnedListen(any(), 30_000, null, 360_000, true, "session") }
+            coVerify(exactly = 0) { audio.reportPinnedListen(any(), 29_999, any(), any(), any(), any()) }
         }
 
     @Test
@@ -59,7 +61,7 @@ class AccountPlayHistoryReportingTest {
             history.onListened(track, 30_000, 600_000, 360_000, progress = true)
             history.onListened(track, 35_000, 600_000, 365_000)
             runCurrent()
-            coVerify(exactly = 0) { audio.reportListen(any(), any(), any(), any(), any(), any()) }
+            coVerify(exactly = 0) { audio.reportPinnedListen(any(), any(), any(), any(), any(), any()) }
         }
 
     @Test
@@ -70,72 +72,104 @@ class AccountPlayHistoryReportingTest {
             serviceScope.cancel()
             history.onListened(track, 35_000, 600_000, 365_000)
             runCurrent()
-            coVerify(exactly = 1) { audio.reportListen(any(), 35_000, 600_000, 365_000, false, null) }
+            coVerify(exactly = 1) { audio.reportPinnedListen(any(), 35_000, 600_000, 365_000, false, null) }
         }
 
     @Test
     fun `seek baseline cannot overtake an unfinished boundary report`() =
         runTest {
             val release = CompletableDeferred<Unit>()
-            coEvery { audio.reportListen(any(), 35_000, 600_000, 35_000, true, null) } coAnswers { release.await() }
+            coEvery { audio.reportPinnedListen(any(), 35_000, 600_000, 35_000, true, null) } coAnswers { release.await() }
             val history = AccountPlayHistory(MemoryPreferences(), audio, video, backgroundScope)
             history.onListened(track, 35_000, 600_000, 35_000, true)
             history.onListened(track, 35_000, 600_000, 365_000, true)
             runCurrent()
-            coVerify(exactly = 0) { audio.reportListen(any(), 35_000, 600_000, 365_000, true, null) }
+            coVerify(exactly = 0) { audio.reportPinnedListen(any(), 35_000, 600_000, 365_000, true, null) }
             release.complete(Unit)
             runCurrent()
-            coVerify(exactly = 1) { audio.reportListen(any(), 35_000, 600_000, 365_000, true, null) }
+            coVerify(exactly = 1) { audio.reportPinnedListen(any(), 35_000, 600_000, 365_000, true, null) }
         }
 
     @Test
     fun `one network exception does not terminate later history reporting`() =
         runTest {
-            coEvery { audio.reportListen(any(), 30_000, 600_000, 30_000, true, null) } throws IOException("offline")
+            coEvery { audio.reportPinnedListen(any(), 30_000, 600_000, 30_000, true, null) } throws IOException("offline")
             val history = AccountPlayHistory(MemoryPreferences(), audio, video, backgroundScope)
             history.onListened(track, 30_000, 600_000, 30_000, true)
             history.onListened(track, 60_000, 600_000, 60_000, true)
             runCurrent()
-            coVerify(exactly = 1) { audio.reportListen(any(), 60_000, 600_000, 60_000, true, null) }
+            coVerify(exactly = 1) { audio.reportPinnedListen(any(), 60_000, 600_000, 60_000, true, null) }
         }
 
     @Test
     fun `transiently failed final report is retried while progress and permanent failures are not`() =
         runTest {
             var finalAttempts = 0
-            coEvery { audio.reportListen(any(), 35_000, 600_000, 365_000, false, "final") } coAnswers {
+            coEvery { audio.reportPinnedListen(any(), 35_000, 600_000, 365_000, false, "final") } coAnswers {
                 if (++finalAttempts == 1) throw networkFailure(PluginErrorCode.NETWORK)
             }
-            coEvery { audio.reportListen(any(), 30_000, 600_000, 30_000, true, "progress") } throws networkFailure(PluginErrorCode.NETWORK)
-            coEvery { audio.reportListen(any(), 40_000, 600_000, 40_000, false, "refused") } throws
+            coEvery { audio.reportPinnedListen(any(), 30_000, 600_000, 30_000, true, "progress") } throws
+                networkFailure(PluginErrorCode.NETWORK)
+            coEvery { audio.reportPinnedListen(any(), 40_000, 600_000, 40_000, false, "refused") } throws
                 networkFailure(PluginErrorCode.UNSUPPORTED)
             val history = AccountPlayHistory(MemoryPreferences(), audio, video, backgroundScope)
             history.onListened(track, 30_000, 600_000, 30_000, true, "progress")
             history.onListened(track, 35_000, 600_000, 365_000, playbackSessionId = "final")
             history.onListened(track, 40_000, 600_000, 40_000, playbackSessionId = "refused")
             runCurrent()
-            coVerify(exactly = 1) { audio.reportListen(any(), 35_000, 600_000, 365_000, false, "final") }
-            coVerify(exactly = 0) { audio.reportListen(any(), 40_000, 600_000, 40_000, false, "refused") }
+            coVerify(exactly = 1) { audio.reportPinnedListen(any(), 35_000, 600_000, 365_000, false, "final") }
+            coVerify(exactly = 0) { audio.reportPinnedListen(any(), 40_000, 600_000, 40_000, false, "refused") }
             advanceTimeBy(5_001)
             runCurrent()
-            coVerify(exactly = 2) { audio.reportListen(any(), 35_000, 600_000, 365_000, false, "final") }
-            coVerify(exactly = 1) { audio.reportListen(any(), 30_000, 600_000, 30_000, true, "progress") }
+            coVerify(exactly = 2) { audio.reportPinnedListen(any(), 35_000, 600_000, 365_000, false, "final") }
+            coVerify(exactly = 1) { audio.reportPinnedListen(any(), 30_000, 600_000, 30_000, true, "progress") }
             advanceTimeBy(60_000)
             runCurrent()
-            coVerify(exactly = 1) { audio.reportListen(any(), 40_000, 600_000, 40_000, false, "refused") }
+            coVerify(exactly = 1) { audio.reportPinnedListen(any(), 40_000, 600_000, 40_000, false, "refused") }
         }
 
     @Test
     fun `switching history off stops a pending final retry`() =
         runTest {
-            coEvery { audio.reportListen(any(), 35_000, 600_000, 365_000, false, null) } throws networkFailure(PluginErrorCode.TIMEOUT)
+            coEvery { audio.reportPinnedListen(any(), 35_000, 600_000, 365_000, false, null) } throws
+                networkFailure(PluginErrorCode.TIMEOUT)
             val history = AccountPlayHistory(MemoryPreferences(), audio, video, backgroundScope)
             history.onListened(track, 35_000, 600_000, 365_000)
             runCurrent()
             history.setEnabled(false)
             advanceTimeBy(70_000)
             runCurrent()
-            coVerify(exactly = 1) { audio.reportListen(any(), 35_000, 600_000, 365_000, false, null) }
+            coVerify(exactly = 1) { audio.reportPinnedListen(any(), 35_000, 600_000, 365_000, false, null) }
+        }
+
+    @Test
+    fun `queued reports keep the resolution accepted when the listen was queued`() =
+        runTest {
+            val first = mockk<ResolvedAudio>()
+            val replaced = mockk<ResolvedAudio>()
+            var current = first
+            every { audio.acceptedListen(any()) } answers { current }
+            val release = CompletableDeferred<Unit>()
+            coEvery { audio.reportPinnedListen(first, 30_000, 600_000, 30_000, true, null) } coAnswers { release.await() }
+            val history = AccountPlayHistory(MemoryPreferences(), audio, video, backgroundScope)
+            history.onListened(track, 30_000, 600_000, 30_000, true)
+            history.onListened(track, 35_000, 600_000, 365_000)
+            runCurrent()
+            current = replaced
+            release.complete(Unit)
+            runCurrent()
+            coVerify(exactly = 1) { audio.reportPinnedListen(first, 35_000, 600_000, 365_000, false, null) }
+            coVerify(exactly = 0) { audio.reportPinnedListen(replaced, any(), any(), any(), any(), any()) }
+        }
+
+    @Test
+    fun `a listen with no accepted resolution is not queued`() =
+        runTest {
+            every { audio.acceptedListen(any()) } returns null
+            val history = AccountPlayHistory(MemoryPreferences(), audio, video, backgroundScope)
+            history.onListened(track, 35_000, 600_000, 365_000)
+            runCurrent()
+            coVerify(exactly = 0) { audio.reportPinnedListen(any(), any(), any(), any(), any(), any()) }
         }
 
     private fun networkFailure(code: PluginErrorCode) = PluginCallException("provider", PluginError(code, "fixture"))

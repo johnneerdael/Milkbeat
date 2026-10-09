@@ -36,6 +36,21 @@ import nl.neerdael.milkbeat.sabr.manifest.Period as SabrPeriod
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 class MusicVideoJoinGateTest {
     @Test
+    fun `audio readiness after a transition is read from the incoming item's published state`() {
+        val f = VideoJoinFixture()
+        assertThat(f.gate.awaitingAudio).isFalse()
+        f.changeSource()
+        f.state = Player.STATE_BUFFERING
+        f.gate.onMediaItemTransition(null, Player.MEDIA_ITEM_TRANSITION_REASON_AUTO)
+        assertThat(f.gate.awaitingAudio).isTrue()
+        f.state = Player.STATE_READY
+        assertThat(f.gate.awaitingAudio).isFalse()
+        f.changeSource()
+        f.gate.onMediaItemTransition(null, Player.MEDIA_ITEM_TRANSITION_REASON_AUTO)
+        assertThat(f.gate.awaitingAudio).isFalse()
+    }
+
+    @Test
     fun `old audio buffer and initialization or audio loads cannot release the picture`() {
         val f = VideoJoinFixture()
         f.bufferedMs = 900_000

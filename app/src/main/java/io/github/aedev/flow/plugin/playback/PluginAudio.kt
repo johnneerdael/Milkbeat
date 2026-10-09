@@ -583,6 +583,9 @@ class PluginAudio
             resolvedRevision.update { it + 1 }
         }
 
+        /** The accepted resolution [track] plays from now; a queued report pins it before it is sent. */
+        fun acceptedListen(track: TrackDescriptor): ResolvedAudio? = resolved[track.audioIdentity()]
+
         /** Reports a listen to the plugin that played it, when it reports listens and the listener allows it. */
         suspend fun reportListen(
             track: TrackDescriptor,
@@ -592,7 +595,17 @@ class PluginAudio
             progress: Boolean = false,
             playbackSessionId: String? = null,
         ) {
-            val played = resolved[track.audioIdentity()] ?: return
-            reportAcceptedListen(host, registry, played, playedMs, durationMs, positionMs, progress, playbackSessionId)
+            val played = acceptedListen(track) ?: return
+            reportPinnedListen(played, playedMs, durationMs, positionMs, progress, playbackSessionId)
         }
+
+        /** Reports against [played] even after an account or quality change replaced the current resolution. */
+        suspend fun reportPinnedListen(
+            played: ResolvedAudio,
+            playedMs: Long,
+            durationMs: Long?,
+            positionMs: Long? = null,
+            progress: Boolean = false,
+            playbackSessionId: String? = null,
+        ) = reportAcceptedListen(host, registry, played, playedMs, durationMs, positionMs, progress, playbackSessionId)
     }

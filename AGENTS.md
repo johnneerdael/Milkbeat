@@ -903,7 +903,9 @@ run that occupies a physical device, and the resulting diff is thousands of line
   `MusicAccountHistoryListener` reports qualified music listens at a 30-second playing-only cadence
   plus event boundaries; pause/buffering stop its timer, seeks emit old/new positions with no skipped
   listening credit, and each new listen gets a new identity. `AccountPlayHistory` preserves report
-  order and its default-on user preference. A final (non-progress) report retries transient failures
+  order and its default-on user preference. Each queued report pins the accepted `ResolvedAudio`
+  when it is queued (`PluginAudio.acceptedListen`), so sends and retries never follow a later
+  account or quality change. A final (non-progress) report retries transient failures
   through `retryingTransient` in queue order; cadence samples are not retried because the next one
   is cumulative. API <8 stays finish-only. Reuse the accepted cached
   resolution; never re-extract streams for progress reporting. Do not log session IDs or credentials.

@@ -16,6 +16,7 @@ import io.github.aedev.flow.player.diagnostics.TraceEvent
 import io.github.aedev.flow.player.diagnostics.TraceField
 import io.github.aedev.flow.plugin.playback.PluginAudio
 import io.github.aedev.flow.plugin.playback.PluginVideo
+import io.github.aedev.flow.plugin.playback.ResolvedAudio
 import io.github.aedev.flow.plugin.runtime.PluginCallException
 import io.github.aedev.flow.plugin.runtime.retryingTransient
 import io.github.aedev.flow.utils.PerformanceDispatcher
@@ -72,6 +73,7 @@ class AccountPlayHistory
 
         private data class ListenReport(
             val track: MusicTrack,
+            val played: ResolvedAudio,
             val playedMs: Long,
             val durationMs: Long,
             val positionMs: Long?,
@@ -91,8 +93,8 @@ class AccountPlayHistory
                             continue
                         }
                         val send: suspend () -> Unit = {
-                            pluginAudio.reportListen(
-                                MusicVideoItems.descriptor(listen.track),
+                            pluginAudio.reportPinnedListen(
+                                listen.played,
                                 listen.playedMs,
                                 listen.durationMs.takeIf { it > 0 },
                                 listen.positionMs,
@@ -135,6 +137,8 @@ class AccountPlayHistory
             playbackSessionId: String? = null,
         ) {
             if (!countsAsPlay(playedMs, durationMs)) return
+            // Pinned now: an account or quality change before the send or a retry must not redirect it.
+            val played = pluginAudio.acceptedListen(MusicVideoItems.descriptor(track)) ?: return
             PlaybackTrace.event(
                 TraceEvent.HISTORY_QUEUED,
                 TraceField.PLAYED_MS to playedMs,
@@ -142,7 +146,7 @@ class AccountPlayHistory
                 TraceField.PROGRESS to if (progress) 1L else 0L,
                 category = TraceCategory.HISTORY,
             )
-            listens.trySend(ListenReport(track, playedMs, durationMs, positionMs, progress, playbackSessionId))
+            listens.trySend(ListenReport(track, played, playedMs, durationMs, positionMs, progress, playbackSessionId))
         }
 
         /**
