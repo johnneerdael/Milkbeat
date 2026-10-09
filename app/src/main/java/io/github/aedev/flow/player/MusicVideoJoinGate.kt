@@ -74,7 +74,7 @@ internal class MusicVideoJoinGate :
         requested = true
         val nextSource = currentSource() ?: return
         if (awaitingAudio) return
-        if (source == nextSource && (waiting || prepared.value)) return
+        if (source == nextSource) return
         source = nextSource
         videoStartMs = C.TIME_UNSET
         videoEndMs = C.TIME_UNSET
@@ -141,7 +141,7 @@ internal class MusicVideoJoinGate :
         loadEventInfo: LoadEventInfo,
         mediaLoadData: MediaLoadData,
     ) {
-        if (!waiting || !isCurrentVideo(eventTime, mediaLoadData)) return
+        if (!requested || prepared.value || !isCurrentVideo(eventTime, mediaLoadData)) return
         val start = mediaLoadData.mediaStartTimeMs
         val end = mediaLoadData.mediaEndTimeMs
         if (start == C.TIME_UNSET || end == C.TIME_UNSET || end <= start) return
@@ -164,7 +164,11 @@ internal class MusicVideoJoinGate :
         error: IOException,
         wasCanceled: Boolean,
     ) {
-        if (waiting && matchesCurrentSource(eventTime)) reset()
+        if (requested && !prepared.value && matchesCurrentSource(eventTime)) {
+            waiting = false
+            videoStartMs = C.TIME_UNSET
+            videoEndMs = C.TIME_UNSET
+        }
     }
 
     private fun currentSource(): Source? {
@@ -216,7 +220,7 @@ internal class MusicVideoJoinGate :
 
     private fun completeIfBuffered() {
         val current = player ?: return
-        if (!waiting || source != currentSource() || videoEndMs == C.TIME_UNSET ||
+        if (!requested || prepared.value || source != currentSource() || videoEndMs == C.TIME_UNSET ||
             !current.currentTracks.isTypeSelected(C.TRACK_TYPE_VIDEO)
         ) {
             return

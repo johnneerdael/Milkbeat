@@ -6,6 +6,7 @@ import androidx.media3.common.C
 import androidx.media3.common.FlagSet
 import androidx.media3.common.Format
 import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.Timeline
 import androidx.media3.common.TrackGroup
@@ -121,6 +122,39 @@ class MusicVideoJoinGateTest {
         f.gate.bind(null)
         assertThat(f.gate.waiting).isFalse()
         assertThat(f.gate.ready.value).isFalse()
+    }
+
+    @Test
+    fun `a successful retry prepares the picture without restoring the readiness bypass`() {
+        val f = VideoJoinFixture()
+        f.gate.begin()
+        f.load(10_000, 11_999)
+        f.gate.onLoadError(f.event(), f.loadInfo, f.mediaLoad(11_999, 14_000), IOException("offline"), false)
+        assertThat(f.gate.waiting).isFalse()
+        f.gate.begin()
+        assertThat(f.gate.waiting).isFalse()
+        f.load(11_999, 14_000)
+        assertThat(f.gate.ready.value).isFalse()
+        f.load(10_000, 11_999)
+        assertThat(f.gate.ready.value).isTrue()
+        assertThat(f.gate.waiting).isFalse()
+    }
+
+    @Test
+    fun `hide and terminal player failure discard retry completions`() {
+        for (terminal in listOf(false, true)) {
+            val f = VideoJoinFixture()
+            f.gate.begin()
+            f.gate.onLoadError(f.event(), f.loadInfo, f.mediaLoad(10_000, 20_000), IOException("offline"), false)
+            if (terminal) {
+                f.gate.onPlayerError(PlaybackException("failed", null, PlaybackException.ERROR_CODE_IO_UNSPECIFIED))
+            } else {
+                f.gate.reset()
+            }
+            f.load(10_000, 20_000)
+            assertThat(f.gate.ready.value).isFalse()
+            assertThat(f.gate.waiting).isFalse()
+        }
     }
 
     @Test
