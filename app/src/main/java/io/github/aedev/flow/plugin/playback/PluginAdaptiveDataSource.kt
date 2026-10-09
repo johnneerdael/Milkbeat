@@ -11,6 +11,7 @@ import androidx.media3.datasource.okhttp.OkHttpDataSource
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import nl.neerdael.milkbeat.plugin.FormatType
+import nl.neerdael.milkbeat.plugin.MediaFormat
 import okhttp3.CookieJar
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
@@ -25,7 +26,7 @@ internal fun pluginAdaptiveDataSourceFactory(
 ): DataSource.Factory {
     val initial = binding.initial
     val formats = listOfNotNull(initial.stream.audioFormat, initial.stream.video).associateBy { it.url }
-    val keyed = formats.values.associateBy { "${initial.pluginId}:${initial.stream.cacheKey}:${it.id}" }
+    val keyed = formats.values.associateBy(initial::adaptiveCacheKey)
     val client =
         base
             .newBuilder()
@@ -63,7 +64,7 @@ internal fun pluginAdaptiveDataSourceFactory(
                 .buildUpon()
                 .setUri(format.url)
                 .setHttpRequestHeaders(headers.filterKeys { !it.equals("Range", ignoreCase = true) })
-                .setKey("${current.pluginId}:${current.stream.cacheKey}:${format.id}")
+                .setKey(current.adaptiveCacheKey(format))
                 .build()
         }
     val upstream: DataSource.Factory =
@@ -82,7 +83,9 @@ internal fun pluginAdaptiveDataSourceFactory(
             verifyCurrent(initial)
             val original = formats[request.uri.toString()] ?: throw IOException("Unknown adaptive rendition")
             checkedPluginMediaUrl(original.url, allowedHosts())
-            request.buildUpon().setKey("${initial.pluginId}:${initial.stream.cacheKey}:${original.id}").build()
+            request.buildUpon().setKey(initial.adaptiveCacheKey(original)).build()
         }
     }
 }
+
+internal fun ResolvedAudio.adaptiveCacheKey(format: MediaFormat): String = "$pluginId:${stream.cacheKey}:${format.id}"

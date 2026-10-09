@@ -63,7 +63,7 @@ class MusicQueuePreparationPlaybackTest {
                             false,
                         )
                     },
-                    { audio -> ResolvingDataSource.Factory(upstream) { spec -> spec.withUri(Uri.parse(audio.stream.url)) } },
+                    { audio, _ -> ResolvingDataSource.Factory(upstream) { spec -> spec.withUri(Uri.parse(audio.stream.url)) } },
                 )
             val active = AtomicInteger()
             val peak = AtomicInteger()

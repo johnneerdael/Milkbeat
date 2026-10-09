@@ -27,7 +27,9 @@ import io.github.aedev.flow.player.MusicVideoItems
 import io.github.aedev.flow.player.datasource.BoundPluginMusicDataSourceFactory
 import io.github.aedev.flow.player.datasource.MusicFolderDataSourceFactory
 import io.github.aedev.flow.player.datasource.PluginMusicDataSourceFactory
+import io.github.aedev.flow.player.datasource.bindAdaptiveMusicRenditions
 import io.github.aedev.flow.player.datasource.bindCachedMusicRendition
+import io.github.aedev.flow.player.datasource.clearCachedMusicResources
 import io.github.aedev.flow.player.datasource.hasCompleteMusicDownload
 import io.github.aedev.flow.player.stream.VideoCodecUtils
 import io.github.aedev.flow.plugin.playback.BoundPluginAudio
@@ -35,6 +37,7 @@ import io.github.aedev.flow.plugin.playback.PictureLimits
 import io.github.aedev.flow.plugin.playback.PluginAudio
 import io.github.aedev.flow.plugin.playback.QueuePreparationResult
 import io.github.aedev.flow.plugin.playback.ResolvedAudio
+import io.github.aedev.flow.plugin.playback.adaptiveCacheKey
 import io.github.aedev.flow.plugin.playback.adaptiveDataSourceFactory
 import io.github.aedev.flow.plugin.playback.drmDataSourceFactory
 import io.github.aedev.flow.plugin.playback.prepareQueue
@@ -299,8 +302,15 @@ class DownloadUtil
                         }.getOrDefault(false)
                     if (cached) null else resolveForPlayback(uri, picture = false, preparePicture = picture)
                 },
-                bind = { audio ->
+                bind = { audio, mediaId ->
                     val binding = BoundPluginAudio(audio, pluginAudio::refreshBound)
+                    if (audio.stream.audioFormat != null) {
+                        bindAdaptiveMusicRenditions(
+                            playerCache,
+                            mediaId,
+                            listOfNotNull(audio.stream.audioFormat, audio.stream.video).map(audio::adaptiveCacheKey),
+                        )
+                    }
                     BoundPluginMusicDataSourceFactory(
                         resolvingFactory(binding),
                         audio.stream.drm?.let { pluginAudio.drmDataSourceFactory(binding, okHttpClient) },
@@ -441,7 +451,7 @@ class DownloadUtil
             songUrlCache.remove(mediaId)
 
             try {
-                playerCache.removeResource(mediaId)
+                clearCachedMusicResources(playerCache, mediaId)
             } catch (e: Exception) {
                 Log.w(TAG, "Error clearing playerCache for $mediaId: ${e.message}")
             }
