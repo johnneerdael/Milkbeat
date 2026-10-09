@@ -518,13 +518,13 @@ Play album (metadata M)
 
 ### 7.3 Music videos
 
-- **Optional stream:** a music video is an optional `video` stream of a track, resolved when the
-  listener has video on (today's Video/Visualizer switch).
-- **Any audio provider:** it asks for it by passing `video: true` to `resolve`.
+- **Optional presentation:** music preparation asks for optional picture metadata using
+  `prepareVideo: true`; audio-only fallback remains valid. `video: true` is a hard picture request.
 - **Picture limits:** music uses the active `Display.Mode` physical short side, capped at 2160p;
   an unknown mode retains 1080p. Codec requests retain the device's hardware-supported keys.
-  Audio-only playback supplies no picture limits or video codec request.
-- **Where it applies:** accepted sources from providers declaring `musicVideo` offer a Video choice for the original playback ID, including static Art Tracks. Eligibility is event-driven from accepted resolution and current account/provider context; original catalog IDs and metadata remain intact. Discovery never reloads playback. Explicit view selection requests picture using the accepted recording and preserves position; unavailable picture uses the existing audio recovery. Providers without `musicVideo` keep the visualizer or artwork.
+  Optional presentation preparation supplies these limits even when picture is hidden; an audio
+  request without picture preparation supplies neither.
+- **Where it applies:** usable prepared sources from providers declaring `musicVideo` offer a Video choice for the original playback ID, including static Art Tracks. Eligibility is event-driven from accepted resolution and current account/provider context; original catalog IDs and metadata remain intact. Discovery never reloads playback. Explicit view selection enables the prepared video track in the accepted presentation without replacing or seeking audio. Sources without prepared picture keep the visualizer or artwork.
 - **Playback artwork:** optional `AudioStream.artwork` carries the best available playback thumbnail. The accepted source's Media3 timeline publishes it as artwork metadata while preserving the original media ID, title, artist and cache key. The music manager observes selected-source metadata events; queued preparation cannot publish wallpaper for another playing item. TV Artwork view requests this URL through Coil and uses the original catalog cover if it is missing, blank or fails to load. It makes no extra resolution or video-media request.
 
 ## 8. Sign-in
