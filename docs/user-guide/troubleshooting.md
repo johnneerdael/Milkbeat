@@ -94,6 +94,18 @@ Check the provider is installed, enabled and signed in: Library shows a chip onl
 
 The device needs OpenGL ES 3.0. For engine-level symptoms, see ProjectM TV's [troubleshooting](https://johnneerdael.github.io/ProjectM-TV/troubleshooting/). Report persistent issues with the device model, the Milkbeat version and the diagnostics line.
 
+## The app closes at preset changes
+
+If Milkbeat closes by itself while the visualizer shows, often when one preset changes into the next:
+
+1. Open Milkbeat again and check **Settings → Visualizations → Last exit**. Select it for the [exit report](settings.md#troubleshooting): *crashed (native code)* or *killed by signal* points to the graphics driver or the engine, *killed for low memory* to memory.
+2. Try **Transition style** Lightweight, then Classic. If only Auto blends crash, the lower blend resolution is involved.
+3. Turn **Shader binary cache** off. If the crashes stop, the GPU driver cannot reuse program binaries between OpenGL contexts.
+4. If they continue, also turn **Background compile** off. Switches then pause the picture while each preset compiles, often for a second or two. If the crashes stop only now, the driver fails when two threads compile at once.
+5. Report the result with a photo of the exit report, the device model and which switches you changed. Turn the switches back on afterwards if they made no difference.
+
+These switches are the same as ProjectM TV's; its [troubleshooting](https://johnneerdael.github.io/ProjectM-TV/troubleshooting/#the-app-closes-at-preset-changes) describes them in depth. They exist to diagnose crashes first reported on a Fire TV Stick 4K Max (2nd gen, PowerVR GE9215 GPU). Leave them on otherwise.
+
 ## A plugin did not update
 
 App updates do not update plugins. With **Update plugins automatically** on, Milkbeat checks at start and every six hours; an update that asks for new permissions waits until you review it in Settings → Plugins. Select **Update all plugins** to check at once, or enter the plugin's code or link again. An update must keep its signing author and cannot be older than the installed version. Sign-ins are kept separately from the plugin code.

@@ -215,7 +215,7 @@ overview; [ProjectM TV's guide](https://johnneerdael.github.io/ProjectM-TV/) cov
 | **Plugins** | Audio priority, video provider, installed plugins and their details, automatic plugin updates, Add a plugin |
 | **Music folders** | Local folder browser, Android folder picker, SMB, WebDAV, SFTP and NFS editors, Rescan library, saved sources |
 | **Playback** | Background Play, Autoplay related videos, Subtitles, Skip Silence, Stable Voice, Ambient mode, Debug playback logging |
-| **Visualizations** | The ProjectM TV presets, transitions, picture quality, diagnostics and timing settings |
+| **Visualizations** | The ProjectM TV presets, transitions, picture quality, diagnostics, timing and crash troubleshooting settings |
 | **About** | Version, automatic app updates (GitHub build), Changelog, GitHub and credits |
 
 [Every setting with screenshots](https://johnneerdael.github.io/Milkbeat/settings/).
