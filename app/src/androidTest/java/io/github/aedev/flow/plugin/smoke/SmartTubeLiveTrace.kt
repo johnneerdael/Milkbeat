@@ -1,8 +1,6 @@
 package io.github.aedev.flow.plugin.smoke
 
-import android.os.ParcelFileDescriptor
 import android.os.SystemClock
-import androidx.test.platform.app.InstrumentationRegistry
 import io.github.aedev.flow.player.diagnostics.PlaybackTrace
 import io.github.aedev.flow.player.diagnostics.TraceCategory
 import io.github.aedev.flow.player.diagnostics.TraceEvent
@@ -12,10 +10,10 @@ import java.io.IOException
 /** Read the safe trace continuously so unrelated device logs cannot evict startup evidence. */
 internal class SmartTubeLiveTrace : AutoCloseable {
     private val startedMs = SystemClock.elapsedRealtime()
-    private val descriptor =
-        InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand(
-            "logcat -v raw -s MilkbeatTrace:I '*:S'",
-        )
+    private val process =
+        ProcessBuilder("logcat", "-v", "raw", "-s", "MilkbeatTrace:I", "*:S")
+            .redirectErrorStream(true)
+            .start()
     private val retained = mutableListOf<String>()
     private val safeLine =
         Regex(
@@ -37,7 +35,7 @@ internal class SmartTubeLiveTrace : AutoCloseable {
     private val worker =
         Thread({
             try {
-                ParcelFileDescriptor.AutoCloseInputStream(descriptor).bufferedReader().use { reader ->
+                process.inputStream.bufferedReader().use { reader ->
                     while (!stopping) {
                         val line = reader.readLine() ?: break
                         if (!safeLine.matches(line) || timeOf(line) < startedMs) continue
@@ -71,12 +69,22 @@ internal class SmartTubeLiveTrace : AutoCloseable {
 
     override fun close() {
         stopping = true
-        // Wake an idle pipe reader before closing its descriptor; logging is restored afterwards.
-        PlaybackTrace.event(TraceEvent.LOGGING_ENABLED)
-        descriptor.close()
-        worker.interrupt()
-        worker.join(2000)
-        check(!worker.isAlive) { "Live playback trace collector did not stop" }
+        try {
+            process.destroy()
+            try {
+                process.inputStream.close()
+            } finally {
+                try {
+                    process.errorStream.close()
+                } finally {
+                    process.outputStream.close()
+                }
+            }
+        } finally {
+            worker.interrupt()
+            worker.join(2000)
+            check(!worker.isAlive) { "Live playback trace collector did not stop" }
+        }
     }
 
     private fun timeOf(line: String): Long =
