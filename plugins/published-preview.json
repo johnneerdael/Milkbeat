@@ -65,6 +65,19 @@
       "fingerprint": "39dca3d132c56262c0873ec96faf22cc8ed9ca30c7ed1f135049f8570b943adc",
       "contentDigest": "1fb2e0e83cca4aac9e459d26ced36d667888ea4bbab03e427fc579b74d10793c",
       "code": "932"
+    },
+    {
+      "id": "nl.neerdael.deezer",
+      "name": "Deezer",
+      "version": "0.2.0",
+      "versionCode": 2,
+      "apiMin": 9,
+      "format": 1,
+      "sha256": "47230df640a8609afc739790021297f4c6c6840e4dcc78fe712a18d67348a2e3",
+      "size": 16106,
+      "fingerprint": "39dca3d132c56262c0873ec96faf22cc8ed9ca30c7ed1f135049f8570b943adc",
+      "contentDigest": "1adc0fd2a815e3edcb56607d8781d0c493850e074bfd9943d51afa73b86bfc2c",
+      "code": "734"
     }
   ]
 }

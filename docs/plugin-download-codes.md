@@ -14,6 +14,7 @@ add-plugin deep link's `url` parameter. Full download URLs remain supported.
 | 494 | YouTube Music, private publisher |
 | 089 | SoundCloud, private publisher |
 | 932 | YouTube Video, private publisher |
+| 734 | Deezer, private publisher |
 <!-- /plugin-codes -->
 
 ## Register another URL
