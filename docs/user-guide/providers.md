@@ -21,6 +21,7 @@ There is no metadata provider to choose: every installed, enabled catalog you ca
 | Beatport | **393** | Catalog, genres, charts, artists, labels, library | Full streams with a streaming subscription | — |
 | SoundCloud | **089** | Discover, Stream, Search, Artists, albums, playlists, Liked Songs, history | Available full tracks, matching and stations | — |
 | YouTube Video | **932** | YouTube's TV Music Home, Search, artists, albums, playlists, library | Streams, cross-provider matching and radio | YouTube videos and playlists |
+| Deezer | **734** | Home, Flow, Search, artists, albums, playlists, library | Account streams and cross-provider matching | — |
 
 Capabilities depend on the installed plugin version, the account and its subscription. YouTube Video shares the YouTube tab with YouTube Music: with both installed the tab shows YouTube Music's catalog, and YouTube Video's catalog appears, also without sign-in, when it is the only one. Sign-in with a TV code is optional. The [Preview app](preview-testing.md#youtube-video-plugin) installs the same release with code **932**.
 
@@ -28,11 +29,12 @@ Capabilities depend on the installed plugin version, the account and its subscri
 
 ## YouTube Video
 
-**YouTube Video 0.2.0** is available in stable Milkbeat with downloader code **932**. It requires
+**YouTube Video 0.2.1** is available in stable Milkbeat with downloader code **932**. It requires
 a Milkbeat build with plugin API 8; update the app before installing if your build is older. It keeps its own
 account alongside YouTube Music and supplies SmartTube's regular YouTube TV Music section:
 recommended music, charts, new videos and the other rows supplied for your region or account.
-Signing in adds Liked Music before those rows. Show More includes the original row and its
+Signing in adds Liked Music before those rows when it has songs. An empty Liked Music library
+does not prevent Home from loading. Show More includes the original row and its
 continuations; playlist and mix pages retain track order.
 
 To browse these feeds, disable YouTube Music when using YouTube Video for your catalog; the shared YouTube
@@ -56,6 +58,15 @@ downloads. Audio-only HLS needs an independent audio rendition; a combined audio
 cannot silently fetch video bytes in audio-only mode. App and plugin packages are distributed
 separately. The optional Preview app installs the released YouTube Video provider with the same code;
 its retired prerelease codes stay pinned to their original packages.
+
+## Deezer
+
+**Deezer 0.2.0** provides Home with Flow, mixes and channels, Search, artist, album and playlist
+pages, a read-only library and radio. Install it with code **734** on a Milkbeat build supporting
+plugin API 9. Sign in with Deezer through the phone web viewer on the same network as the TV.
+Its audio can play native Deezer tracks and accepted matches from other catalogs; stream
+availability and FLAC or MP3 quality depend on the account, region and recording. It supplies
+no video. Its encrypted streams cannot be downloaded for offline playback.
 
 ## Install a plugin
 
@@ -137,7 +148,8 @@ Completed indexing matches are kept when you cancel. Index again after changing 
 ## Sign-in and account requirements
 
 - **YouTube Music:** sign-in is optional. Signing in turns Home into a personalized feed and makes your library available. Free YouTube accounts are supported; Premium is not required for personalization.
-- **YouTube Video:** sign-in is optional. Pair it with a TV code from any phone for a personalized Home and your library; signed out, it browses YouTube's TV Music feeds. YouTube Video 0.2.0 needs a Milkbeat build with plugin API 8.
+- **YouTube Video:** sign-in is optional. Pair it with a TV code from any phone for a personalized Home and your library; signed out, it browses YouTube's TV Music feeds. YouTube Video 0.2.1 needs a Milkbeat build with plugin API 8.
+- **Deezer:** sign in through the phone web viewer for your catalog, Flow and read-only library. Audio availability and quality depend on the account and recording. Deezer 0.2.0 needs a Milkbeat build with plugin API 9.
 - **Spotify:** a catalog with **no audio source**. Its value is your personalized feed, playlists, Liked Songs and library after signing in. Keep at least one audio provider enabled.
 - **Beatport:** sign in for the catalog and your library. Beatport's own full-length audio needs an active streaming subscription; otherwise SoundCloud or YouTube Music can match the recording. A free account does not guarantee a match.
 - **SoundCloud:** sign in for personalized Home, playlists, Liked Songs, history and Artists. Public search and catalog pages can work anonymously. Full-track availability depends on the recording and your listening subscription; Artist Pro does not grant Go+ listening rights. Preview-only or restricted recordings can appear but cannot supply full-track audio, so keep another audio provider as a fallback. SoundCloud plugin 0.2.0 needs a Milkbeat build with plugin API 5. TV-paired accounts currently play clear HLS streams only; protected-only recordings cannot play with this session, and plays from a TV-paired account are not reported to SoundCloud. Existing web sessions keep their Widevine playback path where the account and device allow it.
@@ -150,7 +162,7 @@ Open the installed plugin's details and choose its sign-in method.
 
 ![Example TV pairing screen with a fake demonstration code](images/soundcloud-tv-pairing-example.png)
 
-**Web sign-in (YouTube Music, Spotify and Beatport):** scan the TV's QR code with a phone on the same network. The [phone viewer](https://github.com/johnneerdael/Milkbeat/blob/main/docs/phone-sign-in-remote-view.md) streams the provider's real sign-in page from the TV; use touch and typing on the phone to complete sign-in and any verification. Browsing and playback stay in Milkbeat's TV interface.
+**Web sign-in (YouTube Music, Spotify, Beatport and Deezer):** scan the TV's QR code with a phone on the same network. The [phone viewer](https://github.com/johnneerdael/Milkbeat/blob/main/docs/phone-sign-in-remote-view.md) streams the provider's real sign-in page from the TV; use touch and typing on the phone to complete sign-in and any verification. Browsing and playback stay in Milkbeat's TV interface.
 
 When a provider reports an expired sign-in, Milkbeat asks the plugin again in the background, retrying temporary connection failures, and restores the account without any action when it still works; private playlist preparation then resumes on its own. With YouTube Music 0.2.4 or later, a single refused request no longer signs the account out. An account the provider confirms expired needs sign-in again; local folders keep working.
 

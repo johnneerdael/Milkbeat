@@ -35,6 +35,19 @@ test('the default publication validator accepts all registered providers includi
  assert.ok(rows.some(row=>row.id==='nl.neerdael.soundcloud'));
 });
 
+test('Deezer is required in the registered provider set while unknown and duplicate IDs remain rejected',()=>{
+ const descriptor=JSON.parse(readFileSync(new URL('../published.json',import.meta.url)));
+ const catalog=readCatalog(new URL('../../app/src/main/assets/plugin-download-catalog.json',import.meta.url)).entries;
+ const rows=verifyPublishedPlugins({descriptor,catalog});
+ assert.equal(rows.find(row=>row.id==='nl.neerdael.deezer').apiMin,9);
+ const withoutDeezer={...descriptor,plugins:descriptor.plugins.filter(row=>row.id!=='nl.neerdael.deezer')};
+ assert.throws(()=>verifyPublishedPlugins({descriptor:withoutDeezer,catalog}),/Invalid published plugin descriptor/);
+ for(const id of ['nl.neerdael.unregistered',descriptor.plugins[0].id]){
+  const replaced={...descriptor,plugins:descriptor.plugins.map(row=>row.id==='nl.neerdael.deezer'?{...row,id}:row)};
+  assert.throws(()=>verifyPublishedPlugins({descriptor:replaced,catalog}),/Invalid published plugin identity/);
+ }
+});
+
 test('stable publication rejects prerelease packages before an automatic update can advertise them',()=>{
  const value=fixture();value.descriptor.plugins[0].version='1.0.1-preview.1';
  assert.throws(()=>verifyPublishedPlugins(value),/prerelease.*stable/i);
