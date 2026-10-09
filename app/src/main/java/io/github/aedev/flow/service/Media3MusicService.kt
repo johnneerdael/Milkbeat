@@ -164,6 +164,7 @@ class Media3MusicService : MediaLibraryService() {
     internal var learnDurationMs = 0L
     internal var learnPlayedMs = 0L
     internal var learnPlayingSinceMs = -1L
+    private var accountHistoryListener: MusicAccountHistoryListener? = null
 
     @Inject
     lateinit var downloadUtil: DownloadUtil
@@ -401,6 +402,22 @@ class Media3MusicService : MediaLibraryService() {
 
         player.setOffloadEnabled(shouldOffloadAudio(isTv, equalizerRepository.needsProcessing.value))
         initializeOutputRecovery()
+        accountHistoryListener =
+            MusicAccountHistoryListener(
+                sessionPlayer,
+                lifecycleScope,
+                ::resolveLearnTrack,
+                { track, progress ->
+                    accountPlayHistory.onListened(
+                        track,
+                        progress.playedMs,
+                        progress.durationMs,
+                        progress.positionMs,
+                        progress.progress,
+                        progress.playbackSessionId,
+                    )
+                },
+            )
         sessionPlayer.addListener(VisualizerClockListener(visualizerTap))
         lifecycleScope.launch { followPlayerClock(visualizerTap, sessionPlayer) }
         // Stream URLs belong to the identity that requested them; a sign-in or sign-out starts fresh.
@@ -555,6 +572,8 @@ class Media3MusicService : MediaLibraryService() {
         EnhancedMusicPlayerManager.setVideoCapablePlaybackIds(emptySet())
         EnhancedMusicPlayerManager.playbackArtworkState.value = null
         // Flush the in-flight listen session before the player goes away.
+        accountHistoryListener?.close()
+        accountHistoryListener = null
         finalizeListenSession()
 
         // Clear audio session ID so external processors know we're gone

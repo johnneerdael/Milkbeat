@@ -12,4 +12,11 @@ class AccountPlayHistoryTest {
         assertThat(countsAsPlay(playedMs = 20_000, durationMs = 50_000)).isFalse()
         assertThat(countsAsPlay(playedMs = 0, durationMs = 0)).isFalse()
     }
+
+    @Test
+    fun `live and unknown durations require thirty seconds`() {
+        assertThat(countsAsPlay(playedMs = 1, durationMs = 0)).isFalse()
+        assertThat(countsAsPlay(playedMs = 29_999, durationMs = -1)).isFalse()
+        assertThat(countsAsPlay(playedMs = 30_000, durationMs = 0)).isTrue()
+    }
 }
