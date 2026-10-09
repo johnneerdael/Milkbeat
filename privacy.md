@@ -280,10 +280,6 @@ current network grants. Credentials are refreshed with the bound playback descri
 - `accounts.google.com` and Google's sign-in pages: only while the user signs in on the TV.
 - `api.pipepipe.dev`: remote signature helper, used only as a fallback when both local decoders
   fail on a given video.
-- Lyrics providers, tried in order until one answers, and only when the user opens lyrics:
-  `lrclib.net`, `lyrics.kugou.com`, `mobileservice.kugou.com`, `api-lyrics.simpmusic.org`,
-  `lyrics-api.boidu.dev`, `lyrics.paxsenix.org`, the `lyricsplus` mirrors,
-  `lyrics-api.binimum.org`, `amp-api.music.apple.com`, `beta.music.apple.com`.
 - `amp.shazam.com`: song recognition, only on an explicit user request, and it receives an audio
   fingerprint rather than the recording.
 - `sponsor.ajay.app`: SponsorBlock segments for videos, on by default and switchable off in

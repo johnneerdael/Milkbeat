@@ -98,7 +98,10 @@ class SmartTubeContinuousPlaybackDeviceTest {
     fun inspectReportedRecordingMatches(): Unit =
         runBlocking {
             hilt.inject()
-            SmartTubeSmoke.await { registry.state.value.plugin(SmartTubeSmoke.PROVIDER) != null }
+            org.junit.Assume.assumeTrue(
+                "The optional match diagnostic requires an installed YouTube Video provider",
+                registry.state.value.plugin(SmartTubeSmoke.PROVIDER) != null,
+            )
             val descriptor =
                 TrackDescriptor(
                     EntityRef(EntityKind.TRACK, "soundcloud:tracks:1562058397"),
