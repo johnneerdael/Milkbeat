@@ -22,6 +22,11 @@ class PluginAudioDownloadsTest {
             clear.copy(mimeType = "application/x-mpegURL"),
             clear.copy(mimeType = "application/vnd.apple.mpegurl; charset=utf-8"),
             clear.copy(drm = drm),
+            clear.copy(
+                cipher =
+                    nl.neerdael.milkbeat.plugin
+                        .AudioCipher(nl.neerdael.milkbeat.plugin.AudioCipherScheme.BF_CBC_STRIPE, "00".repeat(16)),
+            ),
             clear.copy(mimeType = "application/x-server-abr"),
             clear.copy(
                 serverAbr =
