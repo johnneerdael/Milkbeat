@@ -6,20 +6,26 @@ import io.github.aedev.flow.player.diagnostics.PlaybackTrace
 import io.github.aedev.flow.player.diagnostics.TraceEvent
 import io.github.aedev.flow.player.diagnostics.TraceField
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.jsonObject
 import nl.neerdael.milkbeat.plugin.HttpBodyEncoding
 import nl.neerdael.milkbeat.plugin.HttpRequest
 import nl.neerdael.milkbeat.plugin.HttpResponse
 import nl.neerdael.milkbeat.plugin.PluginJson
+import okhttp3.Call
+import okhttp3.Callback
 import okhttp3.Interceptor
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.Response
 import java.io.IOException
 import java.util.Base64
 import java.util.concurrent.TimeUnit
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 
 private const val DEFAULT_TIMEOUT_MS = 20_000L
 private const val MAX_TIMEOUT_MS = 60_000L
@@ -87,7 +93,7 @@ internal class PluginHttp(
             var size = 0L
             var success = false
             try {
-                call.execute().use { response ->
+                call.readResponse { response ->
                     status = response.code.toLong()
                     val length = response.body.contentLength()
                     if (length > MAX_RESPONSE_BYTES) throw PluginHttpException("Response of $length bytes is too large")
@@ -147,3 +153,35 @@ internal class PluginHttp(
         return request
     }
 }
+
+// Keep cancellation attached while consuming the body; a header-only await detaches too early.
+private suspend fun <T> Call.readResponse(read: (Response) -> T): T =
+    suspendCancellableCoroutine { continuation ->
+        continuation.invokeOnCancellation { cancel() }
+        enqueue(
+            object : Callback {
+                override fun onFailure(
+                    call: Call,
+                    e: IOException,
+                ) {
+                    if (continuation.isActive) continuation.resumeWithException(e)
+                }
+
+                override fun onResponse(
+                    call: Call,
+                    response: Response,
+                ) {
+                    try {
+                        val result =
+                            response.use {
+                                if (!continuation.isActive) return
+                                read(it)
+                            }
+                        continuation.resume(result)
+                    } catch (error: Exception) {
+                        if (continuation.isActive) continuation.resumeWithException(error)
+                    }
+                }
+            },
+        )
+    }
