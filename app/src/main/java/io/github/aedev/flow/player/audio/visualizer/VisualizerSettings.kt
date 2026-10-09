@@ -18,6 +18,8 @@ data class VisualizerSettings(
     val frameRateCap: Int = 30,
     val meshLevel: Int = 2,
     val nativeTrails: Int = 0,
+    val backgroundCompile: Boolean = true,
+    val shaderBinaryCache: Boolean = true,
 ) {
     val clampedNativeTrails: Int get() = nativeTrails.takeIf { it in 0..2 } ?: 0
 

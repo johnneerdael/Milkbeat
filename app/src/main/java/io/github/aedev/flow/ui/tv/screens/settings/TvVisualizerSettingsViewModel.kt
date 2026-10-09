@@ -92,6 +92,21 @@ class TvVisualizerSettingsViewModel
             }
         }
 
+        private val exitRecordsState = MutableStateFlow<ExitRecords?>(null)
+
+        /** Android's latest exit records and the engine's trail; null until read. */
+        internal val exitRecords: StateFlow<ExitRecords?> = exitRecordsState.asStateFlow()
+
+        fun refreshExitRecords() {
+            viewModelScope.launch {
+                val diagnostics = engine.exitDiagnostics
+                exitRecordsState.value = ExitRecords(diagnostics.recentExits(), diagnostics.trail())
+            }
+        }
+
+        /** The GPU as its driver names it; empty until a visualizer has rendered in this process. */
+        val gpu: String get() = engine.gpu
+
         fun update(change: suspend VisualizerPreferences.() -> Unit) {
             viewModelScope.launch { preferences.change() }
         }
