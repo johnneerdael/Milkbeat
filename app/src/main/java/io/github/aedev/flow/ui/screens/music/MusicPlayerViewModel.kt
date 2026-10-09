@@ -14,7 +14,6 @@ import io.github.aedev.flow.data.local.LikedVideosRepository
 import io.github.aedev.flow.data.local.PlayerPreferences
 import io.github.aedev.flow.data.local.ViewHistory
 import io.github.aedev.flow.data.localmedia.LocalMediaIds
-import io.github.aedev.flow.data.lyrics.LyricsHelper
 import io.github.aedev.flow.data.music.DownloadManager
 import io.github.aedev.flow.data.music.PlaylistRepository
 import io.github.aedev.flow.data.music.model.MUSIC_GENRE_SOURCE_PREFIX
@@ -63,7 +62,6 @@ class MusicPlayerViewModel
         private val _currentPositionMs = MutableStateFlow(0L)
         val currentPositionMs: StateFlow<Long> = _currentPositionMs.asStateFlow()
 
-        private val lyricsHelper = LyricsHelper(context)
         private val playerPreferences = PlayerPreferences(context)
 
         private var metadataJob: kotlinx.coroutines.Job? = null
@@ -73,7 +71,6 @@ class MusicPlayerViewModel
         private var loadTrackJob: kotlinx.coroutines.Job? = null
         private var pendingSeekPosition: Long? = null
         private var pendingSeekStartedAtMs: Long = 0L
-        private val lyrics = MusicPlayerLyrics(context, viewModelScope, _uiState, lyricsHelper, playerPreferences)
         private val trackActions =
             MusicPlayerTrackActions(
                 context,
@@ -88,11 +85,6 @@ class MusicPlayerViewModel
         init {
             EnhancedMusicPlayerManager.initialize(context)
             initializeObservers()
-            viewModelScope.launch {
-                playerPreferences.lyricsTextAlign.collect { align ->
-                    _uiState.update { it.copy(lyricsTextAlign = align) }
-                }
-            }
             viewModelScope.launch {
                 playerPreferences.musicEndlessRadioEnabled.collect { enabled ->
                     _uiState.update { it.copy(endlessRadioEnabled = enabled) }
@@ -146,8 +138,6 @@ class MusicPlayerViewModel
                         _uiState.update {
                             it.copy(
                                 currentTrack = track,
-                                lyrics = null,
-                                syncedLyrics = emptyList(),
                                 duration =
                                     (track?.duration ?: 0) * 1000L,
                             )
@@ -156,7 +146,6 @@ class MusicPlayerViewModel
                         track?.let {
                             if (!isLocalMediaId(it.videoId)) {
                                 checkIfFavorite(it.videoId)
-                                fetchLyrics(it.videoId, it.artist, it.title, it.duration, it.album)
                             } else {
                                 favoriteJob?.cancel()
                                 _uiState.update { state -> state.copy(isLiked = false) }
@@ -528,22 +517,6 @@ class MusicPlayerViewModel
         fun playNext(tracks: List<MusicTrack>) = trackActions.playNext(tracks)
 
         fun addToQueue(tracks: List<MusicTrack>) = trackActions.addToQueue(tracks)
-
-        fun fetchLyrics(
-            videoId: String,
-            artist: String,
-            title: String,
-            duration: Int? = null,
-            album: String? = null,
-        ) = lyrics.fetch(videoId, artist, title, duration, album)
-
-        fun setLyricsTextAlign(align: String) = lyrics.setTextAlign(align)
-
-        fun setLyricsShowTranslation(show: Boolean) = lyrics.setShowTranslation(show)
-
-        fun setLyricsShowRomanization(show: Boolean) = lyrics.setShowRomanization(show)
-
-        fun setLyricsAutoRomanize(enabled: Boolean) = lyrics.setAutoRomanize(enabled)
 
         override fun onCleared() {
             super.onCleared()

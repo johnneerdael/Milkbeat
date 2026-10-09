@@ -1,7 +1,7 @@
 {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "title": "MilkbeatPluginApi",
-    "description": "Plugin API v6, generated from the plugin-api module. Do not edit.",
+    "description": "Plugin API v7, generated from the plugin-api module. Do not edit.",
     "type": "object",
     "properties": {
         "manifest": {
@@ -2463,6 +2463,16 @@
                 },
                 "requireAudioOnlyHls": {
                     "type": "boolean"
+                },
+                "audioFormat": {
+                    "oneOf": [
+                        {
+                            "type": "null"
+                        },
+                        {
+                            "$ref": "#/$defs/nl.neerdael.milkbeat.plugin.MediaFormat"
+                        }
+                    ]
                 }
             },
             "title": "AudioStream"
@@ -3494,6 +3504,9 @@
                             "$ref": "#/$defs/nl.neerdael.milkbeat.plugin.StreamFailure"
                         }
                     ]
+                },
+                "prepareVideo": {
+                    "type": "boolean"
                 }
             },
             "title": "ResolveAudioRequest"

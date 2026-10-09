@@ -36,6 +36,7 @@ import io.github.aedev.flow.data.local.NowPlayingView
 import io.github.aedev.flow.data.local.nextNowPlayingView
 import io.github.aedev.flow.data.local.shownNowPlayingView
 import io.github.aedev.flow.player.EnhancedMusicPlayerManager
+import io.github.aedev.flow.player.resolutionStatus
 import io.github.aedev.flow.ui.components.shared.rememberMediaPalette
 import io.github.aedev.flow.ui.screens.music.MusicPlayerViewModel
 import io.github.aedev.flow.ui.tv.components.TvIconButtonColors
@@ -71,6 +72,7 @@ fun TvMusicNowPlayingScreen(
     val tuning by viewModel.radioTuning.state.collectAsStateWithLifecycle()
     val manager = EnhancedMusicPlayerManager
     val track by manager.currentTrack.collectAsStateWithLifecycle()
+    val resolution by manager.resolutionStatus.collectAsStateWithLifecycle()
     val playbackArtwork by manager.playbackArtwork.collectAsStateWithLifecycle()
     val playerState by manager.playerState.collectAsStateWithLifecycle()
     val radioLoading by manager.radioLoading.collectAsStateWithLifecycle()
@@ -303,6 +305,7 @@ fun TvMusicNowPlayingScreen(
 
         TvNowPlayingTrackCorner(
             current = handOver.shown,
+            statusText = musicResolutionStatusText(resolution, track?.videoId),
             next = handOver.incoming,
             glitch = { handOver.glitch.value },
             contentColor = MaterialTheme.colorScheme.onSurface,

@@ -50,9 +50,10 @@ class PluginTrackMatcher
             pluginId: String,
             excludedId: String? = null,
             strategy: AudioMatchStrategy = AudioMatchStrategy.SONGS,
+            onProgress: (TrackMatchProgress) -> Unit = {},
         ): TrackDescriptor? =
             try {
-                find(track, pluginId, excludedId, strategy)
+                find(track, pluginId, excludedId, strategy, onProgress)
             } catch (e: PluginCallException) {
                 Log.w(TAG, "$pluginId could not search for ${track.title}: ${e.error.message}")
                 null
@@ -63,23 +64,29 @@ class PluginTrackMatcher
             pluginId: String,
             excludedId: String?,
             strategy: AudioMatchStrategy,
+            onProgress: (TrackMatchProgress) -> Unit = {},
         ): TrackDescriptor? {
             val fingerprint = fingerprint(track)
             validatedCache(track, fingerprint, pluginId, strategy)?.let {
-                if (excludedId == null || it.candidate?.ref?.providerId != excludedId) return it.candidate
+                if (excludedId == null || it.candidate?.ref?.providerId != excludedId) {
+                    if (it.candidate != null) onProgress(TrackMatchProgress.SAVED_MATCH)
+                    return it.candidate
+                }
             }
             val key = "$pluginId|$fingerprint|${strategy.name}|${excludedId.orEmpty()}"
             val mine = CompletableDeferred<TrackDescriptor?>()
             inFlight.putIfAbsent(key, mine)?.let { owner ->
+                onProgress(TrackMatchProgress.WAITING)
                 try {
                     return owner.await()
                 } catch (e: CancellationException) {
                     currentCoroutineContext().ensureActive()
                     inFlight.remove(key, owner)
-                    return find(track, pluginId, excludedId, strategy)
+                    return find(track, pluginId, excludedId, strategy, onProgress)
                 }
             }
             try {
+                onProgress(TrackMatchProgress.SEARCHING)
                 return lookup(track, fingerprint, pluginId, excludedId, strategy).also(mine::complete)
             } catch (e: Throwable) {
                 mine.completeExceptionally(e)

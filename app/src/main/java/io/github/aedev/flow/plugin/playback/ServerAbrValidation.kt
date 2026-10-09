@@ -12,6 +12,7 @@ internal fun validateServerAbr(
     playback: ServerAbrPlayback?,
     picture: Boolean,
     allowedHosts: List<String>,
+    allowPicture: Boolean = picture,
 ) {
     if (playback == null) return
     checkedPluginMediaUrl(playback.url, allowedHosts)
@@ -41,7 +42,7 @@ internal fun validateServerAbr(
     }
     if (playback.formats.none { it.format.type == FormatType.AUDIO }) throw IOException("SABR presentation has no audio")
     if (picture && playback.formats.none { it.format.type == FormatType.VIDEO }) throw PictureUnavailable()
-    if (!picture &&
+    if (!allowPicture &&
         playback.formats.any { it.format.type == FormatType.VIDEO }
     ) {
         throw IOException("Audio-only SABR included picture formats")

@@ -2,8 +2,11 @@ package io.github.aedev.flow.player
 
 import android.app.Application
 import androidx.media3.common.C
+import androidx.media3.common.Format
 import androidx.media3.common.MediaItem
+import androidx.media3.common.TrackGroup
 import androidx.media3.common.TrackSelectionParameters
+import androidx.media3.common.Tracks
 import androidx.media3.exoplayer.ExoPlayer
 import com.google.common.truth.Truth.assertThat
 import io.github.aedev.flow.data.music.model.MusicTrack
@@ -63,6 +66,8 @@ class MusicPlaybackVideoTest {
         manager.currentTrackState.value = track
         items += manager.buildMediaItem(track)
         every { player.currentMediaItemIndex } returns 0
+        every { player.currentMediaItem } answers { items.firstOrNull() }
+        every { player.currentTracks } returns preparedMusicPictureTracks()
         every { player.currentPosition } returns 12_345L
         every { player.mediaItemCount } answers { items.size }
         every { player.getMediaItemAt(any()) } answers { items[firstArg()] }
@@ -90,18 +95,92 @@ class MusicPlaybackVideoTest {
     private fun capability(ids: Set<String>) = manager.setVideoCapablePlaybackIds(ids)
 
     @Test
+    fun `local file and content videos switch picture without remote streaming ids`() {
+        for (address in listOf("file:///storage/movie.mp4", "content://media/external/video/media/42")) {
+            val uri = android.net.Uri.parse(address)
+            val local =
+                track.copy(
+                    videoId =
+                        io.github.aedev.flow.data.localmedia.LocalMediaIds
+                            .of(uri),
+                    isVideoSong = true,
+                )
+            manager.currentTrackState.value = local
+            manager.queueState.value = listOf(local)
+            items.clear()
+            items += manager.buildMediaItem(local)
+            val original = items.single()
+            capability(emptySet())
+            manager.acquireVideoSurface()
+            manager.setVideoMode(true)
+            assertThat(manager.videoAvailable.value).isTrue()
+            assertThat(manager.videoShown.value).isTrue()
+            assertThat(selection.disabledTrackTypes).doesNotContain(C.TRACK_TYPE_VIDEO)
+            assertThat(items.single().localConfiguration!!.uri).isEqualTo(uri)
+            assertThat(manager.videoItemIds).doesNotContain(local.videoId)
+            manager.setVideoMode(false)
+            assertThat(selection.disabledTrackTypes).contains(C.TRACK_TYPE_VIDEO)
+            assertThat(items.single()).isSameInstanceAs(original)
+            manager.releaseVideoSurface()
+        }
+        verify(exactly = 0) { player.replaceMediaItem(any(), any()) }
+        verify(exactly = 0) { player.seekTo(any<Int>(), any<Long>()) }
+    }
+
+    @Test
+    fun `audio only HLS cannot offer video from optional picture preparation`() {
+        every { player.currentTracks } returns Tracks.EMPTY
+        capability(setOf(track.videoId))
+        manager.acquireVideoSurface()
+        manager.setVideoMode(true)
+        assertThat(manager.videoAvailable.value).isFalse()
+        assertThat(manager.videoShown.value).isFalse()
+        assertThat(selection.disabledTrackTypes).contains(C.TRACK_TYPE_VIDEO)
+    }
+
+    @Test
+    fun `audio only download replay clears previously prepared video eligibility`() {
+        capability(setOf(track.videoId))
+        assertThat(manager.videoAvailable.value).isTrue()
+        every { player.currentTracks } returns Tracks.EMPTY
+        manager.applyVideoMode(player)
+        assertThat(manager.videoAvailable.value).isFalse()
+        manager.setVideoMode(true)
+        assertThat(manager.videoShown.value).isFalse()
+        verify(exactly = 0) { player.replaceMediaItem(any(), any()) }
+    }
+
+    @Test
+    fun `switching picture repeatedly never replaces or seeks the playing audio`() {
+        capability(setOf(track.videoId))
+        manager.acquireVideoSurface()
+        val original = items.single()
+        repeat(3) {
+            manager.setVideoMode(true)
+            assertThat(selection.disabledTrackTypes).doesNotContain(C.TRACK_TYPE_VIDEO)
+            manager.setVideoMode(false)
+            assertThat(selection.disabledTrackTypes).contains(C.TRACK_TYPE_VIDEO)
+        }
+        assertThat(items.single()).isSameInstanceAs(original)
+        verify(exactly = 0) { player.replaceMediaItem(any(), any()) }
+        verify(exactly = 0) { player.seekTo(any<Int>(), any<Long>()) }
+        verify(exactly = 0) { player.prepare() }
+        verify(exactly = 0) { player.stop() }
+    }
+
+    @Test
     fun `confirmed capability keeps initial playback audio-only until the viewer switches`() {
         capability(setOf(track.videoId))
 
         assertThat(manager.videoAvailable.value).isTrue()
-        assertThat(manager.streamUri(track).scheme).isEqualTo(MusicVideoItems.SONG_SCHEME)
+        assertThat(manager.streamUri(track).scheme).isEqualTo(MusicVideoItems.SCHEME)
         verify(exactly = 0) { player.replaceMediaItem(any(), any()) }
         manager.setVideoMode(true)
         val switched = items.single()
         assertThat(switched.localConfiguration!!.uri.scheme).isEqualTo(MusicVideoItems.SCHEME)
         assertThat(switched.mediaId).isEqualTo(track.videoId)
         assertThat(MusicVideoItems.descriptor(switched.localConfiguration!!.uri)).isEqualTo(descriptor)
-        verify(exactly = 1) { player.seekTo(0, 12_345L) }
+        verify(exactly = 0) { player.seekTo(0, 12_345L) }
     }
 
     @Test
@@ -111,7 +190,7 @@ class MusicPlaybackVideoTest {
         assertThat(manager.videoAvailable.value).isFalse()
         manager.setVideoMode(true)
 
-        assertThat(manager.streamUri(track).scheme).isEqualTo(MusicVideoItems.SONG_SCHEME)
+        assertThat(manager.streamUri(track).scheme).isEqualTo(MusicVideoItems.SCHEME)
         verify(exactly = 0) { player.replaceMediaItem(any(), any()) }
     }
 
@@ -157,13 +236,13 @@ class MusicPlaybackVideoTest {
         assertThat(MusicVideoItems.descriptor(recovered.localConfiguration!!.uri)).isEqualTo(descriptor)
         assertThat(manager.videoAvailable.value).isFalse()
         assertThat(manager.videoShown.value).isFalse()
-        verify(exactly = 2) { player.seekTo(0, 12_345L) }
+        verify(exactly = 1) { player.seekTo(0, 12_345L) }
         verify(exactly = 1) { player.prepare() }
         verify(exactly = 1) { player.play() }
     }
 
     @Test
-    fun `an explicit Video selection rebinds newly confirmed audio even when Video was remembered`() {
+    fun `an explicit Video selection reuses the prepared item even when Video was remembered`() {
         manager.setVideoMode(true)
         capability(setOf(track.videoId))
         assertThat(
@@ -171,7 +250,7 @@ class MusicPlaybackVideoTest {
                 .single()
                 .localConfiguration!!
                 .uri.scheme,
-        ).isEqualTo(MusicVideoItems.SONG_SCHEME)
+        ).isEqualTo(MusicVideoItems.SCHEME)
 
         manager.setVideoMode(true)
         manager.setVideoMode(true)
@@ -182,8 +261,8 @@ class MusicPlaybackVideoTest {
                 .localConfiguration!!
                 .uri.scheme,
         ).isEqualTo(MusicVideoItems.SCHEME)
-        verify(exactly = 1) { player.replaceMediaItem(0, any()) }
-        verify(exactly = 1) { player.seekTo(0, 12_345L) }
+        verify(exactly = 0) { player.replaceMediaItem(0, any()) }
+        verify(exactly = 0) { player.seekTo(0, 12_345L) }
     }
 
     @Test
@@ -200,3 +279,16 @@ class MusicPlaybackVideoTest {
         assertThat(manager.videoAvailable.value).isFalse()
     }
 }
+
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
+internal fun preparedMusicPictureTracks(): Tracks =
+    Tracks(
+        listOf(
+            Tracks.Group(
+                TrackGroup("picture", Format.Builder().setSampleMimeType("video/avc").build()),
+                false,
+                intArrayOf(C.FORMAT_HANDLED),
+                booleanArrayOf(false),
+            ),
+        ),
+    )

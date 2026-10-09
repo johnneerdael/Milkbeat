@@ -5,7 +5,7 @@ Features:
 - Your YouTube Music home on the TV: mood chips and every shelf, in YouTube Music's order
 - Sign in with your phone to see your own YouTube Music feeds; playback stays anonymous
 - Search that starts on music, with videos one press away for live sets and concerts
-- Full-screen now playing with synchronized lyrics and an editable queue
+- Full-screen now playing with an editable queue
 - Artist, album and playlist pages with a mini player across the app
 - Background playback on by default
 - On-device recommendation engine with no analytics or tracking

@@ -340,7 +340,7 @@ class PluginSabrDataSourceTest {
     }
 
     // A synthetic loopback-only PKCS12 fixture; JCA/JSSE owns certificates and TLS.
-    private fun loopbackTls(): Pair<javax.net.ssl.SSLContext, javax.net.ssl.X509TrustManager> {
+    internal fun loopbackTls(): Pair<javax.net.ssl.SSLContext, javax.net.ssl.X509TrustManager> {
         val store = java.security.KeyStore.getInstance("PKCS12")
         javaClass.getResourceAsStream("/plugin-sabr-loopback.p12").use { store.load(it, "fixture-only".toCharArray()) }
         val keys =

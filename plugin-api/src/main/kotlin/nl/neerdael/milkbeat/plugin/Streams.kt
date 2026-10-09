@@ -8,8 +8,9 @@ import nl.neerdael.milkbeat.catalog.PrivatePlaylistImportResult
 import nl.neerdael.milkbeat.catalog.TrackDescriptor
 
 /**
- * A track to resolve for listening. The host asks for the picture too ([video]) only when the
- * listener shows music videos; [maxVideoHeight] and [videoCodecs] describe what this TV decodes:
+ * A track to resolve for listening. [video] requires a picture; [prepareVideo] asks for optional
+ * picture metadata so the host can enable its track without rebuilding the audio source.
+ * Neither flag instructs the plugin to fetch picture media. [maxVideoHeight] and [videoCodecs] describe what this TV decodes:
  * codec keys `h264`, `vp9`, `hevc`, `av1`, those it decodes in hardware, best first.
  */
 @Serializable
@@ -22,6 +23,8 @@ data class ResolveAudioRequest(
     val language: String? = null,
     /** The stream the host got last time failed; the plugin should not hand back the same one. */
     val failure: StreamFailure? = null,
+    /** Prepare an optional picture track alongside audio. Audio-only responses remain valid. */
+    val prepareVideo: Boolean = false,
 )
 
 /** A track another plugin describes, for an audio plugin to find in its own catalog. */
@@ -107,6 +110,8 @@ data class AudioStream(
     val artwork: Artwork? = null,
     /** Require the native HLS parser to select an independently advertised audio rendition. */
     val requireAudioOnlyHls: Boolean = false,
+    /** Exact chosen audio rendition, including byte ranges for one native DASH presentation. */
+    val audioFormat: MediaFormat? = null,
 )
 
 /** License information consumed by the host's platform DRM implementation. */

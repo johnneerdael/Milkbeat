@@ -7,7 +7,7 @@ import java.util.Locale
 import kotlin.math.abs
 
 internal object TrackMatchScore {
-    const val POLICY_VERSION = 3
+    const val POLICY_VERSION = 4
     const val MIN_SCORE = 0.35
     private const val CERTAIN = 1.0
     private const val EARLY_EXIT = 0.95
@@ -111,8 +111,6 @@ internal object TrackMatchScore {
         val sourceMs = track.durationMs ?: return null
         val candidateMs = candidate.durationMs ?: return null
         if (sourceMs <= 0 || candidateMs <= 0 || abs(sourceMs - candidateMs) > MAX_DURATION_DELTA_MS) return null
-        val credit = titleCredit.matchEntire(candidate.title) ?: return null
-        val performer = foldLatinAccents(normalizeText(credit.groupValues[1]))
         val sourceArtist = performerCredits(track).firstOrNull() ?: return null
         val normalizedArtist = foldLatinAccents(normalizeText(sourceArtist.replace(topicSuffix, "")))
         if (normalizedArtist in unavailableArtists) return null
@@ -128,6 +126,20 @@ internal object TrackMatchScore {
         ) {
             return null
         }
+        val sourceTitle = foldLatinAccents(normalize(track.title))
+        val candidateTitle = foldLatinAccents(normalize(candidate.title))
+        if (sourceMs >= MIN_LIVE_SET_DURATION_MS && candidateMs >= MIN_LIVE_SET_DURATION_MS &&
+            sourceTitle.startsWith("$normalizedArtist ") && candidateTitle.startsWith("$normalizedArtist ") &&
+            liveSetWords.containsMatchIn(sourceTitle) && liveSetWords.containsMatchIn(candidateTitle) &&
+            eventYear.findAll(sourceTitle).map { it.value }.toSet() == eventYear.findAll(candidateTitle).map { it.value }.toSet()
+        ) {
+            val titleSimilarity = textSimilarity(sourceTitle, candidateTitle)
+            if (titleSimilarity >= MIN_TITLE_SIMILARITY && versionsCompatible(sourceTitle, candidateTitle)) {
+                return Evidence(titleSimilarity, CERTAIN, durationScore(sourceMs, candidateMs))
+            }
+        }
+        val credit = titleCredit.matchEntire(candidate.title) ?: return null
+        val performer = foldLatinAccents(normalizeText(credit.groupValues[1]))
         val title = normalize(credit.groupValues[2])
         val titleSimilarity = textSimilarity(recordingTitle(track), title)
         if (normalizedArtist == performer && titleSimilarity >= MIN_TITLE_SIMILARITY &&

@@ -76,7 +76,7 @@ class PluginMusicPlaybackTest {
                             false,
                         )
                     },
-                    bind = { audio ->
+                    bind = { audio, _ ->
                         ResolvingDataSource.Factory(upstream) { spec ->
                             if (spec.uri.scheme == "music") spec.withUri(Uri.parse(audio.stream.url)) else spec
                         }

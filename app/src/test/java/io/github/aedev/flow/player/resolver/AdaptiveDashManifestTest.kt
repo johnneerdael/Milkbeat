@@ -77,8 +77,14 @@ class AdaptiveDashManifestTest {
     }
 
     @Test
-    fun `nothing to adapt between, or no ranges to address, means no manifest`() {
-        assertThat(AdaptiveDashManifest.build(videos.take(1), audio, durationSeconds = 212)).isNull()
+    fun `one picture and audio still form a selectable presentation for continuous switching`() {
+        val manifest = parse(AdaptiveDashManifest.build(videos.take(1), audio, durationSeconds = 212)!!)
+        assertThat(sets(manifest).map { it.getAttribute("contentType") }).containsExactly("audio", "video")
+    }
+
+    @Test
+    fun `no video, no usable ranges, or no duration means no manifest`() {
+        assertThat(AdaptiveDashManifest.build(emptyList(), audio, durationSeconds = 212)).isNull()
         val unaddressable =
             PluginVideoStreams.videoStreams(
                 listOf(vp9(1080, 248, 1).copy(indexRange = null), vp9(720, 247, 1).copy(indexRange = null)),

@@ -360,7 +360,7 @@ class MusicVideoMatchingPlaybackDeviceTest {
                         picture,
                     )
                 },
-                { resolved ->
+                { resolved, _ ->
                     ResolvingDataSource.Factory(upstream) { spec ->
                         val picture = MusicVideoItems.videoIdOfVideoKey(spec.key.orEmpty()) != null
                         spec.withUri(Uri.parse(if (picture) requireNotNull(resolved.stream.video).url else resolved.stream.url))
