@@ -4,6 +4,8 @@ This workspace keeps the TypeScript SDK and JSON schema aligned with Milkbeat's 
 
 Plugin API 7 adds optional `ResolveAudioRequest.prepareVideo` and `AudioStream.audioFormat` metadata. Picture preparation remains optional; providers can return audio only. A chosen audio format retains its exact rendition ID, URL and DASH byte ranges. The host prepares one Media3 presentation and toggles video track selection without replacing the audio source. API 6 and older provider responses remain valid; older video providers receive their existing picture request when preparing a presentation. Separate progressive picture URLs without a prepared DASH presentation remain audio-only in the music player, avoiding hidden video range requests. Native SABR and eligible HLS presentations retain their picture support.
 
+Optional picture preparation does not assert that an HLS response contains video. The host confirms a supported video track in the current Media3 presentation before offering Video; cached metadata cannot enable it for audio-only downloads.
+
 Plugin API 5 adds generic `deviceCode` sign-in methods and `signIn.begin/poll/confirm/cancel` operations.
 The native screen displays a permission-checked HTTPS activation URL, QR code and user code;
 polling follows the provider’s cadence only while the screen is resumed. Pending sessions are

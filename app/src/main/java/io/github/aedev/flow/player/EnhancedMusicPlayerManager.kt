@@ -274,6 +274,7 @@ object EnhancedMusicPlayerManager {
                     player: Player,
                     events: Player.Events,
                 ) {
+                    if (events.contains(Player.EVENT_TRACKS_CHANGED)) applyVideoMode(controller)
                     if (events.containsAny(
                             Player.EVENT_MEDIA_METADATA_CHANGED,
                             Player.EVENT_MEDIA_ITEM_TRANSITION,

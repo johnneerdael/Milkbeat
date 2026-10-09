@@ -56,6 +56,7 @@ class PluginAudio
 
         fun selectForegroundPlayback(playbackId: String?) = resolutionProgress.select(playbackId)
 
+        /** Candidate IDs; Media3's current response tracks confirm the displayed Video choice. */
         val videoCapablePlaybackIds: Flow<Set<String>>
             get() =
                 combine(resolvedRevision, registry.state, accounts.accounts, accounts.playbackEpoch) { _, state, accountState, epoch ->
@@ -69,7 +70,8 @@ class PluginAudio
                                         ?.manifest
                                         ?.roles
                                         ?.audio
-                                        ?.musicVideo == true && audio.hasPreparedPicture
+                                        ?.musicVideo == true &&
+                                    (audio.hasPreparedPicture || (isHlsStream(audio.stream) && !audio.stream.requireAudioOnlyHls))
                             } == true
                         }.map { it.key }
                         .toSet()

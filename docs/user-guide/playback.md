@@ -43,6 +43,8 @@ YouTube matching finds recorded videos when needed and reuses validated saved ma
 
 Compatible API 7 providers prepare audio and optional video rendition metadata together. Selecting video changes the existing presentation’s track selection without replacing the media item or seeking the audio. Metadata preparation does not enable video playback. A completed audio download keeps its offline cache path without requiring a downloaded picture or a provider lookup. Older providers keep audio playback; a separate progressive picture without the metadata needed for a prepared presentation stays unavailable. An unavailable optional picture is retried as audio before moving to another provider. Lyrics are not fetched or displayed.
 
+The Video choice appears after the current presentation supplies a supported video track. Audio-only HLS and completed audio downloads keep the visualizer or artwork even if a previous resolution offered video.
+
 ## The queue
 
 ![The queue beside the player, with the radio presets pinned above it](images/queue-radio.jpg)

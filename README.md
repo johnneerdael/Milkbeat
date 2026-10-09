@@ -178,7 +178,7 @@ play/pause, next, repeat, like, the view button and the queue.
 - **The view button** steps through the visualizer, the matched music video (up to the TV's physical
   resolution, capped at 2160p, in a hardware-decoded codec) and the artwork. Milkbeat remembers your choice; video only loads when
   you pick it.
-- **Prepared video playback:** API 7 providers can supply audio and optional picture metadata together. Switching views selects the video track in the existing Media3 presentation; it does not replace or seek the playing audio. Older providers with separate progressive picture URLs remain audio-only unless they supply a prepared presentation. Lyrics are not fetched or displayed.
+- **Prepared video playback:** API 7 providers can supply audio and optional picture metadata together. Switching views selects the video track in the existing Media3 presentation; it does not replace or seek the playing audio. Video is offered only when the current presentation contains a supported video track. Older providers with separate progressive picture URLs remain audio-only unless they supply a prepared presentation. Lyrics are not fetched or displayed.
 - **The queue** shows what is coming. Every queue continues as a radio; press Right on a track to
   reach the radio presets and switch the mix without losing your own tracks.
 - **Queue preparation** matches the remaining queue one track at a time in playback order and

@@ -2,8 +2,11 @@ package io.github.aedev.flow.player
 
 import android.app.Application
 import androidx.media3.common.C
+import androidx.media3.common.Format
 import androidx.media3.common.MediaItem
+import androidx.media3.common.TrackGroup
 import androidx.media3.common.TrackSelectionParameters
+import androidx.media3.common.Tracks
 import androidx.media3.exoplayer.ExoPlayer
 import com.google.common.truth.Truth.assertThat
 import io.github.aedev.flow.data.music.model.MusicTrack
@@ -63,6 +66,8 @@ class MusicPlaybackVideoTest {
         manager.currentTrackState.value = track
         items += manager.buildMediaItem(track)
         every { player.currentMediaItemIndex } returns 0
+        every { player.currentMediaItem } answers { items.firstOrNull() }
+        every { player.currentTracks } returns preparedMusicPictureTracks()
         every { player.currentPosition } returns 12_345L
         every { player.mediaItemCount } answers { items.size }
         every { player.getMediaItemAt(any()) } answers { items[firstArg()] }
@@ -88,6 +93,29 @@ class MusicPlaybackVideoTest {
     }
 
     private fun capability(ids: Set<String>) = manager.setVideoCapablePlaybackIds(ids)
+
+    @Test
+    fun `audio only HLS cannot offer video from optional picture preparation`() {
+        every { player.currentTracks } returns Tracks.EMPTY
+        capability(setOf(track.videoId))
+        manager.acquireVideoSurface()
+        manager.setVideoMode(true)
+        assertThat(manager.videoAvailable.value).isFalse()
+        assertThat(manager.videoShown.value).isFalse()
+        assertThat(selection.disabledTrackTypes).contains(C.TRACK_TYPE_VIDEO)
+    }
+
+    @Test
+    fun `audio only download replay clears previously prepared video eligibility`() {
+        capability(setOf(track.videoId))
+        assertThat(manager.videoAvailable.value).isTrue()
+        every { player.currentTracks } returns Tracks.EMPTY
+        manager.applyVideoMode(player)
+        assertThat(manager.videoAvailable.value).isFalse()
+        manager.setVideoMode(true)
+        assertThat(manager.videoShown.value).isFalse()
+        verify(exactly = 0) { player.replaceMediaItem(any(), any()) }
+    }
 
     @Test
     fun `switching picture repeatedly never replaces or seeks the playing audio`() {
@@ -218,3 +246,16 @@ class MusicPlaybackVideoTest {
         assertThat(manager.videoAvailable.value).isFalse()
     }
 }
+
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
+internal fun preparedMusicPictureTracks(): Tracks =
+    Tracks(
+        listOf(
+            Tracks.Group(
+                TrackGroup("picture", Format.Builder().setSampleMimeType("video/avc").build()),
+                false,
+                intArrayOf(C.FORMAT_HANDLED),
+                booleanArrayOf(false),
+            ),
+        ),
+    )

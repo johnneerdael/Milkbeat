@@ -18,7 +18,13 @@ private var videoCapablePlaybackIds: Set<String> = emptySet()
 internal val musicVideoAvailableState = MutableStateFlow(false)
 
 internal fun EnhancedMusicPlayerManager.canShowVideo(track: MusicTrack): Boolean =
-    ((LocalMediaIds.isLocal(track.videoId) && track.isVideoSong) || track.videoId in videoCapablePlaybackIds) &&
+    (
+        (LocalMediaIds.isLocal(track.videoId) && track.isVideoSong) ||
+            (
+                track.videoId in videoCapablePlaybackIds && player?.currentMediaItem?.mediaId == track.videoId &&
+                    player?.currentTracks?.isTypeSupported(androidx.media3.common.C.TRACK_TYPE_VIDEO) == true
+            )
+    ) &&
         track.videoId !in videoUnavailableIds
 
 @OptIn(UnstableApi::class)

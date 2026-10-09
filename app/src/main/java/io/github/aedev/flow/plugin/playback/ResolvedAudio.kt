@@ -54,8 +54,7 @@ class PictureLimits(
 internal val ResolvedAudio.hasPreparedPicture: Boolean
     get() =
         preparedDashManifest != null ||
-            stream.serverAbr?.formats?.any { it.format.type == nl.neerdael.milkbeat.plugin.FormatType.VIDEO } == true ||
-            (isHlsStream(stream) && !stream.requireAudioOnlyHls && (withPicture || request?.prepareVideo == true))
+            stream.serverAbr?.formats?.any { it.format.type == nl.neerdael.milkbeat.plugin.FormatType.VIDEO } == true
 
 internal fun ResolvedAudio.coversResolution(
     context: Any,
