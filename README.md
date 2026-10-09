@@ -137,6 +137,7 @@ Add **third-party plugins** in **Settings → Plugins** with their downloader co
 | YouTube Music | **494** | 416 |
 | SoundCloud | **089** | — |
 | YouTube Video | **932** | — |
+| Deezer | **734** | — |
 <!-- /plugin-codes -->
 
 A plugin download URL also works, including a supported Buzzheavier file page. Plugins are
@@ -149,8 +150,9 @@ distributed separately from Milkbeat releases, signature-checked and reviewed be
 | Beatport | Catalog, genres, charts, artists, labels, library | Full streams with a streaming subscription | — |
 | SoundCloud | Discover, Stream, Search, Artists, albums, playlists, Liked Songs, history | Available full tracks, matching and stations | — |
 | YouTube Video | YouTube's TV Music Home, Search, artists, albums, playlists, library | Streams, matching and radio | YouTube videos and playlists |
+| Deezer | Home, Flow, Search, artists, albums, playlists, library | Account streams and matching | — |
 
-**YouTube Video 0.2.0** is a separate provider for stable Milkbeat, installed with code **932**.
+**YouTube Video 0.2.1** is a separate provider for stable Milkbeat, installed with code **932**.
 It requires plugin API 8 and keeps its own account alongside
 YouTube Music. It supplies SmartTube's regular YouTube TV Music feeds, TV-code/QR sign-in and
 native SABR playback through Milkbeat's existing Media3 player.
@@ -163,7 +165,9 @@ native SABR playback through Milkbeat's existing Media3 player.
 - **SoundCloud:** pair with a TV code from any phone. Full-track availability depends on the
   recording and your listening subscription. TV-paired accounts currently play clear HLS streams only.
 - **YouTube Video:** works signed out; pairing with a TV code from any phone personalizes Home and
-  Library.
+  Library. An empty Liked Music library still loads Home normally in 0.2.1.
+- **Deezer:** sign in for Home, Flow and your library. Stream availability and FLAC/MP3 quality
+  depend on the account and recording. Deezer 0.2.0 needs plugin API 9; update Milkbeat first.
 
 Under **Audio**, enable providers and put them in priority order; under **Video**, choose the video
 plugin. Native tracks try their own enabled audio provider before ordered fallback; Spotify races
