@@ -777,6 +777,13 @@ revision must pass the configured ktlint rules.
   allocation estimate across height callbacks; do not recompute both topologies at the new size. Visibility resumes still use
   `revalidateForResume`. Fixed-height/RAM-toggle preferences are retired. Standard
   trails is default; Medium/High activate above 1330p. Keep the audio tap and player owners intact.
+  Core 2.3.34's Fire TV troubleshooting switches (`setBackgroundCompile`, `setShaderBinaryCache`,
+  default on) are visualizer settings applied through `VisualizerEngine.apply`. `VisualizerExitDiagnostics`
+  opens the engine trail (`setDiagnosticsFile`, no-backup storage, per-process session via
+  `setProcessStateSummary`) from the settings flow's `onStart` on IO, so the trail is open before the
+  engine first renders without loading the native library at app start or doing file I/O on main.
+  Settings → Visualizations → Last exit formats Android's exit records with that trail
+  (`TvVisualizerExitReport.kt`); focused tests: `--tests '*VisualizerExit*'`.
 - Use JDK 21, as CI does, with an Android SDK containing platform 37 (`compileSdk = 37`).
   Supply the SDK through `ANDROID_HOME` or an untracked `local.properties` containing `sdk.dir`.
   The app targets Android 36, supports API 26+, and compiles Java/Kotlin to JVM 17.

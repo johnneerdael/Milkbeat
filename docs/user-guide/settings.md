@@ -119,6 +119,20 @@ Resolution is always automatic: it follows the frame-rate target and live memory
 
 ![Timing offset picker with +0 ms as the default](images/picker-timing.png)
 
+### Troubleshooting
+
+For devices where the app closes when one preset changes into the next, as first reported on a Fire TV Stick 4K Max (2nd gen, PowerVR GE9215 GPU). Leave both switches **On** otherwise.
+
+| Setting | What it does | Default |
+| --- | --- | --- |
+| **Background compile** | Compiles the next presets on a second thread with its own OpenGL context, so switches do not pause. *Off* compiles them at the switch, and the picture can hold for a second or two | On |
+| **Shader binary cache** | Reuses compiled shader programs as driver binaries between the background and render threads. *Off* always compiles them from source | On |
+| **Last exit** | The latest time Milkbeat crashed or ended while on screen, with how long ago, from Android's exit records (Android 11 and later). Select it for the exit report | — |
+
+**Recent exits**, the exit report, starts with the device, its Android version, the GPU (once the visualizer has shown since Milkbeat started) and the switches as they are now. Then come up to five recent exits of Milkbeat, newest first. Each shows how long ago it was and why it ended, as Android recorded it: for example *crashed (native code)*, *killed by signal 11 (SIGSEGV)* or *killed for low memory*. It also shows whether Milkbeat was *on screen*, *playing in the background* or only *in the background*, Android's description and the memory in use when Android provides them. For a process that showed the visualizer, the report adds the switches it ran with and what the engine was last doing: the *render* line (loading, blending into or showing a preset) and the *prewarm* line (compiling a preset in the background, or idle), each with the seconds before the exit. Android 10 and older keep no exit records; the report then shows only the last engine activity.
+
+The engine keeps those lines in a small file in Milkbeat's own storage. The file is excluded from backups and is never sent anywhere. Take a photo of the report when you report a crash. Steps are in [Troubleshooting](troubleshooting.md#the-app-closes-at-preset-changes).
+
 Whether now playing shows the visualizer, the music video or the artwork is chosen in the player with its [view button](playback.md#visualizer-music-video-or-artwork), not here.
 
 ## About

@@ -172,6 +172,7 @@ internal class TvVisualizerHost(
         if (ProjectMJNI.getCompletedRenderBudgetGeneration() != budgetGeneration) return
         val quality = quality ?: return
         if (quality.onFpsSample(fps) == QualityController.ACTION_SKIP) ProjectMJNI.skipCurrentPreset()
+        if (engine.gpu.isEmpty()) engine.gpu = renderer.glRenderer
         engine.renderStats = VisualizerRenderStats(fps, targetFps, width, height, quality.isAuto)
     }
 

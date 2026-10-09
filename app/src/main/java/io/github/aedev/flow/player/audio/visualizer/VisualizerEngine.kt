@@ -8,6 +8,7 @@ import io.github.aedev.flow.data.local.VisualizerPreferences
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.withContext
 import nl.neerdael.projectm.core.DeviceProfile
 import nl.neerdael.projectm.core.ProjectMCore
@@ -27,6 +28,7 @@ class VisualizerEngine
     constructor(
         @ApplicationContext private val context: Context,
         preferences: VisualizerPreferences,
+        val exitDiagnostics: VisualizerExitDiagnostics,
     ) {
         @Volatile
         private var started = false
@@ -52,7 +54,14 @@ class VisualizerEngine
         /** ProjectM-TV's defaults for this device, for every setting the user has not changed. */
         val defaults: VisualizerSettings by lazy { VisualizerSettings.defaultsFor(profile) }
 
-        val settings: Flow<VisualizerSettings> by lazy { preferences.settings(defaults) }
+        /** The engine starts only once these are read, so its trail file is open before it first renders. */
+        val settings: Flow<VisualizerSettings> by lazy {
+            preferences.settings(defaults).onStart { if (isSupported) exitDiagnostics.open() }
+        }
+
+        /** The GPU as its driver names it, once a visualizer has rendered in this process; empty before. */
+        @Volatile
+        var gpu: String = ""
 
         private var applied: VisualizerSettings? = null
 
@@ -76,6 +85,8 @@ class VisualizerEngine
             if (last?.beatCuts != settings.beatCuts) ProjectMJNI.setBeatCuts(settings.beatCuts)
             if (last?.presetSeconds != settings.presetSeconds) ProjectMJNI.setPresetDuration(settings.presetSeconds)
             if (last?.blankDetection != settings.blankDetection) ProjectMJNI.setBlankDetection(settings.blankDetection)
+            if (last?.backgroundCompile != settings.backgroundCompile) ProjectMJNI.setBackgroundCompile(settings.backgroundCompile)
+            if (last?.shaderBinaryCache != settings.shaderBinaryCache) ProjectMJNI.setShaderBinaryCache(settings.shaderBinaryCache)
             if (last?.transitionMode != settings.transitionMode) {
                 ProjectMJNI.setTransitionMode(settings.transitionMode, profile.lowerBlendResolutionByDefault())
             }
