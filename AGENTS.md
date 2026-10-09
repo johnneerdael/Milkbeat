@@ -742,6 +742,8 @@ revision must pass the configured ktlint rules.
   Never promote preview packages through stable metadata or automatic updates.
   SoundCloud 0.2.0 uses API 5 TV pairing; its stable downloader code remains 089. Preserve
   checkpointed signed bytes when retrying publication after a GitHub promotion failure.
+  A stable archive missing from Buzzheavier is restored from its exact signed bytes and its code
+  repointed in the stable catalog only; see `docs/plugin-download-codes.md`.
 - The visualizer consumes the canonical single Native ProjectM-TV core AAR. `TvVisualizerHost`
   owns a `QualityController` in Auto, acknowledges `BudgetStatsListener` context generations,
   revalidates live memory before resume, and publishes size/trails/transition as one reviewed
