@@ -38,7 +38,13 @@ class PluginStripeCipherDeviceTest {
             blowfish.doFinal(encrypted, index * 2048, 2048, encrypted, index * 2048)
         }
         val source = PluginStripeCipherDataSource(ByteArrayDataSource(encrypted), key)
-        source.open(DataSpec.Builder().setUri(Uri.parse("https://cdn.example/song")).setPosition(5).build())
+        source.open(
+            DataSpec
+                .Builder()
+                .setUri(Uri.parse("https://cdn.example/song"))
+                .setPosition(5)
+                .build(),
+        )
         val out = java.io.ByteArrayOutputStream()
         val buffer = ByteArray(1000)
         while (true) {

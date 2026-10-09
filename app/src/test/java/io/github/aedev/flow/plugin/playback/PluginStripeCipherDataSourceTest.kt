@@ -107,6 +107,17 @@ class PluginStripeCipherDataSourceTest {
     }
 
     @Test
+    fun `cache identity separates clear bytes and each key without exposing it`() {
+        val clearIdentity = (null as AudioCipher?).cacheIdentity()
+        val identity = cipher.cacheIdentity()
+        assertThat(clearIdentity).isEmpty()
+        assertThat(identity).startsWith(":BF_CBC_STRIPE:")
+        assertThat(identity).doesNotContain(keyHex)
+        assertThat(cipher.copy(keyHex = keyHex.uppercase()).cacheIdentity()).isEqualTo(identity)
+        assertThat(cipher.copy(keyHex = "00".repeat(16)).cacheIdentity()).isNotEqualTo(identity)
+    }
+
+    @Test
     fun `malformed keys are refused before any bytes are read`() {
         for (hex in listOf("", "00", "zz".repeat(16), "00".repeat(17))) {
             assertThat(AudioCipher(AudioCipherScheme.BF_CBC_STRIPE, hex).keyBytes()).isNull()

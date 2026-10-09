@@ -10,6 +10,7 @@ import androidx.media3.datasource.TransferListener
 import nl.neerdael.milkbeat.plugin.AudioCipher
 import nl.neerdael.milkbeat.plugin.AudioCipherScheme
 import java.io.IOException
+import java.security.MessageDigest
 import javax.crypto.Cipher
 import javax.crypto.spec.IvParameterSpec
 import javax.crypto.spec.SecretKeySpec
@@ -26,6 +27,16 @@ internal fun AudioCipher.keyBytes(): ByteArray? {
         AudioCipherScheme.BF_CBC_STRIPE -> ByteArray(STRIPE_KEY_BYTES) { keyHex.substring(it * 2, it * 2 + 2).toInt(16).toByte() }
     }
 }
+
+/**
+ * Cached bytes sit beneath the decryptor, so their identity names the key that reads them. Clear
+ * streams keep an empty suffix, leaving their existing cache identity unchanged.
+ */
+internal fun AudioCipher?.cacheIdentity(): String =
+    this?.let { cipher ->
+        val digest = MessageDigest.getInstance("SHA-256").digest(cipher.keyHex.lowercase().toByteArray())
+        ":${cipher.scheme}:" + digest.take(8).joinToString("") { "%02x".format(it) }
+    } ?: ""
 
 internal fun pluginStripeCipherDataSourceFactory(
     upstream: DataSource.Factory,
