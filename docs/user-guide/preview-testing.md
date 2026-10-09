@@ -1,10 +1,11 @@
 # Video matching preview
 
 Install the prerelease APK named **Milkbeat Preview**. It uses a separate app ID and keeps its own settings, plugins and account sessions. Open that launcher entry to test; your stable Milkbeat app remains available. Stable downloader codes and automatic updates keep their stable packages;
-Preview packages are published only for the separate Preview installation. Its plugin update
-checks do not read the stable publication, so automatic updates and **Update all plugins** keep
-these pinned packages. Install a new Preview build or use its documented code to test a newer
-preview package.
+Preview packages are published only for the separate Preview installation. Updated Preview
+builds exclude stable-publication update checks and keep their pinned test packages. Older
+archived Preview APKs retain their previous update behavior: turn off **Settings → Plugins →
+Update plugins automatically** and avoid **Update all plugins** when reproducing those tests.
+Install a new Preview build or use its documented code to test a newer preview package.
 
 ## Set up
 
