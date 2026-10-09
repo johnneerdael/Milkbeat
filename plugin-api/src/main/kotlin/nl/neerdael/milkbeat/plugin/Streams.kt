@@ -112,6 +112,8 @@ data class AudioStream(
     val requireAudioOnlyHls: Boolean = false,
     /** Exact chosen audio rendition, including byte ranges for one native DASH presentation. */
     val audioFormat: MediaFormat? = null,
+    /** Provider encryption the host removes from progressive bytes; distinct from platform [drm]. */
+    val cipher: AudioCipher? = null,
 )
 
 /** License information consumed by the host's platform DRM implementation. */
@@ -125,6 +127,23 @@ data class AudioDrm(
 @Serializable
 enum class AudioDrmScheme { WIDEVINE, }
 
+/** The key that removes a provider's stream encryption, as [keyHex], for one recording. */
+@Serializable
+data class AudioCipher(
+    val scheme: AudioCipherScheme,
+    val keyHex: String,
+)
+
+@Serializable
+enum class AudioCipherScheme {
+    /**
+     * Blowfish CBC without padding over every third whole 2048-byte block (0, 3, 6, …), each block
+     * restarting from the IV `0001020304050607`; other blocks and a final partial block are clear.
+     * The key is 16 bytes.
+     */
+    BF_CBC_STRIPE,
+}
+
 /** A played-enough listen or view, reported to the provider's history when the listener allows it. */
 @Serializable
 data class ReportPlaybackRequest(
@@ -132,6 +151,10 @@ data class ReportPlaybackRequest(
     val trackingToken: String? = null,
     val playedMs: Long,
     val durationMs: Long? = null,
+    /** Actual position in the accepted recording, distinct from elapsed listening time after a seek. */
+    val positionMs: Long? = null,
+    /** Opaque host listen identity; changes when the same recording starts a new listen. */
+    val playbackSessionId: String? = null,
 )
 
 /** A video to play in the video player. */

@@ -126,7 +126,7 @@ Select an installed plugin to see its version, description and account, and to s
 | --- | --- |
 | **Index playlists** | Matches the account's playlist tracks and Liked Songs against your audio providers in priority order, so playback can reuse the matches |
 | **Prepare private playlists in YouTube Music** | Spotify and YouTube Music: see [below](#prepare-private-playlists). Needs both providers signed in |
-| **Report plays to** *provider* | Tracks you listen to for 30 seconds or more, or for half of a track shorter than a minute, are reported to that provider and count toward your listening there |
+| **Report plays to** *provider* | Tracks you listen to for 30 seconds or more, or for half of a track shorter than a minute, are reported to that provider. Compatible API 8 music providers receive updates during playback and at pause/seek/final boundaries; older providers report when the listen ends. Unknown-length tracks require 30 seconds. Skipped sections do not count as listening |
 | **Signed in as** / **Not signed in** | The account state. *Signed out: sign in again* means the provider confirmed the session expired |
 | **Sign in** / **Sign out** | Starts the provider's [sign-in method](#sign-in) or forgets the session |
 | **Remove** | Uninstalls the plugin and its tab |
@@ -157,7 +157,7 @@ When a provider reports an expired sign-in, Milkbeat asks the plugin again in th
 
 ![Audio provider priority: YouTube Music, Beatport, then SoundCloud, with the per-provider audio switches](images/settings-audio-priority.png)
 
-Under **Audio**, switch on the providers you want (**Use** *provider* **for audio**), use **Move earlier** and **Move later** to order them, then select **Done**. Milkbeat searches from top to bottom: if a provider cannot find or play a track, it tries the next one.
+Under **Audio**, switch on the providers you want (**Use** *provider* **for audio**), use **Move earlier** and **Move later** to order them, then select **Done**. YouTube tracks use their known recording IDs. SoundCloud and Beatport try their own enabled audio provider first, then fall back in your chosen order if it cannot play. Spotify starts bounded parallel searches across enabled audio providers and plays the first acceptable match with a validated stream; the remaining searches are cancelled. Explicitly prepared YouTube playlist copies keep their known YouTube recordings.
 
 YouTube matching searches recorded videos, including static Art Tracks and archived live sets, whichever now-playing view you use. It checks recording identity, so an unrelated performance, cover, different remix or short excerpt is rejected, and full versions are preferred over mixed excerpts. The picture loads only when you choose [the video view](playback.md#visualizer-music-video-or-artwork).
 

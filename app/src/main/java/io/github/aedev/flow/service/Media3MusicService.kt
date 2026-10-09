@@ -45,6 +45,7 @@ import io.github.aedev.flow.player.audio.visualizer.VisualizerClockListener
 import io.github.aedev.flow.player.audio.visualizer.VisualizerEngine
 import io.github.aedev.flow.player.audio.visualizer.VisualizerTapProcessor
 import io.github.aedev.flow.player.audio.visualizer.followPlayerClock
+import io.github.aedev.flow.player.diagnostics.PlaybackOutputTrace
 import io.github.aedev.flow.player.factory.LoadControlFactory
 import io.github.aedev.flow.player.musicResolutionStatusState
 import io.github.aedev.flow.player.setVideoCapablePlaybackIds
@@ -163,6 +164,7 @@ class Media3MusicService : MediaLibraryService() {
     internal var learnDurationMs = 0L
     internal var learnPlayedMs = 0L
     internal var learnPlayingSinceMs = -1L
+    private var accountHistoryListener: MusicAccountHistoryListener? = null
 
     @Inject
     lateinit var downloadUtil: DownloadUtil
@@ -357,20 +359,13 @@ class Media3MusicService : MediaLibraryService() {
             }
 
         val renderersFactory =
-            object : androidx.media3.exoplayer.DefaultRenderersFactory(this) {
-                @Suppress("DEPRECATION")
-                override fun buildAudioSink(
-                    context: android.content.Context,
-                    enableFloatOutput: Boolean,
-                    enableAudioTrackPlaybackParams: Boolean,
-                ): androidx.media3.exoplayer.audio.AudioSink? =
-                    androidx.media3.exoplayer.audio.DefaultAudioSink
-                        .Builder(context)
-                        .setAudioTrackProvider(audioOutputProbe)
-                        .setAudioProcessors(
-                            arrayOf<androidx.media3.common.audio.AudioProcessor>(equalizer, VisualizerTapProcessor(visualizerTap)),
-                        ).build()
-            }.setExtensionRendererMode(androidx.media3.exoplayer.DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
+            io.github.aedev.flow.player.renderer
+                .MusicRenderersFactory(
+                    this,
+                    audioOutputProbe,
+                    arrayOf<androidx.media3.common.audio.AudioProcessor>(equalizer, VisualizerTapProcessor(visualizerTap)),
+                    io.github.aedev.flow.player.musicVideoJoinGate,
+                ).setExtensionRendererMode(androidx.media3.exoplayer.DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
 
         val loadControl = LoadControlFactory.forMusic()
 
@@ -386,6 +381,9 @@ class Media3MusicService : MediaLibraryService() {
                 .setSeekBackIncrementMs(5000)
                 .setSeekForwardIncrementMs(5000)
                 .build()
+        io.github.aedev.flow.player.musicVideoJoinGate
+            .bind(player)
+        player.addAnalyticsListener(PlaybackOutputTrace(audioOutputProbe))
         player.trackSelectionParameters =
             player.trackSelectionParameters
                 .buildUpon()
@@ -399,6 +397,13 @@ class Media3MusicService : MediaLibraryService() {
 
         player.setOffloadEnabled(shouldOffloadAudio(isTv, equalizerRepository.needsProcessing.value))
         initializeOutputRecovery()
+        accountHistoryListener =
+            MusicAccountHistoryListener(
+                sessionPlayer,
+                lifecycleScope,
+                ::resolveLearnTrack,
+                accountPlayHistory::reportProgress,
+            )
         sessionPlayer.addListener(VisualizerClockListener(visualizerTap))
         lifecycleScope.launch { followPlayerClock(visualizerTap, sessionPlayer) }
         // Stream URLs belong to the identity that requested them; a sign-in or sign-out starts fresh.
@@ -548,11 +553,15 @@ class Media3MusicService : MediaLibraryService() {
     }
 
     override fun onDestroy() {
+        io.github.aedev.flow.player.musicVideoJoinGate
+            .bind(null)
         musicResolutionStatusState.value = null
         EnhancedMusicPlayerManager.prefetcher = null
         EnhancedMusicPlayerManager.setVideoCapablePlaybackIds(emptySet())
         EnhancedMusicPlayerManager.playbackArtworkState.value = null
         // Flush the in-flight listen session before the player goes away.
+        accountHistoryListener?.close()
+        accountHistoryListener = null
         finalizeListenSession()
 
         // Clear audio session ID so external processors know we're gone

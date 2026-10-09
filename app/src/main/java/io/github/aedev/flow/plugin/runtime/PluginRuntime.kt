@@ -5,6 +5,11 @@ import android.util.Log
 import com.dokar.quickjs.QuickJs
 import com.dokar.quickjs.QuickJsException
 import com.dokar.quickjs.binding.FunctionBinding
+import io.github.aedev.flow.player.diagnostics.PlaybackTrace
+import io.github.aedev.flow.player.diagnostics.TraceCategory
+import io.github.aedev.flow.player.diagnostics.TraceEvent
+import io.github.aedev.flow.player.diagnostics.TraceField
+import io.github.aedev.flow.player.diagnostics.TraceSpan
 import io.github.aedev.flow.plugin.host.CallEnvelope
 import io.github.aedev.flow.plugin.host.PluginBrowser
 import io.github.aedev.flow.plugin.host.PluginHostApi
@@ -63,8 +68,8 @@ class PluginCallException(
  * Runs one plugin: its QuickJS context on a thread of its own, created on the first call and closed
  * after five idle minutes unless something holds it warm. Calls go in through the SDK's dispatcher,
  * at most four at a time, each with a time limit; five internal failures in a row disable the plugin
- * until the app restarts. Warm-up runs in a second, short-lived context and thread, so its long
- * synchronous work never holds up page loads.
+ * until the app restarts. API 8 warm-up retains preparation on the same owner as playback. Older
+ * providers keep their separate warm-up context and its larger, longer-lived compilation budget.
  */
 internal class PluginRuntime(
     val plugin: InstalledPlugin,
@@ -98,26 +103,47 @@ internal class PluginRuntime(
         request: Request,
     ): Response {
         if (disabled) throw PluginCallException(plugin.id, PluginError(PluginErrorCode.UNAVAILABLE, "Disabled after repeated failures"))
-        return inFlight.withPermit {
-            running.incrementAndGet()
-            try {
-                contexts.call(CALL_TIMEOUT_MS) { active -> invoke(active, operation, request, CALL_TIMEOUT_MS) }
-            } catch (e: TimeoutCancellationException) {
-                throw PluginCallException(
-                    plugin.id,
-                    PluginError(PluginErrorCode.TIMEOUT, "${operation.path} took longer than $CALL_TIMEOUT_MS ms"),
-                )
-            } finally {
-                running.decrementAndGet()
-                scheduleIdleStop()
+        val trace = PlaybackTrace.start(TraceEvent.RUNTIME_QUEUED, traceCategory(operation.path))
+        val queuedMs = if (PlaybackTrace.enabled) SystemClock.elapsedRealtime() else 0L
+        var success = false
+        try {
+            return inFlight.withPermit {
+                trace.event(TraceEvent.RUNTIME_PERMIT_ACQUIRED)
+                running.incrementAndGet()
+                try {
+                    contexts
+                        .call(CALL_TIMEOUT_MS) { active ->
+                            trace.event(TraceEvent.RUNTIME_CONTEXT_ACQUIRED, TraceField.GENERATION to contextGeneration)
+                            invoke(active, operation, request, CALL_TIMEOUT_MS, trace, queuedMs)
+                        }.also { success = true }
+                } catch (e: TimeoutCancellationException) {
+                    throw PluginCallException(
+                        plugin.id,
+                        PluginError(PluginErrorCode.TIMEOUT, "${operation.path} took longer than $CALL_TIMEOUT_MS ms"),
+                    )
+                } finally {
+                    running.decrementAndGet()
+                    scheduleIdleStop()
+                }
             }
+        } finally {
+            trace.event(TraceEvent.RUNTIME_FINISHED, TraceField.SUCCESS to if (success) 1L else 0L)
         }
     }
 
-    /** Runs the plugin's warm-up, if it has one, in a context of its own that is gone afterwards. */
+    /** API 8 retains prepared browser/worker state; older providers keep isolated compilation warm-up. */
     suspend fun warmUp() {
         if (disabled) return
         val startedMs = SystemClock.elapsedRealtime()
+        if (plugin.manifest.api.target >= 8) {
+            try {
+                call(PluginOperations.warmUp, Unit)
+                Log.i(TAG, "Persistent warm-up of ${plugin.id} took ${SystemClock.elapsedRealtime() - startedMs} ms")
+            } catch (e: PluginCallException) {
+                if (e.error.code != PluginErrorCode.UNSUPPORTED) Log.w(TAG, "Warm-up of ${plugin.id} failed: ${e.error.code}")
+            }
+            return
+        }
         val warm = start(WARM_UP_MEMORY_LIMIT, WARM_UP_TIMEOUT_MS)
         try {
             invoke(warm, PluginOperations.warmUp, Unit, WARM_UP_TIMEOUT_MS)
@@ -150,9 +176,32 @@ internal class PluginRuntime(
         operation: PluginOperation<Request, Response>,
         request: Request,
         timeoutMs: Long,
+        trace: TraceSpan = PlaybackTrace.start(TraceEvent.RUNTIME_QUEUED, traceCategory(operation.path)),
+        queuedMs: Long = if (PlaybackTrace.enabled) SystemClock.elapsedRealtime() else 0L,
     ): Response =
         withContext(context.thread) {
-            invokeOnOwner(context, operation, request, timeoutMs)
+            val startedMs = if (PlaybackTrace.enabled) SystemClock.elapsedRealtime() else 0L
+            trace.event(TraceEvent.RUNTIME_EXECUTION_STARTED, TraceField.QUEUE_WAIT_MS to (startedMs - queuedMs))
+            var success = false
+            try {
+                invokeOnOwner(context, operation, request, timeoutMs).also { success = true }
+            } finally {
+                trace.event(
+                    TraceEvent.RUNTIME_EXECUTION_FINISHED,
+                    TraceField.EXECUTION_MS to if (startedMs != 0L) SystemClock.elapsedRealtime() - startedMs else 0L,
+                    TraceField.SUCCESS to if (success) 1L else 0L,
+                )
+            }
+        }
+
+    private fun traceCategory(path: String): TraceCategory =
+        when (path) {
+            "audio.resolve" -> TraceCategory.AUDIO_RESOLVE
+            "video.resolve" -> TraceCategory.VIDEO_RESOLVE
+            "metadata.search", "audio.match", "audio.matchBatch", "video.search" -> TraceCategory.SEARCH
+            "audio.reportPlayback", "video.reportPlayback" -> TraceCategory.HISTORY
+            "lifecycle.warmUp" -> TraceCategory.WARM_UP
+            else -> TraceCategory.OTHER_OPERATION
         }
 
     private suspend fun <Request, Response> invokeOnOwner(

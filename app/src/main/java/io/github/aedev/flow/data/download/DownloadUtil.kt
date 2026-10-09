@@ -39,7 +39,9 @@ import io.github.aedev.flow.plugin.playback.QueuePreparationResult
 import io.github.aedev.flow.plugin.playback.ResolvedAudio
 import io.github.aedev.flow.plugin.playback.adaptiveCacheKey
 import io.github.aedev.flow.plugin.playback.adaptiveDataSourceFactory
+import io.github.aedev.flow.plugin.playback.cacheIdentity
 import io.github.aedev.flow.plugin.playback.drmDataSourceFactory
+import io.github.aedev.flow.plugin.playback.pluginStripeCipherDataSourceFactory
 import io.github.aedev.flow.plugin.playback.prepareQueue
 import io.github.aedev.flow.plugin.playback.serverAbrDataSourceFactory
 import io.github.aedev.flow.service.ExoDownloadService
@@ -243,7 +245,8 @@ class DownloadUtil
                     binding?.initial?.let { snapshot ->
                         val video = MusicVideoItems.videoIdOfVideoKey(mediaId) != null
                         val formatId = if (video) snapshot.stream.video?.id else snapshot.stream.renditionId
-                        val token = "${snapshot.pluginId}:${snapshot.stream.cacheKey}:$formatId"
+                        val token =
+                            "${snapshot.pluginId}:${snapshot.stream.cacheKey}:$formatId${snapshot.stream.cipher.cacheIdentity()}"
                         bindCachedMusicRendition(playerCache, mediaId, token)
                     }
 
@@ -282,10 +285,14 @@ class DownloadUtil
                     val picture = MusicVideoItems.videoIdOfVideoKey(mediaId) != null
                     val resolved = resolve(dataSpec.uri, picture)
                     val stream = resolved.stream
+                    if (binding == null && stream.cipher != null) {
+                        throw IOException("Encrypted plugin audio plays only through its bound source")
+                    }
                     val format = if (picture) stream.video ?: error("${stream.cacheKey} has no picture") else null
                     val url = format?.url ?: stream.url
                     val headers = stream.headers + format?.headers.orEmpty()
-                    val rendition = "${resolved.pluginId}:${stream.cacheKey}:${format?.id ?: stream.renditionId}"
+                    val rendition =
+                        "${resolved.pluginId}:${stream.cacheKey}:${format?.id ?: stream.renditionId}${stream.cipher.cacheIdentity()}"
                     bindCachedMusicRendition(playerCache, mediaId, rendition)
                     songUrlCache[mediaId] = PlayableUrl(url, headers, resolved.validUntilMs)
                     Log.d(TAG, "[Player] Resolved $mediaId via ${resolved.pluginId}")
@@ -312,7 +319,9 @@ class DownloadUtil
                         )
                     }
                     BoundPluginMusicDataSourceFactory(
-                        resolvingFactory(binding),
+                        resolvingFactory(binding).let { media ->
+                            audio.stream.cipher?.let { pluginStripeCipherDataSourceFactory(media, it) } ?: media
+                        },
                         audio.stream.drm?.let { pluginAudio.drmDataSourceFactory(binding, okHttpClient) },
                         audio.stream.serverAbr?.let { pluginAudio.serverAbrDataSourceFactory(audio, okHttpClient) },
                         audio.stream.serverAbr?.let { { pluginAudio.acquirePlaybackLease(audio) } },

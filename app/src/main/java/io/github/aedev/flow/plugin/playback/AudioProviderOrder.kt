@@ -18,15 +18,24 @@ internal fun audioProviderAttempts(
     track: TrackDescriptor,
     withPicture: Boolean = false,
     preferredProviderId: String? = null,
-): List<AudioProviderAttempt> =
-    (listOfNotNull(preferredProviderId) + state.selection.audio).distinct().mapNotNull { id ->
-        val plugin = state.plugin(id) ?: return@mapNotNull null
-        val role = plugin.manifest.roles.audio ?: return@mapNotNull null
-        if (withPicture && !role.musicVideo) return@mapNotNull null
-        val direct = directAudioTrack(track, plugin)
-        if (direct == null && (!role.match || track.title.isBlank())) return@mapNotNull null
-        AudioProviderAttempt(plugin, direct)
-    }
+): List<AudioProviderAttempt> {
+    val attempts =
+        (listOfNotNull(preferredProviderId) + state.selection.audio).distinct().mapNotNull { id ->
+            val plugin = state.plugin(id) ?: return@mapNotNull null
+            val role = plugin.manifest.roles.audio ?: return@mapNotNull null
+            if (withPicture && !role.musicVideo) return@mapNotNull null
+            val direct = directAudioTrack(track, plugin)
+            if (direct == null && (!role.match || track.title.isBlank())) return@mapNotNull null
+            AudioProviderAttempt(plugin, direct)
+        }
+    val native = if (track.isSpotifyMetadata) emptyList() else attempts.filter { it.direct?.ref == track.ref }
+    val youtubeSource = track.ids.any { (space, id) -> space in setOf("yt", "ytm", "youtube") && id == track.ref.providerId }
+    if (youtubeSource && !track.isSpotifyMetadata) return native
+    return native + attempts.filterNot { it in native }
+}
+
+internal val TrackDescriptor.isSpotifyMetadata: Boolean
+    get() = ids["spotify"] == ref.providerId
 
 internal fun directAudioTrack(
     track: TrackDescriptor,
@@ -36,6 +45,8 @@ internal fun directAudioTrack(
         plugin.manifest.roles.audio
             ?.idSpaces
             .orEmpty()
-    val own = track.ids.entries.firstOrNull { it.key in spaces && it.value.isNotBlank() } ?: return null
+    val own =
+        track.ids.entries.firstOrNull { it.key in spaces && it.value == track.ref.providerId && it.value.isNotBlank() }
+            ?: track.ids.entries.firstOrNull { it.key in spaces && it.value.isNotBlank() } ?: return null
     return if (track.ref.providerId == own.value) track else track.copy(ref = track.ref.copy(providerId = own.value))
 }

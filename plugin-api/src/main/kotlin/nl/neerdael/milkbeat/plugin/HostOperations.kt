@@ -55,6 +55,9 @@ data class StoredValue(
 enum class HashAlgorithm {
     SHA1,
     SHA256,
+
+    /** For provider protocols that name it; never for new security decisions. */
+    MD5,
 }
 
 @Serializable

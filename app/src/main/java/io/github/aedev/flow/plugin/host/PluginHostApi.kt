@@ -86,6 +86,7 @@ internal class PluginHostApi(
                     when (request.algorithm) {
                         HashAlgorithm.SHA1 -> "SHA-1"
                         HashAlgorithm.SHA256 -> "SHA-256"
+                        HashAlgorithm.MD5 -> "MD5"
                     }
                 HashResult(MessageDigest.getInstance(algorithm).digest(request.text.toByteArray()).joinToString("") { "%02x".format(it) })
             },
@@ -97,6 +98,7 @@ internal class PluginHostApi(
                     when (request.algorithm) {
                         HashAlgorithm.SHA1 -> "HmacSHA1"
                         HashAlgorithm.SHA256 -> "HmacSHA256"
+                        HashAlgorithm.MD5 -> "HmacMD5"
                     }
                 val key = request.keyHex.hexBytes() ?: throw HostCallException(PluginErrorCode.INTERNAL, "The HMAC key is not hex")
                 val message =

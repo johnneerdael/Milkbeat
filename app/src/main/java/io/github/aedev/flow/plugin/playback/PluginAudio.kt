@@ -1,6 +1,10 @@
 package io.github.aedev.flow.plugin.playback
 
 import android.os.SystemClock
+import io.github.aedev.flow.player.diagnostics.PlaybackTrace
+import io.github.aedev.flow.player.diagnostics.TraceCategory
+import io.github.aedev.flow.player.diagnostics.TraceEvent
+import io.github.aedev.flow.player.diagnostics.TraceField
 import io.github.aedev.flow.plugin.PluginHost
 import io.github.aedev.flow.plugin.catalog.PluginAccounts
 import io.github.aedev.flow.plugin.registry.PluginRegistry
@@ -19,7 +23,6 @@ import nl.neerdael.milkbeat.plugin.AudioStream
 import nl.neerdael.milkbeat.plugin.PluginError
 import nl.neerdael.milkbeat.plugin.PluginErrorCode
 import nl.neerdael.milkbeat.plugin.PluginOperations
-import nl.neerdael.milkbeat.plugin.ReportPlaybackRequest
 import nl.neerdael.milkbeat.plugin.ResolveAudioRequest
 import nl.neerdael.milkbeat.plugin.ServerAbrFailure
 import nl.neerdael.milkbeat.plugin.StreamFailure
@@ -33,9 +36,8 @@ private const val EXPIRY_MARGIN_MS = 60_000L
 private const val DEFAULT_LIFETIME_MS = 5 * 60 * 60_000L
 
 /**
- * Plays tracks through the listener's audio plugins in their selected order. Each plugin uses its
- * own id when present, otherwise searches for a match; the next plugin is tried when no suitable
- * recording is found or the recording is unavailable. One resolve serves a music video's sound and picture; it is kept until shortly
+ * Resolves native sources directly and races configured audio providers for Spotify metadata.
+ * Matches still require recording confidence and a validated stream before acceptance. One resolve serves a music video's sound and picture; it is kept until shortly
  * before it expires, and dropped when playback reports it failed, so the plugin is asked for another.
  */
 @Singleton
@@ -88,14 +90,10 @@ class PluginAudio
         internal fun needsQueueMatching(
             track: TrackDescriptor,
             preferredProviderId: String? = null,
-        ): Boolean {
-            val state = registry.state.value
-            val first =
-                (listOfNotNull(preferredProviderId) + state.selection.audio)
-                    .mapNotNull(state::plugin)
-                    .firstOrNull { it.enabled } ?: return false
-            return directAudioTrack(track, first) == null
-        }
+        ): Boolean =
+            audioProviderAttempts(registry.state.value, track, preferredProviderId = preferredProviderId)
+                .firstOrNull()
+                ?.let { it.direct == null } ?: false
 
         internal fun preparationVersion(): Any = streamContext() to cacheGeneration.get()
 
@@ -119,8 +117,14 @@ class PluginAudio
                 resolvedRevision.update { revision -> revision + 1 }
             }
             val ticket = resolutionProgress.begin(playbackId)
+            val trace = PlaybackTrace.start(TraceEvent.RESOLUTION_STARTED, TraceCategory.AUDIO_RESOLVE)
             try {
-                return resolveLocked(track, picture, quality, strict = false, preferredProviderId, preparePicture, ticket)
+                val audio = resolveLocked(track, picture, quality, strict = false, preferredProviderId, preparePicture, ticket)
+                trace.event(TraceEvent.RESOLUTION_FINISHED, TraceField.SUCCESS to 1L)
+                return audio
+            } catch (failure: Exception) {
+                trace.event(TraceEvent.RESOLUTION_FAILED)
+                throw failure
             } finally {
                 resolutionProgress.finish(ticket)
             }
@@ -209,13 +213,23 @@ class PluginAudio
                             ?.audio
                             ?.musicVideo == true,
                     )
-                }?.let { return it }
+                }?.let {
+                    PlaybackTrace.event(TraceEvent.SOURCE_PREPARED, category = TraceCategory.AUDIO_RESOLVE)
+                    return it
+                }
             if (attempts.isEmpty()) {
                 throw PluginCallException("none", PluginError(PluginErrorCode.UNAVAILABLE, "No audio plugin plays ${track.title}"))
             }
-            var last: PluginCallException? = null
-            var lastPictureUnavailable: PictureUnavailable? = null
-            for ((plugin, known) in attempts) {
+
+            suspend fun resolveAttempt(provider: AudioProviderAttempt): ResolvedAudio? {
+                val (plugin, known) = provider
+                val trace = PlaybackTrace.start(TraceEvent.PROVIDER_ATTEMPT, TraceCategory.AUDIO_RESOLVE)
+                trace.event(
+                    if (known != null) TraceEvent.KNOWN_ID_BYPASS else TraceEvent.CROSS_PROVIDER_SEARCH,
+                    TraceField.PROVIDER_INDEX to attempts.indexOf(provider).toLong(),
+                )
+                var last: PluginCallException? = null
+                var lastPictureUnavailable: PictureUnavailable? = null
                 val matchProgress: (TrackMatchProgress) -> Unit = { phase ->
                     resolutionProgress.update(
                         ticket,
@@ -228,15 +242,15 @@ class PluginAudio
                         plugin.manifest.roles.audio
                             ?.musicVideo == true && plugin.manifest.api.target < 7
                 var playable =
-                    try {
-                        known ?: match(track, plugin.id, strict, strategy = plugin.audioMatchStrategy(), onProgress = matchProgress)
-                            ?: continue
-                    } catch (
-                        error: PluginCallException,
-                    ) {
-                        last = error
-                        continue
-                    }
+                    known
+                        ?: matcher.playbackMatch(
+                            track,
+                            plugin.id,
+                            strict,
+                            strategy = plugin.audioMatchStrategy(),
+                            onProgress = matchProgress,
+                        )
+                        ?: return null
                 for (attempt in 0..1) {
                     val request =
                         ResolveAudioRequest(
@@ -288,6 +302,7 @@ class PluginAudio
                             throw IOException("The accepted playback account or provider changed")
                         }
                         val lifetime = stream.expiresInMs ?: DEFAULT_LIFETIME_MS
+                        trace.event(TraceEvent.PROVIDER_RESULT, TraceField.SUCCESS to 1L)
                         return ResolvedAudio(
                             plugin.id,
                             playable,
@@ -300,22 +315,7 @@ class PluginAudio
                             if (stream.serverAbr != null) receipt else null,
                             if (boundPresentation) acceptedContext else null,
                             if (boundPresentation) SystemClock.elapsedRealtime() + lifetime - EXPIRY_MARGIN_MS else null,
-                        ).also {
-                            pendingFailure?.let { failure ->
-                                if (failures.remove(key, failure)) {
-                                    failureProviders.remove(key)
-                                    failureContexts.remove(key)
-                                }
-                            }
-                            synchronized(resolved) {
-                                if (generation == cacheGeneration.get() &&
-                                    (version == preparationVersion() || (stream.serverAbr != null && ownsNativeSource(it)))
-                                ) {
-                                    resolved[key] = it
-                                    resolvedRevision.update { revision -> revision + 1 }
-                                }
-                            }
-                        }
+                        )
                     } catch (e: PictureUnavailable) {
                         lastPictureUnavailable = e
                         break
@@ -332,7 +332,7 @@ class PluginAudio
                         matcher.invalidate(track, plugin.id)
                         if (attempt != 0) break
                         playable =
-                            match(
+                            matcher.playbackMatch(
                                 track,
                                 plugin.id,
                                 strict,
@@ -351,8 +351,38 @@ class PluginAudio
                         break
                     }
                 }
+                trace.event(TraceEvent.PROVIDER_RESULT, TraceField.SUCCESS to 0L)
+                lastPictureUnavailable?.let { throw it }
+                last?.let { throw it }
+                return null
             }
-            lastPictureUnavailable?.let { throw it }
+            val outcome =
+                resolveAudioAttempts(
+                    attempts,
+                    concurrent =
+                        track.isSpotifyMetadata && pinned == null && picture == null &&
+                            attempts.none { it.plugin.id == preferredProviderId && it.direct != null },
+                    resolve = ::resolveAttempt,
+                )
+            outcome.audio?.let { accepted ->
+                pendingFailure?.let { failure ->
+                    if (failures.remove(key, failure)) {
+                        failureProviders.remove(key)
+                        failureContexts.remove(key)
+                    }
+                }
+                synchronized(resolved) {
+                    if (generation == cacheGeneration.get() &&
+                        (version == preparationVersion() || (accepted.stream.serverAbr != null && ownsNativeSource(accepted)))
+                    ) {
+                        resolved[key] = accepted
+                        resolvedRevision.update { revision -> revision + 1 }
+                    }
+                }
+                return accepted
+            }
+            val last = outcome.error
+            outcome.pictureUnavailable?.let { throw it }
             if (strict && last?.error?.code == PluginErrorCode.NOT_FOUND) {
                 throw PluginCallException(
                     last.pluginId,
@@ -362,25 +392,6 @@ class PluginAudio
             if (strict && last == null) throw AudioCatalogMiss()
             throw last ?: PluginCallException("none", PluginError(PluginErrorCode.NOT_FOUND, "No audio plugin found ${track.title}"))
         }
-
-        private suspend fun match(
-            track: TrackDescriptor,
-            pluginId: String,
-            strict: Boolean,
-            excludedId: String? = null,
-            strategy: nl.neerdael.milkbeat.plugin.AudioMatchStrategy,
-            onProgress: (TrackMatchProgress) -> Unit = {},
-        ): TrackDescriptor? =
-            if (strict) {
-                matcher.matchForIndexing(
-                    track,
-                    pluginId,
-                    excludedId,
-                    strategy,
-                )
-            } else {
-                matcher.match(track, pluginId, excludedId, strategy, onProgress)
-            }
 
         suspend fun refreshBound(audio: ResolvedAudio): ResolvedAudio {
             verifyBound(audio)
@@ -415,6 +426,7 @@ class PluginAudio
                 stream.mimeType.substringBefore(';').lowercase() in setOf("application/x-mpegurl", "application/vnd.apple.mpegurl")
             if ((audio.stream.serverAbr != null) != (stream.serverAbr != null) || previousHls != nextHls ||
                 audio.stream.drm?.scheme != stream.drm?.scheme ||
+                audio.stream.cipher?.scheme != stream.cipher?.scheme ||
                 (audio.withPicture && stream.video == null && stream.serverAbr == null && !isHlsStream(stream))
             ) {
                 throw PluginCallException(
@@ -572,23 +584,29 @@ class PluginAudio
             resolvedRevision.update { it + 1 }
         }
 
+        /** The accepted resolution [track] plays from now; a queued report pins it before it is sent. */
+        fun acceptedListen(track: TrackDescriptor): ResolvedAudio? = resolved[track.audioIdentity()]
+
         /** Reports a listen to the plugin that played it, when it reports listens and the listener allows it. */
         suspend fun reportListen(
             track: TrackDescriptor,
             playedMs: Long,
             durationMs: Long?,
+            positionMs: Long? = null,
+            progress: Boolean = false,
+            playbackSessionId: String? = null,
         ) {
-            val played = resolved[track.audioIdentity()] ?: return
-            val plugin = registry.state.value.plugin(played.pluginId) ?: return
-            if (plugin.manifest.roles.audio
-                    ?.reportPlayback != true
-            ) {
-                return
-            }
-            host.call(
-                played.pluginId,
-                PluginOperations.reportListen,
-                ReportPlaybackRequest(played.track.ref, played.stream.trackingToken, playedMs, durationMs),
-            )
+            val played = acceptedListen(track) ?: return
+            reportPinnedListen(played, playedMs, durationMs, positionMs, progress, playbackSessionId)
         }
+
+        /** Reports against [played] even after an account or quality change replaced the current resolution. */
+        suspend fun reportPinnedListen(
+            played: ResolvedAudio,
+            playedMs: Long,
+            durationMs: Long?,
+            positionMs: Long? = null,
+            progress: Boolean = false,
+            playbackSessionId: String? = null,
+        ) = reportAcceptedListen(host, registry, played, playedMs, durationMs, positionMs, progress, playbackSessionId)
     }

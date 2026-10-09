@@ -55,6 +55,7 @@ See [Local and network folders](folders.md) for every field and server requireme
 | **Skip Silence** | Skip parts with no audio |
 | **Stable Voice** | Normalize audio volume for more consistent playback |
 | **Ambient mode** | A soft glow of the video's colours around it |
+| **Debug playback logging** | Write local actions, resolution, request timings and playback output events to Android logcat. Off by default; saved on this device only |
 
 Video quality and codec are picked automatically for your TV and the available streams, and SponsorBlock is always on for supported videos; neither has a setting.
 

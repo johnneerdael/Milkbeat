@@ -880,6 +880,16 @@ run that occupies a physical device, and the resulting diff is thousands of line
   `StartupBenchmark` (`:benchmark:connectedBenchmarkReleaseAndroidTest --no-configuration-cache`)
   to measure.
 
+- Plugin API 9 adds `AudioStream.cipher` (`BF_CBC_STRIPE`, used by Deezer-style providers) and
+  `MD5` in `crypto.hash`. `plugin/playback/PluginStripeCipherDataSource.kt` decrypts with the
+  platform `Blowfish/CBC/NoPadding` cipher above the bound player cache, which keeps encrypted bytes.
+  The persisted cache rendition token carries `AudioCipher.cacheIdentity()` (scheme + key digest),
+  so clear or differently keyed spans are dropped before the decryptor reads them.
+  Every open aligns to a 2048-byte block, since the encrypted stripe depends on absolute block index.
+  The bound media transport keeps the first key, so `BoundPluginAudio` refuses a refresh that changes
+  the key, rendition or cache key. The unbound resolver and the offline downloader reject cipher
+  streams. Focused regressions: `./gradlew :app:testGithubDebugUnitTest --tests '*PluginStripeCipherDataSourceTest'`.
+
 - Plugin API 5 adds `DeviceCodeMethod` and `signIn.begin/poll/confirm/cancel`; keep the generic TV pairing
   controller in `ui/screens/account/DeviceCodeSignInViewModel.kt` and native presentation in
   `ui/tv/screens/account/TvDeviceCodeSignInScreen.kt`. Validate both activation URLs against current
@@ -892,3 +902,37 @@ run that occupies a physical device, and the resulting diff is thousands of line
 
 - Video-capable audio providers use `AudioMatchStrategy.VIDEOS` for ordinary matching, queue preparation, preloads and mirror batches. Keep successful matches, scope misses/in-flight work by strategy, and preserve source metadata/IDs. `PluginAudio.videoCapablePlaybackIds` is a cold event-driven Flow of candidate IDs derived from accepted caches and account/provider context. The current Media3 item must also report a supported video track; track-change events update Now Playing eligibility on main, preventing cached metadata from exposing Video for audio-only HLS or completed downloads. Matching alone must not load picture. API 7's prepared DASH manifest is shared by eligibility and source construction; native SABR and eligible HLS retain picture support. Separate progressive picture URLs stay audio-only in music playback rather than preparing a hidden child. Explicit Video selection uses the prepared presentation's track selection and existing Media3 surface gating without replacing or seeking audio.
 - The existing `githubNightly` build is the separate preview app (`nl.neerdael.milkbeat.nightly`, launcher label Milkbeat Preview), debug-signed with release-like shrinking. Use `:app:assembleGithubNightly` and build-property `milkbeatPatch` for an explicit test artifact; do not manually bump app version files. A test prerelease must remain unmerged until the maintainer tests it. Its optional signed provider package is distributed through Buzzheavier; stable publication checkpoints/catalogs remain separate. Nightly/Preview downloader codes are pinned to `app/src/nightly/assets/plugin-preview-download-catalog.json`; stable builds retain the main asset and live publication.
+
+### Playback startup diagnostics and source routing
+
+- Native YouTube tracks resolve known IDs without cross-provider matching. SoundCloud and Beatport
+  try their own enabled audio provider before serial fallback. Unbound Spotify metadata races
+  at most four enabled providers through recording-confidence checks and validated stream resolution;
+  cancel losers before storing the winner. Prepared or explicitly bound recordings keep their binding.
+- `player/diagnostics/PlaybackTrace` is opt-in, default OFF, controlled by per-device DataStore
+  `DebugLoggingPreferences` and Settings → Playback. Capture release-compatible INFO events with
+  `adb logcat -v threadtime -s MilkbeatTrace:I`. Use fixed enum names and numeric fields only;
+  never add tokens, headers, URLs, config or track titles to this log boundary. Output counters are
+  event-driven. No logged restart/underrun is insufficient evidence for absence of an audible gap.
+
+- Plugin API 8 adds optional actual `ReportPlaybackRequest.positionMs` and opaque
+  `playbackSessionId`. Keep cumulative listened time separate from recording position.
+  `MusicAccountHistoryListener` reports qualified music listens at a 30-second playing-only cadence
+  plus event boundaries; pause/buffering stop its timer, seeks emit old/new positions with no skipped
+  listening credit, and each new listen gets a new identity. `AccountPlayHistory` preserves report
+  order and its default-on user preference. Each queued report pins the accepted `ResolvedAudio`
+  when it is queued (`PluginAudio.acceptedListen`), so sends and retries never follow a later
+  account or quality change. A final (non-progress) report retries transient failures
+  through `retryingTransient` in queue order; cadence samples are not retried because the next one
+  is cumulative. API <8 stays finish-only. Reuse the accepted cached
+  resolution; never re-extract streams for progress reporting. Do not log session IDs or credentials.
+
+- API 8 lifecycle warm-up uses the persistent runtime through the same call/context ownership,
+  memory limit, timeout and grants as playback; earlier APIs retain their isolated compilation
+  warm-up. Deduplicate provider preparation and do not invent account-independent token caches.
+
+- Initial prepared-network video joins require current-video media coverage before attaching the
+  visible surface. Use Media3 ForwardingRenderer only for the finite initial readiness phase;
+  retain the normal audio renderer, clock, exceptions and ongoing buffering behavior. Do not
+  count stale audio-only buffer snapshots, headers, another item, or another period as video
+  prebuffer proof. Local file/content presentation keeps its existing path.
