@@ -1,7 +1,7 @@
 {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "title": "MilkbeatPluginApi",
-    "description": "Plugin API v8, generated from the plugin-api module. Do not edit.",
+    "description": "Plugin API v9, generated from the plugin-api module. Do not edit.",
     "type": "object",
     "properties": {
         "manifest": {

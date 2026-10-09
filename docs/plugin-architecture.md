@@ -4,7 +4,7 @@ Status: architecture proposal, 2026-09-29. It replaces the earlier metadata plug
 (installed APKs, isolated processes) and keeps the block vocabulary of the
 [Metadata plugin UI contract](metadata-plugin-ui-contract.md).
 
-Current host extension (plugin API 8): `AudioStream` may include `cipher` with
+Current host extension (plugin API 9): `AudioStream` may include `cipher` with
 `scheme: "BF_CBC_STRIPE"` and a 16-byte `keyHex`. The host decrypts the progressive bytes above
 its cache with the platform Blowfish cipher. It refuses ciphers combined with other delivery forms,
 and it does not download encrypted audio for offline use. `crypto.hash` also accepts `MD5` for

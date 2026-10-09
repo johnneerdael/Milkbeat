@@ -38,7 +38,7 @@ export type HashAlgorithm = 'SHA1' | 'SHA256' | 'MD5';
 export type LogLevel = 'DEBUG' | 'INFO' | 'WARN' | 'ERROR';
 
 /**
- * Plugin API v8, generated from the plugin-api module. Do not edit.
+ * Plugin API v9, generated from the plugin-api module. Do not edit.
  */
 export interface MilkbeatPluginApi {
   manifest: PluginManifest;

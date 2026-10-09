@@ -873,7 +873,7 @@ run that occupies a physical device, and the resulting diff is thousands of line
   `StartupBenchmark` (`:benchmark:connectedBenchmarkReleaseAndroidTest --no-configuration-cache`)
   to measure.
 
-- Plugin API 8 adds `AudioStream.cipher` (`BF_CBC_STRIPE`, used by Deezer-style providers) and
+- Plugin API 9 adds `AudioStream.cipher` (`BF_CBC_STRIPE`, used by Deezer-style providers) and
   `MD5` in `crypto.hash`. `plugin/playback/PluginStripeCipherDataSource.kt` decrypts with the
   platform `Blowfish/CBC/NoPadding` cipher above the bound player cache, which keeps encrypted bytes.
   The persisted cache rendition token carries `AudioCipher.cacheIdentity()` (scheme + key digest),
