@@ -13,7 +13,7 @@ internal object MusicPlaybackRecoveryPlanner {
         val index: Int,
         val mediaId: String,
         val resumePositionMs: Long,
-        /** Rebuild a native source after a network wait while retaining its URI and recording. */
+        /** Rebuild the accepted source after a network wait or HTTP failure so provider selection runs again. */
         val refreshNativeSource: Boolean = false,
     )
 

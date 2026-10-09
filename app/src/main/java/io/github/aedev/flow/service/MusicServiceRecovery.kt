@@ -43,7 +43,7 @@ internal fun Media3MusicService.handlePlayerError(
     error: PlaybackException,
     errorWindowIndex: Int,
 ) {
-    val failed =
+    var failed =
         MusicPlaybackRecoveryPlanner.resolveFailedItem(
             errorWindowIndex = errorWindowIndex,
             currentIndex = player.currentMediaItemIndex,
@@ -121,6 +121,7 @@ internal fun Media3MusicService.handlePlayerError(
             .of(error)
     if (progressiveHttp != null && (progressiveHttp.second in setOf(403, 404, 410) || progressiveHttp.second >= 500)) {
         pluginAudio.failed(mediaId, progressiveHttp.first, progressiveHttp.second)
+        failed = failed.copy(refreshNativeSource = true)
     }
     if (fallBackToSong(failed)) {
         Log.w(TAG, "Music video of $mediaId failed (${error.errorCodeName}), playing its song instead", error)

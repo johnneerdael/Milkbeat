@@ -152,6 +152,34 @@ class PluginSabrPictureRecoveryTest : PluginAudioFixture() {
         }
 
     @Test
+    fun `song only progressive HTTP retry replaces the bound media source`() =
+        runTest {
+            audio.forgetAll()
+            coEvery { host.call("youtube", PluginOperations.resolveAudio, any()) } returns stream
+            audio.resolve(original, null, playbackId = mediaId)
+            val (service, items) = service()
+            items[0] = items[0].buildUpon().setUri("music://$mediaId").build()
+            val http =
+                androidx.media3.datasource.HttpDataSource.InvalidResponseCodeException(
+                    404,
+                    "fixture",
+                    null,
+                    emptyMap(),
+                    androidx.media3.datasource.DataSpec
+                        .Builder()
+                        .setUri(stream.url)
+                        .build(),
+                    byteArrayOf(),
+                )
+            service.handlePlayerError(PlaybackException("fixture", http, PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS), 0)
+            org.robolectric.Shadows
+                .shadowOf(android.os.Looper.getMainLooper())
+                .idleFor(java.time.Duration.ofSeconds(6))
+            verify(exactly = 1) { service.player.replaceMediaItem(0, any()) }
+            service.pendingRetryJob?.cancel()
+        }
+
+    @Test
     fun `online typed renewal reasons retain protocol priority and reload context`() =
         runTest {
             for (reason in nl.neerdael.milkbeat.sabr.SabrPlaybackException.Reason.entries) {
