@@ -23,7 +23,6 @@ import nl.neerdael.milkbeat.plugin.AudioStream
 import nl.neerdael.milkbeat.plugin.PluginError
 import nl.neerdael.milkbeat.plugin.PluginErrorCode
 import nl.neerdael.milkbeat.plugin.PluginOperations
-import nl.neerdael.milkbeat.plugin.ReportPlaybackRequest
 import nl.neerdael.milkbeat.plugin.ResolveAudioRequest
 import nl.neerdael.milkbeat.plugin.ServerAbrFailure
 import nl.neerdael.milkbeat.plugin.StreamFailure
@@ -594,23 +593,6 @@ class PluginAudio
             playbackSessionId: String? = null,
         ) {
             val played = resolved[track.audioIdentity()] ?: return
-            val plugin = registry.state.value.plugin(played.pluginId) ?: return
-            if (progress && plugin.manifest.api.target < 8) return
-            if (plugin.manifest.roles.audio
-                    ?.reportPlayback != true
-            ) {
-                return
-            }
-            val request =
-                ReportPlaybackRequest(
-                    played.track.ref,
-                    played.stream.trackingToken,
-                    playedMs,
-                    durationMs,
-                    positionMs = positionMs.takeIf { plugin.manifest.api.target >= 8 },
-                    playbackSessionId = playbackSessionId.takeIf { plugin.manifest.api.target >= 8 },
-                )
-            val send: suspend () -> Unit = { host.call(played.pluginId, PluginOperations.reportListen, request) }
-            if (plugin.manifest.api.target >= 8) played.playbackReports.report(request, send) else send()
+            reportAcceptedListen(host, registry, played, playedMs, durationMs, positionMs, progress, playbackSessionId)
         }
     }

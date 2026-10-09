@@ -120,7 +120,7 @@ Select an installed plugin to see its version, description and account, and to s
 | --- | --- |
 | **Index playlists** | Matches the account's playlist tracks and Liked Songs against your audio providers in priority order, so playback can reuse the matches |
 | **Prepare private playlists in YouTube Music** | Spotify and YouTube Music: see [below](#prepare-private-playlists). Needs both providers signed in |
-| **Report plays to** *provider* | Tracks you listen to for 30 seconds or more, or for half of a track shorter than a minute, are reported to that provider and count toward your listening there |
+| **Report plays to** *provider* | Tracks you listen to for 30 seconds or more, or for half of a track shorter than a minute, are reported to that provider. Compatible API 8 music providers receive updates during playback and at pause/seek/final boundaries; older providers report when the listen ends. Unknown-length tracks require 30 seconds. Skipped sections do not count as listening |
 | **Signed in as** / **Not signed in** | The account state. *Signed out: sign in again* means the provider confirmed the session expired |
 | **Sign in** / **Sign out** | Starts the provider's [sign-in method](#sign-in) or forgets the session |
 | **Remove** | Uninstalls the plugin and its tab |

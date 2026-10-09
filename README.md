@@ -185,6 +185,7 @@ play/pause, next, repeat, like, the view button and the queue.
   reach the radio presets and switch the mix without losing your own tracks.
 - **Queue preparation** matches the remaining queue one track at a time in playback order and
   caches matches.
+- **Listening history:** compatible API 8 providers report qualified signed-in listens during playback, including long sets, while respecting the play-reporting setting and skipped sections.
 - **Recovery:** about 16 MB of a stream buffers ahead. Failed links get one provider refresh; repeated media failures try the next configured audio provider for that track. Decoded PCM output that stalls for five seconds is reconnected up to twice.
 
 [Playback, queue and radio](https://johnneerdael.github.io/Milkbeat/playback/).

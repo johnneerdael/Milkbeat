@@ -3,6 +3,7 @@ package io.github.aedev.flow.service
 import android.os.SystemClock
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
+import io.github.aedev.flow.data.account.AccountPlayHistory
 import io.github.aedev.flow.data.account.countsAsPlay
 import io.github.aedev.flow.data.account.playThresholdMs
 import io.github.aedev.flow.data.music.model.MusicTrack
@@ -176,3 +177,8 @@ internal class MusicAccountHistoryListener(
         const val REPORT_INTERVAL_MS = 30_000L
     }
 }
+
+internal fun AccountPlayHistory.reportProgress(
+    track: MusicTrack,
+    progress: AccountListenProgress,
+) = onListened(track, progress.playedMs, progress.durationMs, progress.positionMs, progress.progress, progress.playbackSessionId)

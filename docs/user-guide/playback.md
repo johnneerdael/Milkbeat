@@ -95,3 +95,12 @@ If normal decoded TV audio (PCM) stops advancing for about five seconds while th
 ## Encrypted provider audio
 
 Compatible plugins can supply Widevine-protected audio through the device's DRM implementation. Milkbeat fetches licenses separately from the audio and only from destinations the plugin is allowed to reach. Availability depends on the account, the recording and the device. SoundCloud previews are never treated as full tracks. The offline downloader supports clear progressive audio only; HLS, DRM and native SABR streams cannot be downloaded.
+
+## Signed-in listening history
+
+When **Report plays to** the provider is enabled in its plugin details, compatible API 8 providers receive qualified listening
+updates while music is playing, about every 30 seconds, as well as pause, seek and final updates.
+A listen qualifies after 30 seconds, or half of a shorter track. Skipped sections do not count as
+listened time. Signed-in YouTube Video uses these updates for your account history and recommendations;
+anonymous playback does not update an account. Older providers receive a report when the listen ends.
+Reporting reuses the recording that actually played and does not delay startup by resolving it again.

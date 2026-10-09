@@ -10,6 +10,10 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.aedev.flow.data.local.safePreferencesDataStore
 import io.github.aedev.flow.data.music.model.MusicTrack
 import io.github.aedev.flow.player.MusicVideoItems
+import io.github.aedev.flow.player.diagnostics.PlaybackTrace
+import io.github.aedev.flow.player.diagnostics.TraceCategory
+import io.github.aedev.flow.player.diagnostics.TraceEvent
+import io.github.aedev.flow.player.diagnostics.TraceField
 import io.github.aedev.flow.plugin.playback.PluginAudio
 import io.github.aedev.flow.plugin.playback.PluginVideo
 import io.github.aedev.flow.plugin.runtime.PluginCallException
@@ -81,7 +85,10 @@ class AccountPlayHistory
             scope.launch {
                 for (listen in listens) {
                     try {
-                        if (!enabled.first()) continue
+                        if (!enabled.first()) {
+                            PlaybackTrace.event(TraceEvent.HISTORY_DISABLED, category = TraceCategory.HISTORY)
+                            continue
+                        }
                         pluginAudio.reportListen(
                             MusicVideoItems.descriptor(listen.track),
                             listen.playedMs,
@@ -118,6 +125,13 @@ class AccountPlayHistory
             playbackSessionId: String? = null,
         ) {
             if (!countsAsPlay(playedMs, durationMs)) return
+            PlaybackTrace.event(
+                TraceEvent.HISTORY_QUEUED,
+                TraceField.PLAYED_MS to playedMs,
+                TraceField.POSITION_MS to (positionMs ?: -1L),
+                TraceField.PROGRESS to if (progress) 1L else 0L,
+                category = TraceCategory.HISTORY,
+            )
             listens.trySend(ListenReport(track, playedMs, durationMs, positionMs, progress, playbackSessionId))
         }
 

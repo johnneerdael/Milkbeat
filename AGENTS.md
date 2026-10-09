@@ -897,3 +897,11 @@ run that occupies a physical device, and the resulting diff is thousands of line
   `adb logcat -v threadtime -s MilkbeatTrace:I`. Use fixed enum names and numeric fields only;
   never add tokens, headers, URLs, config or track titles to this log boundary. Output counters are
   event-driven. No logged restart/underrun is insufficient evidence for absence of an audible gap.
+
+- Plugin API 8 adds optional actual `ReportPlaybackRequest.positionMs` and opaque
+  `playbackSessionId`. Keep cumulative listened time separate from recording position.
+  `MusicAccountHistoryListener` reports qualified music listens at a 30-second playing-only cadence
+  plus event boundaries; pause/buffering stop its timer, seeks emit old/new positions with no skipped
+  listening credit, and each new listen gets a new identity. `AccountPlayHistory` preserves report
+  order and its default-on user preference. API <8 stays finish-only. Reuse the accepted cached
+  resolution; never re-extract streams for progress reporting. Do not log session IDs or credentials.

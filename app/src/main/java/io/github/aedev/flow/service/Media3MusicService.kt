@@ -407,16 +407,7 @@ class Media3MusicService : MediaLibraryService() {
                 sessionPlayer,
                 lifecycleScope,
                 ::resolveLearnTrack,
-                { track, progress ->
-                    accountPlayHistory.onListened(
-                        track,
-                        progress.playedMs,
-                        progress.durationMs,
-                        progress.positionMs,
-                        progress.progress,
-                        progress.playbackSessionId,
-                    )
-                },
+                accountPlayHistory::reportProgress,
             )
         sessionPlayer.addListener(VisualizerClockListener(visualizerTap))
         lifecycleScope.launch { followPlayerClock(visualizerTap, sessionPlayer) }
