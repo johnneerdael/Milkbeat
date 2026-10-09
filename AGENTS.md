@@ -735,6 +735,10 @@ revision must pass the configured ktlint rules.
   Stable descriptors reject prerelease versions. Keep `plugins/published-preview.json` aligned
   with `app/src/nightly/assets/plugin-preview-download-catalog.json`; preserve each distributed
   preview version's original archive hash/URL, including harmless signature-envelope rebuilds.
+  The stable provider set now includes YouTube Video 0.1.0 / versionCode 7, code 932, requiring
+  API 6. This normal release is distinct from immutable preview 6/code 304 and preview 4/code 744.
+  Preview (`.nightly`) update checks return no stable-publication candidates; automatic updates
+  and Update all plugins must not replace its pinned packages. Stable hosts retain normal lookup.
   Never promote preview packages through stable metadata or automatic updates.
   SoundCloud 0.2.0 uses API 5 TV pairing; its stable downloader code remains 089. Preserve
   checkpointed signed bytes when retrying publication after a GitHub promotion failure.

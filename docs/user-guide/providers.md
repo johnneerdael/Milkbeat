@@ -20,18 +20,22 @@ There is no metadata provider to choose: every installed, enabled catalog you ca
 | Spotify | **981** | Home, Search, artists, albums, playlists, library | **None: use another audio provider** | — |
 | Beatport | **393** | Catalog, genres, charts, artists, labels, library | Full streams with a streaming subscription | — |
 | SoundCloud | **089** | Discover, Stream, Search, Artists, albums, playlists, Liked Songs, history | Available full tracks, matching and stations | — |
+| YouTube Video | **932** | YouTube's TV Music Home, Search, artists, albums, playlists, library | Streams, cross-provider matching and radio | YouTube videos and playlists |
 
-Capabilities depend on the installed plugin version, the account and its subscription. The separate [Preview app](preview-testing.md#youtube-video-plugin) also offers **YouTube Video** (code **304**, Preview only), which shares the YouTube tab with YouTube Music: with both installed the tab shows YouTube Music's catalog, and YouTube Video's catalog appears, also without sign-in, when it is the only one.
+Capabilities depend on the installed plugin version, the account and its subscription. YouTube Video shares the YouTube tab with YouTube Music: with both installed the tab shows YouTube Music's catalog, and YouTube Video's catalog appears, also without sign-in, when it is the only one. Sign-in with a TV code is optional. The [Preview app](preview-testing.md#youtube-video-plugin) installs its prerelease versions with code **304**.
 
-## YouTube Video preview
+<span id="youtube-video-preview"></span>
 
-**YouTube Video** is a separate provider for a compatible API 6 Preview app. It keeps its own
+## YouTube Video
+
+**YouTube Video 0.1.0** is available in stable Milkbeat with downloader code **932**. It requires
+a Milkbeat build with plugin API 6; update the app before installing if your build is older. It keeps its own
 account alongside YouTube Music and supplies SmartTube's regular YouTube TV Music section:
 recommended music, charts, new videos and the other rows supplied for your region or account.
 Signing in adds Liked Music before those rows. Show More includes the original row and its
 continuations; playlist and mix pages retain track order.
 
-To browse these feeds, disable YouTube Music while testing YouTube Video; the shared YouTube
+To browse these feeds, disable YouTube Music when using YouTube Video for your catalog; the shared YouTube
 tab, Search and Library then show YouTube Video's catalog. YouTube Music's installed package
 and account remain independent. Choose the audio and video sources under Settings → Plugins.
 
@@ -49,8 +53,9 @@ catalog title, artist and recording identity.
 
 The paired host handles SABR through Media3. SABR streams support playback, not offline
 downloads. Audio-only HLS needs an independent audio rendition; a combined audio/video stream
-cannot silently fetch video bytes in audio-only mode. Install the paired provider package for
-your compatible Preview build; app and plugin packages are distributed separately.
+cannot silently fetch video bytes in audio-only mode. App and plugin packages are distributed
+separately. The optional Preview app retains its historical prerelease packages and codes; it
+is not needed to install the released YouTube Video provider.
 
 ## Install a plugin
 
@@ -70,6 +75,7 @@ your compatible Preview build; app and plugin packages are distributed separatel
 | **981** | Spotify |
 | **494** | YouTube Music |
 | **089** | SoundCloud |
+| **932** | YouTube Video |
 <!-- /plugin-codes -->
 
 Stable builds prefer the publisher's live catalog and fall back to the bundled one offline, so newly published codes work without an app update. The separate [Preview app](preview-testing.md) pins its codes to its own test catalog. The original codes **102** (Beatport), **772** (Spotify) and **416** (YouTube Music) still work. An unknown code reports an error; try the plugin's full URL or update Milkbeat.
@@ -124,6 +130,7 @@ Completed indexing matches are kept when you cancel. Index again after changing 
 ## Sign-in and account requirements
 
 - **YouTube Music:** sign-in is optional. Signing in turns Home into a personalized feed and makes your library available. Free YouTube accounts are supported; Premium is not required for personalization.
+- **YouTube Video:** sign-in is optional. Pair it with a TV code from any phone for a personalized Home and your library; signed out, it browses YouTube's TV Music feeds. YouTube Video 0.1.0 needs a Milkbeat build with plugin API 6.
 - **Spotify:** a catalog with **no audio source**. Its value is your personalized feed, playlists, Liked Songs and library after signing in. Keep at least one audio provider enabled.
 - **Beatport:** sign in for the catalog and your library. Beatport's own full-length audio needs an active streaming subscription; otherwise SoundCloud or YouTube Music can match the recording. A free account does not guarantee a match.
 - **SoundCloud:** sign in for personalized Home, playlists, Liked Songs, history and Artists. Public search and catalog pages can work anonymously. Full-track availability depends on the recording and your listening subscription; Artist Pro does not grant Go+ listening rights. Preview-only or restricted recordings can appear but cannot supply full-track audio, so keep another audio provider as a fallback. SoundCloud plugin 0.2.0 needs a Milkbeat build with plugin API 5. TV-paired accounts currently play clear HLS streams only; protected-only recordings cannot play with this session, and plays from a TV-paired account are not reported to SoundCloud. Existing web sessions keep their Widevine playback path where the account and device allow it.

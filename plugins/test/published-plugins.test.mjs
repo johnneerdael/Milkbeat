@@ -52,13 +52,14 @@ test('preview metadata uses only its pinned nightly catalog and retains the orig
  assert.throws(()=>verifyPublishedPlugins({descriptor,catalog,expectedIds}),/prerelease.*stable/i);
 });
 
-test('preview channel expects YouTube Video alongside the stable providers, which stay four',()=>{
- const descriptor=JSON.parse(readFileSync(new URL('../published-preview.json',import.meta.url)));
- const catalog=readCatalog(new URL('../../app/src/nightly/assets/plugin-preview-download-catalog.json',import.meta.url)).entries;
- const rows=verifyPublishedPlugins({descriptor,catalog,channel:'preview'});
- assert.ok(rows.some(row=>row.id==='nl.neerdael.youtube-video'));
+test('stable and preview both publish YouTube Video, and stable rejects a list without it',()=>{
+ const preview=JSON.parse(readFileSync(new URL('../published-preview.json',import.meta.url)));
+ const previewCatalog=readCatalog(new URL('../../app/src/nightly/assets/plugin-preview-download-catalog.json',import.meta.url)).entries;
+ assert.ok(verifyPublishedPlugins({descriptor:preview,catalog:previewCatalog,channel:'preview'}).some(row=>row.id==='nl.neerdael.youtube-video'));
  const stable=JSON.parse(readFileSync(new URL('../published.json',import.meta.url)));
- assert.equal(stable.plugins.length,4);
- const withVideo={...stable,plugins:[...stable.plugins,descriptor.plugins.find(row=>row.id==='nl.neerdael.youtube-video')]};
- assert.throws(()=>verifyPublishedPlugins({descriptor:withVideo,catalog}),/Invalid published plugin descriptor/);
+ const catalog=readCatalog(new URL('../../app/src/main/assets/plugin-download-catalog.json',import.meta.url)).entries;
+ const video=verifyPublishedPlugins({descriptor:stable,catalog}).find(row=>row.id==='nl.neerdael.youtube-video');
+ assert.equal(video.code,'932');
+ const withoutVideo={...stable,plugins:stable.plugins.filter(row=>row.id!=='nl.neerdael.youtube-video')};
+ assert.throws(()=>verifyPublishedPlugins({descriptor:withoutVideo,catalog}),/Invalid published plugin descriptor/);
 });

@@ -132,7 +132,8 @@ Without it, the tab shows the regular signed-out YouTube Music home.
 
 ### YouTube Video TV-code session
 
-The separate YouTube Video preview uses Google's TV device-code flow. Its QR opens YouTube's
+The YouTube Video provider, including its stable and preview releases, uses Google's TV
+device-code flow. Its QR opens YouTube's
 activation address, or the user enters the displayed code on Google's device page. Google handles
 the password and consent directly on the user's phone; neither passes through Milkbeat's phone
 viewer. The TV polls the short-lived challenge while its pairing screen is visible.

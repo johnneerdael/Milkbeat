@@ -43,7 +43,7 @@ and sign-in method, playback and radio, the visualizer, every Settings page and 
 ## Highlights
 
 - **A tab per music service.** Every catalog you can use gets its own sidebar tab with its logo:
-  YouTube as soon as YouTube Music is installed, the others once you are signed in. There is no
+  YouTube as soon as YouTube Music or YouTube Video is installed, the others once you are signed in. There is no
   metadata provider to choose any more, and Milkbeat opens on the tab you used last.
 - **Your own music first.** Local folders, USB drives and SMB 2/3, WebDAV, SFTP and NFS (v3, 4.0,
   4.1) servers, read-only. Their tags build a **Local library** tab of genres, artists, releases,
@@ -93,15 +93,15 @@ and sign-in method, playback and radio, the visualizer, every Settings page and 
 
 | Tab | Appears |
 | --- | --- |
-| **YouTube** | As soon as the YouTube Music plugin is installed and enabled; sign-in is optional |
+| **YouTube** | As soon as the YouTube Music or YouTube Video plugin is installed and enabled; sign-in is optional |
 | **Spotify**, **Beatport**, **SoundCloud** | Once installed, enabled and signed in |
 | **Local library** | Once a music folder is linked |
 
-The YouTube Video plugin, offered only in the Preview app, shares the YouTube tab, which is named
-YouTube whichever plugin provides it: with YouTube Music also installed, the tab shows YouTube Music's
-catalog; with only YouTube Video, it shows YouTube Video's. Each tab shows that provider's own feed through Milkbeat's TV components and keeps its place while
+The YouTube Video plugin shares the YouTube tab, which is named YouTube whichever plugin provides it:
+with YouTube Music also installed, the tab shows YouTube Music's catalog; with only YouTube Video, it
+shows YouTube Video's. Each tab shows that provider's own feed through Milkbeat's TV components and keeps its place while
 you visit another. **Search** offers a chip per music tab, including Local library (video search comes with the
-YouTube Video plugin's own chip, currently in the Preview app), each with only its own provider's filters and suggestions (Local library suggests only your recent searches). **Library** starts with a chip per signed-in
+YouTube Video plugin's own chip), each with only its own provider's filters and suggestions (Local library suggests only your recent searches). **Library** starts with a chip per signed-in
 account, then Folders, History, Watch later and Playlists (app and provider playlists together,
 including Liked songs). Pages opened from a tab, chip or page stay on their provider, the tab they
 came from stays highlighted, and pressing it again returns to its first page.
@@ -135,6 +135,7 @@ Add **third-party plugins** in **Settings → Plugins** with their downloader co
 | Spotify | **981** | 772 |
 | YouTube Music | **494** | 416 |
 | SoundCloud | **089** | — |
+| YouTube Video | **932** | — |
 <!-- /plugin-codes -->
 
 A plugin download URL also works, including a supported Buzzheavier file page. Plugins are
@@ -146,11 +147,13 @@ distributed separately from Milkbeat releases, signature-checked and reviewed be
 | Spotify | Home, Search, artists, albums, playlists, library | **None: use another audio provider** | — |
 | Beatport | Catalog, genres, charts, artists, labels, library | Full streams with a streaming subscription | — |
 | SoundCloud | Discover, Stream, Search, Artists, albums, playlists, Liked Songs, history | Available full tracks, matching and stations | — |
+| YouTube Video | YouTube's TV Music Home, Search, artists, albums, playlists, library | Streams, matching and radio | YouTube videos and playlists |
 
-The separate **YouTube Video** preview requires host API 6 and keeps its own account alongside
+**YouTube Video 0.1.0** is a separate provider for stable Milkbeat, installed with code **932**.
+It requires plugin API 6 and keeps its own account alongside
 YouTube Music. It supplies SmartTube's regular YouTube TV Music feeds, TV-code/QR sign-in and
 native SABR playback through Milkbeat's existing Media3 player.
-[Setup and limitations](docs/user-guide/providers.md#youtube-video-preview).
+[Setup and limitations](docs/user-guide/providers.md#youtube-video).
 
 - **YouTube Music:** sign-in is optional and personalizes Home; free accounts work.
 - **Spotify:** sign in for your feed, playlists and library; playback comes from your audio providers.
@@ -158,6 +161,8 @@ native SABR playback through Milkbeat's existing Media3 player.
   streaming subscription, otherwise another provider can match the recording.
 - **SoundCloud:** pair with a TV code from any phone. Full-track availability depends on the
   recording and your listening subscription. TV-paired accounts currently play clear HLS streams only.
+- **YouTube Video:** works signed out; pairing with a TV code from any phone personalizes Home and
+  Library.
 
 Under **Audio**, enable providers and put them in priority order; under **Video**, choose the video
 plugin. **Update plugins automatically** (on by default) installs new plugin versions at start and

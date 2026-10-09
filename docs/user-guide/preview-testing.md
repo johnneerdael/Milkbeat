@@ -1,7 +1,11 @@
 # Video matching preview
 
 Install the prerelease APK named **Milkbeat Preview**. It uses a separate app ID and keeps its own settings, plugins and account sessions. Open that launcher entry to test; your stable Milkbeat app remains available. Stable downloader codes and automatic updates keep their stable packages;
-Preview packages are published only for the separate Preview installation.
+Preview packages are published only for the separate Preview installation. Updated Preview
+builds exclude stable-publication update checks and keep their pinned test packages. Older
+archived Preview APKs retain their previous update behavior: turn off **Settings → Plugins →
+Update plugins automatically** and avoid **Update all plugins** when reproducing those tests.
+Install a new Preview build or use its documented code to test a newer preview package.
 
 ## Set up
 
@@ -12,7 +16,7 @@ Preview packages are published only for the separate Preview installation.
 
 ## YouTube Video plugin
 
-The Preview app also offers **YouTube Video** (**0.1.0-preview.6**), installed with downloader code **304**. This code exists only in the Preview app's bundled catalog; stable Milkbeat does not offer it. Like YouTube Music it provides metadata, audio and video, and it browses YouTube's TV Music feeds.
+The Preview app offers the prerelease **YouTube Video** (**0.1.0-preview.6**), installed with downloader code **304**. This code exists only in the Preview app's bundled catalog; stable Milkbeat installs the released YouTube Video with code **932** instead. Like YouTube Music it provides metadata, audio and video, and it browses YouTube's TV Music feeds.
 
 Earlier code **744** remains pinned to preview 4. New Preview builds include code **304** for preview 6; if your installed build lacks it, update the Preview app first. Preview 6 adds the exact Google activation destinations used by TV code sign-in.
 
