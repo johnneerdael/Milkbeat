@@ -57,6 +57,17 @@ Use `bug/<task-slug>` instead for a bug fix. Replace the placeholders with verif
 - Prefer additional commits over rewriting published history. Do not force-push unless explicitly authorized and consistent with repository rules.
 - Report useful progress while continuing work. Recover from routine failures autonomously and preserve checkpoints if interrupted.
 
+## Review-fix validation rounds (user rule, 2026-10-09)
+
+Run the full local validation appropriate to the change once before opening the PR. After
+opening, run only a quick check aimed at each review fix: the affected JVM test class, a compile,
+or one focused control, then push. Reviewed-PR CI (`pr-builds.yml`) starts automatically through
+the review gate and runs the full native suite on Linux, including GLES paths macOS cannot
+exercise, JVM tests, both ARM builds, Preset Lab and the strict guide build. Do not dispatch that
+workflow manually, rerun the approximately 20-minute `run_native_tests.sh`, or repeat full device
+passes for every review round. Monitor the automatic final-head results and address failures
+with focused checks before the next push.
+
 ## 3. Evaluate documentation for every change
 
 For every `feat/` and `bug/` change, documentation evaluation is mandatory before the work can be considered ready for review or merge. Do not assume that a small change or an internal bug fix has no documentation impact.
@@ -746,6 +757,8 @@ revision must pass the configured ktlint rules.
   Preview no longer carries a prerelease YouTube Video. Its catalog keeps the retired, immutable
   preview 6/code 304 and preview 4/code 744 entries. Every descriptor row states the package's
   verified `apiMin` and `format`.
+  Deezer 0.2.0 / versionCode 2 uses code 734 and requires
+  API 9 for its encrypted audio. Preserve both original signed archives when retrying publication.
   Preview (`.nightly`) update checks return no stable-publication candidates; automatic updates
   and Update all plugins must not replace its pinned packages. Stable hosts retain normal lookup.
   Never promote preview packages through stable metadata or automatic updates.

@@ -3,7 +3,7 @@ import {join,resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {readCatalog} from '../../tools/plugin-download-codes.mjs';
 const AUTHOR='39dca3d132c56262c0873ec96faf22cc8ed9ca30c7ed1f135049f8570b943adc';
-const PROVIDERS=['nl.neerdael.beatport','nl.neerdael.spotify','nl.neerdael.youtube-music','nl.neerdael.soundcloud','nl.neerdael.youtube-video'];
+const PROVIDERS=['nl.neerdael.beatport','nl.neerdael.spotify','nl.neerdael.youtube-music','nl.neerdael.soundcloud','nl.neerdael.youtube-video','nl.neerdael.deezer'];
 // Packages are not kept in git: the publisher verifies their bytes against the Buzzheavier account
 // listing before it registers them. This checks that the list the app reads agrees with its catalog.
 export function verifyPublishedPlugins({descriptor,catalog,expectedAuthor=AUTHOR,channel='stable',expectedIds=PROVIDERS}){
