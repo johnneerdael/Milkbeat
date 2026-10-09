@@ -37,7 +37,7 @@ export type HashAlgorithm = 'SHA1' | 'SHA256';
 export type LogLevel = 'DEBUG' | 'INFO' | 'WARN' | 'ERROR';
 
 /**
- * Plugin API v7, generated from the plugin-api module. Do not edit.
+ * Plugin API v8, generated from the plugin-api module. Do not edit.
  */
 export interface MilkbeatPluginApi {
   manifest: PluginManifest;
@@ -637,6 +637,8 @@ export interface ReportPlaybackRequest {
   trackingToken?: string | null;
   playedMs: number;
   durationMs?: number | null;
+  positionMs?: number | null;
+  playbackSessionId?: string | null;
 }
 export interface ResolveVideoRequest {
   entity: EntityRef;

@@ -589,18 +589,28 @@ class PluginAudio
             track: TrackDescriptor,
             playedMs: Long,
             durationMs: Long?,
+            positionMs: Long? = null,
+            progress: Boolean = false,
+            playbackSessionId: String? = null,
         ) {
             val played = resolved[track.audioIdentity()] ?: return
             val plugin = registry.state.value.plugin(played.pluginId) ?: return
+            if (progress && plugin.manifest.api.target < 8) return
             if (plugin.manifest.roles.audio
                     ?.reportPlayback != true
             ) {
                 return
             }
-            host.call(
-                played.pluginId,
-                PluginOperations.reportListen,
-                ReportPlaybackRequest(played.track.ref, played.stream.trackingToken, playedMs, durationMs),
-            )
+            val request =
+                ReportPlaybackRequest(
+                    played.track.ref,
+                    played.stream.trackingToken,
+                    playedMs,
+                    durationMs,
+                    positionMs = positionMs.takeIf { plugin.manifest.api.target >= 8 },
+                    playbackSessionId = playbackSessionId.takeIf { plugin.manifest.api.target >= 8 },
+                )
+            val send: suspend () -> Unit = { host.call(played.pluginId, PluginOperations.reportListen, request) }
+            if (plugin.manifest.api.target >= 8) played.playbackReports.report(request, send) else send()
         }
     }
