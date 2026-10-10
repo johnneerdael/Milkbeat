@@ -180,6 +180,16 @@ class PlaylistPreloadRunnerTest {
         }
 
     @Test
+    fun `providers that play only their own tracks still allow indexing without matching others`() =
+        runTest {
+            state.value = state.value.copy(selection = ProviderSelection())
+            val result = runner.run("spotify", "listener", emptyList()) { }
+            assertThat(result.finished).isTrue()
+            assertThat(result.matched).isEqualTo(0)
+            coVerify(exactly = 0) { host.call(any(), PluginOperations.matchAudio, any()) }
+        }
+
+    @Test
     fun `playback and a second preload reuse the indexed provider chain`() =
         runTest {
             runner.run("spotify", "listener", listOf("youtube", "beatport")) { }

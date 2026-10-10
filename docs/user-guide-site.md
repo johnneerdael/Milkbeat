@@ -53,4 +53,6 @@ The current set was captured over `adb` from Milkbeat 0.9.55 on a 4K Smart TV Pr
 (Android 14, 1920×1080 UI) on 8 October 2026. Retained older captures: the local storage picker,
 the SFTP server-key editor, the SoundCloud pairing example (with a fake code), the diagnostics
 line and two visualizer effect examples, plus the preview app's controlled emulator captures.
+The audio priority page (`settings-audio-priority.png`) is an emulator capture of the debug build
+on 10 October 2026, cropped above the emulator's navigation bar.
 Replace an example when that surface changes. Delete images that no page references.

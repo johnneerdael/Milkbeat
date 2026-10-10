@@ -36,8 +36,10 @@ private const val EXPIRY_MARGIN_MS = 60_000L
 private const val DEFAULT_LIFETIME_MS = 5 * 60 * 60_000L
 
 /**
- * Resolves native sources directly and races configured audio providers for Spotify metadata.
- * Matches still require recording confidence and a validated stream before acceptance. One resolve serves a music video's sound and picture; it is kept until shortly
+ * Resolves tracks through the audio providers in the order [audioProviderAttempts] gives. A track no
+ * provider plays natively, such as Spotify metadata, is looked up on several providers at once, but
+ * the highest-ranked success wins. Matches still require recording confidence and a validated
+ * stream before acceptance. One resolve serves a music video's sound and picture; it is kept until shortly
  * before it expires, and dropped when playback reports it failed, so the plugin is asked for another.
  */
 @Singleton
@@ -360,7 +362,7 @@ class PluginAudio
                 resolveAudioAttempts(
                     attempts,
                     concurrent =
-                        track.isSpotifyMetadata && pinned == null && picture == null &&
+                        track.hasNoPlayingSource(attempts) && pinned == null && picture == null &&
                             attempts.none { it.plugin.id == preferredProviderId && it.direct != null },
                     resolve = ::resolveAttempt,
                 )

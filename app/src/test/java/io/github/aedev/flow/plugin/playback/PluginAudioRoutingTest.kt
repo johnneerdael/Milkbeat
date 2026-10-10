@@ -10,7 +10,6 @@ import io.mockk.coVerify
 import io.mockk.every
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -80,7 +79,7 @@ class PluginAudioRoutingTest : PluginAudioFixture() {
         }
 
     @Test
-    fun `native session delivery follows its own provider before global HLS choice`() {
+    fun `delivery follows the listener's order unless the session prefers a provider`() {
         val beatport =
             plugin.copy(
                 manifest =
@@ -92,6 +91,9 @@ class PluginAudioRoutingTest : PluginAudioFixture() {
         every { registry.state } returns
             MutableStateFlow(PluginRegistryState(listOf(beatport, plugin), ProviderSelection(audio = listOf("beatport", "youtube"))))
         assertThat(audio.deliveryFor(candidate, "youtube")).isEqualTo(AudioDelivery.PROGRESSIVE)
+        assertThat(audio.deliveryFor(candidate)).isEqualTo(AudioDelivery.HLS)
+        every { registry.state } returns
+            MutableStateFlow(PluginRegistryState(listOf(beatport, plugin), ProviderSelection(audio = listOf("youtube"))))
         assertThat(audio.deliveryFor(candidate)).isEqualTo(AudioDelivery.PROGRESSIVE)
     }
 
@@ -137,7 +139,7 @@ class PluginAudioRoutingTest : PluginAudioFixture() {
         }
 
     @Test
-    fun `Spotify known alias may resolve before a higher priority matching provider`() =
+    fun `Spotify known alias waits for a higher priority matching provider`() =
         runTest {
             val beatport =
                 plugin.copy(
@@ -151,11 +153,18 @@ class PluginAudioRoutingTest : PluginAudioFixture() {
                 MutableStateFlow(
                     PluginRegistryState(listOf(plugin, beatport), ProviderSelection(audio = listOf("youtube", "beatport"))),
                 )
-            coEvery { host.call("youtube", PluginOperations.matchAudio, any()) } coAnswers { awaitCancellation() }
+            val gate = CompletableDeferred<Unit>()
+            coEvery { host.call("youtube", PluginOperations.matchAudio, any()) } coAnswers {
+                gate.await()
+                AudioMatches(listOf(candidate))
+            }
             coEvery { host.call("beatport", PluginOperations.resolveAudio, any()) } returns stream
             val described = original.copy(ids = original.ids + ("beatport" to "123"))
-            assertThat(audio.resolve(described, null).pluginId).isEqualTo("beatport")
-            coVerify(exactly = 1) { host.call("beatport", PluginOperations.resolveAudio, any()) }
+            val pending = async { audio.resolve(described, null) }
+            runCurrent()
+            assertThat(pending.isCompleted).isFalse()
+            gate.complete(Unit)
+            assertThat(pending.await().pluginId).isEqualTo("youtube")
         }
 
     @Test

@@ -95,9 +95,14 @@ internal fun LazyListScope.audioProviderChooserItems(
     }
     item(key = "audio-enabled-title") { TvSectionHeader(stringResource(R.string.tv_plugins_audio)) }
     items(plugins.filter { it.enabled }, key = { "audio-enabled-${it.id}" }) { plugin ->
+        val matchesOthers = plugin.id in selection.audio
         TvToggleRow(
-            label = stringResource(R.string.tv_plugins_audio_use, plugin.manifest.name),
-            checked = plugin.id in selection.audio,
+            label = stringResource(R.string.tv_plugins_audio_match_others, plugin.manifest.name),
+            supportingText =
+                stringResource(
+                    if (matchesOthers) R.string.tv_plugins_audio_match_others_on else R.string.tv_plugins_audio_match_others_off,
+                ),
+            checked = matchesOthers,
             onCheckedChange = { enabled ->
                 onSelect { current ->
                     current.copy(

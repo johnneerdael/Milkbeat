@@ -58,7 +58,7 @@ Give visible tracks time to load their embedded metadata. Check that the file ac
 
 ## A Spotify track cannot play
 
-Spotify has no audio of its own. Enable at least one audio provider, check its account/subscription. Milkbeat races acceptable matches across enabled providers. Catalogs may not contain the same recording; an unavailable match can fall back to another provider. Temporary failures can be retried.
+Spotify has no audio of its own. Keep at least one audio provider in the order, with its **play other services' tracks** switch on, and check its account/subscription. Milkbeat searches the providers in your [audio order](providers.md#set-audio-priority) at once and plays the highest-ranked acceptable match. Catalogs may not contain the same recording; an unavailable match can fall back to another provider. Temporary failures can be retried.
 
 ## Music stops in the middle of a song
 

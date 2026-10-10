@@ -32,47 +32,140 @@ class PluginSourceRoutingTest : PluginAudioFixture() {
             MutableStateFlow(PluginRegistryState(providers.toList(), ProviderSelection(audio = providers.map { it.id })))
     }
 
+    private fun ownTracksOnly(
+        order: List<InstalledPlugin>,
+        vararg own: InstalledPlugin,
+    ) {
+        every { registry.state } returns
+            MutableStateFlow(PluginRegistryState(order + own, ProviderSelection(audio = order.map { it.id })))
+    }
+
     @Test
-    fun `YouTube source uses known id before globally preferred matching provider`() =
+    fun `YouTube track tries a higher ranked SoundCloud before its own id`() =
         runTest {
-            select(provider("beatport"), plugin)
-            assertThat(audio.needsQueueMatching(candidate)).isFalse()
-            assertThat(audio.resolve(candidate, null).pluginId).isEqualTo("youtube")
-            coVerify(exactly = 0) { host.call(any(), PluginOperations.matchAudio, any()) }
+            val soundcloud = provider("soundcloud")
+            select(soundcloud, plugin)
+            val match = matchTrack("sc-match", "soundcloud")
+            coEvery { host.call("soundcloud", PluginOperations.matchAudio, any()) } returns AudioMatches(listOf(match))
+            coEvery { host.call("soundcloud", PluginOperations.resolveAudio, any()) } returns stream
+            assertThat(audio.needsQueueMatching(candidate)).isTrue()
+            assertThat(audio.resolve(candidate, null).track).isEqualTo(match)
+            coVerify(exactly = 0) { host.call("youtube", PluginOperations.resolveAudio, any()) }
         }
 
     @Test
-    fun `SoundCloud and Beatport source use their own streams before YouTube search`() =
+    fun `SoundCloud track tries a higher ranked YouTube before its own id`() =
         runTest {
-            for (id in listOf("soundcloud", "beatport")) {
-                select(plugin, provider(id))
-                coEvery { host.call(id, PluginOperations.resolveAudio, any()) } returns stream
-                val track = matchTrack("$id-native", id)
-                assertThat(audio.needsQueueMatching(track)).isFalse()
-                assertThat(audio.resolve(track, null).pluginId).isEqualTo(id)
+            select(plugin, provider("soundcloud"))
+            coEvery { host.call("youtube", PluginOperations.matchAudio, any()) } returns AudioMatches(listOf(candidate))
+            val track = matchTrack("sc-native", "soundcloud")
+            assertThat(audio.needsQueueMatching(track)).isTrue()
+            assertThat(audio.resolve(track, null).pluginId).isEqualTo("youtube")
+            coVerify(exactly = 0) { host.call("soundcloud", PluginOperations.resolveAudio, any()) }
+        }
+
+    @Test
+    fun `SoundCloud track plays its own id when the higher ranked YouTube finds nothing`() =
+        runTest {
+            select(plugin, provider("soundcloud"))
+            coEvery { host.call("youtube", PluginOperations.matchAudio, any()) } returns AudioMatches(emptyList())
+            coEvery { host.call("soundcloud", PluginOperations.resolveAudio, any()) } returns stream
+            val track = matchTrack("sc-native", "soundcloud")
+            assertThat(audio.resolve(track, null).track).isEqualTo(track)
+        }
+
+    @Test
+    fun `own-tracks-only Beatport plays its own tracks first and never matches other tracks`() =
+        runTest {
+            ownTracksOnly(listOf(plugin), provider("beatport"))
+            coEvery { host.call("beatport", PluginOperations.resolveAudio, any()) } returns stream
+            val track = matchTrack("bp-native", "beatport").copy(ids = mapOf("beatport" to "bp-native", "youtube" to "youtube-song"))
+            assertThat(audio.needsQueueMatching(track)).isFalse()
+            assertThat(audio.resolve(track, null).pluginId).isEqualTo("beatport")
+            assertThat(audio.resolve(original, null).pluginId).isEqualTo("youtube")
+            coVerify(exactly = 0) { host.call("beatport", PluginOperations.matchAudio, any()) }
+            coVerify(exactly = 1) { host.call("beatport", PluginOperations.resolveAudio, any()) }
+        }
+
+    @Test
+    fun `own-tracks-only Beatport does not jump the order for another service's track carrying its id`() =
+        runTest {
+            ownTracksOnly(listOf(plugin), provider("beatport"))
+            val aliased = candidate.copy(ids = candidate.ids + ("beatport" to "bp-alias"))
+            assertThat(audio.resolve(aliased, null).pluginId).isEqualTo("youtube")
+            coVerify(exactly = 0) { host.call("beatport", PluginOperations.matchAudio, any()) }
+            coVerify(exactly = 0) { host.call("beatport", PluginOperations.resolveAudio, any()) }
+        }
+
+    @Test
+    fun `own-tracks-only Beatport does not claim a track whose source id another service shares`() =
+        runTest {
+            ownTracksOnly(listOf(plugin, provider("soundcloud")), provider("beatport"))
+            coEvery { host.call("youtube", PluginOperations.matchAudio, any()) } returns AudioMatches(listOf(candidate))
+            val shared = matchTrack("123", "soundcloud").copy(ids = mapOf("soundcloud" to "123", "beatport" to "123"))
+            assertThat(audio.resolve(shared, null).pluginId).isEqualTo("youtube")
+            coVerify(exactly = 0) { host.call("beatport", PluginOperations.resolveAudio, any()) }
+        }
+
+    @Test
+    fun `own-tracks-only Beatport that cannot stream continues down the listener's order`() =
+        runTest {
+            ownTracksOnly(listOf(plugin), provider("beatport"))
+            coEvery { host.call("beatport", PluginOperations.resolveAudio, any()) } throws
+                PluginCallException("beatport", PluginError(PluginErrorCode.UNAVAILABLE, "No streaming subscription"))
+            val track = matchTrack("bp-native", "beatport")
+            assertThat(audio.resolve(track, null).track).isEqualTo(candidate)
+            coVerify(exactly = 1) { host.call("beatport", PluginOperations.resolveAudio, any()) }
+        }
+
+    @Test
+    fun `Spotify prefers a slower higher ranked success over a faster lower ranked one`() =
+        runTest {
+            select(plugin, provider("beatport"))
+            val gate = CompletableDeferred<Unit>()
+            coEvery { host.call("youtube", PluginOperations.matchAudio, any()) } coAnswers {
+                gate.await()
+                AudioMatches(listOf(candidate))
             }
-            coVerify(exactly = 0) { host.call(any(), PluginOperations.matchAudio, any()) }
+            coEvery { host.call("beatport", PluginOperations.matchAudio, any()) } returns
+                AudioMatches(listOf(matchTrack("bp-match", "beatport")))
+            coEvery { host.call("beatport", PluginOperations.resolveAudio, any()) } returns stream
+            val pending = async { audio.resolve(original, null) }
+            runCurrent()
+            coVerify(exactly = 1) { host.call("beatport", PluginOperations.resolveAudio, any()) }
+            assertThat(pending.isCompleted).isFalse()
+            gate.complete(Unit)
+            assertThat(pending.await().track).isEqualTo(candidate)
         }
 
     @Test
-    fun `Spotify resolves faster playable provider without waiting for preferred search and cancels loser`() =
+    fun `Spotify uses a lower ranked success once the higher ranked provider fails`() =
+        runTest {
+            select(plugin, provider("beatport"))
+            coEvery { host.call("youtube", PluginOperations.matchAudio, any()) } returns AudioMatches(emptyList())
+            val beatport = matchTrack("bp-match", "beatport")
+            coEvery { host.call("beatport", PluginOperations.matchAudio, any()) } returns AudioMatches(listOf(beatport))
+            coEvery { host.call("beatport", PluginOperations.resolveAudio, any()) } returns stream
+            assertThat(audio.resolve(original, null).track).isEqualTo(beatport)
+        }
+
+    @Test
+    fun `Spotify cancels lower ranked lookups once the highest ranked provider succeeds`() =
         runTest {
             select(plugin, provider("beatport"))
             var cancelled = false
-            coEvery { host.call("youtube", PluginOperations.matchAudio, any()) } coAnswers {
+            coEvery { host.call("youtube", PluginOperations.matchAudio, any()) } returns AudioMatches(listOf(candidate))
+            coEvery { host.call("beatport", PluginOperations.matchAudio, any()) } coAnswers {
                 try {
                     awaitCancellation()
                 } finally {
                     cancelled = true
                 }
             }
-            val beatport = matchTrack("bp-match", "beatport")
-            coEvery { host.call("beatport", PluginOperations.matchAudio, any()) } returns AudioMatches(listOf(beatport))
-            coEvery { host.call("beatport", PluginOperations.resolveAudio, any()) } returns stream
             val pending = async { audio.resolve(original, null) }
             runCurrent()
             assertThat(pending.isCompleted).isTrue()
-            assertThat(pending.await().track).isEqualTo(beatport)
+            assertThat(pending.await().track).isEqualTo(candidate)
             assertThat(cancelled).isTrue()
         }
 
@@ -126,19 +219,16 @@ class PluginSourceRoutingTest : PluginAudioFixture() {
         }
 
     @Test
-    fun `unavailable YouTube source never searches for a different recording`() =
+    fun `unavailable YouTube source falls back to the next provider in the order`() =
         runTest {
-            select(provider("beatport"), plugin)
+            select(plugin, provider("beatport"))
             coEvery { host.call("youtube", PluginOperations.resolveAudio, any()) } throws
                 PluginCallException("youtube", PluginError(PluginErrorCode.UNAVAILABLE, "Unavailable"))
-            try {
-                audio.resolve(candidate, null)
-                throw AssertionError("Expected unavailable native recording")
-            } catch (error: PluginCallException) {
-                assertThat(error.pluginId).isEqualTo("youtube")
-            }
-            coVerify(exactly = 0) { host.call(any(), PluginOperations.matchAudio, any()) }
-            coVerify(exactly = 0) { host.call("beatport", PluginOperations.resolveAudio, any()) }
+            val beatport = matchTrack("bp-match", "beatport")
+            coEvery { host.call("beatport", PluginOperations.matchAudio, any()) } returns AudioMatches(listOf(beatport))
+            coEvery { host.call("beatport", PluginOperations.resolveAudio, any()) } returns stream
+            assertThat(audio.resolve(candidate, null).track).isEqualTo(beatport)
+            coVerify(exactly = 0) { host.call("youtube", PluginOperations.matchAudio, any()) }
         }
 
     @Test
@@ -180,7 +270,7 @@ class PluginSourceRoutingTest : PluginAudioFixture() {
     fun `YouTube source ref takes precedence over an earlier alternate id space`() =
         runTest {
             val youtube = plugin.copy(manifest = plugin.manifest.copy(roles = Roles(audio = AudioRole(setOf("yt", "ytm"), match = true))))
-            select(provider("beatport"), youtube)
+            select(youtube, provider("beatport"))
             val source = candidate.copy(ids = linkedMapOf("ytm" to "alternate-song", "yt" to candidate.ref.providerId))
             assertThat(audio.resolve(source, null).track.ref).isEqualTo(source.ref)
             coVerify(exactly = 0) { host.call(any(), PluginOperations.matchAudio, any()) }

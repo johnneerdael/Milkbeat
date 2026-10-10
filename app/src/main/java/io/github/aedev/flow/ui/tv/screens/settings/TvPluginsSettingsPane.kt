@@ -38,6 +38,7 @@ import io.github.aedev.flow.plugin.install.PendingInstall
 import io.github.aedev.flow.plugin.install.PluginUpdate
 import io.github.aedev.flow.plugin.registry.InstalledPlugin
 import io.github.aedev.flow.plugin.registry.ProviderSelection
+import io.github.aedev.flow.plugin.registry.ownTracksOnlyAudio
 import io.github.aedev.flow.ui.tv.components.TvButton
 import io.github.aedev.flow.ui.tv.components.TvNavRow
 import io.github.aedev.flow.ui.tv.components.TvSearchField
@@ -232,6 +233,7 @@ private fun LazyListScope.overviewItems(
                 label = stringResource(role.label()),
                 value = providerNames(role, state.selection, state.plugins) ?: stringResource(R.string.tv_plugins_none),
                 onClick = { onChoose(role) },
+                scrollingValue = true,
             )
         }
     }
@@ -421,16 +423,21 @@ private fun rolesLabel(manifest: PluginManifest): String =
         manifest.roles.video?.let { stringResource(R.string.tv_plugins_role_video) },
     ).joinToString(", ")
 
+@Composable
 private fun providerNames(
     role: ProviderRole,
     selection: ProviderSelection,
     plugins: List<InstalledPlugin>,
-): String? =
-    role
-        .current(selection)
-        .mapNotNull { id -> plugins.firstOrNull { it.id == id }?.manifest?.name }
-        .takeIf { it.isNotEmpty() }
-        ?.joinToString(", ")
+): String? {
+    val ordered = role.current(selection).mapNotNull { id -> plugins.firstOrNull { it.id == id }?.manifest?.name }
+    val ownTracksOnly =
+        if (role == ProviderRole.AUDIO) {
+            ownTracksOnlyAudio(plugins, selection).map { stringResource(R.string.tv_plugins_audio_own_tracks_value, it.manifest.name) }
+        } else {
+            emptyList()
+        }
+    return (ordered + ownTracksOnly).takeIf { it.isNotEmpty() }?.joinToString(", ")
+}
 
 private fun ProviderRole.label(): Int =
     when (this) {

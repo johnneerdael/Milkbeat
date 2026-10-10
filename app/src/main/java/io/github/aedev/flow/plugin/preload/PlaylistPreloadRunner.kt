@@ -6,6 +6,7 @@ import io.github.aedev.flow.plugin.playback.PluginTrackMatcher
 import io.github.aedev.flow.plugin.playback.audioMatchStrategy
 import io.github.aedev.flow.plugin.playback.audioProviderAttempts
 import io.github.aedev.flow.plugin.registry.PluginRegistry
+import io.github.aedev.flow.plugin.registry.ownTracksOnlyAudio
 import io.github.aedev.flow.plugin.runtime.PluginCallException
 import io.github.aedev.flow.plugin.runtime.retryingTransient
 import kotlinx.coroutines.NonCancellable
@@ -52,7 +53,9 @@ class PlaylistPreloadRunner
             if (MetadataSurface.LIBRARY !in surfaces || MetadataSurface.TRACKS !in surfaces) {
                 throw PlaylistPreloadException(PlaylistPreloadFailure.UNSUPPORTED_LIBRARY)
             }
-            if (audioIds.none {
+            val ownTracksIds = ownTracksOnlyAudio(initial.plugins, initial.selection).map { it.id }
+            if (ownTracksIds.isEmpty() &&
+                audioIds.none {
                     initial
                         .plugin(it)
                         ?.manifest
@@ -62,7 +65,7 @@ class PlaylistPreloadRunner
             ) {
                 throw PlaylistPreloadException(PlaylistPreloadFailure.NO_AUDIO_PROVIDER)
             }
-            val versions = (audioIds + metadataId).distinct().associateWith { initial.plugin(it)?.manifest?.versionCode }
+            val versions = (audioIds + ownTracksIds + metadataId).distinct().associateWith { initial.plugin(it)?.manifest?.versionCode }
             var progress = PlaylistPreloadProgress()
 
             suspend fun validate() {
@@ -71,7 +74,11 @@ class PlaylistPreloadRunner
                     throw PlaylistPreloadException(PlaylistPreloadFailure.ACCOUNT_CHANGED)
                 }
                 val current = registry.state.value
-                if (current.selection.audio != audioIds) throw PlaylistPreloadException(PlaylistPreloadFailure.PROVIDERS_CHANGED)
+                if (current.selection.audio != audioIds ||
+                    ownTracksOnlyAudio(current.plugins, current.selection).map { it.id } != ownTracksIds
+                ) {
+                    throw PlaylistPreloadException(PlaylistPreloadFailure.PROVIDERS_CHANGED)
+                }
                 if (versions.any { (id, version) -> current.plugin(id)?.manifest?.versionCode != version }) {
                     throw PlaylistPreloadException(PlaylistPreloadFailure.PLUGIN_CHANGED)
                 }

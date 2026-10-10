@@ -35,7 +35,10 @@ data class InstalledPlugin(
     val id: String get() = manifest.id
 }
 
-/** Which plugins the listener chose: audio in the order to try, and one for video. Music tabs need no choice. */
+/**
+ * Which plugins the listener chose: audio in the order every track tries, and one for video. Enabled
+ * audio plugins outside that order play only their own tracks. Music tabs need no choice.
+ */
 @Serializable
 data class ProviderSelection(
     val audio: List<String> = emptyList(),
@@ -46,6 +49,7 @@ data class ProviderSelection(
 data class PluginRegistryState(
     val plugins: List<InstalledPlugin> = emptyList(),
     val selection: ProviderSelection = ProviderSelection(),
+    val migrations: Set<String> = emptySet(),
 ) {
     fun plugin(id: String?): InstalledPlugin? = plugins.firstOrNull { it.id == id && it.enabled }
 }
@@ -69,7 +73,11 @@ class PluginRegistry
         private val root = File(context.filesDir, "plugins")
         private val file = File(root, "registry.json")
         private val mutex = Mutex()
-        private val _state = MutableStateFlow(load())
+        private val loaded = load()
+        private val _state = MutableStateFlow(withAudioOrderMigrations(loaded))
+
+        @Volatile
+        private var migrationUnsaved = _state.value != loaded
 
         val state: StateFlow<PluginRegistryState> = _state.asStateFlow()
 
@@ -90,7 +98,7 @@ class PluginRegistry
                             _state.value,
                         ) { plugin -> File(directory(plugin), MANIFEST).takeIf { it.isFile }?.readText() }
                     }
-                if (current != _state.value) {
+                if (current != _state.value || migrationUnsaved) {
                     runCatching { update { current } }.onFailure { Log.w(TAG, "Could not save refreshed plugin manifests", it) }
                 }
             }
@@ -124,7 +132,7 @@ class PluginRegistry
                 withContext(Dispatchers.IO) { unpack(installed, pack.files) }
                 update { state ->
                     val others = state.plugins.filterNot { it.id == installed.id }
-                    state.copy(plugins = others + installed, selection = withDefaults(state.selection, installed))
+                    state.copy(plugins = others + installed, selection = withDefaults(state.selection, current, installed))
                 }
                 withContext(Dispatchers.IO) { pruneVersions(installed) }
                 installed
@@ -153,13 +161,21 @@ class PluginRegistry
             }
 
         // A new plugin fills a role nobody fills yet, so the first install works without a trip to Settings.
+        // An update keeps the listener's audio choice: leaving the order means playing only its own tracks.
         private fun withDefaults(
             selection: ProviderSelection,
+            previous: InstalledPlugin?,
             plugin: InstalledPlugin,
         ): ProviderSelection {
             val roles = plugin.manifest.roles
+            val newAudio = roles.audio != null && previous?.manifest?.roles?.audio == null
             return selection.copy(
-                audio = if (roles.audio != null && plugin.id !in selection.audio) selection.audio + plugin.id else selection.audio,
+                audio =
+                    if (newAudio && plugin.id !in selection.audio && joinsAudioOrderByDefault(plugin.id)) {
+                        selection.audio + plugin.id
+                    } else {
+                        selection.audio
+                    },
                 video = selection.video ?: plugin.id.takeIf { roles.video != null },
             )
         }
@@ -193,6 +209,7 @@ class PluginRegistry
             val next = change(_state.value)
             withContext(Dispatchers.IO) { save(next) }
             _state.value = next
+            migrationUnsaved = false
         }
 
         private fun save(state: PluginRegistryState) {
