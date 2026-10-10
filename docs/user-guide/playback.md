@@ -96,6 +96,8 @@ If normal decoded TV audio (PCM) stops advancing for about five seconds while th
 
 Compatible plugins can supply Widevine-protected audio through the device's DRM implementation. Milkbeat fetches licenses separately from the audio and only from destinations the plugin is allowed to reach. Availability depends on the account, the recording and the device. SoundCloud previews are never treated as full tracks. Some providers encrypt the audio file itself instead of using DRM. A compatible plugin hands Milkbeat the recording's key, and Milkbeat decrypts the audio as it plays, so it can still seek and cache. The cache keeps the encrypted bytes. The offline downloader supports clear progressive audio only; HLS, DRM, encrypted provider audio and native SABR streams cannot be downloaded.
 
+Each provider decides how Milkbeat requests its audio. A plugin built for plugin API 10 has a track fetched in one request unless the provider asks for smaller ranges, which some streaming servers need. Plugins built for older APIs keep Milkbeat's former 512 KiB ranges. If a provider's tracks pause and resume every half minute or so, update the plugin to a release built for plugin API 10.
+
 ## Signed-in listening history
 
 When **Report plays to** the provider is enabled in its plugin details, compatible API 8 providers receive qualified listening

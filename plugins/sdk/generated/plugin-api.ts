@@ -38,7 +38,7 @@ export type HashAlgorithm = 'SHA1' | 'SHA256' | 'MD5';
 export type LogLevel = 'DEBUG' | 'INFO' | 'WARN' | 'ERROR';
 
 /**
- * Plugin API v9, generated from the plugin-api module. Do not edit.
+ * Plugin API v10, generated from the plugin-api module. Do not edit.
  */
 export interface MilkbeatPluginApi {
   manifest: PluginManifest;
@@ -540,6 +540,7 @@ export interface AudioStream {
   requireAudioOnlyHls?: boolean;
   audioFormat?: null | MediaFormat;
   cipher?: null | AudioCipher;
+  rangeRequestBytes?: number | null;
 }
 export interface MediaFormat {
   id: string;

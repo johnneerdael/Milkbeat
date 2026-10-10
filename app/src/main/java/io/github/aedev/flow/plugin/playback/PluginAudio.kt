@@ -317,6 +317,7 @@ class PluginAudio
                             if (stream.serverAbr != null) receipt else null,
                             if (boundPresentation) acceptedContext else null,
                             if (boundPresentation) SystemClock.elapsedRealtime() + lifetime - EXPIRY_MARGIN_MS else null,
+                            stream.rangeRequestBytesFor(plugin.manifest.api.target),
                         )
                     } catch (e: PictureUnavailable) {
                         lastPictureUnavailable = e
@@ -452,6 +453,13 @@ class PluginAudio
                 } else {
                     null
                 },
+                stream.rangeRequestBytesFor(
+                    registry.state.value
+                        .plugin(audio.pluginId)
+                        ?.manifest
+                        ?.api
+                        ?.target,
+                ),
             )
         }
 
@@ -567,6 +575,7 @@ class PluginAudio
                             audio.runtimeReceipt,
                             audio.nativeBinding,
                             audio.nativeValidUntilElapsedMs?.let { 0L },
+                            audio.rangeRequestBytes,
                         )
                     }
                 }

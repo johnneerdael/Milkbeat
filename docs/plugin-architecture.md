@@ -4,7 +4,13 @@ Status: architecture proposal, 2026-09-29. It replaces the earlier metadata plug
 (installed APKs, isolated processes) and keeps the block vocabulary of the
 [Metadata plugin UI contract](metadata-plugin-ui-contract.md).
 
-Current host extension (plugin API 9): `AudioStream` may include `cipher` with
+Current host extension (plugin API 10): `AudioStream.rangeRequestBytes` lets a provider whose
+server throttles or refuses long ranges cap each progressive request. Without it the host fetches the
+file in one request; Media3 treats a bounded open as the end of the file, so the host never imposes
+another provider's limit. Providers targeting API 9 or older keep the former host-wide 512 KiB
+ranges. A music video's picture still widens its ranges to 4 MiB after the first.
+
+Plugin API 9: `AudioStream` may include `cipher` with
 `scheme: "BF_CBC_STRIPE"` and a 16-byte `keyHex`. The host decrypts the progressive bytes above
 its cache with the platform Blowfish cipher. It refuses ciphers combined with other delivery forms,
 and it does not download encrypted audio for offline use. `crypto.hash` also accepts `MD5` for

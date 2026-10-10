@@ -903,6 +903,12 @@ run that occupies a physical device, and the resulting diff is thousands of line
   `StartupBenchmark` (`:benchmark:connectedBenchmarkReleaseAndroidTest --no-configuration-cache`)
   to measure.
 
+- Plugin API 10 adds `AudioStream.rangeRequestBytes`. Range limits belong to the provider that
+  declares them: `plugin/playback/PluginRangeRequests.kt` gives API 9-and-older streams the legacy
+  512 KiB ranges and leaves API 10 streams unbounded unless they declare a size. The effective size
+  lives on `ResolvedAudio.rangeRequestBytes`; the plugin's `AudioStream` stays as offered. Media3's
+  progressive loader treats a bounded open as the end of the file, so never reintroduce a host-wide
+  range cap; it cut Deezer MP3s at ~32 s and made playback stop and resume.
 - Plugin API 9 adds `AudioStream.cipher` (`BF_CBC_STRIPE`, used by Deezer-style providers) and
   `MD5` in `crypto.hash`. `plugin/playback/PluginStripeCipherDataSource.kt` decrypts with the
   platform `Blowfish/CBC/NoPadding` cipher above the bound player cache, which keeps encrypted bytes.

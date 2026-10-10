@@ -41,6 +41,7 @@ import io.github.aedev.flow.plugin.playback.adaptiveCacheKey
 import io.github.aedev.flow.plugin.playback.adaptiveDataSourceFactory
 import io.github.aedev.flow.plugin.playback.cacheIdentity
 import io.github.aedev.flow.plugin.playback.drmDataSourceFactory
+import io.github.aedev.flow.plugin.playback.pluginRequestLength
 import io.github.aedev.flow.plugin.playback.pluginStripeCipherDataSourceFactory
 import io.github.aedev.flow.plugin.playback.prepareQueue
 import io.github.aedev.flow.plugin.playback.serverAbrDataSourceFactory
@@ -76,11 +77,7 @@ class DownloadUtil
     ) {
         companion object {
             private const val TAG = "DownloadUtil"
-            private const val CHUNK_LENGTH = 512 * 1024L // 512KB for cache check
-
-            // A music video's picture runs at megabits a second; audio-sized ranges would need a
-            // request every second and leave the picture waiting on round trips.
-            private const val VIDEO_CHUNK_LENGTH = 4 * 1024 * 1024L
+            private const val CACHE_PROBE_LENGTH = 512 * 1024L
             private val URL_RANGE_PARAM_REGEX = Regex("""([?&])range=\d+-\d*(&?)""")
         }
 
@@ -89,6 +86,7 @@ class DownloadUtil
             val url: String,
             val headers: Map<String, String>,
             val validUntilMs: Long,
+            val rangeRequestBytes: Long?,
         )
 
         private val songUrlCache = java.util.concurrent.ConcurrentHashMap<String, PlayableUrl>()
@@ -178,7 +176,8 @@ class DownloadUtil
                     throw IOException("Could not resolve URL for $mediaId: ${e.message}", e)
                 }
             requireDownloadablePluginAudio(resolved.stream)
-            val playable = PlayableUrl(resolved.stream.url, resolved.stream.headers, resolved.validUntilMs)
+            val playable =
+                PlayableUrl(resolved.stream.url, resolved.stream.headers, resolved.validUntilMs, resolved.rangeRequestBytes)
             songUrlCache[mediaId] = playable
             downloadUrlCache[mediaId] = playable
             Log.d(TAG, "[$source] Resolved $mediaId via ${resolved.pluginId}")
@@ -264,7 +263,7 @@ class DownloadUtil
                     }
 
                     try {
-                        if (playerCache.isCached(mediaId, dataSpec.position, CHUNK_LENGTH)) {
+                        if (playerCache.isCached(mediaId, dataSpec.position, CACHE_PROBE_LENGTH)) {
                             Log.d(TAG, "[Player] Serving from playerCache: $mediaId")
                             return@Factory dataSpec
                         }
@@ -278,7 +277,7 @@ class DownloadUtil
                             dataSpec,
                             cached.url,
                             cached.headers,
-                            chunkLengthFor(mediaId, dataSpec.position),
+                            cached.rangeRequestBytes,
                         )
                     }
 
@@ -294,9 +293,9 @@ class DownloadUtil
                     val rendition =
                         "${resolved.pluginId}:${stream.cacheKey}:${format?.id ?: stream.renditionId}${stream.cipher.cacheIdentity()}"
                     bindCachedMusicRendition(playerCache, mediaId, rendition)
-                    songUrlCache[mediaId] = PlayableUrl(url, headers, resolved.validUntilMs)
+                    songUrlCache[mediaId] = PlayableUrl(url, headers, resolved.validUntilMs, resolved.rangeRequestBytes)
                     Log.d(TAG, "[Player] Resolved $mediaId via ${resolved.pluginId}")
-                    buildPlaybackDataSpec(dataSpec, url, headers, chunkLengthFor(mediaId, dataSpec.position))
+                    buildPlaybackDataSpec(dataSpec, url, headers, resolved.rangeRequestBytes)
                 }
             }
             return PluginMusicDataSourceFactory(
@@ -388,22 +387,19 @@ class DownloadUtil
         private fun pictureCodecs(preference: String): List<String> =
             MusicVideoFormats.hardwareCodecs.sortedBy { VideoCodecUtils.codecRankWithPreference(it, preference) }
 
-        /**
-         * A picture's first range stays audio-sized: it only has to reveal the stream's layout, and while
-         * the picture is hidden the player stops loading right after it.
-         */
-        private fun chunkLengthFor(
-            mediaId: String,
-            position: Long,
-        ): Long = if (position > 0 && MusicVideoItems.videoIdOfVideoKey(mediaId) != null) VIDEO_CHUNK_LENGTH else CHUNK_LENGTH
-
         private fun buildPlaybackDataSpec(
             dataSpec: DataSpec,
             streamUrl: String,
             headers: Map<String, String>,
-            chunkLength: Long = CHUNK_LENGTH,
+            rangeRequestBytes: Long?,
         ): DataSpec {
-            val requestLength = if (dataSpec.length > 0) dataSpec.length else chunkLength
+            val requestLength =
+                pluginRequestLength(
+                    dataSpec.length,
+                    dataSpec.position,
+                    dataSpec.key?.let(MusicVideoItems::videoIdOfVideoKey) != null,
+                    rangeRequestBytes,
+                )
 
             return dataSpec
                 .buildUpon()

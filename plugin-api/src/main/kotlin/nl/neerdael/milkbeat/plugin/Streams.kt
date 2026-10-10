@@ -114,6 +114,12 @@ data class AudioStream(
     val audioFormat: MediaFormat? = null,
     /** Provider encryption the host removes from progressive bytes; distinct from platform [drm]. */
     val cipher: AudioCipher? = null,
+    /**
+     * The most bytes one progressive request may ask for, for a server that throttles or refuses
+     * long ranges. Null fetches the file in one request. Plugins targeting API 9 or older are
+     * given the host's former 512 KiB ranges when they leave it out.
+     */
+    val rangeRequestBytes: Long? = null,
 )
 
 /** License information consumed by the host's platform DRM implementation. */

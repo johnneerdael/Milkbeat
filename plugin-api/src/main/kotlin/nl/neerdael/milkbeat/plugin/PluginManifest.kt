@@ -4,7 +4,7 @@ import kotlinx.serialization.Serializable
 import nl.neerdael.milkbeat.catalog.EntityKind
 
 /** The newest plugin API this host implements; a plugin whose [ApiRange.min] is higher cannot run. */
-const val PLUGIN_API_VERSION = 9
+const val PLUGIN_API_VERSION = 10
 
 /** The container format this host reads. */
 const val PLUGIN_FORMAT_VERSION = 1
