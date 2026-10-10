@@ -1,10 +1,8 @@
 package io.github.aedev.flow.player.audio
 
 import androidx.annotation.OptIn
-import androidx.media3.common.C
 import androidx.media3.common.Format
 import androidx.media3.common.MimeTypes
-import androidx.media3.common.Tracks
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.common.util.Util
 import io.github.aedev.flow.data.folders.MusicFolderKind
@@ -115,21 +113,18 @@ fun playbackAudioQuality(
     )
 }
 
-/** The audio track Media3 plays for the current item, as its source describes it. */
-fun Tracks.selectedAudioFormat(): Format? =
-    groups.firstNotNullOfOrNull { group ->
-        if (group.type != C.TRACK_TYPE_AUDIO) return@firstNotNullOfOrNull null
-        (0 until group.length).firstOrNull(group::isTrackSelected)?.let(group::getTrackFormat)
-    }
-
-/** Names the source of a queue item by its URI scheme, or by the plugin that resolved it. */
+/**
+ * Names the source of a queue item by its URI scheme, or by the plugin that resolved it. A file or
+ * content URI under a provider track's id, not a local library id, is that track's finished download.
+ */
 fun audioQualitySource(
     scheme: String?,
+    localLibraryItem: Boolean,
     providerName: String?,
 ): AudioQualitySource? {
     MusicFolderKind.forScheme(scheme)?.let { return AudioQualitySource.Folder(it) }
     return when {
-        scheme == "content" || scheme == "file" -> AudioQualitySource.Local
+        scheme == "content" || scheme == "file" -> if (localLibraryItem) AudioQualitySource.Local else AudioQualitySource.Download
         providerName != null -> AudioQualitySource.Provider(providerName)
         else -> null
     }

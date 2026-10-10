@@ -3,8 +3,6 @@ package io.github.aedev.flow.player.audio
 import androidx.media3.common.C
 import androidx.media3.common.Format
 import androidx.media3.common.MimeTypes
-import androidx.media3.common.TrackGroup
-import androidx.media3.common.Tracks
 import com.google.common.truth.Truth.assertThat
 import io.github.aedev.flow.data.folders.MusicFolderKind
 import org.junit.Test
@@ -119,34 +117,20 @@ class PlaybackAudioQualityTest {
     }
 
     @Test
-    fun `the selected audio track is the one described`() {
-        val low = audio(MimeTypes.AUDIO_AAC, averageBitrate = 64_000)
-        val high = audio(MimeTypes.AUDIO_AAC, averageBitrate = 256_000)
-        val picture = Format.Builder().setSampleMimeType(MimeTypes.VIDEO_H264).build()
-        val tracks =
-            Tracks(
-                listOf(
-                    Tracks.Group(TrackGroup(picture), false, intArrayOf(C.FORMAT_HANDLED), booleanArrayOf(true)),
-                    Tracks.Group(
-                        TrackGroup(low, high),
-                        true,
-                        intArrayOf(C.FORMAT_HANDLED, C.FORMAT_HANDLED),
-                        booleanArrayOf(false, true),
-                    ),
-                ),
-            )
-
-        assertThat(tracks.selectedAudioFormat()).isEqualTo(high)
-        assertThat(Tracks.EMPTY.selectedAudioFormat()).isNull()
+    fun `sources are named by scheme or by the resolving plugin`() {
+        assertThat(audioQualitySource("smbmusic", localLibraryItem = true, providerName = null))
+            .isEqualTo(AudioQualitySource.Folder(MusicFolderKind.SMB))
+        assertThat(audioQualitySource("nfsmusic", localLibraryItem = true, providerName = null))
+            .isEqualTo(AudioQualitySource.Folder(MusicFolderKind.NFS))
+        assertThat(audioQualitySource("content", localLibraryItem = true, providerName = null)).isEqualTo(AudioQualitySource.Local)
+        assertThat(audioQualitySource("file", localLibraryItem = true, providerName = null)).isEqualTo(AudioQualitySource.Local)
+        assertThat(audioQualitySource("music", localLibraryItem = false, providerName = "Deezer")).isEqualTo(deezer)
+        assertThat(audioQualitySource("music", localLibraryItem = false, providerName = null)).isNull()
     }
 
     @Test
-    fun `sources are named by scheme or by the resolving plugin`() {
-        assertThat(audioQualitySource("smbmusic", null)).isEqualTo(AudioQualitySource.Folder(MusicFolderKind.SMB))
-        assertThat(audioQualitySource("nfsmusic", null)).isEqualTo(AudioQualitySource.Folder(MusicFolderKind.NFS))
-        assertThat(audioQualitySource("content", null)).isEqualTo(AudioQualitySource.Local)
-        assertThat(audioQualitySource("file", null)).isEqualTo(AudioQualitySource.Local)
-        assertThat(audioQualitySource("music", "Deezer")).isEqualTo(deezer)
-        assertThat(audioQualitySource("music", null)).isNull()
+    fun `a provider track playing from its downloaded file is named a download`() {
+        assertThat(audioQualitySource("file", localLibraryItem = false, providerName = null)).isEqualTo(AudioQualitySource.Download)
+        assertThat(audioQualitySource("content", localLibraryItem = false, providerName = null)).isEqualTo(AudioQualitySource.Download)
     }
 }

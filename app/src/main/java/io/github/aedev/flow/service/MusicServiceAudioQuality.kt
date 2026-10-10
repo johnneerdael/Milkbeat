@@ -1,14 +1,19 @@
 package io.github.aedev.flow.service
 
+import androidx.annotation.OptIn
 import androidx.lifecycle.lifecycleScope
+import androidx.media3.common.Format
 import androidx.media3.common.MediaItem
-import androidx.media3.common.Player
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.exoplayer.DecoderReuseEvaluation
+import androidx.media3.exoplayer.analytics.AnalyticsListener
+import io.github.aedev.flow.data.localmedia.LocalMediaIds
 import io.github.aedev.flow.player.MusicVideoItems
 import io.github.aedev.flow.player.audio.AudioQualitySource
 import io.github.aedev.flow.player.audio.DeclaredAudio
+import io.github.aedev.flow.player.audio.PlayingAudioFormats
 import io.github.aedev.flow.player.audio.audioQualitySource
 import io.github.aedev.flow.player.audio.playbackAudioQuality
-import io.github.aedev.flow.player.audio.selectedAudioFormat
 import io.github.aedev.flow.player.musicAudioQualityState
 import io.github.aedev.flow.utils.PerformanceDispatcher
 import kotlinx.coroutines.Job
@@ -21,30 +26,48 @@ private class AudioQualityOrigin(
 )
 
 /**
- * Publishes what the engine decodes whenever the playing item or its tracks change. Nothing polls:
- * one lookup of the item's source runs per change, off the main thread for the download index.
+ * Publishes what the audio renderer decodes for the playing period: when that period starts, and
+ * when its input format changes, as an adaptive stream switches rendition. Nothing polls; one lookup
+ * of the item's source runs per publication, off the main thread for the download index.
  */
+@OptIn(UnstableApi::class)
 internal fun Media3MusicService.observeAudioQuality() {
+    val formats = PlayingAudioFormats()
     var lookup: Job? = null
-    player.addListener(
-        object : Player.Listener {
-            override fun onEvents(
-                player: Player,
-                events: Player.Events,
+
+    fun publish(
+        item: MediaItem?,
+        format: Format?,
+    ) {
+        lookup?.cancel()
+        if (item == null || format == null) {
+            musicAudioQualityState.value = null
+            return
+        }
+        lookup =
+            lifecycleScope.launch {
+                val origin = withContext(PerformanceDispatcher.diskIO) { audioQualityOrigin(item) }
+                musicAudioQualityState.value = playbackAudioQuality(item.mediaId, origin.source, format, origin.declared)
+            }
+    }
+
+    player.addAnalyticsListener(
+        object : AnalyticsListener {
+            override fun onAudioInputFormatChanged(
+                eventTime: AnalyticsListener.EventTime,
+                format: Format,
+                decoderReuseEvaluation: DecoderReuseEvaluation?,
             ) {
-                if (!events.containsAny(Player.EVENT_TRACKS_CHANGED, Player.EVENT_MEDIA_ITEM_TRANSITION)) return
-                lookup?.cancel()
-                val item = player.currentMediaItem
-                val format = player.currentTracks.selectedAudioFormat()
-                if (item == null || format == null) {
-                    musicAudioQualityState.value = null
-                    return
-                }
-                lookup =
-                    lifecycleScope.launch {
-                        val origin = withContext(PerformanceDispatcher.diskIO) { audioQualityOrigin(item) }
-                        musicAudioQualityState.value = playbackAudioQuality(item.mediaId, origin.source, format, origin.declared)
-                    }
+                val period = eventTime.mediaPeriodId ?: return
+                formats.onInput(period, eventTime.currentMediaPeriodId, format)?.let { publish(player.currentMediaItem, it) }
+            }
+
+            override fun onMediaItemTransition(
+                eventTime: AnalyticsListener.EventTime,
+                mediaItem: MediaItem?,
+                reason: Int,
+            ) {
+                publish(mediaItem, formats.onPlaying(eventTime.currentMediaPeriodId))
             }
         },
     )
@@ -53,11 +76,12 @@ internal fun Media3MusicService.observeAudioQuality() {
 private fun Media3MusicService.audioQualityOrigin(item: MediaItem): AudioQualityOrigin {
     val uri = item.localConfiguration?.uri
     val scheme = uri?.scheme
+    val localLibraryItem = LocalMediaIds.isLocal(item.mediaId)
     val descriptor =
         uri
             ?.takeIf { scheme == MusicVideoItems.SONG_SCHEME || scheme == MusicVideoItems.SCHEME }
             ?.let { runCatching { MusicVideoItems.descriptor(it) }.getOrNull() }
-            ?: return AudioQualityOrigin(audioQualitySource(scheme, providerName = null), null)
+            ?: return AudioQualityOrigin(audioQualitySource(scheme, localLibraryItem, providerName = null), null)
     // The resolver plays a finished download before asking any plugin; name it the same way.
     if (downloadUtil.playsFromDownload(descriptor.ref.providerId)) return AudioQualityOrigin(AudioQualitySource.Download, null)
     val accepted = pluginAudio.acceptedListen(descriptor)
@@ -77,5 +101,5 @@ private fun Media3MusicService.audioQualityOrigin(item: MediaItem): AudioQuality
                 bitrate = chosen?.averageBitrate ?: chosen?.bitrate ?: stream.bitrate,
             )
         }
-    return AudioQualityOrigin(audioQualitySource(scheme, name), declared)
+    return AudioQualityOrigin(audioQualitySource(scheme, localLibraryItem, name), declared)
 }
