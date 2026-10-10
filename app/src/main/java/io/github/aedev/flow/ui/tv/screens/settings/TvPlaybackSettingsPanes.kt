@@ -13,6 +13,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.aedev.flow.R
+import io.github.aedev.flow.data.local.AudioQualityReadoutPreferences
 import io.github.aedev.flow.data.local.DebugLoggingPreferences
 import io.github.aedev.flow.data.local.PlayerPreferences
 import io.github.aedev.flow.ui.tv.components.TvToggleRow
@@ -27,6 +28,8 @@ fun TvPlaybackSettingsPane(
     val context = LocalContext.current
     val debugPreferences = remember(context) { DebugLoggingPreferences(context) }
     val debugLogging by debugPreferences.enabled.collectAsStateWithLifecycle(initialValue = false)
+    val qualityPreferences = remember(context) { AudioQualityReadoutPreferences(context) }
+    val audioQuality by qualityPreferences.enabled.collectAsStateWithLifecycle(initialValue = false)
     val backgroundPlay by playerPreferences.backgroundPlayEnabled.collectAsStateWithLifecycle(initialValue = true)
     val autoplay by playerPreferences.autoplayEnabled.collectAsStateWithLifecycle(initialValue = true)
     val skipSilence by playerPreferences.skipSilenceEnabled.collectAsStateWithLifecycle(initialValue = false)
@@ -83,6 +86,14 @@ fun TvPlaybackSettingsPane(
                 supportingText = stringResource(R.string.player_settings_ambient_mode_subtitle),
                 checked = ambientMode,
                 onCheckedChange = { scope.launch { playerPreferences.setVideoAmbientModeEnabled(it) } },
+            )
+        }
+        item(key = "audio-quality") {
+            TvToggleRow(
+                label = stringResource(R.string.player_settings_audio_quality),
+                supportingText = stringResource(R.string.player_settings_audio_quality_subtitle),
+                checked = audioQuality,
+                onCheckedChange = { scope.launch { qualityPreferences.setEnabled(it) } },
             )
         }
         item(key = "debug-logging") {

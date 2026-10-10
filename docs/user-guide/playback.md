@@ -17,6 +17,19 @@ Selecting a track, **Play** or **Shuffle** opens the full player. The track's co
 
 The controls hide on their own after a few seconds. With them hidden, **Left** and **Right** step through visualizer presets. **Back** hides the controls, then leaves the player; the [mini player](getting-started.md#find-your-way-around) keeps showing the track elsewhere in the app. Music keeps playing in the background unless you turn off **Background Play** in [Settings → Playback](settings.md#playback).
 
+## Audio quality
+
+Turn on **Show audio quality** in [Settings → Playback](settings.md#playback) to see what is playing at the top of the controls, in every view:
+
+| Example | Meaning |
+| --- | --- |
+| `Deezer · 1411 kb/s FLAC · 44.1 kHz / 16-bit` | CD-quality lossless from the Deezer plugin |
+| `Deezer · 320 kb/s MP3 · 44.1 kHz` | A high-quality MP3 |
+| `YouTube Music · 160 kb/s Opus · 48 kHz` | Opus from a YouTube Music stream |
+| `SMB · 4608 kb/s FLAC · 96 kHz / 24-bit` | A hi-res file from an SMB share |
+
+The first part names the source: the audio plugin that resolved the track, **On this device** for local files, the protocol for a [network folder](folders.md), or **Downloaded** when an offline copy plays. The rest comes from the audio track the player decodes, not from a provider's label, so it is accurate for every source. A lossless format (FLAC, ALAC, PCM) shows its decoded rate, which is how providers describe CD and hi-res quality. When the stream itself carries no bitrate, the line uses the bitrate the plugin reported; parts that neither reveals are left out. The line appears once the track's audio is loaded and updates when the track changes.
+
 ## Visualizer, music video or artwork
 
 The view button steps through three views while the audio carries on. Video hides the corner cover, artist and title; the visualizer and artwork views keep them visible. Milkbeat remembers the view you leave it on for later tracks and later sessions.

@@ -68,6 +68,7 @@ fun TvMusicNowPlayingScreen(
     visualizer: TvNowPlayingVisual? = null,
     view: NowPlayingView = NowPlayingView.VISUALIZER,
     onViewChange: (NowPlayingView) -> Unit = {},
+    audioQuality: TvAudioQualityViewModel? = null,
 ) {
     val tuning by viewModel.radioTuning.state.collectAsStateWithLifecycle()
     val manager = EnhancedMusicPlayerManager
@@ -332,6 +333,7 @@ fun TvMusicNowPlayingScreen(
             enter = fadeIn(),
             exit = fadeOut(),
         ) {
+            val visualizerStatus = visualizer?.status?.takeIf { shownView == NowPlayingView.VISUALIZER }
             TvNowPlayingControls(
                 state =
                     TvNowPlayingControlsState(
@@ -368,7 +370,7 @@ fun TvMusicNowPlayingScreen(
                 durationMs = durationMs,
                 buttonColors = playerButtonColors,
                 playPauseFocusRequester = playPauseFocusRequester,
-                status = visualizer?.status?.takeIf { shownView == NowPlayingView.VISUALIZER },
+                status = rememberNowPlayingStatus(audioQuality, track?.videoId, visualizerStatus),
             )
         }
         if (!controlsVisible) {

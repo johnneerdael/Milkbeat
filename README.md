@@ -190,6 +190,9 @@ play/pause, next, repeat, like, the view button and the queue.
   resolution, capped at 2160p, in a hardware-decoded codec) and the artwork. Milkbeat remembers your choice; video only loads when
   you pick it.
 - **Prepared video playback:** API 7 providers can supply audio and optional picture metadata together. Switching views selects the video track in the existing Media3 presentation; it does not replace or seek the playing audio. Prepared network video buffers briefly behind a loading indicator before joining the current audio position. The indicator stops animating while paused or hidden. Video is offered only when the current presentation contains a supported video track. Older providers with separate progressive picture URLs remain audio-only unless they supply a prepared presentation. Lyrics are not fetched or displayed.
+- **Audio quality:** with **Settings → Playback → Show audio quality** on, the controls name the
+  source and what the player decodes, such as `Deezer · 1411 kb/s FLAC · 44.1 kHz / 16-bit`, for
+  plugin streams, local files, network folders and downloads alike.
 - **The queue** shows what is coming. Every queue continues as a radio; press Right on a track to
   reach the radio presets and switch the mix without losing your own tracks.
 - **Queue preparation** matches the remaining queue one track at a time in playback order and
@@ -217,7 +220,7 @@ overview; [ProjectM TV's guide](https://johnneerdael.github.io/ProjectM-TV/) cov
 | --- | --- |
 | **Plugins** | Audio priority, video provider, installed plugins and their details, automatic plugin updates, Add a plugin |
 | **Music folders** | Local folder browser, Android folder picker, SMB, WebDAV, SFTP and NFS editors, Rescan library, saved sources |
-| **Playback** | Background Play, Autoplay related videos, Subtitles, Skip Silence, Stable Voice, Ambient mode, Debug playback logging |
+| **Playback** | Background Play, Autoplay related videos, Subtitles, Skip Silence, Stable Voice, Ambient mode, Show audio quality, Debug playback logging |
 | **Visualizations** | The ProjectM TV presets, transitions, picture quality, diagnostics, timing and crash troubleshooting settings |
 | **About** | Version, automatic app updates (GitHub build), Changelog, GitHub and credits |
 

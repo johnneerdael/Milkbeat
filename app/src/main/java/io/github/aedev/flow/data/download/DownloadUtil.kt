@@ -342,6 +342,9 @@ class DownloadUtil
             )
         }
 
+        /** Whether the provider track [id] plays from its finished download; reads the download index. */
+        fun playsFromDownload(id: String): Boolean = runCatching { completeDownload(id) }.getOrDefault(false)
+
         private fun completeDownload(id: String): Boolean =
             hasCompleteMusicDownload(
                 downloadCache,
