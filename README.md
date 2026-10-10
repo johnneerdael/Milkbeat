@@ -233,6 +233,9 @@ overview; [ProjectM TV's guide](https://johnneerdael.github.io/ProjectM-TV/) cov
   subscription and catalog. Matching cannot guarantee the same recording exists elsewhere.
 - HLS, DRM, encrypted provider audio (plugin API 9 stream ciphers) and native SABR streams play but
   cannot be downloaded for offline use.
+- Each provider decides how its audio is requested. Plugins built for plugin API 10 fetch a track in
+  one request unless the provider asks for smaller ranges; older plugins keep Milkbeat's former
+  512 KiB ranges.
 
 ## Install
 

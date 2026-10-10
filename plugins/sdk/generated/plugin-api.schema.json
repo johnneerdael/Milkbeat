@@ -1,7 +1,7 @@
 {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "title": "MilkbeatPluginApi",
-    "description": "Plugin API v9, generated from the plugin-api module. Do not edit.",
+    "description": "Plugin API v10, generated from the plugin-api module. Do not edit.",
     "type": "object",
     "properties": {
         "manifest": {
@@ -2505,6 +2505,14 @@
                             "$ref": "#/$defs/nl.neerdael.milkbeat.plugin.AudioCipher"
                         }
                     ]
+                },
+                "rangeRequestBytes": {
+                    "type": [
+                        "integer",
+                        "null"
+                    ],
+                    "minimum": -9223372036854775808,
+                    "maximum": 9223372036854775807
                 }
             },
             "title": "AudioStream"

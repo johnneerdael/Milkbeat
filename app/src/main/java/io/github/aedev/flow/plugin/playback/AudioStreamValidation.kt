@@ -19,6 +19,9 @@ internal fun validateAudioStream(
     stream: AudioStream,
     allowedHosts: List<String>,
 ) {
+    stream.rangeRequestBytes?.takeIf { it <= 0 }?.let {
+        throw PluginCallException(pluginId, PluginError(PluginErrorCode.UNSUPPORTED, "A stream's range request size must be positive"))
+    }
     stream.audioFormat?.let { format ->
         if (format.type != FormatType.AUDIO || format.id != stream.renditionId || format.url != stream.url ||
             format.mimeType

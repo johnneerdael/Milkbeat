@@ -35,15 +35,19 @@ import io.github.aedev.flow.player.stream.VideoCodecUtils
 import io.github.aedev.flow.plugin.playback.BoundPluginAudio
 import io.github.aedev.flow.plugin.playback.PictureLimits
 import io.github.aedev.flow.plugin.playback.PluginAudio
+import io.github.aedev.flow.plugin.playback.PluginRangePolicy
 import io.github.aedev.flow.plugin.playback.QueuePreparationResult
 import io.github.aedev.flow.plugin.playback.ResolvedAudio
 import io.github.aedev.flow.plugin.playback.adaptiveCacheKey
 import io.github.aedev.flow.plugin.playback.adaptiveDataSourceFactory
 import io.github.aedev.flow.plugin.playback.cacheIdentity
 import io.github.aedev.flow.plugin.playback.drmDataSourceFactory
+import io.github.aedev.flow.plugin.playback.pluginRangedDataSourceFactory
+import io.github.aedev.flow.plugin.playback.pluginRequestLength
 import io.github.aedev.flow.plugin.playback.pluginStripeCipherDataSourceFactory
 import io.github.aedev.flow.plugin.playback.prepareQueue
 import io.github.aedev.flow.plugin.playback.serverAbrDataSourceFactory
+import io.github.aedev.flow.plugin.playback.withRangePolicy
 import io.github.aedev.flow.service.ExoDownloadService
 import io.github.aedev.flow.utils.MusicVideoFormats
 import kotlinx.coroutines.CoroutineScope
@@ -76,11 +80,7 @@ class DownloadUtil
     ) {
         companion object {
             private const val TAG = "DownloadUtil"
-            private const val CHUNK_LENGTH = 512 * 1024L // 512KB for cache check
-
-            // A music video's picture runs at megabits a second; audio-sized ranges would need a
-            // request every second and leave the picture waiting on round trips.
-            private const val VIDEO_CHUNK_LENGTH = 4 * 1024 * 1024L
+            private const val CACHE_PROBE_LENGTH = 512 * 1024L
             private val URL_RANGE_PARAM_REGEX = Regex("""([?&])range=\d+-\d*(&?)""")
         }
 
@@ -89,6 +89,7 @@ class DownloadUtil
             val url: String,
             val headers: Map<String, String>,
             val validUntilMs: Long,
+            val rangePolicy: PluginRangePolicy?,
         )
 
         private val songUrlCache = java.util.concurrent.ConcurrentHashMap<String, PlayableUrl>()
@@ -123,7 +124,7 @@ class DownloadUtil
                         .Factory()
                         .setCache(downloadCache)
                         .setCacheWriteDataSinkFactory(CacheDataSink.Factory().setCache(downloadCache))
-                        .setUpstreamDataSourceFactory(OkHttpDataSource.Factory(okHttpClient))
+                        .setUpstreamDataSourceFactory(pluginRangedDataSourceFactory(OkHttpDataSource.Factory(okHttpClient)))
                         .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR),
                 ) { dataSpec ->
                     resolveDataSpec(dataSpec, "Download")
@@ -161,6 +162,7 @@ class DownloadUtil
                     .setUri(cached.url.toUri())
                     .setHttpRequestHeaders(cached.headers)
                     .build()
+                    .withRangePolicy(cached.rangePolicy)
             }
 
             Log.d(TAG, "[$source] Resolving $mediaId through the audio plugin")
@@ -178,7 +180,8 @@ class DownloadUtil
                     throw IOException("Could not resolve URL for $mediaId: ${e.message}", e)
                 }
             requireDownloadablePluginAudio(resolved.stream)
-            val playable = PlayableUrl(resolved.stream.url, resolved.stream.headers, resolved.validUntilMs)
+            val playable =
+                PlayableUrl(resolved.stream.url, resolved.stream.headers, resolved.validUntilMs, resolved.rangePolicy)
             songUrlCache[mediaId] = playable
             downloadUrlCache[mediaId] = playable
             Log.d(TAG, "[$source] Resolved $mediaId via ${resolved.pluginId}")
@@ -188,6 +191,7 @@ class DownloadUtil
                 .setUri(playable.url.toUri())
                 .setHttpRequestHeaders(playable.headers)
                 .build()
+                .withRangePolicy(playable.rangePolicy)
         }
 
         /**
@@ -207,7 +211,7 @@ class DownloadUtil
                     .Factory()
                     .setCache(playerCache)
                     .setUpstreamDataSourceFactory(
-                        DefaultDataSource.Factory(context, OkHttpDataSource.Factory(okHttpClient)),
+                        DefaultDataSource.Factory(context, pluginRangedDataSourceFactory(OkHttpDataSource.Factory(okHttpClient))),
                     ).setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
 
             val cachedDataSourceFactory =
@@ -264,7 +268,7 @@ class DownloadUtil
                     }
 
                     try {
-                        if (playerCache.isCached(mediaId, dataSpec.position, CHUNK_LENGTH)) {
+                        if (playerCache.isCached(mediaId, dataSpec.position, CACHE_PROBE_LENGTH)) {
                             Log.d(TAG, "[Player] Serving from playerCache: $mediaId")
                             return@Factory dataSpec
                         }
@@ -278,7 +282,7 @@ class DownloadUtil
                             dataSpec,
                             cached.url,
                             cached.headers,
-                            chunkLengthFor(mediaId, dataSpec.position),
+                            cached.rangePolicy,
                         )
                     }
 
@@ -294,9 +298,9 @@ class DownloadUtil
                     val rendition =
                         "${resolved.pluginId}:${stream.cacheKey}:${format?.id ?: stream.renditionId}${stream.cipher.cacheIdentity()}"
                     bindCachedMusicRendition(playerCache, mediaId, rendition)
-                    songUrlCache[mediaId] = PlayableUrl(url, headers, resolved.validUntilMs)
+                    songUrlCache[mediaId] = PlayableUrl(url, headers, resolved.validUntilMs, resolved.rangePolicy)
                     Log.d(TAG, "[Player] Resolved $mediaId via ${resolved.pluginId}")
-                    buildPlaybackDataSpec(dataSpec, url, headers, chunkLengthFor(mediaId, dataSpec.position))
+                    buildPlaybackDataSpec(dataSpec, url, headers, resolved.rangePolicy)
                 }
             }
             return PluginMusicDataSourceFactory(
@@ -388,22 +392,19 @@ class DownloadUtil
         private fun pictureCodecs(preference: String): List<String> =
             MusicVideoFormats.hardwareCodecs.sortedBy { VideoCodecUtils.codecRankWithPreference(it, preference) }
 
-        /**
-         * A picture's first range stays audio-sized: it only has to reveal the stream's layout, and while
-         * the picture is hidden the player stops loading right after it.
-         */
-        private fun chunkLengthFor(
-            mediaId: String,
-            position: Long,
-        ): Long = if (position > 0 && MusicVideoItems.videoIdOfVideoKey(mediaId) != null) VIDEO_CHUNK_LENGTH else CHUNK_LENGTH
-
         private fun buildPlaybackDataSpec(
             dataSpec: DataSpec,
             streamUrl: String,
             headers: Map<String, String>,
-            chunkLength: Long = CHUNK_LENGTH,
+            rangePolicy: PluginRangePolicy?,
         ): DataSpec {
-            val requestLength = if (dataSpec.length > 0) dataSpec.length else chunkLength
+            val requestLength =
+                pluginRequestLength(
+                    dataSpec.length,
+                    dataSpec.position,
+                    dataSpec.key?.let(MusicVideoItems::videoIdOfVideoKey) != null,
+                    rangePolicy,
+                )
 
             return dataSpec
                 .buildUpon()
@@ -411,6 +412,7 @@ class DownloadUtil
                 .setHttpRequestHeaders(headers)
                 .setLength(requestLength)
                 .build()
+                .withRangePolicy(rangePolicy)
         }
 
         private fun removeRangeParameter(url: String): String {
