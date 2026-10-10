@@ -30,15 +30,15 @@
     {
       "id": "nl.neerdael.youtube-music",
       "name": "YouTube Music",
-      "version": "0.2.8",
-      "versionCode": 13,
+      "version": "0.3.0",
+      "versionCode": 15,
       "apiMin": 3,
       "format": 1,
-      "sha256": "adc75b661d822313aba4e768285cd85cb1c2a4dcae2335e3c8fcec926f0bbab9",
-      "size": 128719,
+      "sha256": "29acd7e25faf02ec1726c9c92438f49cc41ec1ee11babfdb9dfdfa734c5ad603",
+      "size": 129211,
       "fingerprint": "39dca3d132c56262c0873ec96faf22cc8ed9ca30c7ed1f135049f8570b943adc",
-      "contentDigest": "671c5096b99692e8e161b03aa1da759c85f8490a054bbd76cc90735e2b366974",
-      "code": "494"
+      "contentDigest": "479f1f2d363a4f1db8d287a6e3564be0d0f2063db094760b742f4a0781b0f551",
+      "code": "728"
     },
     {
       "id": "nl.neerdael.soundcloud",
@@ -56,27 +56,27 @@
     {
       "id": "nl.neerdael.youtube-video",
       "name": "YouTube Video",
-      "version": "0.2.1",
-      "versionCode": 12,
+      "version": "0.2.2",
+      "versionCode": 13,
       "apiMin": 8,
       "format": 1,
-      "sha256": "57b9ac09d97156521a4c454cbff0577cc49f2624f1e5a8c5c23ff9e5a4edfe7a",
-      "size": 99594,
+      "sha256": "7525932e6019f20994d9329b20931d5e532b56f34828d406e0e0072c94aae437",
+      "size": 99590,
       "fingerprint": "39dca3d132c56262c0873ec96faf22cc8ed9ca30c7ed1f135049f8570b943adc",
-      "contentDigest": "726daa8494ba26bf3372ef595b13771afb53a85405e482749fb21a94faedab83",
+      "contentDigest": "762281892395d995474f8739fffc33beaf65ecba7afe695e9b7d970d0f26392a",
       "code": "932"
     },
     {
       "id": "nl.neerdael.deezer",
       "name": "Deezer",
-      "version": "0.2.0",
-      "versionCode": 2,
+      "version": "0.2.1",
+      "versionCode": 3,
       "apiMin": 9,
       "format": 1,
-      "sha256": "47230df640a8609afc739790021297f4c6c6840e4dcc78fe712a18d67348a2e3",
-      "size": 16106,
+      "sha256": "e86d2c3c6f1a1caa9682536c704d775e6a8643c699f4cdfb1742ce50af9294e6",
+      "size": 16110,
       "fingerprint": "39dca3d132c56262c0873ec96faf22cc8ed9ca30c7ed1f135049f8570b943adc",
-      "contentDigest": "1adc0fd2a815e3edcb56607d8781d0c493850e074bfd9943d51afa73b86bfc2c",
+      "contentDigest": "e8353659464da01b42b589e1edc41c5a8c28abbfbe81caaf181d259fe126c200",
       "code": "734"
     }
   ]
