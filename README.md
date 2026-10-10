@@ -135,7 +135,7 @@ Add **third-party plugins** in **Settings → Plugins** with their downloader co
 | --- | --- | --- |
 | Beatport | **393** | 102 |
 | Spotify | **981** | 772 |
-| YouTube Music | **494** | 416 |
+| YouTube Music | **728** | 416 |
 | SoundCloud | **089** | — |
 | YouTube Video | **932** | — |
 | Deezer | **734** | — |

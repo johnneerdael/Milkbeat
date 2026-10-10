@@ -84,7 +84,7 @@ no video. Its encrypted streams cannot be downloaded for offline playback.
 | --- | --- |
 | **393** | Beatport |
 | **981** | Spotify |
-| **494** | YouTube Music |
+| **728** | YouTube Music |
 | **089** | SoundCloud |
 | **932** | YouTube Video |
 | **734** | Deezer |
