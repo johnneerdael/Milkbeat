@@ -16,7 +16,7 @@ There is no metadata provider to choose: every installed, enabled catalog you ca
 
 | Plugin | Code | Catalog | Audio | Video |
 | --- | --- | --- | --- | --- |
-| YouTube Music | **494** | Home, Search, artists, albums, playlists, library | Streams, cross-provider matching and radio | YouTube videos, channels and playlists |
+| YouTube Music | **728** | Home, Search, artists, albums, playlists, library | Streams, cross-provider matching and radio | YouTube videos, channels and playlists |
 | Spotify | **981** | Home, Search, artists, albums, playlists, library | **None: use another audio provider** | — |
 | Beatport | **393** | Catalog, genres, charts, artists, labels, library | Full streams with a streaming subscription | — |
 | SoundCloud | **089** | Discover, Stream, Search, Artists, albums, playlists, Liked Songs, history | Available full tracks, matching and stations | — |
@@ -29,7 +29,7 @@ Capabilities depend on the installed plugin version, the account and its subscri
 
 ## YouTube Video
 
-**YouTube Video 0.2.1** is available in stable Milkbeat with downloader code **932**. It requires
+**YouTube Video 0.2.2** is available in stable Milkbeat with downloader code **932**. It requires
 a Milkbeat build with plugin API 8; update the app before installing if your build is older. It keeps its own
 account alongside YouTube Music and supplies SmartTube's regular YouTube TV Music section:
 recommended music, charts, new videos and the other rows supplied for your region or account.
@@ -61,12 +61,14 @@ its retired prerelease codes stay pinned to their original packages.
 
 ## Deezer
 
-**Deezer 0.2.0** provides Home with Flow, mixes and channels, Search, artist, album and playlist
+**Deezer 0.2.1** provides Home with Flow, mixes and channels, Search, artist, album and playlist
 pages, a read-only library and radio. Install it with code **734** on a Milkbeat build supporting
 plugin API 9. Sign in with Deezer through the phone web viewer on the same network as the TV.
 Its audio can play native Deezer tracks and accepted matches from other catalogs; stream
 availability and FLAC or MP3 quality depend on the account, region and recording. It supplies
-no video. Its encrypted streams cannot be downloaded for offline playback.
+no video. Its encrypted streams cannot be downloaded for offline playback. On a Milkbeat build with
+plugin API 10, Deezer 0.2.1 fetches each track in one request, so playback no longer pauses and
+resumes during a song.
 
 ## Install a plugin
 
@@ -148,8 +150,8 @@ Completed indexing matches are kept when you cancel. Index again after changing 
 ## Sign-in and account requirements
 
 - **YouTube Music:** sign-in is optional. Signing in turns Home into a personalized feed and makes your library available. Free YouTube accounts are supported; Premium is not required for personalization.
-- **YouTube Video:** sign-in is optional. Pair it with a TV code from any phone for a personalized Home and your library; signed out, it browses YouTube's TV Music feeds. YouTube Video 0.2.1 needs a Milkbeat build with plugin API 8.
-- **Deezer:** sign in through the phone web viewer for your catalog, Flow and read-only library. Audio availability and quality depend on the account and recording. Deezer 0.2.0 needs a Milkbeat build with plugin API 9.
+- **YouTube Video:** sign-in is optional. Pair it with a TV code from any phone for a personalized Home and your library; signed out, it browses YouTube's TV Music feeds. YouTube Video 0.2.2 needs a Milkbeat build with plugin API 8.
+- **Deezer:** sign in through the phone web viewer for your catalog, Flow and read-only library. Audio availability and quality depend on the account and recording. Deezer 0.2.1 needs a Milkbeat build with plugin API 9.
 - **Spotify:** a catalog with **no audio source**. Its value is your personalized feed, playlists, Liked Songs and library after signing in. Keep at least one audio provider enabled.
 - **Beatport:** sign in for the catalog and your library. Beatport's own full-length audio needs an active streaming subscription; otherwise SoundCloud or YouTube Music can match the recording. A free account does not guarantee a match.
 - **SoundCloud:** sign in for personalized Home, playlists, Liked Songs, history and Artists. Public search and catalog pages can work anonymously. Full-track availability depends on the recording and your listening subscription; Artist Pro does not grant Go+ listening rights. Preview-only or restricted recordings can appear but cannot supply full-track audio, so keep another audio provider as a fallback. SoundCloud plugin 0.2.0 needs a Milkbeat build with plugin API 5. TV-paired accounts currently play clear HLS streams only; protected-only recordings cannot play with this session, and plays from a TV-paired account are not reported to SoundCloud. Existing web sessions keep their Widevine playback path where the account and device allow it.
@@ -181,7 +183,7 @@ Beatport starts with the switch off, and updating Milkbeat switches it off once 
 
 Spotify has no audio of its own, so Milkbeat searches up to four providers at once. A faster match from a lower provider is used only once every higher provider has failed; the remaining searches are cancelled as soon as the result is decided. Explicitly prepared YouTube playlist copies keep their known YouTube recordings.
 
-YouTube matching searches recorded videos, including static Art Tracks and archived live sets, whichever now-playing view you use. It checks recording identity, so an unrelated performance, cover, different remix or short excerpt is rejected, and full versions are preferred over mixed excerpts. The picture loads only when you choose [the video view](playback.md#visualizer-music-video-or-artwork).
+YouTube matching searches recorded videos, including static Art Tracks and archived live sets, whichever now-playing view you use. It checks recording identity, so an unrelated performance, cover, different remix or short excerpt is rejected, and full versions are preferred over mixed excerpts. The picture loads only when you choose [the video view](playback.md#visualizer-music-video-or-artwork). With YouTube Music, recorded-video matching needs plugin 0.3.0 or later.
 
 ![Video: None or YouTube Music](images/settings-video-provider.png)
 
