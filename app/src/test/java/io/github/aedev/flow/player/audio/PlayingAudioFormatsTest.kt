@@ -61,7 +61,7 @@ class PlayingAudioFormatsTest {
     }
 
     @Test
-    fun `each period keeps its own pinned value`() {
+    fun `recent periods keep a value per period`() {
         val origins = RecentPeriods<String>()
         origins[first] = "Deezer"
         origins[second] = "SoundCloud"
