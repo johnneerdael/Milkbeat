@@ -74,4 +74,15 @@ class MusicAudioOriginTest {
     fun `an item no resolver built has no origin`() {
         assertThat(item.audioOrigin()).isNull()
     }
+
+    @Test
+    fun `a rebuilt window replaces the previous resolution's origin`() {
+        val streamed = AudioStream("https://fixture/a", "key", "mp3", "audio/mpeg", codecs = "mp3", bitrate = 320_000)
+        val bare = AudioStream("https://fixture/b", "key", "flac", "audio/flac")
+
+        assertThat(item.withAudioOrigin(null).withAudioOrigin(resolved(bare)).audioOrigin())
+            .isEqualTo(MusicAudioOrigin("nl.neerdael.deezer", DeclaredAudio("audio/flac", null, null)))
+        assertThat(item.withAudioOrigin(resolved(streamed)).withAudioOrigin(null).audioOrigin())
+            .isEqualTo(MusicAudioOrigin(pluginId = null, declared = null))
+    }
 }

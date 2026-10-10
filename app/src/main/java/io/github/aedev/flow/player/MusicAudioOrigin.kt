@@ -10,6 +10,7 @@ private const val AUDIO_PLUGIN = "milkbeat.audioPlugin"
 private const val AUDIO_MIME = "milkbeat.audioMime"
 private const val AUDIO_CODECS = "milkbeat.audioCodecs"
 private const val AUDIO_BITRATE = "milkbeat.audioBitrate"
+private val ORIGIN_KEYS = listOf(AUDIO_DOWNLOAD, AUDIO_PLUGIN, AUDIO_MIME, AUDIO_CODECS, AUDIO_BITRATE)
 
 /** Where the resolver chose to play a provider track from: [pluginId]'s stream, or its download when null. */
 internal data class MusicAudioOrigin(
@@ -25,6 +26,8 @@ internal data class MusicAudioOrigin(
 internal fun MediaItem.withAudioOrigin(audio: ResolvedAudio?): MediaItem {
     val extras =
         Bundle(mediaMetadata.extras ?: Bundle()).apply {
+            // A rebuilt window, such as a refreshed stream, still carries the previous resolution's origin.
+            ORIGIN_KEYS.forEach(::remove)
             if (audio == null) {
                 putBoolean(AUDIO_DOWNLOAD, true)
                 return@apply
