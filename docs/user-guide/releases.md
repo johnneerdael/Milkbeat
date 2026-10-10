@@ -60,7 +60,7 @@ Update your existing Milkbeat installation to retain sign-ins and settings. Loca
 
 | Third-party plugin | Downloader code |
 | --- | --- |
-| YouTube Music and YouTube | **494** |
+| YouTube Music and YouTube | **728** |
 | Spotify metadata | **981** |
 | Beatport | **393** |
 

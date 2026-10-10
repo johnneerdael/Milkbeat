@@ -135,7 +135,7 @@ Add **third-party plugins** in **Settings → Plugins** with their downloader co
 | --- | --- | --- |
 | Beatport | **393** | 102 |
 | Spotify | **981** | 772 |
-| YouTube Music | **494** | 416 |
+| YouTube Music | **728** | 416 |
 | SoundCloud | **089** | — |
 | YouTube Video | **932** | — |
 | Deezer | **734** | — |
@@ -153,7 +153,7 @@ distributed separately from Milkbeat releases, signature-checked and reviewed be
 | YouTube Video | YouTube's TV Music Home, Search, artists, albums, playlists, library | Streams, matching and radio | YouTube videos and playlists |
 | Deezer | Home, Flow, Search, artists, albums, playlists, library | Account streams and matching | — |
 
-**YouTube Video 0.2.1** is a separate provider for stable Milkbeat, installed with code **932**.
+**YouTube Video 0.2.2** is a separate provider for stable Milkbeat, installed with code **932**.
 It requires plugin API 8 and keeps its own account alongside
 YouTube Music. It supplies SmartTube's regular YouTube TV Music feeds, TV-code/QR sign-in and
 native SABR playback through Milkbeat's existing Media3 player.
@@ -166,9 +166,10 @@ native SABR playback through Milkbeat's existing Media3 player.
 - **SoundCloud:** pair with a TV code from any phone. Full-track availability depends on the
   recording and your listening subscription. TV-paired accounts currently play clear HLS streams only.
 - **YouTube Video:** works signed out; pairing with a TV code from any phone personalizes Home and
-  Library. An empty Liked Music library still loads Home normally in 0.2.1.
+  Library. An empty Liked Music library still loads Home normally since 0.2.1.
 - **Deezer:** sign in for Home, Flow and your library. Stream availability and FLAC/MP3 quality
-  depend on the account and recording. Deezer 0.2.0 needs plugin API 9; update Milkbeat first.
+  depend on the account and recording. Deezer 0.2.1 needs plugin API 9; update Milkbeat first. With
+  plugin API 10 it fetches each track in one request, so songs no longer pause mid-play.
 
 Under **Audio**, put providers in priority order and choose which ones play other services'
 tracks; under **Video**, choose the video plugin. Every track follows the order, including tracks
