@@ -7,11 +7,13 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.DecoderReuseEvaluation
 import androidx.media3.exoplayer.analytics.AnalyticsListener
+import androidx.media3.exoplayer.source.MediaSource.MediaPeriodId
 import io.github.aedev.flow.data.localmedia.LocalMediaIds
 import io.github.aedev.flow.player.MusicVideoItems
 import io.github.aedev.flow.player.audio.AudioQualitySource
 import io.github.aedev.flow.player.audio.DeclaredAudio
 import io.github.aedev.flow.player.audio.PlayingAudioFormats
+import io.github.aedev.flow.player.audio.RecentPeriods
 import io.github.aedev.flow.player.audio.audioQualitySource
 import io.github.aedev.flow.player.audio.playbackAudioQuality
 import io.github.aedev.flow.player.musicAudioQualityState
@@ -27,26 +29,34 @@ private class AudioQualityOrigin(
 
 /**
  * Publishes what the audio renderer decodes for the playing period: when that period starts, and
- * when its input format changes, as an adaptive stream switches rendition. Nothing polls; one lookup
- * of the item's source runs per publication, off the main thread for the download index.
+ * when its input format changes, as an adaptive stream switches rendition. Nothing polls. The
+ * period's source is looked up once, off the main thread for the download index, and pinned: a
+ * sign-in change clears the plugin's accepted streams while the bound source keeps playing.
  */
 @OptIn(UnstableApi::class)
 internal fun Media3MusicService.observeAudioQuality() {
     val formats = PlayingAudioFormats()
+    val origins = RecentPeriods<AudioQualityOrigin>()
     var lookup: Job? = null
 
     fun publish(
         item: MediaItem?,
+        period: MediaPeriodId?,
         format: Format?,
     ) {
         lookup?.cancel()
-        if (item == null || format == null) {
+        if (item == null || period == null || format == null) {
             musicAudioQualityState.value = null
+            return
+        }
+        origins[period]?.let { origin ->
+            musicAudioQualityState.value = playbackAudioQuality(item.mediaId, origin.source, format, origin.declared)
             return
         }
         lookup =
             lifecycleScope.launch {
                 val origin = withContext(PerformanceDispatcher.diskIO) { audioQualityOrigin(item) }
+                origins[period] = origin
                 musicAudioQualityState.value = playbackAudioQuality(item.mediaId, origin.source, format, origin.declared)
             }
     }
@@ -59,7 +69,7 @@ internal fun Media3MusicService.observeAudioQuality() {
                 decoderReuseEvaluation: DecoderReuseEvaluation?,
             ) {
                 val period = eventTime.mediaPeriodId ?: return
-                formats.onInput(period, eventTime.currentMediaPeriodId, format)?.let { publish(player.currentMediaItem, it) }
+                formats.onInput(period, eventTime.currentMediaPeriodId, format)?.let { publish(player.currentMediaItem, period, it) }
             }
 
             override fun onMediaItemTransition(
@@ -67,7 +77,7 @@ internal fun Media3MusicService.observeAudioQuality() {
                 mediaItem: MediaItem?,
                 reason: Int,
             ) {
-                publish(mediaItem, formats.onPlaying(eventTime.currentMediaPeriodId))
+                publish(mediaItem, eventTime.currentMediaPeriodId, formats.onPlaying(eventTime.currentMediaPeriodId))
             }
         },
     )

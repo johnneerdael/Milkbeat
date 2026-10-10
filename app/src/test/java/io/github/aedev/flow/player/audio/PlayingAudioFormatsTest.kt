@@ -59,4 +59,15 @@ class PlayingAudioFormatsTest {
         assertThat(formats.onPlaying(periods.first())).isNull()
         assertThat(formats.onPlaying(periods.last())).isEqualTo(aac(128_000))
     }
+
+    @Test
+    fun `each period keeps its own pinned value`() {
+        val origins = RecentPeriods<String>()
+        origins[first] = "Deezer"
+        origins[second] = "SoundCloud"
+
+        assertThat(origins[first]).isEqualTo("Deezer")
+        assertThat(origins[second]).isEqualTo("SoundCloud")
+        assertThat(origins[null]).isNull()
+    }
 }

@@ -939,7 +939,9 @@ run that occupies a physical device, and the resulting diff is thousands of line
   reads ahead for gapless playback and adaptive streams switch renditions; never read the selected
   tracks (several adaptive renditions are selected at once). `service/MusicServiceAudioQuality.kt`
   publishes on item transition and input-format change only (no polling; the download-index lookup
-  runs on diskIO) through `EnhancedMusicPlayerManager.audioQuality`. Downloads played through
+  runs on diskIO) through `EnhancedMusicPlayerManager.audioQuality`. The source is looked up once per
+  period and pinned (`RecentPeriods`): a sign-in change clears `PluginAudio`'s accepted streams while
+  the bound source keeps playing, so never re-query that cache on a rendition change. Downloads played through
   `localUriOverrides` keep the provider id with a file URI, so they read as Downloaded.
   `TvAudioQualityStatus.kt` returns no status slot while it is off, keeping the controls layout.
   Focused regression: `./gradlew :app:testGithubDebugUnitTest --tests '*PlaybackAudioQualityTest' --tests '*PlayingAudioFormatsTest'`.
