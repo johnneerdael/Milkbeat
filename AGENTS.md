@@ -932,6 +932,13 @@ run that occupies a physical device, and the resulting diff is thousands of line
 - Reuse `ui/components/shared/QrCodeImage.kt` for QR presentation across features; its existing
   ZXing rendering and quiet zone remain shared by device pairing and the web sign-in viewer.
 
+- The optional now-playing audio-quality line (Settings → Playback → Show audio quality, its own
+  `audio_quality_readout` DataStore) is derived in `player/audio/PlaybackAudioQuality.kt` from
+  Media3's selected audio track format, with the accepted plugin stream's declared bitrate as
+  fallback. `service/MusicServiceAudioQuality.kt` publishes it on track/item change only (no polling;
+  the download-index lookup runs on diskIO) through `EnhancedMusicPlayerManager.audioQuality`.
+  `TvAudioQualityStatus.kt` returns no status slot while it is off, keeping the controls layout.
+  Focused regression: `./gradlew :app:testGithubDebugUnitTest --tests '*PlaybackAudioQualityTest'`.
 - Video-capable audio providers use `AudioMatchStrategy.VIDEOS` for ordinary matching, queue preparation, preloads and mirror batches. Keep successful matches, scope misses/in-flight work by strategy, and preserve source metadata/IDs. `PluginAudio.videoCapablePlaybackIds` is a cold event-driven Flow of candidate IDs derived from accepted caches and account/provider context. The current Media3 item must also report a supported video track; track-change events update Now Playing eligibility on main, preventing cached metadata from exposing Video for audio-only HLS or completed downloads. Matching alone must not load picture. API 7's prepared DASH manifest is shared by eligibility and source construction; native SABR and eligible HLS retain picture support. Separate progressive picture URLs stay audio-only in music playback rather than preparing a hidden child. Explicit Video selection uses the prepared presentation's track selection and existing Media3 surface gating without replacing or seeking audio.
 - The existing `githubNightly` build is the separate preview app (`nl.neerdael.milkbeat.nightly`, launcher label Milkbeat Preview), debug-signed with release-like shrinking. Use `:app:assembleGithubNightly` and build-property `milkbeatPatch` for an explicit test artifact; do not manually bump app version files. A test prerelease must remain unmerged until the maintainer tests it. Its optional signed provider package is distributed through Buzzheavier; stable publication checkpoints/catalogs remain separate. Nightly/Preview downloader codes are pinned to `app/src/nightly/assets/plugin-preview-download-catalog.json`; stable builds retain the main asset and live publication.
 

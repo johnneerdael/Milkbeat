@@ -45,7 +45,7 @@ See [Local and network folders](folders.md) for every field and server requireme
 
 ## Playback
 
-![Settings → Playback with Background Play, Autoplay related videos, Subtitles, Skip Silence, Stable Voice and Ambient mode](images/settings-playback-current.png)
+![Settings → Playback with Show audio quality switched on below Ambient mode, and Debug playback logging](images/settings-playback-current.png)
 
 | Setting | What it does |
 | --- | --- |
