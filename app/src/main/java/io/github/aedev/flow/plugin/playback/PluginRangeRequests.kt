@@ -10,24 +10,48 @@ internal const val LEGACY_RANGE_REQUEST_BYTES = 512 * 1024L
 // every second and leave the picture waiting on round trips.
 private const val PICTURE_RANGE_REQUEST_BYTES = 4 * 1024 * 1024L
 
-/** The range size the host uses for this stream from a plugin targeting [pluginApiTarget]. */
-internal fun AudioStream.rangeRequestBytesFor(pluginApiTarget: Int?): Long? =
-    rangeRequestBytes ?: LEGACY_RANGE_REQUEST_BYTES.takeIf { (pluginApiTarget ?: 0) < 10 }
+/** How the host cuts one stream's progressive requests; no policy fetches the file in one request. */
+sealed interface PluginRangePolicy {
+    /** The ranges every plugin got before API 10, kept exactly for plugins that rely on them. */
+    data object Legacy : PluginRangePolicy
+
+    /** The provider's own maximum: no request asks for more, picture included. */
+    data class Declared(
+        val maxBytes: Long,
+    ) : PluginRangePolicy
+}
+
+/** The range policy for this stream from a plugin targeting [pluginApiTarget]. */
+internal fun AudioStream.rangePolicyFor(pluginApiTarget: Int?): PluginRangePolicy? =
+    rangeRequestBytes?.let(PluginRangePolicy::Declared)
+        ?: PluginRangePolicy.Legacy.takeIf { (pluginApiTarget ?: 0) < 10 }
 
 /**
- * The length of one progressive request: what the player asked for, else the range its plugin
- * declared, else the rest of the file. Media3 takes a bounded open as the end of the file, so a
- * stream is only cut into ranges when its plugin asks. A picture's first range stays audio-sized:
- * it only has to reveal the stream's layout, and while the picture is hidden the player stops
- * loading right after it.
+ * The length of one progressive request. Media3 takes a bounded open as the end of the file, so a
+ * stream is only cut into ranges when its plugin asks. Legacy ranges keep their former shape: the
+ * player's own bounded length passes through, and a picture's first range stays audio-sized (it only
+ * has to reveal the stream's layout) before widening.
  */
 internal fun pluginRequestLength(
     requestedLength: Long,
     position: Long,
     picture: Boolean,
-    rangeRequestBytes: Long?,
-): Long {
-    if (requestedLength > 0) return requestedLength
-    val range = rangeRequestBytes ?: return C.LENGTH_UNSET.toLong()
-    return if (picture && position > 0) maxOf(range, PICTURE_RANGE_REQUEST_BYTES) else range
-}
+    policy: PluginRangePolicy?,
+): Long =
+    when (policy) {
+        null -> {
+            if (requestedLength > 0) requestedLength else C.LENGTH_UNSET.toLong()
+        }
+
+        PluginRangePolicy.Legacy -> {
+            when {
+                requestedLength > 0 -> requestedLength
+                picture && position > 0 -> PICTURE_RANGE_REQUEST_BYTES
+                else -> LEGACY_RANGE_REQUEST_BYTES
+            }
+        }
+
+        is PluginRangePolicy.Declared -> {
+            if (requestedLength > 0) minOf(requestedLength, policy.maxBytes) else policy.maxBytes
+        }
+    }

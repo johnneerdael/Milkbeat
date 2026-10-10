@@ -35,8 +35,8 @@ class ResolvedAudio(
     internal val runtimeReceipt: PluginPlaybackReceipt? = null,
     internal val nativeBinding: Any? = null,
     internal val nativeValidUntilElapsedMs: Long? = null,
-    /** The most bytes one progressive request asks for; null fetches the file in one request. */
-    val rangeRequestBytes: Long? = stream.rangeRequestBytes,
+    /** How progressive requests are cut; null fetches the file in one request. */
+    internal val rangePolicy: PluginRangePolicy? = stream.rangeRequestBytes?.let(PluginRangePolicy::Declared),
 ) {
     internal val playbackReports = PlaybackReportDeduplication()
 

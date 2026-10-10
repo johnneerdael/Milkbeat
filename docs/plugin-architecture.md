@@ -8,7 +8,8 @@ Current host extension (plugin API 10): `AudioStream.rangeRequestBytes` lets a p
 server throttles or refuses long ranges cap each progressive request. Without it the host fetches the
 file in one request; Media3 treats a bounded open as the end of the file, so the host never imposes
 another provider's limit. Providers targeting API 9 or older keep the former host-wide 512 KiB
-ranges. A music video's picture still widens its ranges to 4 MiB after the first.
+ranges, whose music-video pictures widen to 4 MiB after the first range. A declared size is a hard
+maximum for every request, the player's own bounded reads and pictures included.
 
 Plugin API 9: `AudioStream` may include `cipher` with
 `scheme: "BF_CBC_STRIPE"` and a 16-byte `keyHex`. The host decrypts the progressive bytes above

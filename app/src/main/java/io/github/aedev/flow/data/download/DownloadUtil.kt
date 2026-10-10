@@ -35,6 +35,7 @@ import io.github.aedev.flow.player.stream.VideoCodecUtils
 import io.github.aedev.flow.plugin.playback.BoundPluginAudio
 import io.github.aedev.flow.plugin.playback.PictureLimits
 import io.github.aedev.flow.plugin.playback.PluginAudio
+import io.github.aedev.flow.plugin.playback.PluginRangePolicy
 import io.github.aedev.flow.plugin.playback.QueuePreparationResult
 import io.github.aedev.flow.plugin.playback.ResolvedAudio
 import io.github.aedev.flow.plugin.playback.adaptiveCacheKey
@@ -86,7 +87,7 @@ class DownloadUtil
             val url: String,
             val headers: Map<String, String>,
             val validUntilMs: Long,
-            val rangeRequestBytes: Long?,
+            val rangePolicy: PluginRangePolicy?,
         )
 
         private val songUrlCache = java.util.concurrent.ConcurrentHashMap<String, PlayableUrl>()
@@ -177,7 +178,7 @@ class DownloadUtil
                 }
             requireDownloadablePluginAudio(resolved.stream)
             val playable =
-                PlayableUrl(resolved.stream.url, resolved.stream.headers, resolved.validUntilMs, resolved.rangeRequestBytes)
+                PlayableUrl(resolved.stream.url, resolved.stream.headers, resolved.validUntilMs, resolved.rangePolicy)
             songUrlCache[mediaId] = playable
             downloadUrlCache[mediaId] = playable
             Log.d(TAG, "[$source] Resolved $mediaId via ${resolved.pluginId}")
@@ -277,7 +278,7 @@ class DownloadUtil
                             dataSpec,
                             cached.url,
                             cached.headers,
-                            cached.rangeRequestBytes,
+                            cached.rangePolicy,
                         )
                     }
 
@@ -293,9 +294,9 @@ class DownloadUtil
                     val rendition =
                         "${resolved.pluginId}:${stream.cacheKey}:${format?.id ?: stream.renditionId}${stream.cipher.cacheIdentity()}"
                     bindCachedMusicRendition(playerCache, mediaId, rendition)
-                    songUrlCache[mediaId] = PlayableUrl(url, headers, resolved.validUntilMs, resolved.rangeRequestBytes)
+                    songUrlCache[mediaId] = PlayableUrl(url, headers, resolved.validUntilMs, resolved.rangePolicy)
                     Log.d(TAG, "[Player] Resolved $mediaId via ${resolved.pluginId}")
-                    buildPlaybackDataSpec(dataSpec, url, headers, resolved.rangeRequestBytes)
+                    buildPlaybackDataSpec(dataSpec, url, headers, resolved.rangePolicy)
                 }
             }
             return PluginMusicDataSourceFactory(
@@ -391,14 +392,14 @@ class DownloadUtil
             dataSpec: DataSpec,
             streamUrl: String,
             headers: Map<String, String>,
-            rangeRequestBytes: Long?,
+            rangePolicy: PluginRangePolicy?,
         ): DataSpec {
             val requestLength =
                 pluginRequestLength(
                     dataSpec.length,
                     dataSpec.position,
                     dataSpec.key?.let(MusicVideoItems::videoIdOfVideoKey) != null,
-                    rangeRequestBytes,
+                    rangePolicy,
                 )
 
             return dataSpec
