@@ -40,12 +40,11 @@ class PluginRangeRequestsTest {
     }
 
     @Test
-    fun `a declared size is the most any request asks for, picture included`() {
+    fun `a declared size never bounds the open, which the network transport splits`() {
         val declared = PluginRangePolicy.Declared(1_000_000)
-        assertThat(pluginRequestLength(unset, 0, picture = false, policy = declared)).isEqualTo(1_000_000)
-        assertThat(pluginRequestLength(unset, 1, picture = true, policy = declared)).isEqualTo(1_000_000)
-        assertThat(pluginRequestLength(4_096, 0, picture = false, policy = declared)).isEqualTo(4_096)
-        assertThat(pluginRequestLength(8_000_000, 0, picture = false, policy = declared)).isEqualTo(1_000_000)
+        assertThat(pluginRequestLength(unset, 0, picture = false, policy = declared)).isEqualTo(unset)
+        assertThat(pluginRequestLength(unset, 1, picture = true, policy = declared)).isEqualTo(unset)
+        assertThat(pluginRequestLength(8_000_000, 0, picture = false, policy = declared)).isEqualTo(8_000_000)
     }
 
     @Test

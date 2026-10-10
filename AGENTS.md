@@ -904,11 +904,14 @@ run that occupies a physical device, and the resulting diff is thousands of line
   to measure.
 
 - Plugin API 10 adds `AudioStream.rangeRequestBytes`. Range limits belong to the provider that
-  declares them: `plugin/playback/PluginRangeRequests.kt` gives API 9-and-older streams the legacy
-  512 KiB ranges and leaves API 10 streams unbounded unless they declare a size. The effective size
-  lives on `ResolvedAudio.rangeRequestBytes`; the plugin's `AudioStream` stays as offered. Media3's
-  progressive loader treats a bounded open as the end of the file, so never reintroduce a host-wide
-  range cap; it cut Deezer MP3s at ~32 s and made playback stop and resume.
+  declares them. `plugin/playback/PluginRangeRequests.kt` resolves a `PluginRangePolicy` into
+  `ResolvedAudio.rangePolicy` (the plugin's `AudioStream` stays as offered): `Legacy` keeps the
+  former bounded 512 KiB opens for API 9-and-older streams, `Declared` carries a provider's size, and
+  null fetches the file in one request. Media3's progressive loader and `CacheWriter` both treat a
+  bounded open as the end of the file, so a declared size never bounds the open: the request carries
+  the policy in `DataSpec.customData`, and `PluginRangedDataSource` (under the player and download
+  caches) splits it into consecutive network ranges. Never reintroduce a host-wide range cap; it cut
+  Deezer MP3s at ~32 s and made playback stop and resume. Focused tests: `*PluginRange*`.
 - Plugin API 9 adds `AudioStream.cipher` (`BF_CBC_STRIPE`, used by Deezer-style providers) and
   `MD5` in `crypto.hash`. `plugin/playback/PluginStripeCipherDataSource.kt` decrypts with the
   platform `Blowfish/CBC/NoPadding` cipher above the bound player cache, which keeps encrypted bytes.

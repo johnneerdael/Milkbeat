@@ -42,10 +42,12 @@ import io.github.aedev.flow.plugin.playback.adaptiveCacheKey
 import io.github.aedev.flow.plugin.playback.adaptiveDataSourceFactory
 import io.github.aedev.flow.plugin.playback.cacheIdentity
 import io.github.aedev.flow.plugin.playback.drmDataSourceFactory
+import io.github.aedev.flow.plugin.playback.pluginRangedDataSourceFactory
 import io.github.aedev.flow.plugin.playback.pluginRequestLength
 import io.github.aedev.flow.plugin.playback.pluginStripeCipherDataSourceFactory
 import io.github.aedev.flow.plugin.playback.prepareQueue
 import io.github.aedev.flow.plugin.playback.serverAbrDataSourceFactory
+import io.github.aedev.flow.plugin.playback.withRangePolicy
 import io.github.aedev.flow.service.ExoDownloadService
 import io.github.aedev.flow.utils.MusicVideoFormats
 import kotlinx.coroutines.CoroutineScope
@@ -122,7 +124,7 @@ class DownloadUtil
                         .Factory()
                         .setCache(downloadCache)
                         .setCacheWriteDataSinkFactory(CacheDataSink.Factory().setCache(downloadCache))
-                        .setUpstreamDataSourceFactory(OkHttpDataSource.Factory(okHttpClient))
+                        .setUpstreamDataSourceFactory(pluginRangedDataSourceFactory(OkHttpDataSource.Factory(okHttpClient)))
                         .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR),
                 ) { dataSpec ->
                     resolveDataSpec(dataSpec, "Download")
@@ -160,6 +162,7 @@ class DownloadUtil
                     .setUri(cached.url.toUri())
                     .setHttpRequestHeaders(cached.headers)
                     .build()
+                    .withRangePolicy(cached.rangePolicy)
             }
 
             Log.d(TAG, "[$source] Resolving $mediaId through the audio plugin")
@@ -188,6 +191,7 @@ class DownloadUtil
                 .setUri(playable.url.toUri())
                 .setHttpRequestHeaders(playable.headers)
                 .build()
+                .withRangePolicy(playable.rangePolicy)
         }
 
         /**
@@ -207,7 +211,7 @@ class DownloadUtil
                     .Factory()
                     .setCache(playerCache)
                     .setUpstreamDataSourceFactory(
-                        DefaultDataSource.Factory(context, OkHttpDataSource.Factory(okHttpClient)),
+                        DefaultDataSource.Factory(context, pluginRangedDataSourceFactory(OkHttpDataSource.Factory(okHttpClient))),
                     ).setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
 
             val cachedDataSourceFactory =
@@ -408,6 +412,7 @@ class DownloadUtil
                 .setHttpRequestHeaders(headers)
                 .setLength(requestLength)
                 .build()
+                .withRangePolicy(rangePolicy)
         }
 
         private fun removeRangeParameter(url: String): String {

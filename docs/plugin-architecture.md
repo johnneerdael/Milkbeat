@@ -9,7 +9,9 @@ server throttles or refuses long ranges cap each progressive request. Without it
 file in one request; Media3 treats a bounded open as the end of the file, so the host never imposes
 another provider's limit. Providers targeting API 9 or older keep the former host-wide 512 KiB
 ranges, whose music-video pictures widen to 4 MiB after the first range. A declared size is a hard
-maximum for every request, the player's own bounded reads and pictures included.
+maximum for every network request, downloads included: `PluginRangedDataSource` splits one logical
+read into consecutive ranges below the caches, so neither the player nor the downloader mistakes a
+range's end for the end of the file.
 
 Plugin API 9: `AudioStream` may include `cipher` with
 `scheme: "BF_CBC_STRIPE"` and a 16-byte `keyHex`. The host decrypts the progressive bytes above

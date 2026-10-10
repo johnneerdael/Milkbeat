@@ -15,7 +15,7 @@ sealed interface PluginRangePolicy {
     /** The ranges every plugin got before API 10, kept exactly for plugins that rely on them. */
     data object Legacy : PluginRangePolicy
 
-    /** The provider's own maximum: no request asks for more, picture included. */
+    /** The provider's own maximum: [PluginRangedDataSource] keeps every network request within it. */
     data class Declared(
         val maxBytes: Long,
     ) : PluginRangePolicy
@@ -27,10 +27,10 @@ internal fun AudioStream.rangePolicyFor(pluginApiTarget: Int?): PluginRangePolic
         ?: PluginRangePolicy.Legacy.takeIf { (pluginApiTarget ?: 0) < 10 }
 
 /**
- * The length of one progressive request. Media3 takes a bounded open as the end of the file, so a
- * stream is only cut into ranges when its plugin asks. Legacy ranges keep their former shape: the
- * player's own bounded length passes through, and a picture's first range stays audio-sized (it only
- * has to reveal the stream's layout) before widening.
+ * The length of one progressive open. Media3 takes a bounded open as the end of the file, so a
+ * declared size never bounds the open: the network transport splits it instead. Legacy ranges keep
+ * their former shape: the player's own bounded length passes through, and a picture's first range
+ * stays audio-sized (it only has to reveal the stream's layout) before widening.
  */
 internal fun pluginRequestLength(
     requestedLength: Long,
@@ -39,7 +39,7 @@ internal fun pluginRequestLength(
     policy: PluginRangePolicy?,
 ): Long =
     when (policy) {
-        null -> {
+        null, is PluginRangePolicy.Declared -> {
             if (requestedLength > 0) requestedLength else C.LENGTH_UNSET.toLong()
         }
 
@@ -49,9 +49,5 @@ internal fun pluginRequestLength(
                 picture && position > 0 -> PICTURE_RANGE_REQUEST_BYTES
                 else -> LEGACY_RANGE_REQUEST_BYTES
             }
-        }
-
-        is PluginRangePolicy.Declared -> {
-            if (requestedLength > 0) minOf(requestedLength, policy.maxBytes) else policy.maxBytes
         }
     }
