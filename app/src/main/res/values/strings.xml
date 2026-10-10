@@ -853,4 +853,38 @@
     <string name="music_loading_saved_match">Loading saved %1$s match…</string>
     <string name="player_settings_debug_logging">Debug playback logging</string>
     <string name="player_settings_debug_logging_subtitle">Write local actions, stream timings and audio/video output events to logcat (MilkbeatTrace). Off by default.</string>
+    <string name="player_settings_audio_quality">Show audio quality</string>
+    <string name="player_settings_audio_quality_subtitle">Name the source, codec, bitrate and sample rate of the playing music in the playback controls</string>
+    <!-- The playing music's quality line, e.g. "Deezer · 1411 kb/s FLAC · 44.1 kHz / 16-bit" -->
+    <string name="audio_quality_separator" translatable="false">" · "</string>
+    <string name="audio_quality_bitrate">%1$d kb/s</string>
+    <string name="audio_quality_bitrate_codec">%1$d kb/s %2$s</string>
+    <string name="audio_quality_sample_rate">%1$s kHz</string>
+    <string name="audio_quality_sample_rate_depth">%1$s kHz / %2$d-bit</string>
+    <string name="audio_quality_source_local">On this device</string>
+    <string name="audio_quality_source_download">Downloaded</string>
+    <string name="audio_quality_source_smb" translatable="false">SMB</string>
+    <string name="audio_quality_source_webdav" translatable="false">WebDAV</string>
+    <string name="audio_quality_source_sftp" translatable="false">SFTP</string>
+    <string name="audio_quality_source_nfs" translatable="false">NFS</string>
+    <string name="audio_codec_flac" translatable="false">FLAC</string>
+    <string name="audio_codec_alac" translatable="false">ALAC</string>
+    <string name="audio_codec_pcm" translatable="false">PCM</string>
+    <string name="audio_codec_truehd" translatable="false">TrueHD</string>
+    <string name="audio_codec_mp3" translatable="false">MP3</string>
+    <string name="audio_codec_mp2" translatable="false">MP2</string>
+    <string name="audio_codec_aac" translatable="false">AAC</string>
+    <string name="audio_codec_he_aac" translatable="false">HE-AAC</string>
+    <string name="audio_codec_he_aac_v2" translatable="false">HE-AAC v2</string>
+    <string name="audio_codec_xhe_aac" translatable="false">xHE-AAC</string>
+    <string name="audio_codec_opus" translatable="false">Opus</string>
+    <string name="audio_codec_vorbis" translatable="false">Vorbis</string>
+    <string name="audio_codec_ac3" translatable="false">AC-3</string>
+    <string name="audio_codec_eac3" translatable="false">E-AC-3</string>
+    <string name="audio_codec_eac3_joc" translatable="false">E-AC-3 JOC</string>
+    <string name="audio_codec_ac4" translatable="false">AC-4</string>
+    <string name="audio_codec_dts" translatable="false">DTS</string>
+    <string name="audio_codec_dts_hd" translatable="false">DTS-HD</string>
+    <string name="audio_codec_mpegh" translatable="false">MPEG-H</string>
+    <string name="audio_codec_iamf" translatable="false">IAMF</string>
 </resources>

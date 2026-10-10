@@ -40,6 +40,7 @@ import io.github.aedev.flow.ui.screens.music.MusicPlayerViewModel
 import io.github.aedev.flow.ui.screens.player.VideoPlayerViewModel
 import io.github.aedev.flow.ui.tv.components.TvNoticeSnackbar
 import io.github.aedev.flow.ui.tv.components.showNotice
+import io.github.aedev.flow.ui.tv.music.TvAudioQualityViewModel
 import io.github.aedev.flow.ui.tv.music.TvMusicNowPlayingScreen
 import io.github.aedev.flow.ui.tv.music.TvVisualizerViewModel
 import io.github.aedev.flow.ui.tv.music.rememberTvNowPlayingVisual
@@ -64,6 +65,7 @@ fun FlowTvApp(
     val playerViewModel: VideoPlayerViewModel = hiltViewModel(activity)
     val musicPlayerViewModel: MusicPlayerViewModel = hiltViewModel(activity)
     val visualizerViewModel: TvVisualizerViewModel = hiltViewModel(activity)
+    val audioQualityViewModel: TvAudioQualityViewModel = hiltViewModel(activity)
     val visualizerActive by visualizerViewModel.active.collectAsStateWithLifecycle()
     val nowPlayingView by visualizerViewModel.nowPlayingView.collectAsStateWithLifecycle()
     val musicTabsViewModel: TvMusicTabsViewModel = hiltViewModel(activity)
@@ -250,6 +252,7 @@ fun FlowTvApp(
                         // Until the stored view is read, the artwork rather than starting a visualizer to drop.
                         view = nowPlayingView ?: NowPlayingView.STATIC,
                         onViewChange = visualizerViewModel::setNowPlayingView,
+                        audioQuality = audioQualityViewModel,
                     )
                 } else if (video == null) {
                     TvShell(

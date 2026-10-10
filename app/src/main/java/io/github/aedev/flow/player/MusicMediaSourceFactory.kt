@@ -43,7 +43,7 @@ class MusicMediaSourceFactory(
             return ResolvingMusicMediaSource(mediaItem) {
                 val audio = resolving.resolve(mediaItem.localConfiguration!!.uri, scheme == MusicVideoItems.SCHEME)
                 val sourceFactory = audio?.let { resolving.bind(it, mediaItem.mediaId) } ?: dataSourceFallback
-                resolvedSource(mediaItem, audio, sourceFactory)
+                resolvedSource(mediaItem.withAudioOrigin(audio), audio, sourceFactory)
             }
         }
         if (scheme == MusicVideoItems.SONG_SCHEME && deliversHls(mediaItem)) return hls.createMediaSource(mediaItem)

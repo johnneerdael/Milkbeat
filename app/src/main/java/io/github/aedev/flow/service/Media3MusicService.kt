@@ -47,12 +47,14 @@ import io.github.aedev.flow.player.audio.visualizer.VisualizerTapProcessor
 import io.github.aedev.flow.player.audio.visualizer.followPlayerClock
 import io.github.aedev.flow.player.diagnostics.PlaybackOutputTrace
 import io.github.aedev.flow.player.factory.LoadControlFactory
+import io.github.aedev.flow.player.musicAudioQualityState
 import io.github.aedev.flow.player.musicResolutionStatusState
 import io.github.aedev.flow.player.setVideoCapablePlaybackIds
 import io.github.aedev.flow.plugin.catalog.PluginAccounts
 import io.github.aedev.flow.plugin.playback.PluginAudio
 import io.github.aedev.flow.plugin.playback.PluginRadio
 import io.github.aedev.flow.plugin.playback.RadioPage
+import io.github.aedev.flow.plugin.registry.PluginRegistry
 import io.github.aedev.flow.utils.NetworkConnectivityObserver
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -195,6 +197,9 @@ class Media3MusicService : MediaLibraryService() {
 
     @Inject
     lateinit var pluginRadio: PluginRadio
+
+    @Inject
+    lateinit var pluginRegistry: PluginRegistry
 
     @Inject
     lateinit var radioTuning: io.github.aedev.flow.plugin.playback.RadioTuningCoordinator
@@ -384,6 +389,7 @@ class Media3MusicService : MediaLibraryService() {
         io.github.aedev.flow.player.musicVideoJoinGate
             .bind(player)
         player.addAnalyticsListener(PlaybackOutputTrace(audioOutputProbe))
+        observeAudioQuality()
         player.trackSelectionParameters =
             player.trackSelectionParameters
                 .buildUpon()
@@ -556,6 +562,7 @@ class Media3MusicService : MediaLibraryService() {
         io.github.aedev.flow.player.musicVideoJoinGate
             .bind(null)
         musicResolutionStatusState.value = null
+        musicAudioQualityState.value = null
         EnhancedMusicPlayerManager.prefetcher = null
         EnhancedMusicPlayerManager.setVideoCapablePlaybackIds(emptySet())
         EnhancedMusicPlayerManager.playbackArtworkState.value = null

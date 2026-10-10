@@ -8,6 +8,7 @@ Selecting a track, **Play** or **Shuffle** opens the full player. The track's co
 
 | Control | What it does |
 | --- | --- |
+| Audio quality (optional) | The source, codec, bitrate and sample rate of the playing music; see [Audio quality](#audio-quality) |
 | Audio level (visualizer only) | **Listening**, **Very quiet** or **No sound**: what the visualizer currently hears |
 | Seek bar | Elapsed and total time of the track |
 | Shuffle, Previous, Play/pause, Next, Repeat | The usual queue controls |
@@ -16,6 +17,22 @@ Selecting a track, **Play** or **Shuffle** opens the full player. The track's co
 | Queue | Opens the queue and radio presets beside the player |
 
 The controls hide on their own after a few seconds. With them hidden, **Left** and **Right** step through visualizer presets. **Back** hides the controls, then leaves the player; the [mini player](getting-started.md#find-your-way-around) keeps showing the track elsewhere in the app. Music keeps playing in the background unless you turn off **Background Play** in [Settings → Playback](settings.md#playback).
+
+## Audio quality
+
+Turn on **Show audio quality** in [Settings → Playback](settings.md#playback) to see what is playing at the top of the controls, in every view.
+
+![The controls with the audio quality line: YouTube Video · 134 kb/s Opus · 48 kHz](images/player-audio-quality.jpg)
+
+| Example | Meaning |
+| --- | --- |
+| `YouTube Video · 134 kb/s Opus · 48 kHz` | Opus from the YouTube Video plugin, at the bitrate the plugin reported |
+| `On this device · 1411 kb/s FLAC · 44.1 kHz / 16-bit` | A CD-quality FLAC file on the TV's storage |
+| `On this device · 4608 kb/s FLAC · 96 kHz / 24-bit` | A hi-res FLAC file |
+| `On this device · 320 kb/s MP3 · 44.1 kHz` | A 320 kb/s MP3 |
+| `On this device · Opus · 48 kHz` | An Ogg Opus file: the file states no bitrate |
+
+The first part names the source: the audio plugin that resolved the track (a Deezer FLAC stream reads `Deezer · 1411 kb/s FLAC · 44.1 kHz / 16-bit`), **On this device** for local files, the protocol (SMB, WebDAV, SFTP or NFS) for a [network folder](folders.md), or **Downloaded** when an offline copy plays. The rest comes from the audio track the player decodes rather than a provider's label. A lossless format (FLAC, ALAC, PCM) shows its decoded rate, which is how providers describe CD and hi-res quality; other formats show the bitrate stored in the stream, or else the one the plugin reported. Parts that neither reveals are left out. The line appears once the track's audio is loaded and changes with the track.
 
 ## Visualizer, music video or artwork
 
