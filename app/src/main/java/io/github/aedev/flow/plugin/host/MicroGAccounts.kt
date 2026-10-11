@@ -76,20 +76,26 @@ class MicroGAccounts internal constructor(
         }
 
     /** Marks when a sign-in began, for [signingIn]: a sign-out or removal after it fails the attempt. */
-    fun revocationMark(pluginId: String): Long = revocations[pluginId] ?: 0L
+    fun revocationMark(pluginId: String): Long = revocations[pluginId]?.count ?: 0L
 
-    // How often each plugin's sign-in was revoked (sign-out, removal). An attempt notes the count it began with,
-    // and its bind and confirm fail once a revocation came since or while one runs: the attempt's own rollback
-    // signs the plugin out, so revocation cannot simply wait for the attempt's lock.
-    private val revocations = ConcurrentHashMap<String, Long>()
+    // Per plugin, how often its sign-in was revoked (sign-out, removal) and how many revocations still run, kept as
+    // one value so both change and are read together. An attempt notes the count it began with, and its bind and
+    // confirm fail once a revocation came since or while one runs: the attempt's own rollback signs the plugin out,
+    // so revocation cannot simply wait for the attempt's lock.
+    private data class Revocations(
+        val count: Long = 0L,
+        val running: Int = 0,
+    )
 
-    // Revocations still running, per plugin: their deletion may not have landed, or the plugin's transition not ended.
-    private val revoking = ConcurrentHashMap<String, Int>()
+    private val revocations = ConcurrentHashMap<String, Revocations>()
 
     private fun revoked(
         pluginId: String,
         since: Long,
-    ) = revocationMark(pluginId) != since || revoking.containsKey(pluginId)
+    ): Boolean {
+        val now = revocations[pluginId] ?: Revocations()
+        return now.count != since || now.running > 0
+    }
 
     private class Attempt(
         val pluginId: String,
@@ -202,9 +208,8 @@ class MicroGAccounts internal constructor(
         pluginId: String,
         transition: suspend () -> Unit = {},
     ) {
-        // Counted first, so an attempt that writes after this deletion still sees it was revoked.
-        revocations.merge(pluginId, 1L, Long::plus)
-        revoking.merge(pluginId, 1, Int::plus)
+        // Counted and marked running in one step, before the deletion: whoever sees the new count also sees it run.
+        revocations.compute(pluginId) { _, now -> (now ?: Revocations()).let { it.copy(count = it.count + 1, running = it.running + 1) } }
         try {
             // The listener's sign-out or removal completes, transition included, even if whoever started it goes
             // away meanwhile; plugin calls are bounded by the runtime's call timeout.
@@ -220,7 +225,7 @@ class MicroGAccounts internal constructor(
                 transition()
             }
         } finally {
-            revoking.computeIfPresent(pluginId) { _, running -> (running - 1).takeIf { it > 0 } }
+            revocations.computeIfPresent(pluginId) { _, now -> now.copy(running = now.running - 1) }
         }
     }
 
