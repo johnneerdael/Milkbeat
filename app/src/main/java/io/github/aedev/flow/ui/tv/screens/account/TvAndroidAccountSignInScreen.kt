@@ -85,7 +85,7 @@ fun TvAndroidAccountSignInScreen(
 }
 
 @Composable
-private fun TvAndroidAccountSignInPanel(
+internal fun TvAndroidAccountSignInPanel(
     state: AndroidAccountSignInState,
     onRetry: () -> Unit,
     onInstall: () -> Unit,
