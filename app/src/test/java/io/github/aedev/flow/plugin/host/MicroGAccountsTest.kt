@@ -13,6 +13,7 @@ import io.mockk.verify
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
@@ -589,5 +590,35 @@ class MicroGAccountsTest {
             microG.confirm(plugin.id, google.id, second)
             microG.forget(plugin.id, google.id, first)
             assertThat(microG.token(plugin, request).token).isEqualTo("ya29.music")
+        }
+
+    @Test fun `a sign-out that begins while the confirmation writes fails the confirmation`() =
+        runTest {
+            val real = PreferenceDataStoreFactory.create(scope = backgroundScope) { temp.newFile("raced.preferences_pb") }
+            var signOutAfterWrite = false
+            lateinit var microG: MicroGAccounts
+            val store =
+                object : DataStore<Preferences> by real {
+                    override suspend fun updateData(transform: suspend (t: Preferences) -> Preferences): Preferences {
+                        val written = real.updateData(transform)
+                        if (signOutAfterWrite) {
+                            signOutAfterWrite = false
+                            backgroundScope.launch(start = CoroutineStart.UNDISPATCHED) { microG.revoke(plugin.id) }
+                        }
+                        return written
+                    }
+                }
+            microG = MicroGAccounts(gateway, store, StandardTestDispatcher(testScheduler))
+
+            val confirmation =
+                runCatching {
+                    microG.signingIn(plugin.id) {
+                        val nonce = microG.bind(plugin, google, "listener@example.com")
+                        signOutAfterWrite = true
+                        microG.confirm(plugin.id, google.id, nonce)
+                    }
+                }
+
+            assertThat(confirmation.isFailure).isTrue()
         }
 }

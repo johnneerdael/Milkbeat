@@ -182,6 +182,8 @@ class MicroGAccounts internal constructor(
                 ) { "The plugin was signed out or removed during sign-in" }
                 it.remove(pendingKey(pluginId, methodId))
             }
+            // A sign-out or removal that began while the write ran is caught here and undone like any failure.
+            check(attempt == null || !revoked(pluginId, attempt.revocation)) { "The plugin was signed out or removed during sign-in" }
         } catch (e: Throwable) {
             // The write may have landed before a cancellation reached us. A confirmation the caller never learned of
             // is undone: still this run's nonce, no longer pending, so nothing newer replaced or revoked it.
