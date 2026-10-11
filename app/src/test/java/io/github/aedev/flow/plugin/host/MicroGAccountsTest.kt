@@ -151,7 +151,7 @@ class MicroGAccountsTest {
             microG.invalidate(plugin, AccountTokenInvalidation("google", "ya29.old"))
             verify { gateway.invalidate("ya29.old") }
 
-            microG.forgetAll(plugin.id)
+            microG.revoke(plugin.id)
 
             val error = failure { microG.token(plugin, AccountTokenRequest("google", AccountIdentity.YOUTUBE_MUSIC)) }
             assertThat(error?.code).isEqualTo(PluginErrorCode.SIGN_IN_REQUIRED)
@@ -180,7 +180,7 @@ class MicroGAccountsTest {
             microG.bind(plugin, google, "listener@example.com")
             microG.bind(other, google, "listener@example.com")
 
-            microG.forgetAll(plugin.id)
+            microG.revoke(plugin.id)
 
             val request = AccountTokenRequest("google", AccountIdentity.YOUTUBE_MUSIC)
             assertThat(failure { microG.token(plugin, request) }?.code).isEqualTo(PluginErrorCode.SIGN_IN_REQUIRED)
@@ -209,7 +209,7 @@ class MicroGAccountsTest {
             val microG = MicroGAccounts(gateway, store, StandardTestDispatcher(testScheduler))
             every { gateway.hasAccount(any()) } returns true
             every { gateway.token(any(), any()) } answers {
-                runBlocking { microG.forgetAll(plugin.id) }
+                runBlocking { microG.revoke(plugin.id) }
                 MicroGTokenResult.Granted("ya29.minted-during-sign-out")
             }
             microG.bind(plugin, google, "listener@example.com")
@@ -317,7 +317,7 @@ class MicroGAccountsTest {
             val beforeBind =
                 runCatching {
                     microG.signingIn(plugin.id) {
-                        microG.forgetAll(plugin.id)
+                        microG.revoke(plugin.id)
                         microG.bind(plugin, google, "listener@example.com")
                     }
                 }
@@ -327,7 +327,7 @@ class MicroGAccountsTest {
                 runCatching {
                     microG.signingIn(plugin.id) {
                         val nonce = microG.bind(plugin, google, "listener@example.com")
-                        microG.forgetAll(plugin.id)
+                        microG.revoke(plugin.id)
                         microG.confirm(plugin.id, google.id, nonce)
                     }
                 }
@@ -354,7 +354,7 @@ class MicroGAccountsTest {
             microG.confirm(both.id, google.id, microG.bind(both, google, "first@example.com"))
             microG.confirm(both.id, tricky.id, microG.bind(both, tricky, "second@example.com"))
             microG.confirm(nested.id, google.id, microG.bind(nested, google, "third@example.com"))
-            microG.forgetAll(nested.id)
+            microG.revoke(nested.id)
 
             assertThat(microG.token(both, AccountTokenRequest(google.id, AccountIdentity.YOUTUBE_MUSIC)).token)
                 .isEqualTo("for first@example.com")
@@ -383,7 +383,7 @@ class MicroGAccountsTest {
             every { gateway.token(any(), any()) } returns MicroGTokenResult.Granted("ya29.music")
             microG.confirm(plugin.id, google.id, microG.bind(plugin, google, "listener@example.com"))
             holdNext = true
-            val signOut = launch { microG.forgetAll(plugin.id) }
+            val signOut = launch { microG.revoke(plugin.id) }
             testScheduler.runCurrent()
 
             val error = failure { microG.token(plugin, AccountTokenRequest("google", AccountIdentity.YOUTUBE_MUSIC)) }
@@ -391,5 +391,26 @@ class MicroGAccountsTest {
             assertThat(error?.code).isEqualTo(PluginErrorCode.SIGN_IN_REQUIRED)
             deletion.complete(Unit)
             signOut.join()
+        }
+
+    @Test fun `no attempt binds while a sign-out or removal is still running, and one after it does`() =
+        runTest {
+            val microG = accounts()
+            every { gateway.hasAccount(any()) } returns true
+            every { gateway.token(any(), any()) } returns MicroGTokenResult.Granted("ya29.music")
+            val removal = CompletableDeferred<Unit>()
+            val removing = launch { microG.revoke(plugin.id) { removal.await() } }
+            testScheduler.runCurrent()
+
+            // The chooser returned while the plugin's sign-out or removal ran, so the attempt dates from after it began.
+            val during = runCatching { microG.signingIn(plugin.id) { microG.bind(plugin, google, "listener@example.com") } }
+            assertThat(during.isFailure).isTrue()
+            assertThat(failure { microG.token(plugin, AccountTokenRequest("google", AccountIdentity.YOUTUBE_MUSIC)) }?.code)
+                .isEqualTo(PluginErrorCode.SIGN_IN_REQUIRED)
+
+            removal.complete(Unit)
+            removing.join()
+            microG.signingIn(plugin.id) { microG.confirm(plugin.id, google.id, microG.bind(plugin, google, "listener@example.com")) }
+            assertThat(microG.token(plugin, AccountTokenRequest("google", AccountIdentity.YOUTUBE_MUSIC)).token).isEqualTo("ya29.music")
         }
 }

@@ -44,8 +44,8 @@ class PluginAccounts internal constructor(
     private val host: PluginHost,
     private val scope: CoroutineScope,
     private val nowMs: () -> Long,
-    /** Ends what the host itself holds for a plugin's sign-in: its MicroG account bindings. */
-    private val forgetBindings: suspend (String) -> Unit = {},
+    /** Ends what the host itself holds for a plugin's sign-in, its MicroG account bindings, through a transition. */
+    private val revoke: suspend (String, suspend () -> Unit) -> Unit = { _, transition -> transition() },
 ) {
     constructor(host: PluginHost) : this(
         host,
@@ -58,7 +58,7 @@ class PluginAccounts internal constructor(
         host,
         CoroutineScope(SupervisorJob() + PerformanceDispatcher.networkIO),
         SystemClock::elapsedRealtime,
-        microG::forgetAll,
+        microG::revoke,
     )
 
     private val _accounts = MutableStateFlow<Map<String, ProviderAccount>>(emptyMap())
@@ -234,18 +234,21 @@ class PluginAccounts internal constructor(
         return account
     }
 
-    suspend fun signOut(pluginId: String) {
-        // The host's bindings go first, so the plugin can mint no token whatever its own sign-out does.
-        forgetBindings(pluginId)
-        invalidatePlayback(pluginId)
-        supersedeChecks(pluginId)
-        cancelRevalidation(pluginId)
-        host.call(pluginId, PluginOperations.signOut, Unit)
-        _accounts.update { it + (pluginId to ProviderAccount.Anonymous) }
-    }
+    // The host's bindings end first and stay ended through the plugin's own sign-out, whatever it does.
+    suspend fun signOut(pluginId: String) =
+        revoke(pluginId) {
+            invalidatePlayback(pluginId)
+            supersedeChecks(pluginId)
+            cancelRevalidation(pluginId)
+            host.call(pluginId, PluginOperations.signOut, Unit)
+            _accounts.update { it + (pluginId to ProviderAccount.Anonymous) }
+        }
 
-    /** A removed plugin keeps no account binding a later plugin under its id could inherit. */
-    suspend fun removed(pluginId: String) = forgetBindings(pluginId)
+    /** Runs [removal] with the plugin's account bindings ended first, so no later plugin under its id inherits one. */
+    suspend fun removing(
+        pluginId: String,
+        removal: suspend () -> Unit,
+    ) = revoke(pluginId, removal)
 
     /** A call said the plugin's sign-in expired; the plugin is asked again right away whether it still signs in. */
     fun expired(pluginId: String) {

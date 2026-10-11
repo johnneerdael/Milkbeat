@@ -186,9 +186,8 @@ class TvPluginsViewModel
 
         fun remove(id: String) {
             viewModelScope.launch {
-                // Revoked first, so no token request still running can be granted for a plugin being removed.
-                accounts.removed(id)
-                registry.remove(id)
+                // Revoked first and throughout, so no token or sign-in still running survives the removal.
+                accounts.removing(id) { registry.remove(id) }
             }
         }
 

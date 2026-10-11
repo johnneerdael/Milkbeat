@@ -344,12 +344,18 @@ class PluginAccountsTest {
     @Test fun `signing out and removing a plugin end its host-held account bindings`() =
         runTest(UnconfinedTestDispatcher()) {
             val forgotten = mutableListOf<String>()
-            val accounts = PluginAccounts(host, backgroundScope, { testScheduler.currentTime }, { forgotten += it })
+            val accounts =
+                PluginAccounts(host, backgroundScope, { testScheduler.currentTime }, { id, transition ->
+                    forgotten += id
+                    transition()
+                })
             coEvery { host.call("youtube", PluginOperations.signOut, Unit) } throws failure(PluginErrorCode.UNAVAILABLE)
 
             runCatching { accounts.signOut("youtube") }
-            accounts.removed("spotify")
+            var removed = false
+            accounts.removing("spotify") { removed = true }
 
             assertThat(forgotten).containsExactly("youtube", "spotify").inOrder()
+            assertThat(removed).isTrue()
         }
 }

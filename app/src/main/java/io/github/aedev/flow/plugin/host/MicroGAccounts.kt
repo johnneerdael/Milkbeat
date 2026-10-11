@@ -79,11 +79,11 @@ class MicroGAccounts internal constructor(
     fun revocationMark(pluginId: String): Long = revocations[pluginId] ?: 0L
 
     // How often each plugin's sign-in was revoked (sign-out, removal). An attempt notes the count it began with,
-    // and its bind and confirm fail once a revocation came since: the attempt's own rollback signs the plugin
-    // out, so revocation cannot simply wait for the attempt's lock.
+    // and its bind and confirm fail once a revocation came since or while one runs: the attempt's own rollback
+    // signs the plugin out, so revocation cannot simply wait for the attempt's lock.
     private val revocations = ConcurrentHashMap<String, Long>()
 
-    // Revocations still deleting, per plugin: until their write lands, the store still shows the old bindings.
+    // Revocations still running, per plugin: their deletion may not have landed, or the plugin's transition not ended.
     private val revoking = ConcurrentHashMap<String, Int>()
 
     private fun revoked(
@@ -101,7 +101,7 @@ class MicroGAccounts internal constructor(
     /** Fails a sign-in attempt for [pluginId] that a sign-out or removal overtook. */
     private suspend fun checkNotRevoked(pluginId: String) {
         val attempt = currentCoroutineContext()[Attempt] ?: return
-        check(attempt.pluginId != pluginId || revocationMark(pluginId) == attempt.revocation) {
+        check(attempt.pluginId != pluginId || !revoked(pluginId, attempt.revocation)) {
             "The plugin was signed out or removed during sign-in"
         }
     }
@@ -158,7 +158,7 @@ class MicroGAccounts internal constructor(
         store.edit {
             check(it[pendingKey(pluginId, methodId)] == nonce) { "The binding was replaced or ended meanwhile" }
             check(
-                attempt == null || revocationMark(pluginId) == attempt.revocation,
+                attempt == null || !revoked(pluginId, attempt.revocation),
             ) { "The plugin was signed out or removed during sign-in" }
             it.remove(pendingKey(pluginId, methodId))
         }
@@ -193,8 +193,14 @@ class MicroGAccounts internal constructor(
         remove(pendingKey(pluginId, methodId))
     }
 
-    /** Every binding of [pluginId], as its sign-out or removal ends them. */
-    suspend fun forgetAll(pluginId: String) {
+    /**
+     * Ends every binding of [pluginId] and runs [transition], the plugin's own sign-out or its removal, with the
+     * revocation in force throughout: until it is done no sign-in attempt binds or confirms and no token is handed out.
+     */
+    suspend fun revoke(
+        pluginId: String,
+        transition: suspend () -> Unit = {},
+    ) {
         // Counted first, so an attempt that writes after this deletion still sees it was revoked.
         revocations.merge(pluginId, 1L, Long::plus)
         revoking.merge(pluginId, 1, Int::plus)
@@ -207,6 +213,7 @@ class MicroGAccounts internal constructor(
                     .forEach { preferences.remove(it) }
             }
             provisional.keys.removeIf { it.startsWith(prefix(pluginId)) }
+            transition()
         } finally {
             revoking.computeIfPresent(pluginId) { _, running -> (running - 1).takeIf { it > 0 } }
         }

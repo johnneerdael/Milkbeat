@@ -674,6 +674,14 @@ declare, and answers from MicroG's own token cache. Milkbeat stores no token. `s
 token to `invalidateAuthToken`. MicroG-RE-TV grants these identities only to the caller package `nl.neerdael.milkbeat`
 (its `TrustedCallerIdentity`), so Preview and debug builds cannot use the method.
 
+Sign-out and removal revoke a plugin's bindings through `MicroGAccounts.revoke`, which deletes them first and keeps the
+revocation in force until the plugin's own sign-out or its registry removal has finished. Sign-in attempts for one
+plugin run one at a time and date from the listener's account choice: an attempt that a revocation overtook, or one
+that runs while a revocation is in progress, neither binds nor confirms. A token MicroG issues while a revocation began
+or was running is not handed out. If an update replaces or removes the method while its screen is open, the screen's
+download and attempt are cancelled. An update that lands during the completion or the confirmation signs the plugin
+out again. Binding keys encode the plugin and method ids, so no id can address another binding.
+
 ### Additive API 7 music presentations
 
 Separate progressive picture URLs are not merged into the music presentation: preparing that child would fetch hidden picture bytes. Without usable DASH metadata, native SABR or eligible HLS, the accepted source remains audio-only and does not advertise a Video choice. The same prepared DASH manifest determines both picture eligibility and source construction.
