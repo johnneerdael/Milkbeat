@@ -10,6 +10,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -34,11 +35,26 @@ import io.github.aedev.flow.player.EnhancedMusicPlayerManager
 fun TvMusicVideoSurface(
     player: Player?,
     modifier: Modifier = Modifier,
+    showLoadingIndicator: Boolean = true,
+    onPictureReadyChanged: (Boolean) -> Unit = {},
+    onLoadingChanged: (Boolean) -> Unit = {},
 ) {
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val videoPrepared by EnhancedMusicPlayerManager.videoPrepared.collectAsStateWithLifecycle()
     var showJoinIndicator by remember(lifecycle) { mutableStateOf(false) }
-    val joining = remember(lifecycle) { TvMusicVideoJoinObserver(lifecycle) { showJoinIndicator = it } }
+    val readyCallback by rememberUpdatedState(onPictureReadyChanged)
+    val loadingCallback by rememberUpdatedState(onLoadingChanged)
+    val joining =
+        remember(lifecycle) {
+            TvMusicVideoJoinObserver(
+                lifecycle,
+                onIndicatorChanged = {
+                    showJoinIndicator = it
+                    loadingCallback(it)
+                },
+                onPictureReadyChanged = { readyCallback(it) },
+            )
+        }
     DisposableEffect(joining) {
         onDispose { joining.close() }
     }
@@ -65,7 +81,10 @@ fun TvMusicVideoSurface(
             hold(false)
         }
     }
-    val shutter = MaterialTheme.colorScheme.scrim.toArgb()
+    val shutter =
+        MaterialTheme.colorScheme.scrim
+            .copy(alpha = if (showLoadingIndicator) 1f else 0f)
+            .toArgb()
     Box(modifier = modifier) {
         AndroidView(
             factory = { context ->
@@ -85,7 +104,7 @@ fun TvMusicVideoSurface(
             },
             modifier = Modifier.fillMaxSize(),
         )
-        if (showJoinIndicator) {
+        if (showLoadingIndicator && showJoinIndicator) {
             CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
         }
     }

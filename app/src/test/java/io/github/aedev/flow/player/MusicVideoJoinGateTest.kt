@@ -58,23 +58,23 @@ class MusicVideoJoinGateTest {
         f.events()
         assertThat(f.gate.waiting).isTrue()
         assertThat(f.gate.ready.value).isFalse()
-        f.load(10_000, 30_000, C.TRACK_TYPE_AUDIO)
+        f.load(10_000, 40_000, C.TRACK_TYPE_AUDIO)
         f.load(C.TIME_UNSET, C.TIME_UNSET)
-        f.load(10_000, 30_000, dataType = C.DATA_TYPE_MEDIA_INITIALIZATION)
+        f.load(10_000, 40_000, dataType = C.DATA_TYPE_MEDIA_INITIALIZATION)
         assertThat(f.gate.waiting).isTrue()
         assertThat(f.gate.ready.value).isFalse()
     }
 
     @Test
-    fun `a current video chunk must cover two seconds and the real buffer before completion`() {
+    fun `a current video chunk must cover thirty seconds and the real buffer before completion`() {
         val f = VideoJoinFixture()
         f.gate.begin()
-        f.load(10_000, 11_999)
+        f.load(10_000, 39_999)
         assertThat(f.gate.ready.value).isFalse()
-        f.bufferedMs = 1_999
-        f.load(11_999, 14_000)
+        f.bufferedMs = 29_999
+        f.load(39_999, 42_000)
         assertThat(f.gate.ready.value).isFalse()
-        f.bufferedMs = 2_000
+        f.bufferedMs = 30_000
         f.events()
         assertThat(f.gate.ready.value).isTrue()
         assertThat(f.gate.waiting).isFalse()
@@ -86,6 +86,20 @@ class MusicVideoJoinGateTest {
         f.events()
         assertThat(f.gate.ready.value).isTrue()
         assertThat(f.gate.waiting).isFalse()
+    }
+
+    @Test
+    fun `thirty seconds of current video must be ahead of the advancing audio clock`() {
+        val f = VideoJoinFixture()
+        f.bufferedMs = 90_000
+        f.gate.begin()
+        f.load(10_000, 39_999)
+        assertThat(f.gate.ready.value).isFalse()
+        f.positionMs = 12_000
+        f.load(39_999, 40_000)
+        assertThat(f.gate.ready.value).isFalse()
+        f.load(40_000, 42_000)
+        assertThat(f.gate.ready.value).isTrue()
     }
 
     @Test
@@ -105,13 +119,13 @@ class MusicVideoJoinGateTest {
         val previous = f.event()
         f.changeSource()
         f.events()
-        f.load(10_000, 30_000, event = previous)
+        f.load(10_000, 40_000, event = previous)
         assertThat(f.gate.ready.value).isFalse()
         f.selected = false
-        f.load(10_000, 30_000)
+        f.load(10_000, 40_000)
         assertThat(f.gate.ready.value).isFalse()
         f.selected = true
-        f.load(10_000, 30_000)
+        f.load(10_000, 40_000)
         assertThat(f.gate.ready.value).isTrue()
     }
 
@@ -119,9 +133,9 @@ class MusicVideoJoinGateTest {
     fun `muxed HLS must prove video rather than an audio default-track format`() {
         val f = VideoJoinFixture()
         f.gate.begin()
-        f.load(10_000, 30_000, C.TRACK_TYPE_DEFAULT, format = Format.Builder().setCodecs("mp4a.40.2").build())
+        f.load(10_000, 40_000, C.TRACK_TYPE_DEFAULT, format = Format.Builder().setCodecs("mp4a.40.2").build())
         assertThat(f.gate.ready.value).isFalse()
-        f.load(10_000, 30_000, C.TRACK_TYPE_DEFAULT, format = Format.Builder().setCodecs("avc1.640028,mp4a.40.2").build())
+        f.load(10_000, 40_000, C.TRACK_TYPE_DEFAULT, format = Format.Builder().setCodecs("avc1.640028,mp4a.40.2").build())
         assertThat(f.gate.ready.value).isTrue()
     }
 
@@ -146,14 +160,14 @@ class MusicVideoJoinGateTest {
     fun `a successful retry prepares the picture without restoring the readiness bypass`() {
         val f = VideoJoinFixture()
         f.gate.begin()
-        f.load(10_000, 11_999)
-        f.gate.onLoadError(f.event(), f.loadInfo, f.mediaLoad(11_999, 14_000), IOException("offline"), false)
+        f.load(10_000, 39_999)
+        f.gate.onLoadError(f.event(), f.loadInfo, f.mediaLoad(39_999, 42_000), IOException("offline"), false)
         assertThat(f.gate.waiting).isFalse()
         f.gate.begin()
         assertThat(f.gate.waiting).isFalse()
-        f.load(11_999, 14_000)
+        f.load(39_999, 42_000)
         assertThat(f.gate.ready.value).isFalse()
-        f.load(10_000, 11_999)
+        f.load(10_000, 39_999)
         assertThat(f.gate.ready.value).isTrue()
         assertThat(f.gate.waiting).isFalse()
     }
@@ -186,7 +200,7 @@ class MusicVideoJoinGateTest {
         f.changeSource()
         f.events()
         assertThat(f.gate.waiting).isTrue()
-        f.load(10_000, 30_000)
+        f.load(10_000, 40_000)
         assertThat(f.gate.ready.value).isTrue()
     }
 
@@ -197,7 +211,7 @@ class MusicVideoJoinGateTest {
         f.gate.begin()
         f.load(610_000, 611_999)
         assertThat(f.gate.ready.value).isFalse()
-        f.load(611_999, 614_000)
+        f.load(611_999, 640_000)
         assertThat(f.gate.ready.value).isTrue()
     }
 
@@ -211,7 +225,7 @@ class MusicVideoJoinGateTest {
         f.slideWindow(601_000)
         f.positionMs = 9_000
         f.events()
-        f.load(611_500, 613_500)
+        f.load(611_500, 640_000)
         assertThat(f.gate.ready.value).isTrue()
     }
 
@@ -238,7 +252,7 @@ class MusicVideoJoinGateTest {
             val f = VideoJoinFixture()
             f.offsetWindow(600_000, manifest)
             f.gate.begin()
-            f.load(periodStart + 610_000, periodStart + 614_000)
+            f.load(periodStart + 610_000, periodStart + 640_000)
             assertThat(f.gate.ready.value).isTrue()
         }
     }
@@ -266,7 +280,7 @@ internal class VideoJoinFixture(
             .build()
     private var timeline: Timeline = timeline()
     var positionMs = 10_000L
-    var bufferedMs = 20_000L
+    var bufferedMs = 60_000L
     var selected = true
     var state = Player.STATE_READY
     val loadInfo = LoadEventInfo(1, DataSpec(Uri.parse("https://example.invalid/video")), 0)

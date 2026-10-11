@@ -770,6 +770,18 @@ revision must pass the configured ktlint rules.
   checkpointed signed bytes when retrying publication after a GitHub promotion failure.
   A stable archive missing from Buzzheavier is restored from its exact signed bytes and its code
   repointed in the stable catalog only; see `docs/plugin-download-codes.md`.
+- `ui/tv/music/TvMusicNowPlayingBackdrop.kt` retains the existing visualizer composition while
+  video prepares beneath it. `MusicVideoJoinGate` requires 30 seconds of current-source video
+  coverage ahead of the live audio clock (remaining duration near the end); only a first-frame
+  callback for the attached, prepared surface reveals video. Keep picture readiness separate
+  from spinner visibility, which is gated by playback intent and resumed lifecycle. Preserve
+  `SurfaceView` output and the visualizer's media-overlay ordering; do not hide/detach the
+  preparing video surface or replace the music player. Cancelled/failed preparation retains
+  visuals; successful reveal disposes their renderer and audio monitoring.
+  Focused tests: `./gradlew :app:testGithubDebugUnitTest --tests '*MusicVideoJoinGate*'
+  --tests '*TvMusicVideoJoin*' --tests '*InitialVideoJoinRenderer*'`.
+  `TvMusicVideoHandoffDeviceTest` exercises real DASH media, native visuals, audio continuity,
+  cancellation and failure; its generated fixtures live in `app/src/androidTest/assets/player/video-handoff/`.
 - The visualizer consumes the canonical single Native ProjectM-TV core AAR. `TvVisualizerHost`
   owns a `QualityController` in Auto, acknowledges `BudgetStatsListener` context generations,
   revalidates live memory before resume, and publishes size/trails/transition as one reviewed
