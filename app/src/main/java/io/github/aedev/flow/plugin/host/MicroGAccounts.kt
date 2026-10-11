@@ -206,14 +206,17 @@ class MicroGAccounts internal constructor(
         revocations.merge(pluginId, 1L, Long::plus)
         revoking.merge(pluginId, 1, Int::plus)
         try {
-            store.edit { preferences ->
-                preferences
-                    .asMap()
-                    .keys
-                    .filter { it.name.startsWith(prefix(pluginId)) }
-                    .forEach { preferences.remove(it) }
+            // The listener's revocation completes even if whoever started it goes away meanwhile.
+            withContext(NonCancellable) {
+                provisional.keys.removeIf { it.startsWith(prefix(pluginId)) }
+                store.edit { preferences ->
+                    preferences
+                        .asMap()
+                        .keys
+                        .filter { it.name.startsWith(prefix(pluginId)) }
+                        .forEach { preferences.remove(it) }
+                }
             }
-            provisional.keys.removeIf { it.startsWith(prefix(pluginId)) }
             transition()
         } finally {
             revoking.computeIfPresent(pluginId) { _, running -> (running - 1).takeIf { it > 0 } }
