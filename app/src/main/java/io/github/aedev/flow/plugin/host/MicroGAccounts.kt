@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -21,6 +22,7 @@ import nl.neerdael.milkbeat.plugin.AccountTokenInvalidation
 import nl.neerdael.milkbeat.plugin.AccountTokenRequest
 import nl.neerdael.milkbeat.plugin.AndroidAccountMethod
 import nl.neerdael.milkbeat.plugin.PluginErrorCode
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -56,17 +58,35 @@ class MicroGAccounts internal constructor(
         identity: AccountIdentity,
     ): MicroGTokenResult = withContext(io) { gateway.token(accountName, identity) }
 
-    /** Binds [method] of [plugin] to [accountName], for the identities the listener has just confirmed. */
+    // Bindings this run made and the plugin has not completed yet; one left by a process that died is not here.
+    private val provisional = ConcurrentHashMap.newKeySet<String>()
+
+    /**
+     * Binds [method] of [plugin] to [accountName], for the identities the listener has just confirmed. The
+     * binding is provisional until [confirm]: it serves tokens in this run only, so the plugin can check the
+     * account while it completes the sign-in, and one a dead process left behind serves none.
+     */
     suspend fun bind(
         plugin: InstalledPlugin,
         method: AndroidAccountMethod,
         accountName: String,
     ) {
+        provisional += key(plugin.id, method.id).name
         store.edit {
             it[key(plugin.id, method.id)] = accountName
             it[signerKey(plugin.id, method.id)] = plugin.signerFingerprint
             it[identitiesKey(plugin.id, method.id)] = method.identities.joinToString(",") { identity -> identity.name }
+            it[pendingKey(plugin.id, method.id)] = true
         }
+    }
+
+    /** The plugin completed the sign-in: the binding lasts until sign-out or removal. */
+    suspend fun confirm(
+        pluginId: String,
+        methodId: String,
+    ) {
+        store.edit { it.remove(pendingKey(pluginId, methodId)) }
+        provisional -= key(pluginId, methodId).name
     }
 
     suspend fun forget(
@@ -77,7 +97,9 @@ class MicroGAccounts internal constructor(
             it.remove(key(pluginId, methodId))
             it.remove(signerKey(pluginId, methodId))
             it.remove(identitiesKey(pluginId, methodId))
+            it.remove(pendingKey(pluginId, methodId))
         }
+        provisional -= key(pluginId, methodId).name
     }
 
     /** Every binding of [pluginId], as its sign-out or removal ends them. */
@@ -89,6 +111,7 @@ class MicroGAccounts internal constructor(
                 .filter { it.name.startsWith("$pluginId/") }
                 .forEach { preferences.remove(it) }
         }
+        provisional.removeIf { it.startsWith("$pluginId/") }
     }
 
     internal suspend fun token(
@@ -131,7 +154,8 @@ class MicroGAccounts internal constructor(
     ): String {
         val stored = store.data.first()
         val account = stored[key(plugin.id, method.id)]
-        if (account == null || stored[signerKey(plugin.id, method.id)] != plugin.signerFingerprint) {
+        val unfinished = stored[pendingKey(plugin.id, method.id)] == true && key(plugin.id, method.id).name !in provisional
+        if (account == null || unfinished || stored[signerKey(plugin.id, method.id)] != plugin.signerFingerprint) {
             if (account != null) forget(plugin.id, method.id)
             throw HostCallException(PluginErrorCode.SIGN_IN_REQUIRED, "No account was chosen for ${method.id}")
         }
@@ -185,4 +209,9 @@ class MicroGAccounts internal constructor(
         pluginId: String,
         methodId: String,
     ) = stringPreferencesKey("$pluginId/$methodId#identities")
+
+    private fun pendingKey(
+        pluginId: String,
+        methodId: String,
+    ) = booleanPreferencesKey("$pluginId/$methodId#pending")
 }

@@ -89,13 +89,17 @@ class AndroidAccountSignInViewModel
     ) : ViewModel() {
         private val pluginId: String = checkNotNull(savedStateHandle[PLUGIN_ARG])
 
-        val method: AndroidAccountMethod? =
-            registry.state.value
-                .plugin(pluginId)
-                ?.manifest
-                ?.signIn
-                ?.filterIsInstance<AndroidAccountMethod>()
-                ?.firstOrNull { it.id == savedStateHandle.get<String>(METHOD_ARG) }
+        private val methodId: String? = savedStateHandle[METHOD_ARG]
+
+        /** The method as the installed plugin declares it now; an update can change it while the screen is open. */
+        val method: AndroidAccountMethod?
+            get() =
+                registry.state.value
+                    .plugin(pluginId)
+                    ?.manifest
+                    ?.signIn
+                    ?.filterIsInstance<AndroidAccountMethod>()
+                    ?.firstOrNull { it.id == methodId }
 
         private val _state = MutableStateFlow<AndroidAccountSignInState>(AndroidAccountSignInState.Starting)
         val state: StateFlow<AndroidAccountSignInState> = _state.asStateFlow()
@@ -117,6 +121,7 @@ class AndroidAccountSignInViewModel
 
         fun start() {
             if (_state.value != AndroidAccountSignInState.Starting) return
+            val method = method
             when {
                 method == null || method.identities.isEmpty() -> _state.value = AndroidAccountSignInState.Failed()
                 !microG.installed() -> _state.value = missing()
@@ -231,13 +236,20 @@ class AndroidAccountSignInViewModel
             account: String,
         ) {
             val plugin = registry.state.value.plugin(pluginId) ?: error("The plugin is no longer installed")
+            if (this.method != method) {
+                // The plugin was updated meanwhile: confirm what it declares now before binding anything.
+                confirmNext()
+                return
+            }
             var signedIn: ProviderAccount.SignedIn? = null
             try {
                 microG.bind(plugin, method, account)
-                signedIn =
+                val completed =
                     accounts.completeAccountSignIn(pluginId, AndroidAccountSignIn(method.id, account)) as? ProviderAccount.SignedIn
                         ?: error("The plugin did not accept the account")
-                _state.value = AndroidAccountSignInState.SignedIn(signedIn.name)
+                microG.confirm(pluginId, method.id)
+                signedIn = completed
+                _state.value = AndroidAccountSignInState.SignedIn(completed.name)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {

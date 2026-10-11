@@ -59,7 +59,8 @@ class AndroidAccountSignInViewModelTest {
             emptyList(),
             emptyList(),
         )
-    private val registry = mockk<PluginRegistry> { every { state } returns MutableStateFlow(PluginRegistryState(listOf(plugin))) }
+    private val installed = MutableStateFlow(PluginRegistryState(listOf(plugin)))
+    private val registry = mockk<PluginRegistry> { every { state } returns installed }
     private val accounts = mockk<PluginAccounts>(relaxed = true)
     private val microG = mockk<MicroGAccounts>(relaxed = true)
     private val chooser = mockk<Intent>()
@@ -255,5 +256,46 @@ class AndroidAccountSignInViewModelTest {
             runCurrent()
 
             coVerify { microG.forget(plugin.id, "google") }
+        }
+
+    @Test fun `a plugin update that adds an identity during sign-in is confirmed before anything is bound`() =
+        runTest(dispatcher) {
+            val narrow =
+                plugin.copy(
+                    manifest =
+                        plugin.manifest.copy(
+                            signIn = listOf(AndroidAccountMethod("google", "Google", listOf(AccountIdentity.YOUTUBE_MUSIC))),
+                        ),
+                )
+            installed.value = PluginRegistryState(listOf(narrow))
+            coEvery { microG.request(account, AccountIdentity.YOUTUBE_MUSIC) } coAnswers {
+                // The update lands while MicroG answers the first identity.
+                installed.value = PluginRegistryState(listOf(plugin))
+                MicroGTokenResult.Granted("music")
+            }
+            coEvery { microG.request(account, AccountIdentity.YOUTUBE) } returns MicroGTokenResult.NeedsConsent(musicPrompt)
+            val vm = viewModel()
+            vm.start()
+
+            vm.onAccountChosen(account)
+            runCurrent()
+
+            assertThat(vm.state.value).isEqualTo(AndroidAccountSignInState.Confirm(AccountIdentity.YOUTUBE, musicPrompt))
+            coVerify(exactly = 0) { microG.bind(any(), any(), any()) }
+        }
+
+    @Test fun `a completed sign-in makes its binding last`() =
+        runTest(dispatcher) {
+            val vm = viewModel()
+            vm.start()
+            vm.onAccountChosen(account)
+            runCurrent()
+
+            assertThat(vm.state.value).isEqualTo(AndroidAccountSignInState.SignedIn("Listener"))
+            coVerify(ordering = io.mockk.Ordering.ORDERED) {
+                microG.bind(plugin, any(), account)
+                accounts.completeAccountSignIn(plugin.id, AndroidAccountSignIn("google", account))
+                microG.confirm(plugin.id, "google")
+            }
         }
 }
