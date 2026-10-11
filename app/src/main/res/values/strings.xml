@@ -490,6 +490,7 @@
     </plurals>
     <string name="tv_plugins_update_to">Update %1$s</string>
     <string name="tv_plugins_update_check_failed">Could not check for updates. Check the connection and try again.</string>
+    <string name="tv_plugins_storage_failed">Milkbeat could not save the change. Free up some storage and try again.</string>
     <string name="tv_plugins_newer_installed">A newer version of this plugin is already installed.</string>
     <plurals name="tv_plugins_updates_failed">
         <item quantity="one">Could not download %1$d update. Select to try again</item>

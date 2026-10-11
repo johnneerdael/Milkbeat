@@ -20,14 +20,17 @@ class MicroGInstallReceiver : BroadcastReceiver() {
         context: Context,
         intent: Intent,
     ) {
-        when (val status = intent.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE)) {
+        val status = intent.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE)
+        val sessionId = intent.getIntExtra(PackageInstaller.EXTRA_SESSION_ID, -1)
+        if (!installer.awaits(sessionId)) {
+            // The sign-in that committed it has moved on: its prompt, success or failure concerns no attempt now.
+            if (status == PackageInstaller.STATUS_PENDING_USER_ACTION) {
+                runCatching { context.packageManager.packageInstaller.abandonSession(sessionId) }
+            }
+            return
+        }
+        when (status) {
             PackageInstaller.STATUS_PENDING_USER_ACTION -> {
-                val sessionId = intent.getIntExtra(PackageInstaller.EXTRA_SESSION_ID, -1)
-                if (!installer.awaits(sessionId)) {
-                    // The sign-in that committed it has moved on; the listener did not ask for it here.
-                    runCatching { context.packageManager.packageInstaller.abandonSession(sessionId) }
-                    return
-                }
                 val confirm = IntentCompat.getParcelableExtra(intent, Intent.EXTRA_INTENT, Intent::class.java)
                 // An installer whose confirmation cannot be started fails the install instead of the app.
                 try {

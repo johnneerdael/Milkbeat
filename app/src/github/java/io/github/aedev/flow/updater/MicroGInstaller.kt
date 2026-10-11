@@ -95,10 +95,12 @@ class MicroGInstaller
         internal fun awaits(sessionId: Int): Boolean = sessionId != -1 && awaited == sessionId
 
         internal fun reportFailure() {
+            awaited = null
             _failed.value = true
         }
 
         internal fun reportInstalled() {
+            awaited = null
             _installed.value++
         }
 
