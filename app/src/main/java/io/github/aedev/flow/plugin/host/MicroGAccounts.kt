@@ -34,6 +34,9 @@ import javax.inject.Singleton
 import kotlin.coroutines.AbstractCoroutineContextElement
 import kotlin.coroutines.CoroutineContext
 
+// No count equals it, so whatever dates from a running revocation counts as revoked.
+private const val REVOKING = -1L
+
 private val Context.pluginAndroidAccounts: DataStore<Preferences> by safePreferencesDataStore(name = "plugin_android_accounts")
 
 /**
@@ -75,8 +78,14 @@ class MicroGAccounts internal constructor(
             withContext(Attempt(pluginId, since)) { attempt() }
         }
 
-    /** Marks when a sign-in began, for [signingIn]: a sign-out or removal after it fails the attempt. */
-    fun revocationMark(pluginId: String): Long = revocations[pluginId]?.count ?: 0L
+    /**
+     * Marks when a sign-in began, for [signingIn]: a sign-out or removal after it fails the attempt, and so does one
+     * that was still running when the mark was taken.
+     */
+    fun revocationMark(pluginId: String): Long {
+        val now = revocations[pluginId] ?: Revocations()
+        return if (now.running > 0 || now.undeleted) REVOKING else now.count
+    }
 
     // Per plugin, how often its sign-in was revoked (sign-out, removal), how many revocations still run and whether
     // a failed deletion left bindings behind, kept as one value so all change and are read together. An attempt notes the count it began with, and its bind and

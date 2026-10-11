@@ -10,6 +10,7 @@ import io.github.aedev.flow.plugin.host.MicroGTokenResult
 import io.github.aedev.flow.plugin.registry.InstalledPlugin
 import io.github.aedev.flow.plugin.registry.PluginRegistry
 import io.github.aedev.flow.plugin.registry.PluginRegistryState
+import io.github.aedev.flow.plugin.runtime.PluginCallException
 import io.github.aedev.flow.updater.MicroGInstaller
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -32,6 +33,8 @@ import nl.neerdael.milkbeat.plugin.AndroidAccountSignIn
 import nl.neerdael.milkbeat.plugin.ApiRange
 import nl.neerdael.milkbeat.plugin.AudioRole
 import nl.neerdael.milkbeat.plugin.DeviceCodeMethod
+import nl.neerdael.milkbeat.plugin.PluginError
+import nl.neerdael.milkbeat.plugin.PluginErrorCode
 import nl.neerdael.milkbeat.plugin.PluginManifest
 import nl.neerdael.milkbeat.plugin.Roles
 import org.junit.After
@@ -488,5 +491,20 @@ class AndroidAccountSignInViewModelTest {
                 clear()
             }
             verify(exactly = 2) { installer.release() }
+        }
+
+    @Test fun `a completion that fails after the plugin may have kept the account signs it out`() =
+        runTest(dispatcher) {
+            coEvery { accounts.completeAccountSignIn(any(), any()) } throws
+                PluginCallException(plugin.id, PluginError(PluginErrorCode.TIMEOUT, "took too long"))
+            val vm = viewModel()
+            vm.start()
+
+            vm.onAccountChosen(account)
+            runCurrent()
+
+            assertThat(vm.state.value).isInstanceOf(AndroidAccountSignInState.Failed::class.java)
+            coVerify { microG.forget(plugin.id, "google", "nonce") }
+            coVerify { accounts.signOut(plugin.id) }
         }
 }

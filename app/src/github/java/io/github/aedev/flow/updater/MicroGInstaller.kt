@@ -53,7 +53,10 @@ class MicroGInstaller
         val installed: StateFlow<Int> = _installed.asStateFlow()
 
         // The committed install session a sign-in screen still waits for; its confirmation opens only while it does.
-        @Volatile private var awaited: Int? = null
+        // Each release starts a new generation, so an install the screen left cannot register its session after.
+        private val lock = Any()
+        private var generation = 0L
+        private var awaited: Int? = null
 
         // MicroG-RE-TV serves only the stable app; Preview and debug builds could install it and still get no token.
         val isAvailable: Boolean = context.packageName == STABLE_PACKAGE
@@ -67,6 +70,7 @@ class MicroGInstaller
         suspend fun install(): Boolean =
             withContext(Dispatchers.IO) {
                 _failed.value = false
+                val attempt = synchronized(lock) { generation }
                 val apk = File(context.cacheDir, "microg/microg-re-tv.apk")
                 try {
                     download(apk)
@@ -74,7 +78,7 @@ class MicroGInstaller
                     if (archive?.packageName != MICROG_PACKAGE) return@withContext false
                     // A sign-in screen that moved on while the download ran opens no installer.
                     ensureActive()
-                    commit(apk)
+                    commit(apk, attempt)
                     true
                 } catch (e: CancellationException) {
                     throw e
@@ -88,19 +92,21 @@ class MicroGInstaller
             }
 
         /** The sign-in moved on: a session it committed earlier opens no confirmation over what came next. */
-        fun release() {
-            awaited = null
-        }
+        fun release() =
+            synchronized(lock) {
+                generation++
+                awaited = null
+            }
 
-        internal fun awaits(sessionId: Int): Boolean = sessionId != -1 && awaited == sessionId
+        internal fun awaits(sessionId: Int): Boolean = synchronized(lock) { sessionId != -1 && awaited == sessionId }
 
         internal fun reportFailure() {
-            awaited = null
+            synchronized(lock) { awaited = null }
             _failed.value = true
         }
 
         internal fun reportInstalled() {
-            awaited = null
+            synchronized(lock) { awaited = null }
             _installed.value++
         }
 
@@ -127,7 +133,10 @@ class MicroGInstaller
             }
         }
 
-        private fun commit(apk: File) {
+        private fun commit(
+            apk: File,
+            attempt: Long,
+        ) {
             val installer = context.packageManager.packageInstaller
             val params =
                 PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL).apply {
@@ -148,7 +157,11 @@ class MicroGInstaller
                             Intent(context, MicroGInstallReceiver::class.java),
                             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE,
                         )
-                    awaited = sessionId
+                    val current =
+                        synchronized(lock) {
+                            (generation == attempt).also { if (it) awaited = sessionId }
+                        }
+                    check(current) { "The sign-in left before its install was committed" }
                     session.commit(callback.intentSender)
                 }
             } catch (e: Exception) {

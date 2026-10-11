@@ -304,11 +304,12 @@ class AndroidAccountSignInViewModel
             account: String,
         ) {
             var nonce: String? = null
-            var completed: ProviderAccount.SignedIn? = null
+            var completing = false
             var confirmed = false
             try {
                 nonce = microG.bind(plugin, method, account)
-                completed =
+                completing = true
+                val completed =
                     accounts.completeAccountSignIn(pluginId, AndroidAccountSignIn(method.id, account)) as? ProviderAccount.SignedIn
                         ?: error("The plugin did not accept the account")
                 // An update during the completion may need more than was confirmed: undo it and sign in again.
@@ -324,15 +325,12 @@ class AndroidAccountSignInViewModel
             } catch (e: Exception) {
                 _state.value = AndroidAccountSignInState.Failed(failureMessage(e))
             } finally {
-                // An unfinished sign-in leaves no binding; one the plugin already completed is undone with it, so
-                // the plugin does not believe in an account it cannot get a token for.
+                // An unfinished sign-in leaves no binding. Once the plugin was asked to complete, it may have kept the
+                // account whatever it answered, so it is signed out too and believes in no account without a token.
                 if (!confirmed) {
                     withContext(NonCancellable) {
-                        if (completed != null) {
-                            runCatching { accounts.signOut(pluginId) }
-                        } else {
-                            nonce?.let { microG.forget(pluginId, method.id, it) }
-                        }
+                        nonce?.let { microG.forget(pluginId, method.id, it) }
+                        if (completing) runCatching { accounts.signOut(pluginId) }
                     }
                 }
             }

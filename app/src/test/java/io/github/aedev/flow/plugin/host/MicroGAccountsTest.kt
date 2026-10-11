@@ -526,4 +526,22 @@ class MicroGAccountsTest {
             microG.signingIn(plugin.id) { microG.confirm(plugin.id, google.id, microG.bind(plugin, google, "listener@example.com")) }
             assertThat(microG.token(plugin, request).token).isEqualTo("ya29.music")
         }
+
+    @Test fun `an attempt dated while a revocation ran stays refused after it ends`() =
+        runTest {
+            val microG = accounts()
+            val transition = CompletableDeferred<Unit>()
+            val signOut = launch { microG.revoke(plugin.id) { transition.await() } }
+            testScheduler.runCurrent()
+            val chosenDuringSignOut = microG.revocationMark(plugin.id)
+
+            transition.complete(Unit)
+            signOut.join()
+
+            val attempt =
+                runCatching {
+                    microG.signingIn(plugin.id, chosenDuringSignOut) { microG.bind(plugin, google, "listener@example.com") }
+                }
+            assertThat(attempt.isFailure).isTrue()
+        }
 }
