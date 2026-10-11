@@ -507,4 +507,33 @@ class AndroidAccountSignInViewModelTest {
             coVerify { microG.forget(plugin.id, "google", "nonce") }
             coVerify { accounts.undoSignIn(plugin.id, any()) }
         }
+
+    @Test fun `an outdated MicroG-RE-TV is offered the update, then the chooser once it is current`() =
+        runTest(dispatcher) {
+            every { microG.outdated() } returns true
+            every { installer.canInstall() } returns true
+            coEvery { installer.install() } returns true
+            val vm = viewModel()
+            vm.start()
+            assertThat(vm.state.value).isEqualTo(AndroidAccountSignInState.OfferUpdate)
+
+            vm.install()
+            runCurrent()
+            vm.onResumed()
+            assertThat(vm.state.value).isEqualTo(AndroidAccountSignInState.Installing)
+
+            every { microG.outdated() } returns false
+            vm.onResumed()
+            assertThat(vm.state.value).isEqualTo(AndroidAccountSignInState.ChooseAccount(chooser))
+        }
+
+    @Test fun `a build that cannot install says an outdated MicroG-RE-TV needs updating`() {
+        every { microG.outdated() } returns true
+        every { installer.isAvailable } returns false
+        val vm = viewModel()
+
+        vm.start()
+
+        assertThat(vm.state.value).isEqualTo(AndroidAccountSignInState.MicroGOutdated)
+    }
 }

@@ -63,6 +63,8 @@ class MicroGAccounts internal constructor(
 
     fun installed(): Boolean = gateway.installed()
 
+    fun outdated(): Boolean = gateway.outdated()
+
     private val attempts = ConcurrentHashMap<String, Mutex>()
 
     /**

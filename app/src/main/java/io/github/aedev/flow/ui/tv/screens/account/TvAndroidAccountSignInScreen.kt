@@ -124,6 +124,18 @@ internal fun TvAndroidAccountSignInPanel(
                 )
             }
 
+            AndroidAccountSignInState.MicroGOutdated -> {
+                TvMessageState(title = stringResource(R.string.tv_microg_sign_in_outdated), modifier = Modifier.weight(1f))
+            }
+
+            AndroidAccountSignInState.OfferUpdate -> {
+                TvMessageState(
+                    title = stringResource(R.string.tv_microg_update_title),
+                    message = stringResource(R.string.tv_microg_update_message),
+                    modifier = Modifier.weight(1f),
+                )
+            }
+
             AndroidAccountSignInState.Installing -> {
                 TvMessageState(title = stringResource(R.string.tv_microg_installing), modifier = Modifier.weight(1f))
             }
@@ -156,10 +168,22 @@ internal fun TvAndroidAccountSignInPanel(
                 )
             }
         }
-        val installable = state == AndroidAccountSignInState.OfferInstall || state == AndroidAccountSignInState.InstallFailed
+        val installable =
+            state == AndroidAccountSignInState.OfferInstall ||
+                state == AndroidAccountSignInState.OfferUpdate ||
+                state == AndroidAccountSignInState.InstallFailed
         if (installable) {
             TvButton(
-                text = stringResource(R.string.tv_microg_install_action),
+                text =
+                    stringResource(
+                        if (state ==
+                            AndroidAccountSignInState.OfferUpdate
+                        ) {
+                            R.string.tv_microg_update_action
+                        } else {
+                            R.string.tv_microg_install_action
+                        },
+                    ),
                 onClick = onInstall,
                 modifier = Modifier.tvInitialFocus(state),
             )

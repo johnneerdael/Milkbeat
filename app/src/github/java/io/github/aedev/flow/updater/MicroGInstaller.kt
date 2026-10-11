@@ -10,6 +10,7 @@ import android.util.Log
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.aedev.flow.plugin.host.MICROG_PACKAGE
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -58,6 +59,9 @@ class MicroGInstaller
         private var generation = 0L
         private var awaited: Int? = null
 
+        // The install under way, which a second request joins instead of downloading over its file and session.
+        private var running: CompletableDeferred<Boolean>? = null
+
         // MicroG-RE-TV serves only the stable app; Preview and debug builds could install it and still get no token.
         val isAvailable: Boolean = context.packageName == STABLE_PACKAGE
 
@@ -67,13 +71,27 @@ class MicroGInstaller
             Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${context.packageName}"))
 
         /** Downloads and commits the install; false when the download is not MicroG-RE-TV or fails. */
-        suspend fun install(): Boolean =
+        suspend fun install(): Boolean {
+            val (owner, result) =
+                synchronized(lock) {
+                    running?.let { false to it } ?: (true to CompletableDeferred<Boolean>().also { running = it })
+                }
+            if (!owner) return result.await()
+            try {
+                return download().also { result.complete(it) }
+            } finally {
+                result.complete(false)
+                synchronized(lock) { if (running === result) running = null }
+            }
+        }
+
+        private suspend fun download(): Boolean =
             withContext(Dispatchers.IO) {
                 _failed.value = false
                 val attempt = synchronized(lock) { generation }
                 val apk = File(context.cacheDir, "microg/microg-re-tv.apk")
                 try {
-                    download(apk)
+                    fetch(apk)
                     val archive = context.packageManager.getPackageArchiveInfo(apk.path, 0)
                     if (archive?.packageName != MICROG_PACKAGE) return@withContext false
                     // A sign-in screen that moved on while the download ran opens no installer.
@@ -110,7 +128,7 @@ class MicroGInstaller
             _installed.value++
         }
 
-        private suspend fun download(target: File) {
+        private suspend fun fetch(target: File) {
             target.parentFile?.mkdirs()
             client.newCall(Request.Builder().url(MICROG_APK_URL).build()).execute().use { response ->
                 if (!response.isSuccessful) throw IOException("MicroG-RE-TV download failed: HTTP ${response.code}")

@@ -168,9 +168,11 @@ class PluginAccounts internal constructor(
         @Volatile internal var id: Long? = null
     }
 
-    // The latest sign-in completion each plugin started, by any method. Completions and the undoing of one run one at
-    // a time per plugin, so an obsolete sign-in's rollback never ends the account another method completed after it.
-    private val latestCompletions = ConcurrentHashMap<String, Long>()
+    // Completions, of any method, take their place in one order; each plugin remembers its latest that succeeded.
+    // Completions and the undoing of one run one at a time per plugin, so an obsolete sign-in's rollback never ends
+    // the account another method completed after it, while one that failed after it does not shield it.
+    private val completionOrder = AtomicLong()
+    private val latestSucceeded = ConcurrentHashMap<String, Long>()
     private val completionLocks = ConcurrentHashMap<String, Mutex>()
 
     private suspend fun <T> completing(
@@ -179,16 +181,18 @@ class PluginAccounts internal constructor(
         complete: suspend () -> T,
     ): T =
         completionLocks.getOrPut(pluginId) { Mutex() }.withLock {
-            completion.id = latestCompletions.merge(pluginId, 1L, Long::plus)
-            complete()
+            val id = completionOrder.incrementAndGet()
+            completion.id = id
+            complete().also { latestSucceeded[pluginId] = id }
         }
 
-    /** Signs the plugin out after [completion], unless no completion began or another one began after it. */
+    /** Signs the plugin out after [completion], unless it never began or another completion succeeded after it. */
     suspend fun undoSignIn(
         pluginId: String,
         completion: Completion,
     ) = completionLocks.getOrPut(pluginId) { Mutex() }.withLock {
-        if (completion.id != null && latestCompletions[pluginId] == completion.id) signOut(pluginId)
+        val id = completion.id ?: return@withLock
+        if ((latestSucceeded[pluginId] ?: 0L) <= id) signOut(pluginId)
     }
 
     suspend fun complete(

@@ -660,7 +660,10 @@ A manifest can declare
 The TV screen (`ui/tv/screens/account/TvAndroidAccountSignInScreen.kt`, driven by
 `ui/screens/account/AndroidAccountSignInViewModel.kt`) checks for MicroG-RE-TV (`app.revanced.android.gms`). The GitHub
 build offers to download `microg-re-tv.apk` from the fork's latest release. It installs it through a platform installer
-session only if the archive is that package. It then opens Android's account chooser for type `app.revanced`, which also
+session only if the archive is that package. It also offers that download as an update when the installed MicroG is
+signed with MicroG-RE-TV's release key but older than 7.2.1.5, the first release that serves Milkbeat; other MicroG
+builds under the package are used as they are, since Android would refuse the update. Concurrent install requests
+join the one under way. It then opens Android's account chooser for type `app.revanced`, which also
 makes the account visible to Milkbeat on API 26+. For each declared identity it asks `AccountManager.getAuthToken`
 for `oauth2:` + the `youtube` and `youtube.force-ssl` scopes, with the option `overridePackage` naming the official app.
 A prompt MicroG returns is launched once; closing it without a grant ends the attempt as declined. Only when every identity is granted

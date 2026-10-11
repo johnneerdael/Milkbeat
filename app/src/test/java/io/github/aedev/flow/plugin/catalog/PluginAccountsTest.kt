@@ -385,4 +385,19 @@ class PluginAccountsTest {
             accounts.undoSignIn("youtube", PluginAccounts.Completion())
             coVerify(exactly = 1) { host.call("youtube", PluginOperations.signOut, Unit) }
         }
+
+    @Test fun `a completion that fails after a MicroG one does not keep it from being undone`() =
+        runTest {
+            coEvery { host.call("youtube", PluginOperations.completeAccountSignIn, any()) } returns ProviderAccount.SignedIn("microg")
+            coEvery { host.call("youtube", PluginOperations.completeSignIn, any()) } throws failure(PluginErrorCode.NETWORK)
+            coEvery { host.call("youtube", PluginOperations.signOut, Unit) } returns Unit
+            val accounts = accounts()
+            val microg = PluginAccounts.Completion()
+            accounts.completeAccountSignIn("youtube", AndroidAccountSignIn("google", "listener@example.com"), microg)
+
+            runCatching { accounts.complete("youtube", WebLoginResult(method = "web", cookies = "SAPISID=x")) }
+            accounts.undoSignIn("youtube", microg)
+
+            coVerify(exactly = 1) { host.call("youtube", PluginOperations.signOut, Unit) }
+        }
 }

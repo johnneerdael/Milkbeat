@@ -42,6 +42,12 @@ sealed interface AndroidAccountSignInState {
     /** MicroG-RE-TV is not installed; the listener can install it from here. */
     data object OfferInstall : AndroidAccountSignInState
 
+    /** The installed MicroG-RE-TV is too old to sign Milkbeat in and this build cannot update it. */
+    data object MicroGOutdated : AndroidAccountSignInState
+
+    /** The installed MicroG-RE-TV is too old to sign Milkbeat in; the listener can update it from here. */
+    data object OfferUpdate : AndroidAccountSignInState
+
     /** The screen opens the setting that lets Milkbeat install apps with [intent], once. */
     data class InstallPermission(
         val intent: Intent,
@@ -114,6 +120,9 @@ class AndroidAccountSignInViewModel
 
         private var accountName: String? = null
 
+        // The install or update offer the install permission setting returns to.
+        private var offered: AndroidAccountSignInState = AndroidAccountSignInState.OfferInstall
+
         // A sign-out or removal after the listener chose the account fails the attempt that follows.
         private var since = 0L
         private val prompted = mutableSetOf<AccountIdentity>()
@@ -147,6 +156,7 @@ class AndroidAccountSignInViewModel
                 method == null || method.identities.isEmpty() -> _state.value = AndroidAccountSignInState.Failed()
                 !microG.supported() -> _state.value = AndroidAccountSignInState.UnsupportedBuild
                 !microG.installed() -> _state.value = missing()
+                microG.outdated() -> _state.value = outdated()
                 else -> _state.value = AndroidAccountSignInState.ChooseAccount(microG.chooseAccountIntent())
             }
         }
@@ -159,7 +169,7 @@ class AndroidAccountSignInViewModel
                 }
 
                 is AndroidAccountSignInState.InstallPermission -> {
-                    _state.value = AndroidAccountSignInState.OfferInstall
+                    _state.value = offered
                 }
 
                 else -> {
@@ -186,17 +196,19 @@ class AndroidAccountSignInViewModel
         }
 
         fun onInstallPermissionClosed() {
-            if (_state.value == AndroidAccountSignInState.OfferInstall && installer.canInstall()) install()
+            if (_state.value == offered && installer.canInstall()) install()
         }
 
         /** Back from the install permission setting, Android's install prompt or MicroG itself. */
         fun onResumed() {
             val waitingForMicroG =
                 _state.value == AndroidAccountSignInState.OfferInstall ||
+                    _state.value == AndroidAccountSignInState.OfferUpdate ||
                     _state.value == AndroidAccountSignInState.Installing ||
                     _state.value == AndroidAccountSignInState.InstallFailed ||
-                    _state.value == AndroidAccountSignInState.MicroGMissing
-            if (waitingForMicroG && microG.installed()) {
+                    _state.value == AndroidAccountSignInState.MicroGMissing ||
+                    _state.value == AndroidAccountSignInState.MicroGOutdated
+            if (waitingForMicroG && microG.installed() && !microG.outdated()) {
                 _state.value = AndroidAccountSignInState.ChooseAccount(microG.chooseAccountIntent())
             }
         }
@@ -340,7 +352,18 @@ class AndroidAccountSignInViewModel
         }
 
         private fun missing(): AndroidAccountSignInState =
-            if (installer.isAvailable) AndroidAccountSignInState.OfferInstall else AndroidAccountSignInState.MicroGMissing
+            if (installer.isAvailable) {
+                AndroidAccountSignInState.OfferInstall.also { offered = it }
+            } else {
+                AndroidAccountSignInState.MicroGMissing
+            }
+
+        private fun outdated(): AndroidAccountSignInState =
+            if (installer.isAvailable) {
+                AndroidAccountSignInState.OfferUpdate.also { offered = it }
+            } else {
+                AndroidAccountSignInState.MicroGOutdated
+            }
 
         private fun failureMessage(error: Exception): String? =
             (error as? PluginCallException)?.error?.let { (it.userMessage ?: it.message).takeIf(String::isNotBlank) }
