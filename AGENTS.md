@@ -925,6 +925,14 @@ run that occupies a physical device, and the resulting diff is thousands of line
   the key, rendition or cache key. The unbound resolver and the offline downloader reject cipher
   streams. Focused regressions: `./gradlew :app:testGithubDebugUnitTest --tests '*PluginStripeCipherDataSourceTest'`.
 
+- Plugin API 11 adds `AndroidAccountMethod` (`androidAccount`), `signIn.completeAccount` and the host functions
+  `signIn.token` / `signIn.invalidateToken`. `plugin/host/MicroGAccounts.kt` binds a method to the account the
+  listener chose (DataStore `plugin_android_accounts`, names only) and talks to AccountManager through
+  `MicroGAccountGateway`; keep the account type, scopes and `overridePackage` identities fixed on the host side and
+  never persist tokens. The TV flow is `TvAndroidAccountSignInScreen` + `AndroidAccountSignInViewModel`; launches of
+  chooser/prompt/settings intents must not crash on `SecurityException`. GitHub builds install MicroG-RE-TV through
+  the flavor-split `updater/MicroGInstaller` (package check before the installer session); foss builds only explain.
+  MicroG-RE-TV serves only `nl.neerdael.milkbeat`, so on-device token tests need the stable package.
 - Plugin API 5 adds `DeviceCodeMethod` and `signIn.begin/poll/confirm/cancel`; keep the generic TV pairing
   controller in `ui/screens/account/DeviceCodeSignInViewModel.kt` and native presentation in
   `ui/tv/screens/account/TvDeviceCodeSignInScreen.kt`. Validate both activation URLs against current

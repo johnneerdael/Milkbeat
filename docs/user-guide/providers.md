@@ -166,6 +166,14 @@ Open the installed plugin's details and choose its sign-in method.
 
 **Web sign-in (YouTube Music, Spotify, Beatport and Deezer):** scan the TV's QR code with a phone on the same network. The [phone viewer](https://github.com/johnneerdael/Milkbeat/blob/main/docs/phone-sign-in-remote-view.md) streams the provider's real sign-in page from the TV; use touch and typing on the phone to complete sign-in and any verification. Browsing and playback stay in Milkbeat's TV interface.
 
+**Google account through MicroG-RE-TV (plugins that offer it):** select **Sign in with your Google account**. Everything happens on the TV with the remote; no phone is needed.
+
+1. If MicroG-RE-TV is not installed, the GitHub build offers **Install MicroG-RE-TV**. It downloads the latest release from [MicroG-RE-TV](https://github.com/johnneerdael/MicroG-RE-TV/releases) and opens Android's install prompt. The first time, Android asks you to allow Milkbeat to install apps; allow it and press Back. The foss build asks you to install MicroG-RE-TV yourself.
+2. Pick your Google account. If there is none yet, add it in MicroG-RE-TV when Android offers to.
+3. MicroG-RE-TV asks once per account for each kind of access the plugin needs, such as "use your account as YouTube Music". Select **Allow**. Declining ends the attempt; select **Retry** to be asked again.
+
+Milkbeat keeps only the account name. MicroG-RE-TV keeps your grants and issues short-lived tokens; to withdraw access, remove it in MicroG-RE-TV. This sign-in works only in the stable app (`nl.neerdael.milkbeat`), not in Milkbeat Preview or debug builds.
+
 When a provider reports an expired sign-in, Milkbeat asks the plugin again in the background, retrying temporary connection failures, and restores the account without any action when it still works; private playlist preparation then resumes on its own. With YouTube Music 0.2.4 or later, a single refused request no longer signs the account out. An account the provider confirms expired needs sign-in again; local folders keep working.
 
 ## Set audio priority
