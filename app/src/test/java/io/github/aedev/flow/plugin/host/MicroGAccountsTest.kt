@@ -361,4 +361,35 @@ class MicroGAccountsTest {
             assertThat(microG.token(both, AccountTokenRequest(tricky.id, AccountIdentity.YOUTUBE_MUSIC)).token)
                 .isEqualTo("for second@example.com")
         }
+
+    @Test fun `a token asked for while a sign-out is still deleting is refused`() =
+        runTest {
+            val real = PreferenceDataStoreFactory.create(scope = backgroundScope) { temp.newFile("slow.preferences_pb") }
+            val deletion = CompletableDeferred<Unit>()
+            var holdNext = false
+            // A store whose next write waits, as a sign-out's deletion can while a token request reads.
+            val store =
+                object : DataStore<Preferences> by real {
+                    override suspend fun updateData(transform: suspend (t: Preferences) -> Preferences): Preferences {
+                        if (holdNext) {
+                            holdNext = false
+                            deletion.await()
+                        }
+                        return real.updateData(transform)
+                    }
+                }
+            val microG = MicroGAccounts(gateway, store, StandardTestDispatcher(testScheduler))
+            every { gateway.hasAccount(any()) } returns true
+            every { gateway.token(any(), any()) } returns MicroGTokenResult.Granted("ya29.music")
+            microG.confirm(plugin.id, google.id, microG.bind(plugin, google, "listener@example.com"))
+            holdNext = true
+            val signOut = launch { microG.forgetAll(plugin.id) }
+            testScheduler.runCurrent()
+
+            val error = failure { microG.token(plugin, AccountTokenRequest("google", AccountIdentity.YOUTUBE_MUSIC)) }
+
+            assertThat(error?.code).isEqualTo(PluginErrorCode.SIGN_IN_REQUIRED)
+            deletion.complete(Unit)
+            signOut.join()
+        }
 }

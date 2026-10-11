@@ -83,6 +83,14 @@ class MicroGAccounts internal constructor(
     // out, so revocation cannot simply wait for the attempt's lock.
     private val revocations = ConcurrentHashMap<String, Long>()
 
+    // Revocations still deleting, per plugin: until their write lands, the store still shows the old bindings.
+    private val revoking = ConcurrentHashMap<String, Int>()
+
+    private fun revoked(
+        pluginId: String,
+        since: Long,
+    ) = revocationMark(pluginId) != since || revoking.containsKey(pluginId)
+
     private class Attempt(
         val pluginId: String,
         val revocation: Long,
@@ -189,14 +197,19 @@ class MicroGAccounts internal constructor(
     suspend fun forgetAll(pluginId: String) {
         // Counted first, so an attempt that writes after this deletion still sees it was revoked.
         revocations.merge(pluginId, 1L, Long::plus)
-        store.edit { preferences ->
-            preferences
-                .asMap()
-                .keys
-                .filter { it.name.startsWith(prefix(pluginId)) }
-                .forEach { preferences.remove(it) }
+        revoking.merge(pluginId, 1, Int::plus)
+        try {
+            store.edit { preferences ->
+                preferences
+                    .asMap()
+                    .keys
+                    .filter { it.name.startsWith(prefix(pluginId)) }
+                    .forEach { preferences.remove(it) }
+            }
+            provisional.keys.removeIf { it.startsWith(prefix(pluginId)) }
+        } finally {
+            revoking.computeIfPresent(pluginId) { _, running -> (running - 1).takeIf { it > 0 } }
         }
-        provisional.keys.removeIf { it.startsWith(prefix(pluginId)) }
     }
 
     internal suspend fun token(
@@ -207,6 +220,7 @@ class MicroGAccounts internal constructor(
         if (request.identity !in method.identities) {
             throw HostCallException(PluginErrorCode.UNSUPPORTED, "${method.id} does not declare ${request.identity}")
         }
+        val since = revocationMark(plugin.id)
         val account = boundAccount(plugin, method, request.identity)
         val token =
             withContext(io) {
@@ -224,8 +238,9 @@ class MicroGAccounts internal constructor(
                     }
                 }
             }
-        // A sign-out or removal while MicroG answered ends the binding: its token is not handed out.
-        if (runCatching { boundAccount(plugin, method, request.identity) }.getOrNull() != account) {
+        // A sign-out or removal that began or was still deleting while MicroG answered ends the binding: its token
+        // is not handed out.
+        if (revoked(plugin.id, since) || runCatching { boundAccount(plugin, method, request.identity) }.getOrNull() != account) {
             throw HostCallException(PluginErrorCode.SIGN_IN_REQUIRED, "The sign-in for ${method.id} ended")
         }
         return AccountToken(token)
