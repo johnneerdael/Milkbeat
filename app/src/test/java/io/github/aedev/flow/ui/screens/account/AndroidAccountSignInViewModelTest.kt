@@ -2,6 +2,7 @@ package io.github.aedev.flow.ui.screens.account
 
 import android.content.Intent
 import androidx.lifecycle.SavedStateHandle
+import androidx.lifecycle.ViewModelStore
 import com.google.common.truth.Truth.assertThat
 import io.github.aedev.flow.plugin.catalog.PluginAccounts
 import io.github.aedev.flow.plugin.host.MicroGAccounts
@@ -16,6 +17,7 @@ import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -237,5 +239,21 @@ class AndroidAccountSignInViewModelTest {
             runCurrent()
 
             assertThat(vm.state.value).isEqualTo(AndroidAccountSignInState.ChooseAccount(chooser))
+        }
+
+    @Test fun `leaving while the plugin completes the sign-in leaves no binding behind`() =
+        runTest(dispatcher) {
+            coEvery { accounts.completeAccountSignIn(any(), any()) } coAnswers { awaitCancellation() }
+            val vm = viewModel()
+            val store = ViewModelStore().apply { put("sign-in", vm) }
+            vm.start()
+            vm.onAccountChosen(account)
+            runCurrent()
+            coVerify { microG.bind(plugin, any(), account) }
+
+            store.clear()
+            runCurrent()
+
+            coVerify { microG.forget(plugin.id, "google") }
         }
 }

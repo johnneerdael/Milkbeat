@@ -12,11 +12,13 @@ import io.github.aedev.flow.plugin.registry.PluginRegistry
 import io.github.aedev.flow.plugin.runtime.PluginCallException
 import io.github.aedev.flow.updater.MicroGInstaller
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import nl.neerdael.milkbeat.catalog.ProviderAccount
 import nl.neerdael.milkbeat.plugin.AccountIdentity
 import nl.neerdael.milkbeat.plugin.AndroidAccountMethod
@@ -229,18 +231,20 @@ class AndroidAccountSignInViewModel
             account: String,
         ) {
             val plugin = registry.state.value.plugin(pluginId) ?: error("The plugin is no longer installed")
-            microG.bind(plugin, method, account)
+            var signedIn: ProviderAccount.SignedIn? = null
             try {
-                val signedIn =
+                microG.bind(plugin, method, account)
+                signedIn =
                     accounts.completeAccountSignIn(pluginId, AndroidAccountSignIn(method.id, account)) as? ProviderAccount.SignedIn
                         ?: error("The plugin did not accept the account")
                 _state.value = AndroidAccountSignInState.SignedIn(signedIn.name)
             } catch (e: CancellationException) {
-                microG.forget(pluginId, method.id)
                 throw e
             } catch (e: Exception) {
-                microG.forget(pluginId, method.id)
                 _state.value = AndroidAccountSignInState.Failed(failureMessage(e))
+            } finally {
+                // A sign-in that did not finish, left or failed, leaves no binding the plugin could use.
+                if (signedIn == null) withContext(NonCancellable) { microG.forget(pluginId, method.id) }
             }
         }
 
