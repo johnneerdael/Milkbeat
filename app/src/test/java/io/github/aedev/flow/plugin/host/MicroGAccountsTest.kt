@@ -205,9 +205,10 @@ class MicroGAccountsTest {
 
     @Test fun `a sign-out while MicroG answers keeps its token from the plugin`() =
         runTest {
-            // The store runs on its own threads, so the sign-out can complete inside MicroG's blocking answer.
+            // The store and MicroG's answer run on real threads, as in the app, so the sign-out can complete inside
+            // MicroG's blocking answer.
             val store = PreferenceDataStoreFactory.create(scope = CoroutineScope(Dispatchers.IO)) { temp.newFile("race.preferences_pb") }
-            val microG = MicroGAccounts(gateway, store, StandardTestDispatcher(testScheduler))
+            val microG = MicroGAccounts(gateway, store, Dispatchers.IO)
             every { gateway.hasAccount(any()) } returns true
             every { gateway.token(any(), any()) } answers {
                 runBlocking { microG.revoke(plugin.id) }
@@ -636,5 +637,41 @@ class MicroGAccountsTest {
 
             restarted.confirm(plugin.id, google.id, restarted.bind(plugin, google, "listener@example.com"))
             assertThat(restarted.orphaned(plugin.id)).isFalse()
+        }
+
+    @Test fun `a revocation whose deletion failed stays in force after a restart until a later one deletes the bindings`() =
+        runTest {
+            val real = PreferenceDataStoreFactory.create(scope = backgroundScope) { temp.newFile("tombstone.preferences_pb") }
+            var failNext = false
+            val store =
+                object : DataStore<Preferences> by real {
+                    override suspend fun updateData(transform: suspend (t: Preferences) -> Preferences): Preferences {
+                        if (failNext) {
+                            failNext = false
+                            throw java.io.IOException("no space left")
+                        }
+                        return real.updateData(transform)
+                    }
+                }
+            val tombstones = MemoryRevocationTombstones()
+            every { gateway.hasAccount(any()) } returns true
+            every { gateway.token(any(), any()) } returns MicroGTokenResult.Granted("ya29.music")
+            val request = AccountTokenRequest("google", AccountIdentity.YOUTUBE_MUSIC)
+            val firstRun = MicroGAccounts(gateway, store, StandardTestDispatcher(testScheduler), tombstones)
+            firstRun.confirm(plugin.id, google.id, firstRun.bind(plugin, google, "listener@example.com"))
+            failNext = true
+            assertThat(runCatching { firstRun.revoke(plugin.id) }.isFailure).isTrue()
+
+            val restarted = MicroGAccounts(gateway, store, StandardTestDispatcher(testScheduler), tombstones)
+            assertThat(failure { restarted.token(plugin, request) }?.code).isEqualTo(PluginErrorCode.SIGN_IN_REQUIRED)
+            assertThat(restarted.orphaned(plugin.id)).isTrue()
+
+            restarted.revoke(plugin.id)
+            assertThat(tombstones.contains(plugin.id)).isFalse()
+            assertThat(restarted.orphaned(plugin.id)).isFalse()
+            restarted.signingIn(
+                plugin.id,
+            ) { restarted.confirm(plugin.id, google.id, restarted.bind(plugin, google, "listener@example.com")) }
+            assertThat(restarted.token(plugin, request).token).isEqualTo("ya29.music")
         }
 }

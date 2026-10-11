@@ -26,6 +26,7 @@ import nl.neerdael.milkbeat.plugin.AccountTokenInvalidation
 import nl.neerdael.milkbeat.plugin.AccountTokenRequest
 import nl.neerdael.milkbeat.plugin.AndroidAccountMethod
 import nl.neerdael.milkbeat.plugin.PluginErrorCode
+import java.io.File
 import java.net.URLEncoder
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -54,12 +55,18 @@ class MicroGAccounts internal constructor(
     private val gateway: MicroGAccountGateway,
     private val store: DataStore<Preferences>,
     private val io: CoroutineDispatcher,
+    private val tombstones: RevocationTombstones = MemoryRevocationTombstones(),
 ) {
     @Inject
     constructor(
         @ApplicationContext context: Context,
         gateway: MicroGAccountGateway,
-    ) : this(gateway, context.pluginAndroidAccounts, Dispatchers.IO)
+    ) : this(
+        gateway,
+        context.pluginAndroidAccounts,
+        Dispatchers.IO,
+        FileRevocationTombstones(File(context.noBackupFilesDir, "microg_revocations")),
+    )
 
     fun supported(): Boolean = gateway.serves()
 
@@ -102,6 +109,14 @@ class MicroGAccounts internal constructor(
     )
 
     private val revocations = ConcurrentHashMap<String, Revocations>()
+
+    // A failed revocation an earlier run left behind counts from the start, loaded once per plugin and run before any
+    // binding, confirmation or token is judged.
+    private suspend fun load(pluginId: String) {
+        if (revocations.containsKey(pluginId)) return
+        val undeleted = withContext(io) { runCatching { tombstones.contains(pluginId) }.getOrDefault(false) }
+        revocations.putIfAbsent(pluginId, Revocations(undeleted = undeleted))
+    }
 
     private fun revoked(
         pluginId: String,
@@ -148,6 +163,7 @@ class MicroGAccounts internal constructor(
         method: AndroidAccountMethod,
         accountName: String,
     ): String {
+        load(plugin.id)
         val nonce = UUID.randomUUID().toString()
         // Recorded before the write: until the write lands the stored record carries an older nonce, which fails.
         checkNotRevoked(plugin.id)
@@ -175,6 +191,7 @@ class MicroGAccounts internal constructor(
         methodId: String,
         nonce: String,
     ) {
+        load(pluginId)
         val attempt = currentCoroutineContext()[Attempt]?.takeIf { it.pluginId == pluginId }
         try {
             store.edit {
@@ -260,9 +277,12 @@ class MicroGAccounts internal constructor(
                     } catch (e: Exception) {
                         e
                     }
-                // Bindings the store failed to delete stay revoked in this run until a later revocation deletes them,
-                // and the plugin still signs out, so neither outlives the listener's request.
+                // Bindings the store failed to delete stay revoked, in this run and on disk, until a later revocation
+                // deletes them, and the plugin still signs out, so neither outlives the listener's request.
                 revocations.computeIfPresent(pluginId) { _, now -> now.copy(undeleted = deletion != null) }
+                withContext(io) {
+                    runCatching { if (deletion != null) tombstones.add(pluginId) else tombstones.remove(pluginId) }
+                }
                 try {
                     transition()
                 } catch (e: Throwable) {
@@ -280,12 +300,16 @@ class MicroGAccounts internal constructor(
      * Whether [pluginId] has a binding a sign-in left unfinished that no attempt of this run is completing, as one in a
      * run that died: its plugin may believe in an account it cannot get a token for, and is signed out.
      */
-    suspend fun orphaned(pluginId: String): Boolean =
-        store.data.first().asMap().any { (key, value) ->
+    suspend fun orphaned(pluginId: String): Boolean {
+        load(pluginId)
+        // Bindings a revocation failed to delete are retried by the sign-out this answer leads to.
+        if (revocations[pluginId]?.undeleted == true) return true
+        return store.data.first().asMap().any { (key, value) ->
             key.name.startsWith(prefix(pluginId)) &&
                 key.name.endsWith(PENDING_SUFFIX) &&
                 provisional[key.name.removeSuffix(PENDING_SUFFIX)] != value
         }
+    }
 
     internal suspend fun token(
         plugin: InstalledPlugin,
@@ -295,6 +319,7 @@ class MicroGAccounts internal constructor(
         if (request.identity !in method.identities) {
             throw HostCallException(PluginErrorCode.UNSUPPORTED, "${method.id} does not declare ${request.identity}")
         }
+        load(plugin.id)
         val since = revocationMark(plugin.id)
         val account = boundAccount(plugin, method, request.identity)
         val token =
