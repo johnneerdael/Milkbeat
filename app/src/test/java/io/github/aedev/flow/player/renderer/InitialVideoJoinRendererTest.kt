@@ -29,7 +29,7 @@ class InitialVideoJoinRendererTest {
         assertThat(renderer.isReady).isFalse()
         f.gate.begin()
         assertThat(renderer.isReady).isTrue()
-        f.load(10_000, 20_000)
+        f.load(10_000, 40_000)
         assertThat(renderer.isReady).isFalse()
         every { delegate.isReady } returns true
         assertThat(renderer.isReady).isTrue()

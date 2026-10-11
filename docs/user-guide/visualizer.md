@@ -9,7 +9,7 @@ This page covers what the visualizer does inside Milkbeat. The **[ProjectM TV us
 ## How it fits into Milkbeat
 
 - **It hears Milkbeat's own player.** The visuals take their sound straight from the track you are playing, not from the TV's output, so Milkbeat needs no microphone or audio-recording permission. Other apps' audio is not visualized.
-- **It runs only when you can see it.** Rendering and audio monitoring stop when the visualizer leaves the screen, when you switch to the video or artwork view, and when Milkbeat goes to the background. A visible visualizer can keep drifting on silence while music is paused.
+- **It runs only when you can see it.** Rendering and audio monitoring stop when the visualizer leaves the screen, when a prepared video replaces it or you switch to the artwork view, and when Milkbeat goes to the background. While a music video prepares, the visualizer keeps running under its loading indicator until 30 seconds of video are buffered and the first frame is ready (or the remaining duration near the end). A visible visualizer can keep drifting on silence while music is paused.
 - **It uses the same engine as the standalone app.** Each Milkbeat release names the ProjectM TV core it ships in its [release notes](https://github.com/johnneerdael/Milkbeat/releases). Milkbeat uses ProjectM TV's defaults for your device until you change something.
 - **Track details are Milkbeat's own.** The cover, artists and title in the upper left come from Milkbeat's player, so ProjectM TV's *Track display* and notification-access settings do not apply. Custom preset packs and ProjectM TV's own auto-update are not part of Milkbeat either.
 

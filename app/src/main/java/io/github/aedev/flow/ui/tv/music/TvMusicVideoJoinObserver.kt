@@ -5,6 +5,7 @@ import android.view.SurfaceView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.ui.PlayerView
 
@@ -13,6 +14,7 @@ import androidx.media3.ui.PlayerView
 internal class TvMusicVideoJoinObserver(
     private val lifecycle: Lifecycle,
     private val onIndicatorChanged: (Boolean) -> Unit,
+    private val onPictureReadyChanged: (Boolean) -> Unit = {},
 ) : Player.Listener,
     SurfaceHolder.Callback {
     private val state = TvMusicVideoJoinState()
@@ -100,7 +102,16 @@ internal class TvMusicVideoJoinObserver(
         publish()
     }
 
-    private fun publish() = onIndicatorChanged(state.showIndicator)
+    override fun onPlayerError(error: PlaybackException) {
+        picturePrepared = false
+        state.onPlayerError()
+        publish()
+    }
+
+    private fun publish() {
+        onIndicatorChanged(state.showIndicator)
+        onPictureReadyChanged(state.pictureReady)
+    }
 
     fun releaseSurface(view: PlayerView) {
         val released = (view.videoSurfaceView as? SurfaceView)?.holder
@@ -109,6 +120,7 @@ internal class TvMusicVideoJoinObserver(
         holder = null
         this.view = null
         state.surfaceChanged(false)
+        publish()
     }
 
     fun close() {

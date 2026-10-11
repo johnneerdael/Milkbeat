@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="utf-8"?>
+<MPD xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns="urn:mpeg:dash:schema:mpd:2011"
+	xmlns:xlink="http://www.w3.org/1999/xlink"
+	xsi:schemaLocation="urn:mpeg:DASH:schema:MPD:2011 http://standards.iso.org/ittf/PubliclyAvailableStandards/MPEG-DASH_schema_files/DASH-MPD.xsd"
+	profiles="urn:mpeg:dash:profile:isoff-live:2011"
+	type="static"
+	mediaPresentationDuration="PT1M0.0S"
+	maxSegmentDuration="PT2.0S"
+	minBufferTime="PT4.0S">
+	<ProgramInformation>
+	</ProgramInformation>
+	<ServiceDescription id="0">
+	</ServiceDescription>
+	<Period id="0" start="PT0.0S">
+		<AdaptationSet id="0" contentType="video" startWithSAP="1" segmentAlignment="true" bitstreamSwitching="true" frameRate="5/1" maxWidth="160" maxHeight="90" par="16:9">
+			<Representation id="0" mimeType="video/mp4" codecs="avc1.42c00a" bandwidth="63642" width="160" height="90" sar="1:1">
+				<BaseURL>manifest-stream0.mp4</BaseURL>
+				<SegmentList timescale="1000000" duration="2000000" startNumber="1">
+					<Initialization range="0-807" />
+					<SegmentURL mediaRange="808-15676" indexRange="808-859" />
+					<SegmentURL mediaRange="15677-32007" indexRange="15677-15728" />
+					<SegmentURL mediaRange="32008-47572" indexRange="32008-32059" />
+					<SegmentURL mediaRange="47573-64718" indexRange="47573-47624" />
+					<SegmentURL mediaRange="64719-79807" indexRange="64719-64770" />
+					<SegmentURL mediaRange="79808-95716" indexRange="79808-79859" />
+					<SegmentURL mediaRange="95717-110639" indexRange="95717-95768" />
+					<SegmentURL mediaRange="110640-127163" indexRange="110640-110691" />
+					<SegmentURL mediaRange="127164-142703" indexRange="127164-127215" />
+					<SegmentURL mediaRange="142704-159703" indexRange="142704-142755" />
+					<SegmentURL mediaRange="159704-174342" indexRange="159704-159755" />
+					<SegmentURL mediaRange="174343-190251" indexRange="174343-174394" />
+					<SegmentURL mediaRange="190252-205493" indexRange="190252-190303" />
+					<SegmentURL mediaRange="205494-222658" indexRange="205494-205545" />
+					<SegmentURL mediaRange="222659-238391" indexRange="222659-222710" />
+					<SegmentURL mediaRange="238392-255289" indexRange="238392-238443" />
+					<SegmentURL mediaRange="255290-270204" indexRange="255290-255341" />
+					<SegmentURL mediaRange="270205-286470" indexRange="270205-270256" />
+					<SegmentURL mediaRange="286471-301252" indexRange="286471-286522" />
+					<SegmentURL mediaRange="301253-317946" indexRange="301253-301304" />
+					<SegmentURL mediaRange="317947-333874" indexRange="317947-317998" />
+					<SegmentURL mediaRange="333875-350861" indexRange="333875-333926" />
+					<SegmentURL mediaRange="350862-366075" indexRange="350862-350913" />
+					<SegmentURL mediaRange="366076-382052" indexRange="366076-366127" />
+					<SegmentURL mediaRange="382053-396928" indexRange="382053-382104" />
+					<SegmentURL mediaRange="396929-413949" indexRange="396929-396980" />
+					<SegmentURL mediaRange="413950-429546" indexRange="413950-414001" />
+					<SegmentURL mediaRange="429547-446502" indexRange="429547-429598" />
+					<SegmentURL mediaRange="446503-461637" indexRange="446503-446554" />
+					<SegmentURL mediaRange="461638-477317" indexRange="461638-461689" />
+				</SegmentList>
+			</Representation>
+		</AdaptationSet>
+		<AdaptationSet id="1" contentType="audio" startWithSAP="1" segmentAlignment="true" bitstreamSwitching="true">
+			<Representation id="1" mimeType="audio/mp4" codecs="mp4a.40.2" bandwidth="32000" audioSamplingRate="44100">
+				<AudioChannelConfiguration schemeIdUri="urn:mpeg:dash:23003:3:audio_channel_configuration:2011" value="1" />
+				<BaseURL>manifest-stream1.mp4</BaseURL>
+				<SegmentList timescale="1000000" duration="2000000" startNumber="1">
+					<Initialization range="0-763" />
+					<SegmentURL mediaRange="764-9393" indexRange="764-815" />
+					<SegmentURL mediaRange="9394-18095" indexRange="9394-9445" />
+					<SegmentURL mediaRange="18096-26751" indexRange="18096-18147" />
+					<SegmentURL mediaRange="26752-35420" indexRange="26752-26803" />
+					<SegmentURL mediaRange="35421-44033" indexRange="35421-35472" />
+					<SegmentURL mediaRange="44034-52690" indexRange="44034-44085" />
+					<SegmentURL mediaRange="52691-61310" indexRange="52691-52742" />
+					<SegmentURL mediaRange="61311-70037" indexRange="61311-61362" />
+					<SegmentURL mediaRange="70038-78674" indexRange="70038-70089" />
+					<SegmentURL mediaRange="78675-87323" indexRange="78675-78726" />
+					<SegmentURL mediaRange="87324-95954" indexRange="87324-87375" />
+					<SegmentURL mediaRange="95955-104634" indexRange="95955-96006" />
+					<SegmentURL mediaRange="104635-113241" indexRange="104635-104686" />
+					<SegmentURL mediaRange="113242-121865" indexRange="113242-113293" />
+					<SegmentURL mediaRange="121866-130505" indexRange="121866-121917" />
+					<SegmentURL mediaRange="130506-139232" indexRange="130506-130557" />
+					<SegmentURL mediaRange="139233-147899" indexRange="139233-139284" />
+					<SegmentURL mediaRange="147900-156485" indexRange="147900-147951" />
+					<SegmentURL mediaRange="156486-165143" indexRange="156486-156537" />
+					<SegmentURL mediaRange="165144-173764" indexRange="165144-165195" />
+					<SegmentURL mediaRange="173765-182387" indexRange="173765-173816" />
+					<SegmentURL mediaRange="182388-191042" indexRange="182388-182439" />
+					<SegmentURL mediaRange="191043-199759" indexRange="191043-191094" />
+					<SegmentURL mediaRange="199760-208411" indexRange="199760-199811" />
+					<SegmentURL mediaRange="208412-217041" indexRange="208412-208463" />
+					<SegmentURL mediaRange="217042-225687" indexRange="217042-217093" />
+					<SegmentURL mediaRange="225688-234325" indexRange="225688-225739" />
+					<SegmentURL mediaRange="234326-242940" indexRange="234326-234377" />
+					<SegmentURL mediaRange="242941-251610" indexRange="242941-242992" />
+					<SegmentURL mediaRange="251611-260560" indexRange="251611-251662" />
+				</SegmentList>
+			</Representation>
+		</AdaptationSet>
+	</Period>
+</MPD>
