@@ -163,39 +163,39 @@ class PluginAccounts internal constructor(
         }
     }
 
-    // Sign-ins each plugin completed, by any method. Completions and the undoing of one run one at a time per plugin,
-    // so an obsolete sign-in's rollback never ends the account another method completed meanwhile.
-    private val completions = ConcurrentHashMap<String, Long>()
+    /** One sign-in completion of a plugin, for [undoSignIn]; it gets its place once the completion is under way. */
+    class Completion {
+        @Volatile internal var id: Long? = null
+    }
+
+    // The latest sign-in completion each plugin started, by any method. Completions and the undoing of one run one at
+    // a time per plugin, so an obsolete sign-in's rollback never ends the account another method completed after it.
+    private val latestCompletions = ConcurrentHashMap<String, Long>()
     private val completionLocks = ConcurrentHashMap<String, Mutex>()
 
     private suspend fun <T> completing(
         pluginId: String,
+        completion: Completion,
         complete: suspend () -> T,
     ): T =
         completionLocks.getOrPut(pluginId) { Mutex() }.withLock {
-            complete().also { completions.merge(pluginId, 1L, Long::plus) }
+            completion.id = latestCompletions.merge(pluginId, 1L, Long::plus)
+            complete()
         }
 
-    /** How many sign-ins [pluginId] has completed, by any method. */
-    fun completionMark(pluginId: String): Long = completions[pluginId] ?: 0L
-
-    /**
-     * Signs out a sign-in that began at [mark] and completed [own] times itself, unless another sign-in of the plugin
-     * completed meanwhile.
-     */
+    /** Signs the plugin out after [completion], unless no completion began or another one began after it. */
     suspend fun undoSignIn(
         pluginId: String,
-        mark: Long,
-        own: Long,
+        completion: Completion,
     ) = completionLocks.getOrPut(pluginId) { Mutex() }.withLock {
-        if (completionMark(pluginId) == mark + own) signOut(pluginId)
+        if (completion.id != null && latestCompletions[pluginId] == completion.id) signOut(pluginId)
     }
 
     suspend fun complete(
         pluginId: String,
         result: WebLoginResult,
     ): ProviderAccount =
-        completing(pluginId) {
+        completing(pluginId, Completion()) {
             supersedeChecks(pluginId)
             cancelRevalidation(pluginId)
             invalidatePlayback(pluginId)
@@ -208,8 +208,9 @@ class PluginAccounts internal constructor(
     suspend fun completeAccountSignIn(
         pluginId: String,
         signIn: AndroidAccountSignIn,
+        completion: Completion = Completion(),
     ): ProviderAccount =
-        completing(pluginId) {
+        completing(pluginId, completion) {
             supersedeChecks(pluginId)
             cancelRevalidation(pluginId)
             invalidatePlayback(pluginId)
@@ -255,7 +256,7 @@ class PluginAccounts internal constructor(
         pluginId: String,
         session: String,
     ): ProviderAccount.SignedIn =
-        completing(pluginId) {
+        completing(pluginId, Completion()) {
             invalidatePlayback(pluginId)
             val account =
                 host.call(pluginId, PluginOperations.confirmSignIn, DeviceCodeSession(session)) as? ProviderAccount.SignedIn

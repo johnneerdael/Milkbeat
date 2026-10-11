@@ -303,17 +303,18 @@ class AndroidAccountSignInViewModel
             method: AndroidAccountMethod,
             account: String,
         ) {
-            val mark = accounts.completionMark(pluginId)
+            val completion = PluginAccounts.Completion()
             var nonce: String? = null
-            var completing = false
-            var returned = false
             var confirmed = false
             try {
                 nonce = microG.bind(plugin, method, account)
-                completing = true
-                val answer = accounts.completeAccountSignIn(pluginId, AndroidAccountSignIn(method.id, account))
-                returned = true
-                val completed = answer as? ProviderAccount.SignedIn ?: error("The plugin did not accept the account")
+                val completed =
+                    accounts.completeAccountSignIn(
+                        pluginId,
+                        AndroidAccountSignIn(method.id, account),
+                        completion,
+                    ) as? ProviderAccount.SignedIn
+                        ?: error("The plugin did not accept the account")
                 // An update during the completion may need more than was confirmed: undo it and sign in again.
                 check(unchanged(plugin, method)) { "The plugin changed during sign-in" }
                 microG.confirm(pluginId, method.id, nonce)
@@ -332,7 +333,7 @@ class AndroidAccountSignInViewModel
                 if (!confirmed) {
                     withContext(NonCancellable) {
                         nonce?.let { microG.forget(pluginId, method.id, it) }
-                        if (completing) runCatching { accounts.undoSignIn(pluginId, mark, if (returned) 1L else 0L) }
+                        runCatching { accounts.undoSignIn(pluginId, completion) }
                     }
                 }
             }

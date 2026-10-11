@@ -87,7 +87,7 @@ class AndroidAccountSignInViewModelTest {
         coEvery { microG.signingIn<Unit>(any(), any(), any()) } coAnswers { thirdArg<suspend () -> Unit>().invoke() }
         every { microG.chooseAccountIntent() } returns chooser
         coEvery { microG.request(account, any()) } returns MicroGTokenResult.Granted("token")
-        coEvery { accounts.completeAccountSignIn(plugin.id, AndroidAccountSignIn("google", account)) } returns
+        coEvery { accounts.completeAccountSignIn(plugin.id, AndroidAccountSignIn("google", account), any()) } returns
             ProviderAccount.SignedIn("channel", "Listener")
     }
 
@@ -135,7 +135,7 @@ class AndroidAccountSignInViewModelTest {
             vm.onAccountChosen(account)
             runCurrent()
             assertThat(vm.state.value).isEqualTo(AndroidAccountSignInState.Confirm(AccountIdentity.YOUTUBE_MUSIC, musicPrompt))
-            coVerify(exactly = 0) { accounts.completeAccountSignIn(any(), any()) }
+            coVerify(exactly = 0) { accounts.completeAccountSignIn(any(), any(), any()) }
 
             vm.onLaunched()
             vm.onPromptClosed()
@@ -144,7 +144,7 @@ class AndroidAccountSignInViewModelTest {
             assertThat(vm.state.value).isEqualTo(AndroidAccountSignInState.SignedIn("Listener"))
             coVerify(ordering = io.mockk.Ordering.ORDERED) {
                 microG.bind(plugin, plugin.manifest.signIn.single() as AndroidAccountMethod, account)
-                accounts.completeAccountSignIn(plugin.id, AndroidAccountSignIn("google", account))
+                accounts.completeAccountSignIn(plugin.id, AndroidAccountSignIn("google", account), any())
             }
         }
 
@@ -166,7 +166,7 @@ class AndroidAccountSignInViewModelTest {
 
     @Test fun `a plugin that refuses the account leaves no binding behind`() =
         runTest(dispatcher) {
-            coEvery { accounts.completeAccountSignIn(any(), any()) } returns ProviderAccount.Anonymous
+            coEvery { accounts.completeAccountSignIn(any(), any(), any()) } returns ProviderAccount.Anonymous
             val vm = viewModel()
             vm.start()
 
@@ -252,7 +252,7 @@ class AndroidAccountSignInViewModelTest {
 
     @Test fun `leaving while the plugin completes the sign-in leaves no binding behind`() =
         runTest(dispatcher) {
-            coEvery { accounts.completeAccountSignIn(any(), any()) } coAnswers { awaitCancellation() }
+            coEvery { accounts.completeAccountSignIn(any(), any(), any()) } coAnswers { awaitCancellation() }
             val vm = viewModel()
             val store = ViewModelStore().apply { put("sign-in", vm) }
             vm.start()
@@ -302,7 +302,7 @@ class AndroidAccountSignInViewModelTest {
             assertThat(vm.state.value).isEqualTo(AndroidAccountSignInState.SignedIn("Listener"))
             coVerify(ordering = io.mockk.Ordering.ORDERED) {
                 microG.bind(plugin, any(), account)
-                accounts.completeAccountSignIn(plugin.id, AndroidAccountSignIn("google", account))
+                accounts.completeAccountSignIn(plugin.id, AndroidAccountSignIn("google", account), any())
                 microG.confirm(plugin.id, "google", "nonce")
             }
         }
@@ -328,7 +328,7 @@ class AndroidAccountSignInViewModelTest {
             runCurrent()
 
             assertThat(vm.state.value).isInstanceOf(AndroidAccountSignInState.Failed::class.java)
-            coVerify { accounts.undoSignIn(plugin.id, 0L, any()) }
+            coVerify { accounts.undoSignIn(plugin.id, any()) }
         }
 
     @Test fun `leaving between the completion and its binding signs the plugin out again`() =
@@ -343,7 +343,7 @@ class AndroidAccountSignInViewModelTest {
             store.clear()
             runCurrent()
 
-            coVerify { accounts.undoSignIn(plugin.id, 0L, any()) }
+            coVerify { accounts.undoSignIn(plugin.id, any()) }
         }
 
     @Test fun `a build MicroG-RE-TV does not serve stops before the chooser`() {
@@ -358,7 +358,7 @@ class AndroidAccountSignInViewModelTest {
     @Test fun `an update that lands while the plugin completes is undone, not confirmed`() =
         runTest(dispatcher) {
             val widened = plugin.copy(manifest = plugin.manifest.copy(versionCode = 2))
-            coEvery { accounts.completeAccountSignIn(any(), any()) } coAnswers {
+            coEvery { accounts.completeAccountSignIn(any(), any(), any()) } coAnswers {
                 installed.value = PluginRegistryState(listOf(widened))
                 ProviderAccount.SignedIn("channel", "Listener")
             }
@@ -370,7 +370,7 @@ class AndroidAccountSignInViewModelTest {
 
             assertThat(vm.state.value).isInstanceOf(AndroidAccountSignInState.Failed::class.java)
             coVerify(exactly = 0) { microG.confirm(any(), any(), any()) }
-            coVerify { accounts.undoSignIn(plugin.id, 0L, any()) }
+            coVerify { accounts.undoSignIn(plugin.id, any()) }
         }
 
     @Test fun `the attempt dates from the account choice, so a sign-out during the prompts ends it`() =
@@ -404,7 +404,7 @@ class AndroidAccountSignInViewModelTest {
             runCurrent()
 
             assertThat(vm.state.value).isInstanceOf(AndroidAccountSignInState.Failed::class.java)
-            coVerify { accounts.undoSignIn(plugin.id, 0L, any()) }
+            coVerify { accounts.undoSignIn(plugin.id, any()) }
         }
 
     @Test fun `an update that moves the route to another method cancels the download and the account request`() =
@@ -453,13 +453,13 @@ class AndroidAccountSignInViewModelTest {
             vm.onPromptClosed()
             runCurrent()
             assertThat(vm.state.value).isEqualTo(AndroidAccountSignInState.Starting)
-            coVerify(exactly = 0) { accounts.completeAccountSignIn(any(), any()) }
+            coVerify(exactly = 0) { accounts.completeAccountSignIn(any(), any(), any()) }
         }
 
     @Test fun `a reinstall of the same release during the completion is undone, not confirmed`() =
         runTest(dispatcher) {
             val reinstalled = plugin.copy(installedAtMs = plugin.installedAtMs + 1)
-            coEvery { accounts.completeAccountSignIn(any(), any()) } coAnswers {
+            coEvery { accounts.completeAccountSignIn(any(), any(), any()) } coAnswers {
                 installed.value = PluginRegistryState(listOf(reinstalled))
                 ProviderAccount.SignedIn("channel", "Listener")
             }
@@ -471,7 +471,7 @@ class AndroidAccountSignInViewModelTest {
 
             assertThat(vm.state.value).isInstanceOf(AndroidAccountSignInState.Failed::class.java)
             coVerify(exactly = 0) { microG.confirm(any(), any(), any()) }
-            coVerify { accounts.undoSignIn(plugin.id, 0L, any()) }
+            coVerify { accounts.undoSignIn(plugin.id, any()) }
         }
 
     @Test fun `an install the sign-in committed opens no confirmation once it moved on or closed`() =
@@ -495,7 +495,7 @@ class AndroidAccountSignInViewModelTest {
 
     @Test fun `a completion that fails after the plugin may have kept the account signs it out`() =
         runTest(dispatcher) {
-            coEvery { accounts.completeAccountSignIn(any(), any()) } throws
+            coEvery { accounts.completeAccountSignIn(any(), any(), any()) } throws
                 PluginCallException(plugin.id, PluginError(PluginErrorCode.TIMEOUT, "took too long"))
             val vm = viewModel()
             vm.start()
@@ -505,6 +505,6 @@ class AndroidAccountSignInViewModelTest {
 
             assertThat(vm.state.value).isInstanceOf(AndroidAccountSignInState.Failed::class.java)
             coVerify { microG.forget(plugin.id, "google", "nonce") }
-            coVerify { accounts.undoSignIn(plugin.id, 0L, 0L) }
+            coVerify { accounts.undoSignIn(plugin.id, any()) }
         }
 }
