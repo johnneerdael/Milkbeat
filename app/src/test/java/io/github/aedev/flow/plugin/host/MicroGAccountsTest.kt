@@ -572,4 +572,22 @@ class MicroGAccountsTest {
             val error = failure { microG.token(plugin, AccountTokenRequest("google", AccountIdentity.YOUTUBE_MUSIC)) }
             assertThat(error?.code).isEqualTo(PluginErrorCode.SIGN_IN_REQUIRED)
         }
+
+    @Test fun `the sign-in that confirmed a binding can still forget it, and only that one`() =
+        runTest {
+            val microG = accounts()
+            every { gateway.hasAccount(any()) } returns true
+            every { gateway.token(any(), any()) } returns MicroGTokenResult.Granted("ya29.music")
+            val request = AccountTokenRequest("google", AccountIdentity.YOUTUBE_MUSIC)
+            val first = microG.bind(plugin, google, "listener@example.com")
+            microG.confirm(plugin.id, google.id, first)
+
+            microG.forget(plugin.id, google.id, first)
+            assertThat(failure { microG.token(plugin, request) }?.code).isEqualTo(PluginErrorCode.SIGN_IN_REQUIRED)
+
+            val second = microG.bind(plugin, google, "listener@example.com")
+            microG.confirm(plugin.id, google.id, second)
+            microG.forget(plugin.id, google.id, first)
+            assertThat(microG.token(plugin, request).token).isEqualTo("ya29.music")
+        }
 }

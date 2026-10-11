@@ -154,6 +154,7 @@ class MicroGAccounts internal constructor(
                 it[signerKey(plugin.id, method.id)] = plugin.signerFingerprint
                 it[identitiesKey(plugin.id, method.id)] = method.identities.joinToString(",") { identity -> identity.name }
                 it[pendingKey(plugin.id, method.id)] = nonce
+                it[nonceKey(plugin.id, method.id)] = nonce
             }
             checkNotRevoked(plugin.id)
         } catch (e: Throwable) {
@@ -184,7 +185,7 @@ class MicroGAccounts internal constructor(
             // is undone: still this run's nonce, no longer pending, so nothing newer replaced or revoked it.
             withContext(NonCancellable) {
                 store.edit {
-                    if (it[pendingKey(pluginId, methodId)] == null && provisional[key(pluginId, methodId).name] == nonce) {
+                    if (it[pendingKey(pluginId, methodId)] == null && it[nonceKey(pluginId, methodId)] == nonce) {
                         it.removeBinding(pluginId, methodId)
                     }
                 }
@@ -195,7 +196,7 @@ class MicroGAccounts internal constructor(
         }
     }
 
-    /** Forgets the binding the sign-in that wrote [nonce] left unfinished, and no other. */
+    /** Forgets the binding the sign-in that wrote [nonce] made, pending or confirmed, and no other. */
     suspend fun forget(
         pluginId: String,
         methodId: String,
@@ -203,7 +204,7 @@ class MicroGAccounts internal constructor(
     ) {
         // Withdrawn before the write, so no token request serves the abandoned binding while it is deleted.
         provisional.remove(key(pluginId, methodId).name, nonce)
-        store.edit { if (it[pendingKey(pluginId, methodId)] == nonce) it.removeBinding(pluginId, methodId) }
+        store.edit { if (it[nonceKey(pluginId, methodId)] == nonce) it.removeBinding(pluginId, methodId) }
     }
 
     private suspend fun forget(
@@ -222,6 +223,7 @@ class MicroGAccounts internal constructor(
         remove(signerKey(pluginId, methodId))
         remove(identitiesKey(pluginId, methodId))
         remove(pendingKey(pluginId, methodId))
+        remove(nonceKey(pluginId, methodId))
     }
 
     /**
@@ -370,6 +372,12 @@ class MicroGAccounts internal constructor(
         pluginId: String,
         methodId: String,
     ) = stringPreferencesKey(base(pluginId, methodId) + "#identities")
+
+    // Which sign-in wrote the binding; it outlasts the pending marker, so that sign-in can still undo it once confirmed.
+    private fun nonceKey(
+        pluginId: String,
+        methodId: String,
+    ) = stringPreferencesKey(base(pluginId, methodId) + "#nonce")
 
     private fun pendingKey(
         pluginId: String,
