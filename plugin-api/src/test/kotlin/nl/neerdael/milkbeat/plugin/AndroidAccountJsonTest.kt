@@ -27,7 +27,11 @@ class AndroidAccountJsonTest {
     }
 
     @Test fun `token calls keep their wire names`() {
-        val request = PluginJson.encodeToString(AccountTokenRequest.serializer(), AccountTokenRequest("google", AccountIdentity.YOUTUBE_MUSIC))
+        val request =
+            PluginJson.encodeToString(
+                AccountTokenRequest.serializer(),
+                AccountTokenRequest("google", AccountIdentity.YOUTUBE_MUSIC),
+            )
         assertThat(request).contains("\"identity\":\"youtubeMusic\"")
         assertThat(HostOperations.all.map { it.path }).containsAtLeast("signIn.token", "signIn.invalidateToken")
         assertThat(PluginOperations.all.map { it.path }).contains("signIn.completeAccount")

@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import nl.neerdael.milkbeat.catalog.ProviderAccount
+import nl.neerdael.milkbeat.plugin.AndroidAccountSignIn
 import nl.neerdael.milkbeat.plugin.DeviceCodeBeginRequest
 import nl.neerdael.milkbeat.plugin.DeviceCodeChallenge
 import nl.neerdael.milkbeat.plugin.DeviceCodePollResult
@@ -158,6 +159,19 @@ class PluginAccounts internal constructor(
         cancelRevalidation(pluginId)
         invalidatePlayback(pluginId)
         val account = host.call(pluginId, PluginOperations.completeSignIn, result)
+        _accounts.update { it + (pluginId to account) }
+        return account
+    }
+
+    /** Hands the plugin the MicroG account the listener chose and confirmed for its `androidAccount` sign-in. */
+    suspend fun completeAccountSignIn(
+        pluginId: String,
+        signIn: AndroidAccountSignIn,
+    ): ProviderAccount {
+        supersedeChecks(pluginId)
+        cancelRevalidation(pluginId)
+        invalidatePlayback(pluginId)
+        val account = host.call(pluginId, PluginOperations.completeAccountSignIn, signIn)
         _accounts.update { it + (pluginId to account) }
         return account
     }

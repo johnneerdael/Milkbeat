@@ -18,6 +18,8 @@ import androidx.test.platform.app.InstrumentationRegistry
 import io.github.aedev.flow.data.local.AppDatabase
 import io.github.aedev.flow.plugin.catalog.PluginAccounts
 import io.github.aedev.flow.plugin.catalog.toMusicTrack
+import io.github.aedev.flow.plugin.host.AndroidMicroGAccountGateway
+import io.github.aedev.flow.plugin.host.MicroGAccounts
 import io.github.aedev.flow.plugin.host.WebLoginRefresher
 import io.github.aedev.flow.plugin.install.PluginDownloadCodes
 import io.github.aedev.flow.plugin.install.PluginInstaller
@@ -201,7 +203,8 @@ class SpotifyPluginHostTest {
         val installer = PluginInstaller(client, registry, PluginDownloadCodes(context, PluginPublication(client)))
         val pack = assets.open("spotify.mbplugin").use(PluginPackageReader::read)
         val plugin = installer.install(installer.check(pack, "test://spotify"))
-        val host = PluginHost(context, registry, client, WebLoginRefresher(context))
+        val host =
+            PluginHost(context, registry, client, WebLoginRefresher(context), MicroGAccounts(context, AndroidMicroGAccountGateway(context)))
         try {
             block(host, plugin.id, registry, client)
         } finally {

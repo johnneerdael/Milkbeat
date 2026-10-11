@@ -64,6 +64,7 @@ internal class PluginHostApi(
     client: OkHttpClient,
     private val appLocale: () -> Locale,
     private val webLogin: WebLoginRefresher? = null,
+    private val microG: MicroGAccounts? = null,
 ) {
     private val http = PluginHttp(client, plugin.grantedNetwork)
     private val storage = PluginStore(File(dataDirectory, "storage.json"), plugin.manifest.permissions.storage)
@@ -122,6 +123,13 @@ internal class PluginHostApi(
             handler(HostOperations.sleep) { delay(it.ms.coerceIn(0, MAX_SLEEP_MS)) },
             handler(HostOperations.signInRefresh) { request ->
                 webLogin?.refresh(plugin, request) ?: throw HostCallException(PluginErrorCode.UNSUPPORTED, "Sign-in refresh is unavailable")
+            },
+            handler(HostOperations.signInToken) { request ->
+                microG?.token(plugin, request) ?: throw HostCallException(PluginErrorCode.UNSUPPORTED, "Account sign-in is unavailable")
+            },
+            handler(HostOperations.signInInvalidateToken) { request ->
+                microG?.invalidate(plugin, request)
+                    ?: throw HostCallException(PluginErrorCode.UNSUPPORTED, "Account sign-in is unavailable")
             },
         )
 

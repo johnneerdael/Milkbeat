@@ -36,6 +36,7 @@ import io.github.aedev.flow.ui.tv.components.TvScreenScaffold
 import io.github.aedev.flow.ui.tv.focus.tvInitialFocus
 import io.github.aedev.flow.ui.tv.theme.LocalTvDimens
 import kotlinx.coroutines.delay
+import nl.neerdael.milkbeat.plugin.AndroidAccountMethod
 import nl.neerdael.milkbeat.plugin.DeviceCodeMethod
 
 private const val SIGNED_IN_DISMISS_MS = 1_500L
@@ -47,6 +48,10 @@ fun TvAccountSignInScreen(
 ) {
     if (viewModel.signInMethod is DeviceCodeMethod) {
         TvDeviceCodeSignInScreen(onNavigateBack = onNavigateBack)
+        return
+    }
+    if (viewModel.signInMethod is AndroidAccountMethod) {
+        TvAndroidAccountSignInScreen(onNavigateBack = onNavigateBack)
         return
     }
     val state by viewModel.state.collectAsStateWithLifecycle()
