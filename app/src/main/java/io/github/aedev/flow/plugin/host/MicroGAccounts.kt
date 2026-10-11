@@ -14,6 +14,7 @@ import io.github.aedev.flow.data.local.safePreferencesDataStore
 import io.github.aedev.flow.plugin.registry.InstalledPlugin
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -89,11 +90,17 @@ class MicroGAccounts internal constructor(
         val nonce = UUID.randomUUID().toString()
         // Recorded before the write: until the write lands the stored record carries an older nonce, which fails.
         provisional[key(plugin.id, method.id).name] = nonce
-        store.edit {
-            it[key(plugin.id, method.id)] = accountName
-            it[signerKey(plugin.id, method.id)] = plugin.signerFingerprint
-            it[identitiesKey(plugin.id, method.id)] = method.identities.joinToString(",") { identity -> identity.name }
-            it[pendingKey(plugin.id, method.id)] = nonce
+        try {
+            store.edit {
+                it[key(plugin.id, method.id)] = accountName
+                it[signerKey(plugin.id, method.id)] = plugin.signerFingerprint
+                it[identitiesKey(plugin.id, method.id)] = method.identities.joinToString(",") { identity -> identity.name }
+                it[pendingKey(plugin.id, method.id)] = nonce
+            }
+        } catch (e: Throwable) {
+            // The write may have landed before a cancellation reached us; the caller never learns the nonce.
+            withContext(NonCancellable) { forget(plugin.id, method.id, nonce) }
+            throw e
         }
         return nonce
     }

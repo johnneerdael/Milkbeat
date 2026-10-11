@@ -2,12 +2,15 @@ package io.github.aedev.flow.plugin.host
 
 import android.accounts.AuthenticatorException
 import android.content.Intent
+import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import androidx.datastore.preferences.core.Preferences
 import com.google.common.truth.Truth.assertThat
 import io.github.aedev.flow.plugin.registry.InstalledPlugin
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -274,5 +277,31 @@ class MicroGAccountsTest {
             second.join()
 
             assertThat(order).containsExactly("first start", "first end", "second").inOrder()
+        }
+
+    @Test fun `a bind cancelled after its write leaves no binding this run would accept`() =
+        runTest {
+            val real = PreferenceDataStoreFactory.create(scope = backgroundScope) { temp.newFile("cancelled.preferences_pb") }
+            var cancelNext = true
+            // A store whose write lands and whose caller is cancelled before it hears so.
+            val store =
+                object : DataStore<Preferences> by real {
+                    override suspend fun updateData(transform: suspend (t: Preferences) -> Preferences): Preferences {
+                        val written = real.updateData(transform)
+                        if (cancelNext) {
+                            cancelNext = false
+                            throw CancellationException("screen left")
+                        }
+                        return written
+                    }
+                }
+            val microG = MicroGAccounts(gateway, store, StandardTestDispatcher(testScheduler))
+            every { gateway.hasAccount(any()) } returns true
+            every { gateway.token(any(), any()) } returns MicroGTokenResult.Granted("ya29.music")
+
+            assertThat(runCatching { microG.bind(plugin, google, "listener@example.com") }.isFailure).isTrue()
+
+            val error = failure { microG.token(plugin, AccountTokenRequest("google", AccountIdentity.YOUTUBE_MUSIC)) }
+            assertThat(error?.code).isEqualTo(PluginErrorCode.SIGN_IN_REQUIRED)
         }
 }
