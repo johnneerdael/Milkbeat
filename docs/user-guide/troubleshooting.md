@@ -64,6 +64,8 @@ Spotify has no audio of its own. Keep at least one audio provider in the order, 
 
 Milkbeat buffers up to about 16 MB of a streamed song ahead (usually all of it) and, when a stream link fails, requests a fresh one for the same recording and resumes at the same position. Playback can still stop if the song is not yet buffered far enough when the link fails, for example right after it starts, while a music video's picture shares the buffer, or on a slow network, and the audio provider then cannot supply a new stream in time. Retry later, or check whether YouTube is limiting your network.
 
+When switching to a streamed music video, the loading indicator stays over the visuals until 30 seconds of video are buffered ahead of the music and the first frame is ready. Near the end of a track, only the remaining duration is required. On a slow connection the visuals can stay up longer; use the view button to switch back to the visualizer and cancel preparation.
+
 ## Music becomes silent while the player keeps advancing
 
 Milkbeat checks actual audio-frame progress for normal decoded TV audio (PCM). After about five seconds

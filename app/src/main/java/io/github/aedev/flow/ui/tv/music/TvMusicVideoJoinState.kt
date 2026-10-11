@@ -4,10 +4,13 @@ package io.github.aedev.flow.ui.tv.music
 internal class TvMusicVideoJoinState {
     private var surfaceAvailable = false
     private var renderedFirstFrame = false
+    private var failed = false
     var visible = false
     var playWhenReady = false
 
-    val showIndicator: Boolean get() = visible && playWhenReady && !renderedFirstFrame
+    val pictureReady: Boolean get() = surfaceAvailable && renderedFirstFrame
+
+    val showIndicator: Boolean get() = visible && playWhenReady && !pictureReady && !failed
 
     fun surfaceChanged(available: Boolean) {
         surfaceAvailable = available
@@ -15,10 +18,16 @@ internal class TvMusicVideoJoinState {
     }
 
     fun itemChanged() {
+        failed = false
+        renderedFirstFrame = false
+    }
+
+    fun onPlayerError() {
+        failed = true
         renderedFirstFrame = false
     }
 
     fun onRenderedFirstFrame() {
-        if (surfaceAvailable) renderedFirstFrame = true
+        if (surfaceAvailable && !failed) renderedFirstFrame = true
     }
 }

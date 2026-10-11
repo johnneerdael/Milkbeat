@@ -6,6 +6,39 @@ import org.junit.Test
 /** State policy only: no claim that mocked callbacks establish actual rendered video on a device. */
 class TvMusicVideoJoinStateTest {
     @Test
+    fun `terminal failure hides the spinner rejects stale frames and leaves the backdrop visible`() {
+        val state =
+            TvMusicVideoJoinState().apply {
+                visible = true
+                playWhenReady = true
+            }
+        state.surfaceChanged(true)
+        state.onPlayerError()
+        state.onRenderedFirstFrame()
+        assertThat(state.pictureReady).isFalse()
+        assertThat(state.showIndicator).isFalse()
+        state.itemChanged()
+        assertThat(state.showIndicator).isTrue()
+    }
+
+    @Test
+    fun `first picture readiness is independent from spinner visibility and resets for another item`() {
+        val state = TvMusicVideoJoinState()
+        state.surfaceChanged(true)
+        assertThat(state.pictureReady).isFalse()
+        state.onRenderedFirstFrame()
+        assertThat(state.pictureReady).isTrue()
+        state.visible = false
+        state.playWhenReady = false
+        assertThat(state.pictureReady).isTrue()
+        state.itemChanged()
+        assertThat(state.pictureReady).isFalse()
+        state.onRenderedFirstFrame()
+        state.surfaceChanged(false)
+        assertThat(state.pictureReady).isFalse()
+    }
+
+    @Test
     fun `waiting animates only while the view is visible and playback is requested`() {
         val state = TvMusicVideoJoinState()
         assertThat(state.showIndicator).isFalse()

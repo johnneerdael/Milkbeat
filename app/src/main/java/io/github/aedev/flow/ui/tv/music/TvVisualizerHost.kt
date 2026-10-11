@@ -76,7 +76,8 @@ internal class TvVisualizerHost(
             },
         )
 
-    val view = VisualizerView(context)
+    // Keep the visible GL surface above the video surface being prepared underneath it.
+    val view = VisualizerView(context).apply { setZOrderMediaOverlay(true) }
 
     /** The user's timing offset; read by the render thread every frame. */
     @Volatile

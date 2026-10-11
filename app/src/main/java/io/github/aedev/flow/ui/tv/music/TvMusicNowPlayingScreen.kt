@@ -287,22 +287,14 @@ fun TvMusicNowPlayingScreen(
                     }
                 },
     ) {
-        when (shownView) {
-            NowPlayingView.VIDEO -> {
-                TvMusicVideoSurface(player = manager.player, modifier = Modifier.fillMaxSize())
-            }
-
-            NowPlayingView.VISUALIZER -> {
-                visualizer?.background?.invoke()
-            }
-
-            NowPlayingView.STATIC -> {
-                TvNowPlayingArtwork(
-                    artworkUrl = playbackArtwork?.forTrack(track?.videoId) ?: artworkUrl,
-                    fallbackArtworkUrl = artworkUrl,
-                )
-            }
-        }
+        TvMusicNowPlayingBackdrop(
+            view = shownView,
+            player = manager.player,
+            trackKey = track?.videoId,
+            visualizer = visualizer,
+            artworkUrl = playbackArtwork?.forTrack(track?.videoId) ?: artworkUrl,
+            fallbackArtworkUrl = artworkUrl,
+        )
 
         if (shownView != NowPlayingView.VIDEO) {
             TvNowPlayingTrackCorner(

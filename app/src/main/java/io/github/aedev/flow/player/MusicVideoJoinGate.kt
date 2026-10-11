@@ -283,7 +283,7 @@ internal class MusicVideoJoinGate :
     }
 
     private companion object {
-        const val INITIAL_VIDEO_BUFFER_MS = 2_000L
+        const val INITIAL_VIDEO_BUFFER_MS = 30_000L
     }
 }
 
