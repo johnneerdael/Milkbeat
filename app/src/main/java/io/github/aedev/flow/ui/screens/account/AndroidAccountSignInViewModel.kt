@@ -199,8 +199,13 @@ class AndroidAccountSignInViewModel
         }
 
         private fun confirmNext() {
-            val method = method ?: return
             val account = accountName ?: return
+            val method = method
+            if (method == null || method.identities.isEmpty()) {
+                // An update removed or emptied the method while a chooser or prompt was open.
+                _state.value = AndroidAccountSignInState.Failed()
+                return
+            }
             _state.value = AndroidAccountSignInState.Waiting
             viewModelScope.launch {
                 try {

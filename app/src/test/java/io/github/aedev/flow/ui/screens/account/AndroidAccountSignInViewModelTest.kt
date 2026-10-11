@@ -298,4 +298,15 @@ class AndroidAccountSignInViewModelTest {
                 microG.confirm(plugin.id, "google")
             }
         }
+
+    @Test fun `an update that removes the method while a prompt is open fails the attempt instead of waiting`() {
+        val vm = viewModel()
+        vm.start()
+        vm.onLaunched()
+        installed.value = PluginRegistryState(listOf(plugin.copy(manifest = plugin.manifest.copy(signIn = emptyList()))))
+
+        vm.onAccountChosen(account)
+
+        assertThat(vm.state.value).isEqualTo(AndroidAccountSignInState.Failed())
+    }
 }
