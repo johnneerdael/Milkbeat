@@ -1,5 +1,6 @@
 package io.github.aedev.flow.updater
 
+import android.content.ActivityNotFoundException
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -21,8 +22,16 @@ class MicroGInstallReceiver : BroadcastReceiver() {
     ) {
         when (val status = intent.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE)) {
             PackageInstaller.STATUS_PENDING_USER_ACTION -> {
-                IntentCompat.getParcelableExtra(intent, Intent.EXTRA_INTENT, Intent::class.java)?.let { confirm ->
-                    context.startActivity(confirm.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                val confirm = IntentCompat.getParcelableExtra(intent, Intent.EXTRA_INTENT, Intent::class.java)
+                // An installer whose confirmation cannot be started fails the install instead of the app.
+                try {
+                    confirm?.let { context.startActivity(it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } ?: installer.reportFailure()
+                } catch (e: ActivityNotFoundException) {
+                    Log.w(TAG, "MicroG-RE-TV install confirmation could not open", e)
+                    installer.reportFailure()
+                } catch (e: SecurityException) {
+                    Log.w(TAG, "MicroG-RE-TV install confirmation could not open", e)
+                    installer.reportFailure()
                 }
             }
 
