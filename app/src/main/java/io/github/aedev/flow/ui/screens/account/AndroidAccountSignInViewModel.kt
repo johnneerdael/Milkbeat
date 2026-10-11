@@ -79,7 +79,7 @@ class AndroidAccountSignInViewModel
     @Inject
     constructor(
         savedStateHandle: SavedStateHandle,
-        registry: PluginRegistry,
+        private val registry: PluginRegistry,
         private val accounts: PluginAccounts,
         private val microG: MicroGAccounts,
         private val installer: MicroGInstaller,
@@ -225,7 +225,8 @@ class AndroidAccountSignInViewModel
             method: AndroidAccountMethod,
             account: String,
         ) {
-            microG.bind(pluginId, method.id, account)
+            val plugin = registry.state.value.plugin(pluginId) ?: error("The plugin is no longer installed")
+            microG.bind(plugin, method.id, account)
             try {
                 val signedIn =
                     accounts.completeAccountSignIn(pluginId, AndroidAccountSignIn(method.id, account)) as? ProviderAccount.SignedIn

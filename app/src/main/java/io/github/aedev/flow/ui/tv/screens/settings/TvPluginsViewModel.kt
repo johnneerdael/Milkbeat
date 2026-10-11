@@ -185,7 +185,10 @@ class TvPluginsViewModel
         }
 
         fun remove(id: String) {
-            viewModelScope.launch { registry.remove(id) }
+            viewModelScope.launch {
+                registry.remove(id)
+                accounts.removed(id)
+            }
         }
 
         fun select(selection: ProviderSelection) {

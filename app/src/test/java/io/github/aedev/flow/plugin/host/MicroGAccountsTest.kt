@@ -72,7 +72,7 @@ class MicroGAccountsTest {
             val microG = accounts()
             every { gateway.hasAccount("listener@example.com") } returns true
             every { gateway.token("listener@example.com", AccountIdentity.YOUTUBE_MUSIC) } returns MicroGTokenResult.Granted("ya29.music")
-            microG.bind(plugin.id, "google", "listener@example.com")
+            microG.bind(plugin, "google", "listener@example.com")
 
             val token = microG.token(plugin, AccountTokenRequest("google", AccountIdentity.YOUTUBE_MUSIC))
 
@@ -90,7 +90,7 @@ class MicroGAccountsTest {
     @Test fun `an identity the method did not declare is refused before MicroG is asked`() =
         runTest {
             val microG = accounts()
-            microG.bind(plugin.id, "google", "listener@example.com")
+            microG.bind(plugin, "google", "listener@example.com")
 
             val error = failure { microG.token(plugin, AccountTokenRequest("google", AccountIdentity.YOUTUBE)) }
 
@@ -108,7 +108,7 @@ class MicroGAccountsTest {
     @Test fun `a withdrawn grant or a removed account expires the sign-in`() =
         runTest {
             val microG = accounts()
-            microG.bind(plugin.id, "google", "listener@example.com")
+            microG.bind(plugin, "google", "listener@example.com")
             every { gateway.hasAccount("listener@example.com") } returns true
             every { gateway.token(any(), any()) } returns MicroGTokenResult.NeedsConsent(mockk<Intent>())
             val request = AccountTokenRequest("google", AccountIdentity.YOUTUBE_MUSIC)
@@ -122,7 +122,7 @@ class MicroGAccountsTest {
     @Test fun `an authenticator failure is reported as unavailable`() =
         runTest {
             val microG = accounts()
-            microG.bind(plugin.id, "google", "listener@example.com")
+            microG.bind(plugin, "google", "listener@example.com")
             every { gateway.hasAccount(any()) } returns true
             every { gateway.token(any(), any()) } throws AuthenticatorException("bind failure")
 
@@ -134,7 +134,7 @@ class MicroGAccountsTest {
     @Test fun `forgetting the binding ends token access and invalidation reaches MicroG`() =
         runTest {
             val microG = accounts()
-            microG.bind(plugin.id, "google", "listener@example.com")
+            microG.bind(plugin, "google", "listener@example.com")
             microG.invalidate(plugin, AccountTokenInvalidation("google", "ya29.old"))
             verify { gateway.invalidate("ya29.old") }
 
@@ -142,5 +142,35 @@ class MicroGAccountsTest {
 
             val error = failure { microG.token(plugin, AccountTokenRequest("google", AccountIdentity.YOUTUBE_MUSIC)) }
             assertThat(error?.code).isEqualTo(PluginErrorCode.SIGN_IN_REQUIRED)
+        }
+
+    @Test fun `a plugin under the same id from another signer inherits no account`() =
+        runTest {
+            val microG = accounts()
+            every { gateway.hasAccount(any()) } returns true
+            every { gateway.token(any(), any()) } returns MicroGTokenResult.Granted("ya29.music")
+            microG.bind(plugin, "google", "listener@example.com")
+            val impostor = plugin.copy(signerFingerprint = "another-signer")
+            val request = AccountTokenRequest("google", AccountIdentity.YOUTUBE_MUSIC)
+
+            assertThat(failure { microG.token(impostor, request) }?.code).isEqualTo(PluginErrorCode.SIGN_IN_REQUIRED)
+            assertThat(failure { microG.token(plugin, request) }?.code).isEqualTo(PluginErrorCode.SIGN_IN_REQUIRED)
+            verify(exactly = 0) { gateway.token(any(), any()) }
+        }
+
+    @Test fun `sign-out or removal forgets every binding of the plugin and only its own`() =
+        runTest {
+            val microG = accounts()
+            every { gateway.hasAccount(any()) } returns true
+            every { gateway.token(any(), any()) } returns MicroGTokenResult.Granted("ya29.music")
+            val other = plugin.copy(manifest = plugin.manifest.copy(id = "dev.youtube.other"))
+            microG.bind(plugin, "google", "listener@example.com")
+            microG.bind(other, "google", "listener@example.com")
+
+            microG.forgetAll(plugin.id)
+
+            val request = AccountTokenRequest("google", AccountIdentity.YOUTUBE_MUSIC)
+            assertThat(failure { microG.token(plugin, request) }?.code).isEqualTo(PluginErrorCode.SIGN_IN_REQUIRED)
+            assertThat(microG.token(other, request).token).isEqualTo("ya29.music")
         }
 }

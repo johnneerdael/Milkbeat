@@ -340,4 +340,16 @@ class PluginAccountsTest {
                 assertThat(accounts.accounts.value["soundcloud"]).isEqualTo(old)
             }
         }
+
+    @Test fun `signing out and removing a plugin end its host-held account bindings`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val forgotten = mutableListOf<String>()
+            val accounts = PluginAccounts(host, backgroundScope, { testScheduler.currentTime }, { forgotten += it })
+            coEvery { host.call("youtube", PluginOperations.signOut, Unit) } throws failure(PluginErrorCode.UNAVAILABLE)
+
+            runCatching { accounts.signOut("youtube") }
+            accounts.removed("spotify")
+
+            assertThat(forgotten).containsExactly("youtube", "spotify").inOrder()
+        }
 }

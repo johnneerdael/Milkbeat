@@ -3,6 +3,7 @@ package io.github.aedev.flow.plugin.catalog
 import android.os.SystemClock
 import android.util.Log
 import io.github.aedev.flow.plugin.PluginHost
+import io.github.aedev.flow.plugin.host.MicroGAccounts
 import io.github.aedev.flow.plugin.runtime.PluginCallException
 import io.github.aedev.flow.utils.PerformanceDispatcher
 import kotlinx.coroutines.CancellationException
@@ -43,12 +44,21 @@ class PluginAccounts internal constructor(
     private val host: PluginHost,
     private val scope: CoroutineScope,
     private val nowMs: () -> Long,
+    /** Ends what the host itself holds for a plugin's sign-in: its MicroG account bindings. */
+    private val forgetBindings: suspend (String) -> Unit = {},
 ) {
-    @Inject
     constructor(host: PluginHost) : this(
         host,
         CoroutineScope(SupervisorJob() + PerformanceDispatcher.networkIO),
         SystemClock::elapsedRealtime,
+    )
+
+    @Inject
+    constructor(host: PluginHost, microG: MicroGAccounts) : this(
+        host,
+        CoroutineScope(SupervisorJob() + PerformanceDispatcher.networkIO),
+        SystemClock::elapsedRealtime,
+        microG::forgetAll,
     )
 
     private val _accounts = MutableStateFlow<Map<String, ProviderAccount>>(emptyMap())
@@ -225,12 +235,17 @@ class PluginAccounts internal constructor(
     }
 
     suspend fun signOut(pluginId: String) {
+        // The host's bindings go first, so the plugin can mint no token whatever its own sign-out does.
+        forgetBindings(pluginId)
         invalidatePlayback(pluginId)
         supersedeChecks(pluginId)
         cancelRevalidation(pluginId)
         host.call(pluginId, PluginOperations.signOut, Unit)
         _accounts.update { it + (pluginId to ProviderAccount.Anonymous) }
     }
+
+    /** A removed plugin keeps no account binding a later plugin under its id could inherit. */
+    suspend fun removed(pluginId: String) = forgetBindings(pluginId)
 
     /** A call said the plugin's sign-in expired; the plugin is asked again right away whether it still signs in. */
     fun expired(pluginId: String) {

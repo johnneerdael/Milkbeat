@@ -49,7 +49,7 @@ class TvMusicTabsViewModelTest {
                 every { folders } returns flowOf(listOf(MusicFolder(name = "Music", kind = MusicFolderKind.LOCAL)))
             }
         val store = PreferenceDataStoreFactory.create(scope = backgroundScope) { temp.newFile("music_tabs.preferences_pb") }
-        return MusicSources(registry, PluginAccounts(mockk<PluginHost>(), backgroundScope) { 0L }, folders, store, backgroundScope)
+        return MusicSources(registry, PluginAccounts(mockk<PluginHost>(), backgroundScope, nowMs = { 0L }), folders, store, backgroundScope)
     }
 
     @Test
