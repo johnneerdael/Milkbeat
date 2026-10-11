@@ -328,7 +328,7 @@ class AndroidAccountSignInViewModelTest {
             runCurrent()
 
             assertThat(vm.state.value).isInstanceOf(AndroidAccountSignInState.Failed::class.java)
-            coVerify { accounts.signOut(plugin.id) }
+            coVerify { accounts.undoSignIn(plugin.id, 0L, any()) }
         }
 
     @Test fun `leaving between the completion and its binding signs the plugin out again`() =
@@ -343,7 +343,7 @@ class AndroidAccountSignInViewModelTest {
             store.clear()
             runCurrent()
 
-            coVerify { accounts.signOut(plugin.id) }
+            coVerify { accounts.undoSignIn(plugin.id, 0L, any()) }
         }
 
     @Test fun `a build MicroG-RE-TV does not serve stops before the chooser`() {
@@ -370,7 +370,7 @@ class AndroidAccountSignInViewModelTest {
 
             assertThat(vm.state.value).isInstanceOf(AndroidAccountSignInState.Failed::class.java)
             coVerify(exactly = 0) { microG.confirm(any(), any(), any()) }
-            coVerify { accounts.signOut(plugin.id) }
+            coVerify { accounts.undoSignIn(plugin.id, 0L, any()) }
         }
 
     @Test fun `the attempt dates from the account choice, so a sign-out during the prompts ends it`() =
@@ -404,7 +404,7 @@ class AndroidAccountSignInViewModelTest {
             runCurrent()
 
             assertThat(vm.state.value).isInstanceOf(AndroidAccountSignInState.Failed::class.java)
-            coVerify { accounts.signOut(plugin.id) }
+            coVerify { accounts.undoSignIn(plugin.id, 0L, any()) }
         }
 
     @Test fun `an update that moves the route to another method cancels the download and the account request`() =
@@ -471,7 +471,7 @@ class AndroidAccountSignInViewModelTest {
 
             assertThat(vm.state.value).isInstanceOf(AndroidAccountSignInState.Failed::class.java)
             coVerify(exactly = 0) { microG.confirm(any(), any(), any()) }
-            coVerify { accounts.signOut(plugin.id) }
+            coVerify { accounts.undoSignIn(plugin.id, 0L, any()) }
         }
 
     @Test fun `an install the sign-in committed opens no confirmation once it moved on or closed`() =
@@ -505,6 +505,6 @@ class AndroidAccountSignInViewModelTest {
 
             assertThat(vm.state.value).isInstanceOf(AndroidAccountSignInState.Failed::class.java)
             coVerify { microG.forget(plugin.id, "google", "nonce") }
-            coVerify { accounts.signOut(plugin.id) }
+            coVerify { accounts.undoSignIn(plugin.id, 0L, 0L) }
         }
 }

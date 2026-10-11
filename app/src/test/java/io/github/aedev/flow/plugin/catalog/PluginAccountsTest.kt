@@ -17,6 +17,7 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import nl.neerdael.milkbeat.catalog.Artwork
 import nl.neerdael.milkbeat.catalog.ProviderAccount
+import nl.neerdael.milkbeat.plugin.AndroidAccountSignIn
 import nl.neerdael.milkbeat.plugin.DeviceCodeSession
 import nl.neerdael.milkbeat.plugin.PluginError
 import nl.neerdael.milkbeat.plugin.PluginErrorCode
@@ -357,5 +358,28 @@ class PluginAccountsTest {
 
             assertThat(forgotten).containsExactly("youtube", "spotify").inOrder()
             assertThat(removed).isTrue()
+        }
+
+    @Test fun `an obsolete sign-in's rollback leaves the account another method completed meanwhile`() =
+        runTest {
+            coEvery { host.call("youtube", PluginOperations.completeAccountSignIn, any()) } returns ProviderAccount.SignedIn("microg")
+            coEvery { host.call("youtube", PluginOperations.completeSignIn, any()) } returns ProviderAccount.SignedIn("web")
+            coEvery { host.call("youtube", PluginOperations.signOut, Unit) } returns Unit
+            val accounts = accounts()
+
+            val mark = accounts.completionMark("youtube")
+            accounts.completeAccountSignIn("youtube", AndroidAccountSignIn("google", "listener@example.com"))
+            accounts.complete("youtube", WebLoginResult(method = "web", cookies = "SAPISID=x"))
+            accounts.undoSignIn("youtube", mark, own = 1)
+
+            coVerify(exactly = 0) { host.call("youtube", PluginOperations.signOut, Unit) }
+            assertThat(accounts.accounts.value["youtube"]).isEqualTo(ProviderAccount.SignedIn("web"))
+
+            val alone = accounts.completionMark("youtube")
+            accounts.completeAccountSignIn("youtube", AndroidAccountSignIn("google", "listener@example.com"))
+            accounts.undoSignIn("youtube", alone, own = 1)
+
+            coVerify(exactly = 1) { host.call("youtube", PluginOperations.signOut, Unit) }
+            assertThat(accounts.accounts.value["youtube"]).isEqualTo(ProviderAccount.Anonymous)
         }
 }

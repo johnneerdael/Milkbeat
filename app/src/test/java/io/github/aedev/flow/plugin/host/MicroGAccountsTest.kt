@@ -544,4 +544,32 @@ class MicroGAccountsTest {
                 }
             assertThat(attempt.isFailure).isTrue()
         }
+
+    @Test fun `a confirmation whose write lands before its caller is cancelled leaves no binding`() =
+        runTest {
+            val real = PreferenceDataStoreFactory.create(scope = backgroundScope) { temp.newFile("confirmed.preferences_pb") }
+            var cancelNext = false
+            val store =
+                object : DataStore<Preferences> by real {
+                    override suspend fun updateData(transform: suspend (t: Preferences) -> Preferences): Preferences {
+                        val written = real.updateData(transform)
+                        if (cancelNext) {
+                            cancelNext = false
+                            throw CancellationException("screen left")
+                        }
+                        return written
+                    }
+                }
+            val microG = MicroGAccounts(gateway, store, StandardTestDispatcher(testScheduler))
+            every { gateway.hasAccount(any()) } returns true
+            every { gateway.token(any(), any()) } returns MicroGTokenResult.Granted("ya29.music")
+            val nonce = microG.bind(plugin, google, "listener@example.com")
+            cancelNext = true
+
+            assertThat(runCatching { microG.confirm(plugin.id, google.id, nonce) }.isFailure).isTrue()
+            microG.forget(plugin.id, google.id, nonce)
+
+            val error = failure { microG.token(plugin, AccountTokenRequest("google", AccountIdentity.YOUTUBE_MUSIC)) }
+            assertThat(error?.code).isEqualTo(PluginErrorCode.SIGN_IN_REQUIRED)
+        }
 }

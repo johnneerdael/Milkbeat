@@ -19,6 +19,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import nl.neerdael.milkbeat.catalog.ProviderAccount
 import nl.neerdael.milkbeat.plugin.AndroidAccountSignIn
 import nl.neerdael.milkbeat.plugin.DeviceCodeBeginRequest
@@ -161,30 +163,60 @@ class PluginAccounts internal constructor(
         }
     }
 
+    // Sign-ins each plugin completed, by any method. Completions and the undoing of one run one at a time per plugin,
+    // so an obsolete sign-in's rollback never ends the account another method completed meanwhile.
+    private val completions = ConcurrentHashMap<String, Long>()
+    private val completionLocks = ConcurrentHashMap<String, Mutex>()
+
+    private suspend fun <T> completing(
+        pluginId: String,
+        complete: suspend () -> T,
+    ): T =
+        completionLocks.getOrPut(pluginId) { Mutex() }.withLock {
+            complete().also { completions.merge(pluginId, 1L, Long::plus) }
+        }
+
+    /** How many sign-ins [pluginId] has completed, by any method. */
+    fun completionMark(pluginId: String): Long = completions[pluginId] ?: 0L
+
+    /**
+     * Signs out a sign-in that began at [mark] and completed [own] times itself, unless another sign-in of the plugin
+     * completed meanwhile.
+     */
+    suspend fun undoSignIn(
+        pluginId: String,
+        mark: Long,
+        own: Long,
+    ) = completionLocks.getOrPut(pluginId) { Mutex() }.withLock {
+        if (completionMark(pluginId) == mark + own) signOut(pluginId)
+    }
+
     suspend fun complete(
         pluginId: String,
         result: WebLoginResult,
-    ): ProviderAccount {
-        supersedeChecks(pluginId)
-        cancelRevalidation(pluginId)
-        invalidatePlayback(pluginId)
-        val account = host.call(pluginId, PluginOperations.completeSignIn, result)
-        _accounts.update { it + (pluginId to account) }
-        return account
-    }
+    ): ProviderAccount =
+        completing(pluginId) {
+            supersedeChecks(pluginId)
+            cancelRevalidation(pluginId)
+            invalidatePlayback(pluginId)
+            val account = host.call(pluginId, PluginOperations.completeSignIn, result)
+            _accounts.update { it + (pluginId to account) }
+            account
+        }
 
     /** Hands the plugin the MicroG account the listener chose and confirmed for its `androidAccount` sign-in. */
     suspend fun completeAccountSignIn(
         pluginId: String,
         signIn: AndroidAccountSignIn,
-    ): ProviderAccount {
-        supersedeChecks(pluginId)
-        cancelRevalidation(pluginId)
-        invalidatePlayback(pluginId)
-        val account = host.call(pluginId, PluginOperations.completeAccountSignIn, signIn)
-        _accounts.update { it + (pluginId to account) }
-        return account
-    }
+    ): ProviderAccount =
+        completing(pluginId) {
+            supersedeChecks(pluginId)
+            cancelRevalidation(pluginId)
+            invalidatePlayback(pluginId)
+            val account = host.call(pluginId, PluginOperations.completeAccountSignIn, signIn)
+            _accounts.update { it + (pluginId to account) }
+            account
+        }
 
     suspend fun beginDeviceSignIn(
         pluginId: String,
@@ -222,17 +254,18 @@ class PluginAccounts internal constructor(
     suspend fun acceptDeviceSignIn(
         pluginId: String,
         session: String,
-    ): ProviderAccount.SignedIn {
-        invalidatePlayback(pluginId)
-        val account =
-            host.call(pluginId, PluginOperations.confirmSignIn, DeviceCodeSession(session)) as? ProviderAccount.SignedIn
-                ?: error("Pairing confirmation did not return a signed-in account")
-        require(account.key.isNotBlank()) { "Pairing confirmation returned an empty account identity" }
-        supersedeChecks(pluginId)
-        cancelRevalidation(pluginId)
-        _accounts.update { it + (pluginId to account) }
-        return account
-    }
+    ): ProviderAccount.SignedIn =
+        completing(pluginId) {
+            invalidatePlayback(pluginId)
+            val account =
+                host.call(pluginId, PluginOperations.confirmSignIn, DeviceCodeSession(session)) as? ProviderAccount.SignedIn
+                    ?: error("Pairing confirmation did not return a signed-in account")
+            require(account.key.isNotBlank()) { "Pairing confirmation returned an empty account identity" }
+            supersedeChecks(pluginId)
+            cancelRevalidation(pluginId)
+            _accounts.update { it + (pluginId to account) }
+            account
+        }
 
     // The host's bindings end first and stay ended through the plugin's own sign-out, whatever it does.
     suspend fun signOut(pluginId: String) =

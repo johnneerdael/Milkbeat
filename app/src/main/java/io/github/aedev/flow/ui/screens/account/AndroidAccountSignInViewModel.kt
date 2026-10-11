@@ -303,15 +303,17 @@ class AndroidAccountSignInViewModel
             method: AndroidAccountMethod,
             account: String,
         ) {
+            val mark = accounts.completionMark(pluginId)
             var nonce: String? = null
             var completing = false
+            var returned = false
             var confirmed = false
             try {
                 nonce = microG.bind(plugin, method, account)
                 completing = true
-                val completed =
-                    accounts.completeAccountSignIn(pluginId, AndroidAccountSignIn(method.id, account)) as? ProviderAccount.SignedIn
-                        ?: error("The plugin did not accept the account")
+                val answer = accounts.completeAccountSignIn(pluginId, AndroidAccountSignIn(method.id, account))
+                returned = true
+                val completed = answer as? ProviderAccount.SignedIn ?: error("The plugin did not accept the account")
                 // An update during the completion may need more than was confirmed: undo it and sign in again.
                 check(unchanged(plugin, method)) { "The plugin changed during sign-in" }
                 microG.confirm(pluginId, method.id, nonce)
@@ -326,11 +328,11 @@ class AndroidAccountSignInViewModel
                 _state.value = AndroidAccountSignInState.Failed(failureMessage(e))
             } finally {
                 // An unfinished sign-in leaves no binding. Once the plugin was asked to complete, it may have kept the
-                // account whatever it answered, so it is signed out too and believes in no account without a token.
+                // account whatever it answered, so it is signed out too, unless another method signed it in meanwhile.
                 if (!confirmed) {
                     withContext(NonCancellable) {
                         nonce?.let { microG.forget(pluginId, method.id, it) }
-                        if (completing) runCatching { accounts.signOut(pluginId) }
+                        if (completing) runCatching { accounts.undoSignIn(pluginId, mark, if (returned) 1L else 0L) }
                     }
                 }
             }

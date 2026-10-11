@@ -171,14 +171,28 @@ class MicroGAccounts internal constructor(
         nonce: String,
     ) {
         val attempt = currentCoroutineContext()[Attempt]?.takeIf { it.pluginId == pluginId }
-        store.edit {
-            check(it[pendingKey(pluginId, methodId)] == nonce) { "The binding was replaced or ended meanwhile" }
-            check(
-                attempt == null || !revoked(pluginId, attempt.revocation),
-            ) { "The plugin was signed out or removed during sign-in" }
-            it.remove(pendingKey(pluginId, methodId))
+        try {
+            store.edit {
+                check(it[pendingKey(pluginId, methodId)] == nonce) { "The binding was replaced or ended meanwhile" }
+                check(
+                    attempt == null || !revoked(pluginId, attempt.revocation),
+                ) { "The plugin was signed out or removed during sign-in" }
+                it.remove(pendingKey(pluginId, methodId))
+            }
+        } catch (e: Throwable) {
+            // The write may have landed before a cancellation reached us. A confirmation the caller never learned of
+            // is undone: still this run's nonce, no longer pending, so nothing newer replaced or revoked it.
+            withContext(NonCancellable) {
+                store.edit {
+                    if (it[pendingKey(pluginId, methodId)] == null && provisional[key(pluginId, methodId).name] == nonce) {
+                        it.removeBinding(pluginId, methodId)
+                    }
+                }
+            }
+            throw e
+        } finally {
+            provisional.remove(key(pluginId, methodId).name, nonce)
         }
-        provisional.remove(key(pluginId, methodId).name, nonce)
     }
 
     /** Forgets the binding the sign-in that wrote [nonce] left unfinished, and no other. */
