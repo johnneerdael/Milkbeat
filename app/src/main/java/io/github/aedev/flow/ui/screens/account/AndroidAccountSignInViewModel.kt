@@ -226,7 +226,7 @@ class AndroidAccountSignInViewModel
             account: String,
         ) {
             val plugin = registry.state.value.plugin(pluginId) ?: error("The plugin is no longer installed")
-            microG.bind(plugin, method.id, account)
+            microG.bind(plugin, method, account)
             try {
                 val signedIn =
                     accounts.completeAccountSignIn(pluginId, AndroidAccountSignIn(method.id, account)) as? ProviderAccount.SignedIn

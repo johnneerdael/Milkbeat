@@ -28,10 +28,11 @@ private val Context.pluginAndroidAccounts: DataStore<Preferences> by safePrefere
 
 /**
  * The MicroG-RE-TV account each plugin's `androidAccount` sign-in is bound to, and the tokens it asks
- * for. Milkbeat keeps only the account name and the signer of the plugin it was chosen for; MicroG
+ * for. Milkbeat keeps only the account name, the signer of the plugin it was chosen for and the
+ * identities confirmed; MicroG
  * keeps the grants and caches the tokens. A plugin never names the account itself, so it reaches only
- * the one the listener picked for it, and a plugin from another signer under the same id reaches none.
- * Sign-out and removal forget the binding.
+ * the one the listener picked for it, as only the identities confirmed then, and a plugin from another
+ * signer under the same id reaches none. Sign-out and removal forget the binding.
  */
 @Singleton
 class MicroGAccounts internal constructor(
@@ -55,14 +56,16 @@ class MicroGAccounts internal constructor(
         identity: AccountIdentity,
     ): MicroGTokenResult = withContext(io) { gateway.token(accountName, identity) }
 
+    /** Binds [method] of [plugin] to [accountName], for the identities the listener has just confirmed. */
     suspend fun bind(
         plugin: InstalledPlugin,
-        methodId: String,
+        method: AndroidAccountMethod,
         accountName: String,
     ) {
         store.edit {
-            it[key(plugin.id, methodId)] = accountName
-            it[signerKey(plugin.id, methodId)] = plugin.signerFingerprint
+            it[key(plugin.id, method.id)] = accountName
+            it[signerKey(plugin.id, method.id)] = plugin.signerFingerprint
+            it[identitiesKey(plugin.id, method.id)] = method.identities.joinToString(",") { identity -> identity.name }
         }
     }
 
@@ -73,6 +76,7 @@ class MicroGAccounts internal constructor(
         store.edit {
             it.remove(key(pluginId, methodId))
             it.remove(signerKey(pluginId, methodId))
+            it.remove(identitiesKey(pluginId, methodId))
         }
     }
 
@@ -100,6 +104,11 @@ class MicroGAccounts internal constructor(
         if (account == null || stored[signerKey(plugin.id, method.id)] != plugin.signerFingerprint) {
             if (account != null) forget(plugin.id, method.id)
             throw HostCallException(PluginErrorCode.SIGN_IN_REQUIRED, "No account was chosen for ${method.id}")
+        }
+        // An identity an update added was never confirmed for this plugin: it signs in again for it.
+        val approved = stored[identitiesKey(plugin.id, method.id)].orEmpty().split(',')
+        if (request.identity.name !in approved) {
+            throw HostCallException(PluginErrorCode.SIGN_IN_EXPIRED, "${request.identity} was not confirmed for ${method.id}")
         }
         return withContext(io) {
             authenticator {
@@ -155,4 +164,9 @@ class MicroGAccounts internal constructor(
         pluginId: String,
         methodId: String,
     ) = stringPreferencesKey("$pluginId/$methodId#signer")
+
+    private fun identitiesKey(
+        pluginId: String,
+        methodId: String,
+    ) = stringPreferencesKey("$pluginId/$methodId#identities")
 }

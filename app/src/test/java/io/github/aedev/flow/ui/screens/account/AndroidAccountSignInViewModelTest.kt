@@ -130,7 +130,7 @@ class AndroidAccountSignInViewModelTest {
 
             assertThat(vm.state.value).isEqualTo(AndroidAccountSignInState.SignedIn("Listener"))
             coVerify(ordering = io.mockk.Ordering.ORDERED) {
-                microG.bind(plugin, "google", account)
+                microG.bind(plugin, plugin.manifest.signIn.single() as AndroidAccountMethod, account)
                 accounts.completeAccountSignIn(plugin.id, AndroidAccountSignIn("google", account))
             }
         }
