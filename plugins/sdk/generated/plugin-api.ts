@@ -5,7 +5,8 @@ export type EntityKind =
   'TRACK' | 'MUSIC_VIDEO' | 'ALBUM' | 'PLAYLIST' | 'ARTIST' | 'PROFILE' | 'MIX' | 'RADIO' | 'VIDEO' | 'CHANNEL';
 export type AudioDelivery = 'PROGRESSIVE' | 'HLS';
 export type VideoSurface = 'SEARCH' | 'SUGGEST' | 'CHANNEL' | 'PLAYLIST' | 'RELATED' | 'COMMENTS' | 'LIVE_CHAT';
-export type SignInMethod = SignInMethodDeviceCode | SignInMethodWebLogin;
+export type SignInMethod = SignInMethodAndroidAccount | SignInMethodDeviceCode | SignInMethodWebLogin;
+export type AccountIdentity = 'youtube' | 'youtubeMusic';
 export type SettingType = 'TOGGLE' | 'CHOICE' | 'TEXT';
 export type PageBlock = PageBlockCollection | PageBlockHeader;
 export type CollectionLayout = 'HORIZONTAL_SHELF' | 'MULTI_COLUMN_LIST' | 'TRACK_TABLE';
@@ -38,7 +39,7 @@ export type HashAlgorithm = 'SHA1' | 'SHA256' | 'MD5';
 export type LogLevel = 'DEBUG' | 'INFO' | 'WARN' | 'ERROR';
 
 /**
- * Plugin API v10, generated from the plugin-api module. Do not edit.
+ * Plugin API v11, generated from the plugin-api module. Do not edit.
  */
 export interface MilkbeatPluginApi {
   manifest: PluginManifest;
@@ -154,6 +155,10 @@ export interface MilkbeatPluginApi {
       request: WebLoginResult;
       response: ProviderAccount;
     };
+    'signIn.completeAccount': {
+      request: AndroidAccountSignIn;
+      response: ProviderAccount;
+    };
     'signIn.account': {
       response: ProviderAccount;
     };
@@ -235,6 +240,13 @@ export interface MilkbeatPluginApi {
       request: WebLoginRefreshRequest;
       response: WebLoginResult;
     };
+    'signIn.token': {
+      request: AccountTokenRequest;
+      response: AccountToken;
+    };
+    'signIn.invalidateToken': {
+      request: AccountTokenInvalidation;
+    };
   };
   error: PluginError;
 }
@@ -289,6 +301,12 @@ export interface VideoRole {
   surfaces: VideoSurface[];
   live?: boolean;
   reportPlayback?: boolean;
+}
+export interface SignInMethodAndroidAccount {
+  type: 'androidAccount';
+  id: string;
+  label: string;
+  identities: AccountIdentity[];
 }
 export interface SignInMethodDeviceCode {
   type: 'deviceCode';
@@ -782,6 +800,10 @@ export interface WebLoginResult {
     [k: string]: string;
   };
 }
+export interface AndroidAccountSignIn {
+  method: string;
+  accountName: string;
+}
 export interface SettingOptionsRequest {
   key: string;
 }
@@ -884,6 +906,17 @@ export interface WebLoginRefreshRequest {
   method: string;
   cookies: string;
 }
+export interface AccountTokenRequest {
+  method: string;
+  identity: AccountIdentity;
+}
+export interface AccountToken {
+  token: string;
+}
+export interface AccountTokenInvalidation {
+  method: string;
+  token: string;
+}
 
 export const HOST_OPERATIONS = [
   'http.fetch',
@@ -905,5 +938,7 @@ export const HOST_OPERATIONS = [
   'browser.close',
   'settings.get',
   'time.sleep',
-  'signIn.refresh'
+  'signIn.refresh',
+  'signIn.token',
+  'signIn.invalidateToken'
 ] as const;

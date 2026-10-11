@@ -81,6 +81,8 @@ object PluginOperations {
     val cancelSignIn = PluginOperation("signIn.cancel", DeviceCodeSession.serializer(), Unit.serializer())
 
     val completeSignIn = PluginOperation("signIn.complete", WebLoginResult.serializer(), ProviderAccount.serializer())
+    val completeAccountSignIn =
+        PluginOperation("signIn.completeAccount", AndroidAccountSignIn.serializer(), ProviderAccount.serializer())
     val account = PluginOperation("signIn.account", Unit.serializer(), ProviderAccount.serializer())
     val signOut = PluginOperation("signIn.signOut", Unit.serializer(), Unit.serializer())
 
@@ -119,6 +121,7 @@ object PluginOperations {
             confirmSignIn,
             cancelSignIn,
             completeSignIn,
+            completeAccountSignIn,
             account,
             signOut,
             settingOptions,
