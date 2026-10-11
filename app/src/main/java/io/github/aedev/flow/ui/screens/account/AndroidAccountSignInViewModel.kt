@@ -245,7 +245,7 @@ class AndroidAccountSignInViewModel
             method: AndroidAccountMethod,
             account: String,
         ) {
-            microG.signingIn(pluginId, method.id) {
+            microG.signingIn(pluginId) {
                 // Read inside the attempt's lock: an update may have landed while another attempt held it.
                 val plugin = registry.state.value.plugin(pluginId) ?: error("The plugin is no longer installed")
                 if (this.method != method) {

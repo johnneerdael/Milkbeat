@@ -79,7 +79,7 @@ class AndroidAccountSignInViewModelTest {
         every { microG.installed() } returns true
         every { microG.supported() } returns true
         coEvery { microG.bind(any(), any(), any()) } returns "nonce"
-        coEvery { microG.signingIn<Unit>(any(), any(), any()) } coAnswers { thirdArg<suspend () -> Unit>().invoke() }
+        coEvery { microG.signingIn<Unit>(any(), any()) } coAnswers { secondArg<suspend () -> Unit>().invoke() }
         every { microG.chooseAccountIntent() } returns chooser
         coEvery { microG.request(account, any()) } returns MicroGTokenResult.Granted("token")
         coEvery { accounts.completeAccountSignIn(plugin.id, AndroidAccountSignIn("google", account)) } returns

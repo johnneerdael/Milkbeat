@@ -58,12 +58,14 @@ class MicroGAccounts internal constructor(
 
     private val attempts = ConcurrentHashMap<String, Mutex>()
 
-    /** Runs one sign-in attempt for a plugin's method at a time, so two screens never interleave their bindings. */
+    /**
+     * Runs one sign-in attempt for a plugin at a time, whatever its method: a failed attempt signs the whole plugin
+     * out, which must never undo another method's attempt that has just completed.
+     */
     suspend fun <T> signingIn(
         pluginId: String,
-        methodId: String,
         attempt: suspend () -> T,
-    ): T = attempts.getOrPut(key(pluginId, methodId).name) { Mutex() }.withLock { attempt() }
+    ): T = attempts.getOrPut(pluginId) { Mutex() }.withLock { attempt() }
 
     fun chooseAccountIntent(): Intent = gateway.chooseAccountIntent()
 

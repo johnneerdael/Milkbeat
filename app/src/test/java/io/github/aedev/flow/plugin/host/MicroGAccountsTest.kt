@@ -257,26 +257,29 @@ class MicroGAccountsTest {
             microG.confirm(plugin.id, google.id, newer)
         }
 
-    @Test fun `two sign-ins for one method run one after the other`() =
+    @Test fun `two sign-ins for one plugin run one after the other, whatever their methods`() =
         runTest {
             val microG = accounts()
             val order = mutableListOf<String>()
             val gate = CompletableDeferred<Unit>()
             val first =
                 launch {
-                    microG.signingIn(plugin.id, google.id) {
+                    microG.signingIn(plugin.id) {
                         order += "first start"
                         gate.await()
                         order += "first end"
                     }
                 }
-            val second = launch { microG.signingIn(plugin.id, google.id) { order += "second" } }
+            val second = launch { microG.signingIn(plugin.id) { order += "second" } }
+            val otherPlugin = launch { microG.signingIn("dev.other") { order += "other plugin" } }
             testScheduler.runCurrent()
+            assertThat(order).containsExactly("first start", "other plugin").inOrder()
             gate.complete(Unit)
             first.join()
             second.join()
+            otherPlugin.join()
 
-            assertThat(order).containsExactly("first start", "first end", "second").inOrder()
+            assertThat(order).containsExactly("first start", "other plugin", "first end", "second").inOrder()
         }
 
     @Test fun `a bind cancelled after its write leaves no binding this run would accept`() =
