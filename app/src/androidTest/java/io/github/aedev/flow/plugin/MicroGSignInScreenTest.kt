@@ -72,6 +72,20 @@ class MicroGSignInScreenTest {
         assertTrue(installing)
     }
 
+    @Test fun anOutdatedMicroGOffersTheUpdateWithTheRemote() {
+        var updating = false
+        show(AndroidAccountSignInState.OfferUpdate, onInstall = { updating = true })
+
+        compose.onNodeWithText(context.getString(R.string.tv_microg_update_title)).assertIsDisplayed()
+        val update = compose.onNodeWithText(context.getString(R.string.tv_microg_update_action))
+        compose.waitForIdle()
+        update.assertIsFocused()
+        capture("microg-sign-in-offer-update.png")
+        update.performKeyInput { pressKey(Key.DirectionCenter) }
+
+        assertTrue(updating)
+    }
+
     @Test fun aDeclinedIdentityNamesItAndOffersRetry() {
         var retried = false
         show(AndroidAccountSignInState.Denied(AccountIdentity.YOUTUBE_MUSIC), onRetry = { retried = true })
