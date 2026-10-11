@@ -1,6 +1,7 @@
 package io.github.aedev.flow.ui.tv.screens.account
 
 import android.accounts.AccountManager
+import android.content.ActivityNotFoundException
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -14,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.aedev.flow.R
 import io.github.aedev.flow.ui.screens.account.AndroidAccountSignInState
@@ -40,6 +42,12 @@ fun TvAndroidAccountSignInScreen(
             viewModel.onAccountChosen(result.data?.getStringExtra(AccountManager.KEY_ACCOUNT_NAME))
         }
     val prompt = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { viewModel.onPromptClosed() }
+    val installPermission =
+        rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { viewModel.onInstallPermissionClosed() }
+    LifecycleResumeEffect(viewModel) {
+        viewModel.onResumed()
+        onPauseOrDispose { }
+    }
     LaunchedEffect(state) {
         when (val current = state) {
             AndroidAccountSignInState.Starting -> {
@@ -48,12 +56,17 @@ fun TvAndroidAccountSignInScreen(
 
             is AndroidAccountSignInState.ChooseAccount -> {
                 viewModel.onLaunched()
-                chooser.launch(current.intent)
+                launchOrFail({ chooser.launch(current.intent) }, viewModel::onLaunchFailed)
             }
 
             is AndroidAccountSignInState.Confirm -> {
                 viewModel.onLaunched()
-                prompt.launch(current.intent)
+                launchOrFail({ prompt.launch(current.intent) }, viewModel::onLaunchFailed)
+            }
+
+            is AndroidAccountSignInState.InstallPermission -> {
+                viewModel.onLaunched()
+                launchOrFail({ installPermission.launch(current.intent) }, viewModel::onLaunchFailed)
             }
 
             is AndroidAccountSignInState.SignedIn -> {
@@ -67,7 +80,7 @@ fun TvAndroidAccountSignInScreen(
         }
     }
     TvScreenScaffold(title = stringResource(R.string.tv_microg_sign_in_title)) {
-        TvAndroidAccountSignInPanel(state, viewModel::retry, onNavigateBack)
+        TvAndroidAccountSignInPanel(state, viewModel::retry, viewModel::install, onNavigateBack)
     }
 }
 
@@ -75,6 +88,7 @@ fun TvAndroidAccountSignInScreen(
 private fun TvAndroidAccountSignInPanel(
     state: AndroidAccountSignInState,
     onRetry: () -> Unit,
+    onInstall: () -> Unit,
     onCancel: () -> Unit,
 ) {
     Column(
@@ -82,7 +96,11 @@ private fun TvAndroidAccountSignInPanel(
         verticalArrangement = Arrangement.spacedBy(24.dp),
     ) {
         when (state) {
-            AndroidAccountSignInState.Starting, is AndroidAccountSignInState.ChooseAccount, is AndroidAccountSignInState.Confirm -> {
+            AndroidAccountSignInState.Starting,
+            is AndroidAccountSignInState.ChooseAccount,
+            is AndroidAccountSignInState.Confirm,
+            is AndroidAccountSignInState.InstallPermission,
+            -> {
                 TvLoadingState(modifier = Modifier.weight(1f))
             }
 
@@ -92,6 +110,22 @@ private fun TvAndroidAccountSignInPanel(
 
             AndroidAccountSignInState.MicroGMissing -> {
                 TvMessageState(title = stringResource(R.string.tv_microg_sign_in_missing), modifier = Modifier.weight(1f))
+            }
+
+            AndroidAccountSignInState.OfferInstall -> {
+                TvMessageState(
+                    title = stringResource(R.string.tv_microg_install_title),
+                    message = stringResource(R.string.tv_microg_install_message),
+                    modifier = Modifier.weight(1f),
+                )
+            }
+
+            AndroidAccountSignInState.Installing -> {
+                TvMessageState(title = stringResource(R.string.tv_microg_installing), modifier = Modifier.weight(1f))
+            }
+
+            AndroidAccountSignInState.InstallFailed -> {
+                TvMessageState(title = stringResource(R.string.tv_microg_install_failed), modifier = Modifier.weight(1f))
             }
 
             AndroidAccountSignInState.NoAccountChosen -> {
@@ -118,6 +152,14 @@ private fun TvAndroidAccountSignInPanel(
                 )
             }
         }
+        val installable = state == AndroidAccountSignInState.OfferInstall || state == AndroidAccountSignInState.InstallFailed
+        if (installable) {
+            TvButton(
+                text = stringResource(R.string.tv_microg_install_action),
+                onClick = onInstall,
+                modifier = Modifier.tvInitialFocus(state),
+            )
+        }
         val retryable =
             state == AndroidAccountSignInState.NoAccountChosen ||
                 state is AndroidAccountSignInState.Denied ||
@@ -129,7 +171,7 @@ private fun TvAndroidAccountSignInPanel(
             TvButton(
                 text = stringResource(R.string.cancel),
                 onClick = onCancel,
-                modifier = if (retryable) Modifier else Modifier.tvInitialFocus(state),
+                modifier = if (retryable || installable) Modifier else Modifier.tvInitialFocus(state),
             )
         }
     }
@@ -141,3 +183,17 @@ private fun identityLabel(identity: AccountIdentity): String =
         AccountIdentity.YOUTUBE -> stringResource(R.string.tv_microg_identity_youtube)
         AccountIdentity.YOUTUBE_MUSIC -> stringResource(R.string.tv_microg_identity_youtube_music)
     }
+
+// A prompt another app returns may not be startable from Milkbeat; that ends the attempt instead of the app.
+private inline fun launchOrFail(
+    launch: () -> Unit,
+    onFailure: () -> Unit,
+) {
+    try {
+        launch()
+    } catch (_: ActivityNotFoundException) {
+        onFailure()
+    } catch (_: SecurityException) {
+        onFailure()
+    }
+}

@@ -9,6 +9,7 @@ import io.github.aedev.flow.plugin.host.MicroGTokenResult
 import io.github.aedev.flow.plugin.registry.InstalledPlugin
 import io.github.aedev.flow.plugin.registry.PluginRegistry
 import io.github.aedev.flow.plugin.registry.PluginRegistryState
+import io.github.aedev.flow.updater.MicroGInstaller
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -61,6 +62,12 @@ class AndroidAccountSignInViewModelTest {
     private val microG = mockk<MicroGAccounts>(relaxed = true)
     private val chooser = mockk<Intent>()
     private val musicPrompt = mockk<Intent>()
+    private val installFailed = MutableStateFlow(false)
+    private val installer =
+        mockk<MicroGInstaller>(relaxed = true) {
+            every { failed } returns installFailed
+            every { isAvailable } returns true
+        }
 
     @Before fun before() {
         Dispatchers.setMain(dispatcher)
@@ -79,10 +86,12 @@ class AndroidAccountSignInViewModelTest {
             registry,
             accounts,
             microG,
+            installer,
         )
 
-    @Test fun `without MicroG the screen says so and opens nothing`() {
+    @Test fun `without MicroG a build that cannot install says so and opens nothing`() {
         every { microG.installed() } returns false
+        every { installer.isAvailable } returns false
         val vm = viewModel()
 
         vm.start()
@@ -153,5 +162,59 @@ class AndroidAccountSignInViewModelTest {
 
             assertThat(vm.state.value).isInstanceOf(AndroidAccountSignInState.Failed::class.java)
             coVerify { microG.forget(plugin.id, "google") }
+        }
+
+    @Test fun `without MicroG the listener is offered the install, then the chooser once it is there`() =
+        runTest(dispatcher) {
+            every { microG.installed() } returns false
+            every { installer.canInstall() } returns true
+            coEvery { installer.install() } returns true
+            val vm = viewModel()
+            vm.start()
+            assertThat(vm.state.value).isEqualTo(AndroidAccountSignInState.OfferInstall)
+
+            vm.install()
+            runCurrent()
+            assertThat(vm.state.value).isEqualTo(AndroidAccountSignInState.Installing)
+
+            every { microG.installed() } returns true
+            vm.onResumed()
+
+            assertThat(vm.state.value).isEqualTo(AndroidAccountSignInState.ChooseAccount(chooser))
+        }
+
+    @Test fun `installing first asks for the install permission and continues once it is granted`() =
+        runTest(dispatcher) {
+            every { microG.installed() } returns false
+            every { installer.canInstall() } returns false
+            val permission = mockk<Intent>()
+            every { installer.installPermissionIntent() } returns permission
+            val vm = viewModel()
+            vm.start()
+
+            vm.install()
+            assertThat(vm.state.value).isEqualTo(AndroidAccountSignInState.InstallPermission(permission))
+            vm.onLaunched()
+            every { installer.canInstall() } returns true
+            vm.onInstallPermissionClosed()
+            runCurrent()
+
+            coVerify { installer.install() }
+        }
+
+    @Test fun `a rejected install offers another try`() =
+        runTest(dispatcher) {
+            every { microG.installed() } returns false
+            every { installer.canInstall() } returns true
+            coEvery { installer.install() } returns true
+            val vm = viewModel()
+            vm.start()
+            vm.install()
+            runCurrent()
+
+            installFailed.value = true
+            runCurrent()
+
+            assertThat(vm.state.value).isEqualTo(AndroidAccountSignInState.InstallFailed)
         }
 }

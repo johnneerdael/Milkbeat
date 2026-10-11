@@ -10,6 +10,7 @@ import io.github.aedev.flow.plugin.host.MicroGAccounts
 import io.github.aedev.flow.plugin.host.MicroGTokenResult
 import io.github.aedev.flow.plugin.registry.PluginRegistry
 import io.github.aedev.flow.plugin.runtime.PluginCallException
+import io.github.aedev.flow.updater.MicroGInstaller
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -24,7 +25,20 @@ import javax.inject.Inject
 sealed interface AndroidAccountSignInState {
     data object Starting : AndroidAccountSignInState
 
+    /** MicroG-RE-TV is not installed and this build cannot install it. */
     data object MicroGMissing : AndroidAccountSignInState
+
+    /** MicroG-RE-TV is not installed; the listener can install it from here. */
+    data object OfferInstall : AndroidAccountSignInState
+
+    /** The screen opens the setting that lets Milkbeat install apps with [intent], once. */
+    data class InstallPermission(
+        val intent: Intent,
+    ) : AndroidAccountSignInState
+
+    data object Installing : AndroidAccountSignInState
+
+    data object InstallFailed : AndroidAccountSignInState
 
     /** The screen opens Android's account chooser with [intent], once. */
     data class ChooseAccount(
@@ -68,6 +82,7 @@ class AndroidAccountSignInViewModel
         registry: PluginRegistry,
         private val accounts: PluginAccounts,
         private val microG: MicroGAccounts,
+        private val installer: MicroGInstaller,
     ) : ViewModel() {
         private val pluginId: String = checkNotNull(savedStateHandle[PLUGIN_ARG])
 
@@ -85,19 +100,72 @@ class AndroidAccountSignInViewModel
         private var accountName: String? = null
         private val prompted = mutableSetOf<AccountIdentity>()
 
+        init {
+            viewModelScope.launch {
+                installer.failed.collect { failed ->
+                    if (failed && _state.value == AndroidAccountSignInState.Installing) {
+                        _state.value = AndroidAccountSignInState.InstallFailed
+                    }
+                }
+            }
+        }
+
         fun start() {
             if (_state.value != AndroidAccountSignInState.Starting) return
             when {
                 method == null || method.identities.isEmpty() -> _state.value = AndroidAccountSignInState.Failed()
-                !microG.installed() -> _state.value = AndroidAccountSignInState.MicroGMissing
+                !microG.installed() -> _state.value = missing()
                 else -> _state.value = AndroidAccountSignInState.ChooseAccount(microG.chooseAccountIntent())
             }
         }
 
         /** The screen opened the chooser or prompt the state asked for. */
         fun onLaunched() {
-            if (_state.value is AndroidAccountSignInState.ChooseAccount || _state.value is AndroidAccountSignInState.Confirm) {
-                _state.value = AndroidAccountSignInState.Waiting
+            when (_state.value) {
+                is AndroidAccountSignInState.ChooseAccount, is AndroidAccountSignInState.Confirm -> {
+                    _state.value = AndroidAccountSignInState.Waiting
+                }
+
+                is AndroidAccountSignInState.InstallPermission -> {
+                    _state.value = AndroidAccountSignInState.OfferInstall
+                }
+
+                else -> {
+                    Unit
+                }
+            }
+        }
+
+        fun onLaunchFailed() {
+            _state.value = AndroidAccountSignInState.Failed()
+        }
+
+        fun install() {
+            if (!installer.canInstall()) {
+                _state.value = AndroidAccountSignInState.InstallPermission(installer.installPermissionIntent())
+                return
+            }
+            _state.value = AndroidAccountSignInState.Installing
+            viewModelScope.launch {
+                if (!installer.install() && _state.value == AndroidAccountSignInState.Installing) {
+                    _state.value = AndroidAccountSignInState.InstallFailed
+                }
+            }
+        }
+
+        fun onInstallPermissionClosed() {
+            if (_state.value == AndroidAccountSignInState.OfferInstall && installer.canInstall()) install()
+        }
+
+        /** Back from the install permission setting, Android's install prompt or MicroG itself. */
+        fun onResumed() {
+            val waitingForMicroG =
+                _state.value == AndroidAccountSignInState.OfferInstall ||
+                    _state.value == AndroidAccountSignInState.Installing ||
+                    _state.value == AndroidAccountSignInState.InstallFailed ||
+                    _state.value == AndroidAccountSignInState.MicroGMissing
+            if (waitingForMicroG && microG.installed()) {
+                _state.value = AndroidAccountSignInState.ChooseAccount(microG.chooseAccountIntent())
             }
         }
 
@@ -171,6 +239,9 @@ class AndroidAccountSignInViewModel
                 _state.value = AndroidAccountSignInState.Failed(failureMessage(e))
             }
         }
+
+        private fun missing(): AndroidAccountSignInState =
+            if (installer.isAvailable) AndroidAccountSignInState.OfferInstall else AndroidAccountSignInState.MicroGMissing
 
         private fun failureMessage(error: Exception): String? =
             (error as? PluginCallException)?.error?.let { (it.userMessage ?: it.message).takeIf(String::isNotBlank) }

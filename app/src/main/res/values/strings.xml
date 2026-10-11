@@ -852,6 +852,11 @@
     <string name="tv_microg_sign_in_waiting">Choose your account, then confirm each request on this TV.</string>
     <string name="tv_microg_sign_in_missing">MicroG-RE-TV isn\'t installed. Install it, add your Google account there, then try again.</string>
     <string name="tv_microg_sign_in_no_account">No account was chosen.</string>
+    <string name="tv_microg_install_title">Install MicroG-RE-TV?</string>
+    <string name="tv_microg_install_message">This sign-in uses your Google account through MicroG-RE-TV, which isn\'t installed yet. Install it now, then add your Google account in it when asked.</string>
+    <string name="tv_microg_install_action">Install MicroG-RE-TV</string>
+    <string name="tv_microg_installing">Downloading and installing MicroG-RE-TV…</string>
+    <string name="tv_microg_install_failed">MicroG-RE-TV couldn\'t be installed.</string>
     <string name="tv_microg_sign_in_denied">Milkbeat wasn\'t allowed to use your account as %1$s.</string>
     <string name="tv_microg_sign_in_failed">Unable to sign in. Try again.</string>
     <string name="tv_microg_identity_youtube">YouTube</string>
