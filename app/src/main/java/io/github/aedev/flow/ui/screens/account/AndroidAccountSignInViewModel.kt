@@ -289,6 +289,9 @@ class AndroidAccountSignInViewModel
                 // An update during the completion may need more than was confirmed: undo it and sign in again.
                 check(unchanged(plugin, method)) { "The plugin changed during sign-in" }
                 microG.confirm(pluginId, method.id, nonce)
+                // One that lands during the confirmation is undone the same way. A later one is an update after
+                // sign-in like any other: its added identity answers SIGN_IN_EXPIRED until the listener signs in again.
+                check(unchanged(plugin, method)) { "The plugin changed during sign-in" }
                 confirmed = true
                 _state.value = AndroidAccountSignInState.SignedIn(completed.name)
             } catch (e: CancellationException) {

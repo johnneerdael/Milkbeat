@@ -26,6 +26,7 @@ import nl.neerdael.milkbeat.plugin.AccountTokenInvalidation
 import nl.neerdael.milkbeat.plugin.AccountTokenRequest
 import nl.neerdael.milkbeat.plugin.AndroidAccountMethod
 import nl.neerdael.milkbeat.plugin.PluginErrorCode
+import java.net.URLEncoder
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
@@ -192,10 +193,10 @@ class MicroGAccounts internal constructor(
             preferences
                 .asMap()
                 .keys
-                .filter { it.name.startsWith("$pluginId/") }
+                .filter { it.name.startsWith(prefix(pluginId)) }
                 .forEach { preferences.remove(it) }
         }
-        provisional.keys.removeIf { it.startsWith("$pluginId/") }
+        provisional.keys.removeIf { it.startsWith(prefix(pluginId)) }
     }
 
     internal suspend fun token(
@@ -284,23 +285,31 @@ class MicroGAccounts internal constructor(
             throw HostCallException(PluginErrorCode.SIGN_IN_EXPIRED, "The chosen account is not available to Milkbeat")
         }
 
+    // Ids are encoded so none can spell another binding's key: '/' separates plugin and method, '#' the fields.
+    private fun prefix(pluginId: String) = URLEncoder.encode(pluginId, "UTF-8") + "/"
+
+    private fun base(
+        pluginId: String,
+        methodId: String,
+    ) = prefix(pluginId) + URLEncoder.encode(methodId, "UTF-8")
+
     private fun key(
         pluginId: String,
         methodId: String,
-    ) = stringPreferencesKey("$pluginId/$methodId")
+    ) = stringPreferencesKey(base(pluginId, methodId))
 
     private fun signerKey(
         pluginId: String,
         methodId: String,
-    ) = stringPreferencesKey("$pluginId/$methodId#signer")
+    ) = stringPreferencesKey(base(pluginId, methodId) + "#signer")
 
     private fun identitiesKey(
         pluginId: String,
         methodId: String,
-    ) = stringPreferencesKey("$pluginId/$methodId#identities")
+    ) = stringPreferencesKey(base(pluginId, methodId) + "#identities")
 
     private fun pendingKey(
         pluginId: String,
         methodId: String,
-    ) = stringPreferencesKey("$pluginId/$methodId#pending")
+    ) = stringPreferencesKey(base(pluginId, methodId) + "#pending")
 }

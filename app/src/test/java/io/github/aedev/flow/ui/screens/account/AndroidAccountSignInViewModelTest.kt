@@ -385,4 +385,20 @@ class AndroidAccountSignInViewModelTest {
 
             coVerify { microG.signingIn<Unit>(plugin.id, 7L, any()) }
         }
+
+    @Test fun `an update that lands while the binding is confirmed is undone with a sign-out`() =
+        runTest(dispatcher) {
+            val widened = plugin.copy(manifest = plugin.manifest.copy(versionCode = 2))
+            coEvery { microG.confirm(plugin.id, "google", "nonce") } coAnswers {
+                installed.value = PluginRegistryState(listOf(widened))
+            }
+            val vm = viewModel()
+            vm.start()
+
+            vm.onAccountChosen(account)
+            runCurrent()
+
+            assertThat(vm.state.value).isInstanceOf(AndroidAccountSignInState.Failed::class.java)
+            coVerify { accounts.signOut(plugin.id) }
+        }
 }

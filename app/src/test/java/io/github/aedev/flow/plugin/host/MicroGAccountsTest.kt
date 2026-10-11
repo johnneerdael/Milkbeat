@@ -341,4 +341,24 @@ class MicroGAccountsTest {
             }
             assertThat(microG.token(plugin, AccountTokenRequest("google", AccountIdentity.YOUTUBE_MUSIC)).token).isEqualTo("ya29.music")
         }
+
+    @Test fun `method and plugin ids that spell another binding's keys stay apart`() =
+        runTest {
+            val microG = accounts()
+            every { gateway.hasAccount(any()) } returns true
+            every { gateway.token(any(), any()) } answers { MicroGTokenResult.Granted("for ${firstArg<String>()}") }
+            val tricky = AndroidAccountMethod("google#signer", "Other", listOf(AccountIdentity.YOUTUBE_MUSIC))
+            val both = plugin.copy(manifest = plugin.manifest.copy(signIn = listOf(google, tricky)))
+            val nested = plugin.copy(manifest = plugin.manifest.copy(id = "${plugin.id}/google"))
+
+            microG.confirm(both.id, google.id, microG.bind(both, google, "first@example.com"))
+            microG.confirm(both.id, tricky.id, microG.bind(both, tricky, "second@example.com"))
+            microG.confirm(nested.id, google.id, microG.bind(nested, google, "third@example.com"))
+            microG.forgetAll(nested.id)
+
+            assertThat(microG.token(both, AccountTokenRequest(google.id, AccountIdentity.YOUTUBE_MUSIC)).token)
+                .isEqualTo("for first@example.com")
+            assertThat(microG.token(both, AccountTokenRequest(tricky.id, AccountIdentity.YOUTUBE_MUSIC)).token)
+                .isEqualTo("for second@example.com")
+        }
 }
