@@ -8,9 +8,11 @@ import io.github.aedev.flow.plugin.registry.InstalledPlugin
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -146,7 +148,7 @@ class MicroGAccountsTest {
             microG.invalidate(plugin, AccountTokenInvalidation("google", "ya29.old"))
             verify { gateway.invalidate("ya29.old") }
 
-            microG.forget(plugin.id, "google")
+            microG.forgetAll(plugin.id)
 
             val error = failure { microG.token(plugin, AccountTokenRequest("google", AccountIdentity.YOUTUBE_MUSIC)) }
             assertThat(error?.code).isEqualTo(PluginErrorCode.SIGN_IN_REQUIRED)
@@ -230,9 +232,47 @@ class MicroGAccountsTest {
             assertThat(afterDeath.token(plugin, request).token).isEqualTo("ya29.music")
 
             val signingIn = MicroGAccounts(gateway, store, StandardTestDispatcher(testScheduler))
-            signingIn.bind(plugin, google, "listener@example.com")
-            signingIn.confirm(plugin.id, google.id)
+            val nonce = signingIn.bind(plugin, google, "listener@example.com")
+            signingIn.confirm(plugin.id, google.id, nonce)
             val restarted = MicroGAccounts(gateway, store, StandardTestDispatcher(testScheduler))
             assertThat(restarted.token(plugin, request).token).isEqualTo("ya29.music")
+        }
+
+    @Test fun `an attempt another one replaced can neither confirm nor forget the newer binding`() =
+        runTest {
+            val microG = accounts()
+            every { gateway.hasAccount(any()) } returns true
+            every { gateway.token(any(), any()) } returns MicroGTokenResult.Granted("ya29.music")
+            val older = microG.bind(plugin, google, "older@example.com")
+            val newer = microG.bind(plugin, google, "newer@example.com")
+
+            assertThat(runCatching { microG.confirm(plugin.id, google.id, older) }.isFailure).isTrue()
+            microG.forget(plugin.id, google.id, older)
+
+            assertThat(microG.token(plugin, AccountTokenRequest("google", AccountIdentity.YOUTUBE_MUSIC)).token).isEqualTo("ya29.music")
+            verify { gateway.token("newer@example.com", AccountIdentity.YOUTUBE_MUSIC) }
+            microG.confirm(plugin.id, google.id, newer)
+        }
+
+    @Test fun `two sign-ins for one method run one after the other`() =
+        runTest {
+            val microG = accounts()
+            val order = mutableListOf<String>()
+            val gate = CompletableDeferred<Unit>()
+            val first =
+                launch {
+                    microG.signingIn(plugin.id, google.id) {
+                        order += "first start"
+                        gate.await()
+                        order += "first end"
+                    }
+                }
+            val second = launch { microG.signingIn(plugin.id, google.id) { order += "second" } }
+            testScheduler.runCurrent()
+            gate.complete(Unit)
+            first.join()
+            second.join()
+
+            assertThat(order).containsExactly("first start", "first end", "second").inOrder()
         }
 }

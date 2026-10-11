@@ -18,11 +18,15 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import nl.neerdael.milkbeat.catalog.ProviderAccount
+import nl.neerdael.milkbeat.plugin.SignInMethod
 import nl.neerdael.milkbeat.plugin.WebLoginMethod
 import nl.neerdael.milkbeat.plugin.WebLoginResult
 import java.io.IOException
@@ -100,6 +104,17 @@ class AccountSignInViewModel
                 ?.firstOrNull { it.id == savedStateHandle.get<String>(METHOD_ARG) }
 
         val method: WebLoginMethod? = signInMethod as? WebLoginMethod
+
+        /** The method as the installed plugin declares it now, which picks the screen; an update can change its kind. */
+        val currentSignInMethod: StateFlow<SignInMethod?> =
+            registry.state
+                .map { state ->
+                    state
+                        .plugin(pluginId)
+                        ?.manifest
+                        ?.signIn
+                        ?.firstOrNull { it.id == savedStateHandle.get<String>(METHOD_ARG) }
+                }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), signInMethod)
 
         private val _state = MutableStateFlow<AccountSignInState>(AccountSignInState.Starting)
         val state: StateFlow<AccountSignInState> = _state.asStateFlow()

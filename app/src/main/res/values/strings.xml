@@ -852,6 +852,7 @@
     <string name="tv_microg_sign_in_waiting">Choose your account, then confirm each request on this TV.</string>
     <string name="tv_microg_sign_in_missing">MicroG-RE-TV isn\'t installed. Install it, add your Google account there, then try again.</string>
     <string name="tv_microg_sign_in_no_account">No account was chosen.</string>
+    <string name="tv_microg_sign_in_unsupported_build">Google account sign-in works only in the stable Milkbeat app, not in Milkbeat Preview or debug builds.</string>
     <string name="tv_microg_install_title">Install MicroG-RE-TV?</string>
     <string name="tv_microg_install_message">This sign-in uses your Google account through MicroG-RE-TV, which isn\'t installed yet. Install it now, then add your Google account in it when asked.</string>
     <string name="tv_microg_install_action">Install MicroG-RE-TV</string>

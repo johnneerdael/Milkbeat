@@ -77,6 +77,9 @@ class AndroidAccountSignInViewModelTest {
     @Before fun before() {
         Dispatchers.setMain(dispatcher)
         every { microG.installed() } returns true
+        every { microG.supported() } returns true
+        coEvery { microG.bind(any(), any(), any()) } returns "nonce"
+        coEvery { microG.signingIn<Unit>(any(), any(), any()) } coAnswers { thirdArg<suspend () -> Unit>().invoke() }
         every { microG.chooseAccountIntent() } returns chooser
         coEvery { microG.request(account, any()) } returns MicroGTokenResult.Granted("token")
         coEvery { accounts.completeAccountSignIn(plugin.id, AndroidAccountSignIn("google", account)) } returns
@@ -166,7 +169,7 @@ class AndroidAccountSignInViewModelTest {
             runCurrent()
 
             assertThat(vm.state.value).isInstanceOf(AndroidAccountSignInState.Failed::class.java)
-            coVerify { microG.forget(plugin.id, "google") }
+            coVerify { microG.forget(plugin.id, "google", "nonce") }
         }
 
     @Test fun `without MicroG the listener is offered the install, then the chooser once it is there`() =
@@ -255,7 +258,7 @@ class AndroidAccountSignInViewModelTest {
             store.clear()
             runCurrent()
 
-            coVerify { microG.forget(plugin.id, "google") }
+            coVerify { microG.forget(plugin.id, "google", "nonce") }
         }
 
     @Test fun `a plugin update that adds an identity during sign-in is confirmed before anything is bound`() =
@@ -295,7 +298,7 @@ class AndroidAccountSignInViewModelTest {
             coVerify(ordering = io.mockk.Ordering.ORDERED) {
                 microG.bind(plugin, any(), account)
                 accounts.completeAccountSignIn(plugin.id, AndroidAccountSignIn("google", account))
-                microG.confirm(plugin.id, "google")
+                microG.confirm(plugin.id, "google", "nonce")
             }
         }
 
@@ -312,7 +315,7 @@ class AndroidAccountSignInViewModelTest {
 
     @Test fun `a completion the binding cannot follow is undone with a sign-out`() =
         runTest(dispatcher) {
-            coEvery { microG.confirm(any(), any()) } throws java.io.IOException("disk full")
+            coEvery { microG.confirm(any(), any(), any()) } throws java.io.IOException("disk full")
             val vm = viewModel()
             vm.start()
 
@@ -325,7 +328,7 @@ class AndroidAccountSignInViewModelTest {
 
     @Test fun `leaving between the completion and its binding signs the plugin out again`() =
         runTest(dispatcher) {
-            coEvery { microG.confirm(any(), any()) } coAnswers { awaitCancellation() }
+            coEvery { microG.confirm(any(), any(), any()) } coAnswers { awaitCancellation() }
             val vm = viewModel()
             val store = ViewModelStore().apply { put("sign-in", vm) }
             vm.start()
@@ -337,4 +340,13 @@ class AndroidAccountSignInViewModelTest {
 
             coVerify { accounts.signOut(plugin.id) }
         }
+
+    @Test fun `a build MicroG-RE-TV does not serve stops before the chooser`() {
+        every { microG.supported() } returns false
+        val vm = viewModel()
+
+        vm.start()
+
+        assertThat(vm.state.value).isEqualTo(AndroidAccountSignInState.UnsupportedBuild)
+    }
 }

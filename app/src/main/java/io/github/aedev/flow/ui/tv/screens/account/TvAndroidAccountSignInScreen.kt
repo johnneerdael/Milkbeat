@@ -108,6 +108,10 @@ internal fun TvAndroidAccountSignInPanel(
                 TvMessageState(title = stringResource(R.string.tv_microg_sign_in_waiting), modifier = Modifier.weight(1f))
             }
 
+            AndroidAccountSignInState.UnsupportedBuild -> {
+                TvMessageState(title = stringResource(R.string.tv_microg_sign_in_unsupported_build), modifier = Modifier.weight(1f))
+            }
+
             AndroidAccountSignInState.MicroGMissing -> {
                 TvMessageState(title = stringResource(R.string.tv_microg_sign_in_missing), modifier = Modifier.weight(1f))
             }

@@ -20,6 +20,7 @@ import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -30,6 +31,7 @@ import kotlinx.coroutines.test.setMain
 import nl.neerdael.milkbeat.catalog.ProviderAccount
 import nl.neerdael.milkbeat.plugin.ApiRange
 import nl.neerdael.milkbeat.plugin.AudioRole
+import nl.neerdael.milkbeat.plugin.DeviceCodeMethod
 import nl.neerdael.milkbeat.plugin.PluginError
 import nl.neerdael.milkbeat.plugin.PluginErrorCode
 import nl.neerdael.milkbeat.plugin.PluginManifest
@@ -71,7 +73,8 @@ class AccountSignInViewModelTest {
             grantedNetwork = emptyList(),
             grantedBrowser = emptyList(),
         )
-    private val registry = mockk<PluginRegistry> { every { state } returns MutableStateFlow(PluginRegistryState(plugins = listOf(plugin))) }
+    private val installed = MutableStateFlow(PluginRegistryState(plugins = listOf(plugin)))
+    private val registry = mockk<PluginRegistry> { every { state } returns installed }
     private val accounts =
         mockk<PluginAccounts> { coEvery { complete(any(), any()) } returns ProviderAccount.SignedIn(key = "k", name = "Test User") }
     private var launches = 0
@@ -279,5 +282,20 @@ class AccountSignInViewModelTest {
             runCurrent()
             assertThat(lastStatus().actions).isEmpty()
             assertThat(lastStatus().fields).isEmpty()
+        }
+
+    @Test
+    fun `the screen follows the method kind an update gives the plugin`() =
+        runTest(dispatcher) {
+            val vm = viewModel()
+            backgroundScope.launch { vm.currentSignInMethod.collect {} }
+            runCurrent()
+            assertThat(vm.currentSignInMethod.value).isInstanceOf(WebLoginMethod::class.java)
+
+            val paired = plugin.copy(manifest = plugin.manifest.copy(signIn = listOf(DeviceCodeMethod("google", "Pair"))))
+            installed.value = PluginRegistryState(plugins = listOf(paired))
+            runCurrent()
+
+            assertThat(vm.currentSignInMethod.value).isEqualTo(DeviceCodeMethod("google", "Pair"))
         }
 }

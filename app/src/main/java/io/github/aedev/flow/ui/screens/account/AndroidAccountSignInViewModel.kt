@@ -8,6 +8,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.aedev.flow.plugin.catalog.PluginAccounts
 import io.github.aedev.flow.plugin.host.MicroGAccounts
 import io.github.aedev.flow.plugin.host.MicroGTokenResult
+import io.github.aedev.flow.plugin.registry.InstalledPlugin
 import io.github.aedev.flow.plugin.registry.PluginRegistry
 import io.github.aedev.flow.plugin.runtime.PluginCallException
 import io.github.aedev.flow.updater.MicroGInstaller
@@ -30,6 +31,9 @@ sealed interface AndroidAccountSignInState {
 
     /** MicroG-RE-TV is not installed and this build cannot install it. */
     data object MicroGMissing : AndroidAccountSignInState
+
+    /** This build is not the app MicroG-RE-TV issues YouTube tokens to (Preview, debug). */
+    data object UnsupportedBuild : AndroidAccountSignInState
 
     /** MicroG-RE-TV is not installed; the listener can install it from here. */
     data object OfferInstall : AndroidAccountSignInState
@@ -124,6 +128,7 @@ class AndroidAccountSignInViewModel
             val method = method
             when {
                 method == null || method.identities.isEmpty() -> _state.value = AndroidAccountSignInState.Failed()
+                !microG.supported() -> _state.value = AndroidAccountSignInState.UnsupportedBuild
                 !microG.installed() -> _state.value = missing()
                 else -> _state.value = AndroidAccountSignInState.ChooseAccount(microG.chooseAccountIntent())
             }
@@ -246,14 +251,23 @@ class AndroidAccountSignInViewModel
                 confirmNext()
                 return
             }
+            microG.signingIn(pluginId, method.id) { attempt(plugin, method, account) }
+        }
+
+        private suspend fun attempt(
+            plugin: InstalledPlugin,
+            method: AndroidAccountMethod,
+            account: String,
+        ) {
+            var nonce: String? = null
             var completed: ProviderAccount.SignedIn? = null
             var confirmed = false
             try {
-                microG.bind(plugin, method, account)
+                nonce = microG.bind(plugin, method, account)
                 completed =
                     accounts.completeAccountSignIn(pluginId, AndroidAccountSignIn(method.id, account)) as? ProviderAccount.SignedIn
                         ?: error("The plugin did not accept the account")
-                microG.confirm(pluginId, method.id)
+                microG.confirm(pluginId, method.id, nonce)
                 confirmed = true
                 _state.value = AndroidAccountSignInState.SignedIn(completed.name)
             } catch (e: CancellationException) {
@@ -265,7 +279,11 @@ class AndroidAccountSignInViewModel
                 // the plugin does not believe in an account it cannot get a token for.
                 if (!confirmed) {
                     withContext(NonCancellable) {
-                        if (completed != null) runCatching { accounts.signOut(pluginId) } else microG.forget(pluginId, method.id)
+                        if (completed != null) {
+                            runCatching { accounts.signOut(pluginId) }
+                        } else {
+                            nonce?.let { microG.forget(pluginId, method.id, it) }
+                        }
                     }
                 }
             }

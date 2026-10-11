@@ -5,6 +5,7 @@ import android.accounts.OperationCanceledException
 import android.content.Context
 import android.content.Intent
 import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -14,6 +15,8 @@ import io.github.aedev.flow.plugin.registry.InstalledPlugin
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import nl.neerdael.milkbeat.plugin.AccountIdentity
 import nl.neerdael.milkbeat.plugin.AccountToken
@@ -48,7 +51,18 @@ class MicroGAccounts internal constructor(
         gateway: MicroGAccountGateway,
     ) : this(gateway, context.pluginAndroidAccounts, Dispatchers.IO)
 
+    fun supported(): Boolean = gateway.serves()
+
     fun installed(): Boolean = gateway.installed()
+
+    private val attempts = ConcurrentHashMap<String, Mutex>()
+
+    /** Runs one sign-in attempt for a plugin's method at a time, so two screens never interleave their bindings. */
+    suspend fun <T> signingIn(
+        pluginId: String,
+        methodId: String,
+        attempt: suspend () -> T,
+    ): T = attempts.getOrPut(key(pluginId, methodId).name) { Mutex() }.withLock { attempt() }
 
     fun chooseAccountIntent(): Intent = gateway.chooseAccountIntent()
 
@@ -71,7 +85,7 @@ class MicroGAccounts internal constructor(
         plugin: InstalledPlugin,
         method: AndroidAccountMethod,
         accountName: String,
-    ) {
+    ): String {
         val nonce = UUID.randomUUID().toString()
         // Recorded before the write: until the write lands the stored record carries an older nonce, which fails.
         provisional[key(plugin.id, method.id).name] = nonce
@@ -81,28 +95,48 @@ class MicroGAccounts internal constructor(
             it[identitiesKey(plugin.id, method.id)] = method.identities.joinToString(",") { identity -> identity.name }
             it[pendingKey(plugin.id, method.id)] = nonce
         }
+        return nonce
     }
 
-    /** The plugin completed the sign-in: the binding lasts until sign-out or removal. */
+    /** The plugin completed the sign-in that wrote [nonce]: that binding lasts until sign-out or removal. */
     suspend fun confirm(
         pluginId: String,
         methodId: String,
+        nonce: String,
     ) {
-        store.edit { it.remove(pendingKey(pluginId, methodId)) }
-        provisional.remove(key(pluginId, methodId).name)
+        store.edit {
+            check(it[pendingKey(pluginId, methodId)] == nonce) { "The binding was replaced or ended meanwhile" }
+            it.remove(pendingKey(pluginId, methodId))
+        }
+        provisional.remove(key(pluginId, methodId).name, nonce)
     }
 
+    /** Forgets the binding the sign-in that wrote [nonce] left unfinished, and no other. */
     suspend fun forget(
         pluginId: String,
         methodId: String,
+        nonce: String,
     ) {
-        store.edit {
-            it.remove(key(pluginId, methodId))
-            it.remove(signerKey(pluginId, methodId))
-            it.remove(identitiesKey(pluginId, methodId))
-            it.remove(pendingKey(pluginId, methodId))
-        }
+        store.edit { if (it[pendingKey(pluginId, methodId)] == nonce) it.removeBinding(pluginId, methodId) }
+        provisional.remove(key(pluginId, methodId).name, nonce)
+    }
+
+    private suspend fun forget(
+        pluginId: String,
+        methodId: String,
+    ) {
+        store.edit { it.removeBinding(pluginId, methodId) }
         provisional.remove(key(pluginId, methodId).name)
+    }
+
+    private fun MutablePreferences.removeBinding(
+        pluginId: String,
+        methodId: String,
+    ) {
+        remove(key(pluginId, methodId))
+        remove(signerKey(pluginId, methodId))
+        remove(identitiesKey(pluginId, methodId))
+        remove(pendingKey(pluginId, methodId))
     }
 
     /** Every binding of [pluginId], as its sign-out or removal ends them. */

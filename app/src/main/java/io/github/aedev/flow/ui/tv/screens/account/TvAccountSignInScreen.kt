@@ -46,11 +46,12 @@ fun TvAccountSignInScreen(
     onNavigateBack: () -> Unit,
     viewModel: AccountSignInViewModel = hiltViewModel(),
 ) {
-    if (viewModel.signInMethod is DeviceCodeMethod) {
+    val signInMethod by viewModel.currentSignInMethod.collectAsStateWithLifecycle()
+    if (signInMethod is DeviceCodeMethod) {
         TvDeviceCodeSignInScreen(onNavigateBack = onNavigateBack)
         return
     }
-    if (viewModel.signInMethod is AndroidAccountMethod) {
+    if (signInMethod is AndroidAccountMethod) {
         TvAndroidAccountSignInScreen(onNavigateBack = onNavigateBack)
         return
     }

@@ -16,6 +16,9 @@ import javax.inject.Inject
 internal const val MICROG_PACKAGE = "app.revanced.android.gms"
 internal const val MICROG_ACCOUNT_TYPE = "app.revanced"
 
+// The one caller MicroG-RE-TV's TrustedCallerIdentity issues YouTube tokens to.
+private const val MILKBEAT_PACKAGE = "nl.neerdael.milkbeat"
+
 // MicroG-RE-TV issues tokens as the official app only for these scopes, and only to Milkbeat.
 private const val YOUTUBE_TOKEN_TYPE = "oauth2:https://www.googleapis.com/auth/youtube https://www.googleapis.com/auth/youtube.force-ssl"
 
@@ -42,6 +45,9 @@ sealed interface MicroGTokenResult {
 
 /** What Milkbeat needs from Android's account manager for MicroG-RE-TV accounts. Token calls block. */
 interface MicroGAccountGateway {
+    /** Whether MicroG-RE-TV serves this app at all: it issues YouTube identities to the stable app only. */
+    fun serves(): Boolean
+
     fun installed(): Boolean
 
     fun chooseAccountIntent(): Intent
@@ -62,6 +68,8 @@ class AndroidMicroGAccountGateway
         @ApplicationContext private val context: Context,
     ) : MicroGAccountGateway {
         private val manager = AccountManager.get(context)
+
+        override fun serves(): Boolean = context.packageName == MILKBEAT_PACKAGE
 
         override fun installed(): Boolean =
             try {
