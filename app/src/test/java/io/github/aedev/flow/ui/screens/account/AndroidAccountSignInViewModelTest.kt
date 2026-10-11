@@ -30,6 +30,7 @@ import nl.neerdael.milkbeat.plugin.AndroidAccountMethod
 import nl.neerdael.milkbeat.plugin.AndroidAccountSignIn
 import nl.neerdael.milkbeat.plugin.ApiRange
 import nl.neerdael.milkbeat.plugin.AudioRole
+import nl.neerdael.milkbeat.plugin.DeviceCodeMethod
 import nl.neerdael.milkbeat.plugin.PluginManifest
 import nl.neerdael.milkbeat.plugin.Roles
 import org.junit.After
@@ -400,5 +401,54 @@ class AndroidAccountSignInViewModelTest {
 
             assertThat(vm.state.value).isInstanceOf(AndroidAccountSignInState.Failed::class.java)
             coVerify { accounts.signOut(plugin.id) }
+        }
+
+    @Test fun `an update that moves the route to another method cancels the download and the account request`() =
+        runTest(dispatcher) {
+            val paired = plugin.copy(manifest = plugin.manifest.copy(signIn = listOf(DeviceCodeMethod("google", "Pair"))))
+            every { microG.installed() } returns false
+            every { installer.canInstall() } returns true
+            var downloadCancelled = false
+            coEvery { installer.install() } coAnswers {
+                try {
+                    awaitCancellation()
+                } finally {
+                    downloadCancelled = true
+                }
+            }
+            val vm = viewModel()
+            runCurrent()
+            vm.start()
+            vm.install()
+            runCurrent()
+
+            installed.value = PluginRegistryState(listOf(paired))
+            runCurrent()
+            assertThat(downloadCancelled).isTrue()
+            assertThat(vm.state.value).isEqualTo(AndroidAccountSignInState.Starting)
+
+            installed.value = PluginRegistryState(listOf(plugin))
+            every { microG.installed() } returns true
+            var requestCancelled = false
+            coEvery { microG.request(account, any()) } coAnswers {
+                try {
+                    awaitCancellation()
+                } finally {
+                    requestCancelled = true
+                }
+            }
+            runCurrent()
+            vm.start()
+            vm.onLaunched()
+            vm.onAccountChosen(account)
+            runCurrent()
+
+            installed.value = PluginRegistryState(listOf(paired))
+            runCurrent()
+            assertThat(requestCancelled).isTrue()
+            vm.onPromptClosed()
+            runCurrent()
+            assertThat(vm.state.value).isEqualTo(AndroidAccountSignInState.Starting)
+            coVerify(exactly = 0) { accounts.completeAccountSignIn(any(), any()) }
         }
 }

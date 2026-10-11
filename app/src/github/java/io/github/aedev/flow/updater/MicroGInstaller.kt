@@ -69,6 +69,8 @@ class MicroGInstaller
                     download(apk)
                     val archive = context.packageManager.getPackageArchiveInfo(apk.path, 0)
                     if (archive?.packageName != MICROG_PACKAGE) return@withContext false
+                    // A sign-in screen that moved on while the download ran opens no installer.
+                    ensureActive()
                     commit(apk)
                     true
                 } catch (e: CancellationException) {

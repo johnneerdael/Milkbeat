@@ -13,11 +13,14 @@ import io.github.aedev.flow.plugin.registry.PluginRegistry
 import io.github.aedev.flow.plugin.runtime.PluginCallException
 import io.github.aedev.flow.updater.MicroGInstaller
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import nl.neerdael.milkbeat.catalog.ProviderAccount
@@ -114,7 +117,17 @@ class AndroidAccountSignInViewModel
         private var since = 0L
         private val prompted = mutableSetOf<AccountIdentity>()
 
+        // The current sign-in's download and attempt, cancelled together when the route leaves this method.
+        private var session = Job(viewModelScope.coroutineContext[Job])
+
         init {
+            // An update that replaces or removes the method routes the screen away; nothing of it may finish later.
+            viewModelScope.launch {
+                registry.state
+                    .map { method != null }
+                    .distinctUntilChanged()
+                    .collect { declared -> if (!declared) leave() }
+            }
             viewModelScope.launch {
                 installer.failed.collect { failed ->
                     if (failed && _state.value == AndroidAccountSignInState.Installing) {
@@ -164,7 +177,7 @@ class AndroidAccountSignInViewModel
                 return
             }
             _state.value = AndroidAccountSignInState.Installing
-            viewModelScope.launch {
+            viewModelScope.launch(session) {
                 if (!installer.install() && _state.value == AndroidAccountSignInState.Installing) {
                     _state.value = AndroidAccountSignInState.InstallFailed
                 }
@@ -216,7 +229,7 @@ class AndroidAccountSignInViewModel
                 return
             }
             _state.value = AndroidAccountSignInState.Waiting
-            viewModelScope.launch {
+            viewModelScope.launch(session) {
                 try {
                     for (identity in method.identities) {
                         when (val result = microG.request(account, identity)) {
@@ -243,6 +256,14 @@ class AndroidAccountSignInViewModel
                     _state.value = AndroidAccountSignInState.Failed(failureMessage(e))
                 }
             }
+        }
+
+        private fun leave() {
+            session.cancel()
+            session = Job(viewModelScope.coroutineContext[Job])
+            accountName = null
+            prompted.clear()
+            _state.value = AndroidAccountSignInState.Starting
         }
 
         private suspend fun complete(
