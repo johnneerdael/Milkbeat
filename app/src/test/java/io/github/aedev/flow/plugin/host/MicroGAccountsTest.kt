@@ -413,4 +413,34 @@ class MicroGAccountsTest {
             microG.signingIn(plugin.id) { microG.confirm(plugin.id, google.id, microG.bind(plugin, google, "listener@example.com")) }
             assertThat(microG.token(plugin, AccountTokenRequest("google", AccountIdentity.YOUTUBE_MUSIC)).token).isEqualTo("ya29.music")
         }
+
+    @Test fun `an abandoned sign-in serves no token while its binding is being deleted`() =
+        runTest {
+            val real = PreferenceDataStoreFactory.create(scope = backgroundScope) { temp.newFile("abandoned.preferences_pb") }
+            val deletion = CompletableDeferred<Unit>()
+            var holdNext = false
+            val store =
+                object : DataStore<Preferences> by real {
+                    override suspend fun updateData(transform: suspend (t: Preferences) -> Preferences): Preferences {
+                        if (holdNext) {
+                            holdNext = false
+                            deletion.await()
+                        }
+                        return real.updateData(transform)
+                    }
+                }
+            val microG = MicroGAccounts(gateway, store, StandardTestDispatcher(testScheduler))
+            every { gateway.hasAccount(any()) } returns true
+            every { gateway.token(any(), any()) } returns MicroGTokenResult.Granted("ya29.music")
+            val nonce = microG.bind(plugin, google, "listener@example.com")
+            holdNext = true
+            val forgetting = launch { microG.forget(plugin.id, google.id, nonce) }
+            testScheduler.runCurrent()
+
+            val error = failure { microG.token(plugin, AccountTokenRequest("google", AccountIdentity.YOUTUBE_MUSIC)) }
+
+            assertThat(error?.code).isEqualTo(PluginErrorCode.SIGN_IN_EXPIRED)
+            deletion.complete(Unit)
+            forgetting.join()
+        }
 }

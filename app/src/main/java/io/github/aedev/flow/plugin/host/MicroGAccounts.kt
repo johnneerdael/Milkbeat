@@ -171,16 +171,17 @@ class MicroGAccounts internal constructor(
         methodId: String,
         nonce: String,
     ) {
-        store.edit { if (it[pendingKey(pluginId, methodId)] == nonce) it.removeBinding(pluginId, methodId) }
+        // Withdrawn before the write, so no token request serves the abandoned binding while it is deleted.
         provisional.remove(key(pluginId, methodId).name, nonce)
+        store.edit { if (it[pendingKey(pluginId, methodId)] == nonce) it.removeBinding(pluginId, methodId) }
     }
 
     private suspend fun forget(
         pluginId: String,
         methodId: String,
     ) {
-        store.edit { it.removeBinding(pluginId, methodId) }
         provisional.remove(key(pluginId, methodId).name)
+        store.edit { it.removeBinding(pluginId, methodId) }
     }
 
     private fun MutablePreferences.removeBinding(

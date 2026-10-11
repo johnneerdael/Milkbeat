@@ -8,6 +8,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.aedev.flow.plugin.catalog.PluginAccounts
 import io.github.aedev.flow.plugin.host.MicroGAccounts
 import io.github.aedev.flow.plugin.host.MicroGTokenResult
+import io.github.aedev.flow.plugin.installation
 import io.github.aedev.flow.plugin.registry.InstalledPlugin
 import io.github.aedev.flow.plugin.registry.PluginRegistry
 import io.github.aedev.flow.plugin.runtime.PluginCallException
@@ -282,7 +283,7 @@ class AndroidAccountSignInViewModel
             }
         }
 
-        /** Whether [plugin] still runs as the same release with the same [method], as the attempt began. */
+        /** Whether [plugin] is still the same installation, a reinstall of one release included, with the same [method]. */
         private fun unchanged(
             plugin: InstalledPlugin,
             method: AndroidAccountMethod,
@@ -290,7 +291,7 @@ class AndroidAccountSignInViewModel
             val now = registry.state.value.plugin(pluginId)
             return now != null &&
                 now.signerFingerprint == plugin.signerFingerprint &&
-                now.manifest.versionCode == plugin.manifest.versionCode &&
+                now.installation == plugin.installation &&
                 this.method == method
         }
 

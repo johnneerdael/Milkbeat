@@ -451,4 +451,22 @@ class AndroidAccountSignInViewModelTest {
             assertThat(vm.state.value).isEqualTo(AndroidAccountSignInState.Starting)
             coVerify(exactly = 0) { accounts.completeAccountSignIn(any(), any()) }
         }
+
+    @Test fun `a reinstall of the same release during the completion is undone, not confirmed`() =
+        runTest(dispatcher) {
+            val reinstalled = plugin.copy(installedAtMs = plugin.installedAtMs + 1)
+            coEvery { accounts.completeAccountSignIn(any(), any()) } coAnswers {
+                installed.value = PluginRegistryState(listOf(reinstalled))
+                ProviderAccount.SignedIn("channel", "Listener")
+            }
+            val vm = viewModel()
+            vm.start()
+
+            vm.onAccountChosen(account)
+            runCurrent()
+
+            assertThat(vm.state.value).isInstanceOf(AndroidAccountSignInState.Failed::class.java)
+            coVerify(exactly = 0) { microG.confirm(any(), any(), any()) }
+            coVerify { accounts.signOut(plugin.id) }
+        }
 }
