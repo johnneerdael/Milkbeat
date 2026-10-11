@@ -6,8 +6,10 @@ import android.content.Intent
 import android.content.pm.PackageInstaller
 import android.net.Uri
 import android.provider.Settings
+import android.util.Log
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.aedev.flow.plugin.host.MICROG_PACKAGE
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -25,6 +27,7 @@ import javax.inject.Singleton
 private const val MICROG_APK_URL = "https://github.com/johnneerdael/MicroG-RE-TV/releases/latest/download/microg-re-tv.apk"
 private const val MAX_APK_BYTES = 256L * 1024 * 1024
 private const val INSTALL_REQUEST = 7302
+private const val TAG = "MicroGInstaller"
 
 /**
  * Installs MicroG-RE-TV for account sign-in: the latest release's APK, downloaded while the sign-in
@@ -61,7 +64,11 @@ class MicroGInstaller
                     if (archive?.packageName != MICROG_PACKAGE) return@withContext false
                     commit(apk)
                     true
-                } catch (e: IOException) {
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    // Download, archive and installer failures alike leave the offer to try again.
+                    Log.w(TAG, "MicroG-RE-TV install failed", e)
                     false
                 } finally {
                     apk.delete()
@@ -103,19 +110,25 @@ class MicroGInstaller
                     setSize(apk.length())
                 }
             val sessionId = installer.createSession(params)
-            installer.openSession(sessionId).use { session ->
-                session.openWrite(apk.name, 0, apk.length()).use { output ->
-                    apk.inputStream().use { it.copyTo(output) }
-                    session.fsync(output)
+            try {
+                installer.openSession(sessionId).use { session ->
+                    session.openWrite(apk.name, 0, apk.length()).use { output ->
+                        apk.inputStream().use { it.copyTo(output) }
+                        session.fsync(output)
+                    }
+                    val callback =
+                        PendingIntent.getBroadcast(
+                            context,
+                            INSTALL_REQUEST,
+                            Intent(context, MicroGInstallReceiver::class.java),
+                            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE,
+                        )
+                    session.commit(callback.intentSender)
                 }
-                val callback =
-                    PendingIntent.getBroadcast(
-                        context,
-                        INSTALL_REQUEST,
-                        Intent(context, MicroGInstallReceiver::class.java),
-                        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE,
-                    )
-                session.commit(callback.intentSender)
+            } catch (e: Exception) {
+                // An uncommitted session keeps its staged APK until abandoned.
+                installer.abandonSession(sessionId)
+                throw e
             }
         }
     }
