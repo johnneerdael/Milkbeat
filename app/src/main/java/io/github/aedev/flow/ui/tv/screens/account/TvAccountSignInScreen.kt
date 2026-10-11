@@ -47,6 +47,8 @@ fun TvAccountSignInScreen(
     viewModel: AccountSignInViewModel = hiltViewModel(),
 ) {
     val signInMethod by viewModel.currentSignInMethod.collectAsStateWithLifecycle()
+    val webSignIn = signInMethod !is DeviceCodeMethod && signInMethod !is AndroidAccountMethod
+    LaunchedEffect(webSignIn) { if (!webSignIn) viewModel.leaveWebSignIn() }
     if (signInMethod is DeviceCodeMethod) {
         TvDeviceCodeSignInScreen(onNavigateBack = onNavigateBack)
         return

@@ -298,4 +298,18 @@ class AccountSignInViewModelTest {
 
             assertThat(vm.currentSignInMethod.value).isEqualTo(DeviceCodeMethod("google", "Pair"))
         }
+
+    @Test
+    fun `leaving web sign-in for another method stops its server and timeout at once`() =
+        runTest(dispatcher) {
+            val vm = viewModel()
+            vm.start(loginSupported = true)
+            runCurrent()
+
+            vm.leaveWebSignIn()
+            advanceTimeBy(AccountSignInViewModel.SIGN_IN_TIMEOUT_MS + 1)
+
+            assertThat(stops).isEqualTo(1)
+            assertThat(vm.state.value).isEqualTo(AccountSignInState.Starting)
+        }
 }

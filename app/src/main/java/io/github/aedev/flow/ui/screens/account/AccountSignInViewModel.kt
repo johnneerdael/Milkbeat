@@ -220,6 +220,15 @@ class AccountSignInViewModel
             _state.value = AccountSignInState.Starting
         }
 
+        /**
+         * The route left web sign-in for another method an update gave the plugin: its phone server and timeout
+         * stop now rather than when the route closes. A return to web sign-in starts afresh.
+         */
+        fun leaveWebSignIn() {
+            if (server == null && timeoutJob == null) return
+            retry()
+        }
+
         override fun onCleared() {
             frameProvider = null
             stopServer()
