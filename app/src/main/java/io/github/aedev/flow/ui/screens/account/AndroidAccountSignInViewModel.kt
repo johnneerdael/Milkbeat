@@ -189,7 +189,7 @@ class AndroidAccountSignInViewModel
             }
             _state.value = AndroidAccountSignInState.Installing
             viewModelScope.launch(session) {
-                if (!installer.install() && _state.value == AndroidAccountSignInState.Installing) {
+                if (!installer.install(this@AndroidAccountSignInViewModel) && _state.value == AndroidAccountSignInState.Installing) {
                     _state.value = AndroidAccountSignInState.InstallFailed
                 }
             }
@@ -271,10 +271,10 @@ class AndroidAccountSignInViewModel
             }
         }
 
-        override fun onCleared() = installer.release()
+        override fun onCleared() = installer.release(this)
 
         private fun leave() {
-            installer.release()
+            installer.release(this)
             session.cancel()
             session = Job(viewModelScope.coroutineContext[Job])
             accountName = null
@@ -344,7 +344,8 @@ class AndroidAccountSignInViewModel
                 // account whatever it answered, so it is signed out too, unless another method signed it in meanwhile.
                 if (!confirmed) {
                     withContext(NonCancellable) {
-                        nonce?.let { microG.forget(pluginId, method.id, it) }
+                        // Independent: a binding the store fails to delete must not keep the plugin from being signed out.
+                        nonce?.let { runCatching { microG.forget(pluginId, method.id, it) } }
                         runCatching { accounts.undoSignIn(pluginId, completion) }
                     }
                 }

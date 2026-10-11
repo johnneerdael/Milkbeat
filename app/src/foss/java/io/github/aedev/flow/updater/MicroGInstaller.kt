@@ -21,7 +21,7 @@ class MicroGInstaller
 
         fun installPermissionIntent(): Intent = Intent()
 
-        suspend fun install(): Boolean = false
+        suspend fun install(waiter: Any): Boolean = false
 
-        fun release() = Unit
+        fun release(waiter: Any) = Unit
     }

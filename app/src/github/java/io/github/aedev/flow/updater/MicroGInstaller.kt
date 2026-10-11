@@ -10,8 +10,11 @@ import android.util.Log
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.aedev.flow.plugin.host.MICROG_PACKAGE
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -53,14 +56,18 @@ class MicroGInstaller
         /** Counts installs the installer reported done, so a screen still waiting moves on. */
         val installed: StateFlow<Int> = _installed.asStateFlow()
 
-        // The committed install session a sign-in screen still waits for; its confirmation opens only while it does.
-        // Each release starts a new generation, so an install the screen left cannot register its session after.
+        // The sign-in screens waiting for an install, and the committed session they wait for; its confirmation opens
+        // only while one does. When the last one leaves a new generation starts, so the install it started can no
+        // longer register its session, and the download under way stops.
         private val lock = Any()
+        private val waiters = mutableSetOf<Any>()
         private var generation = 0L
         private var awaited: Int? = null
 
-        // The install under way, which a second request joins instead of downloading over its file and session.
-        private var running: CompletableDeferred<Boolean>? = null
+        // The install under way, which a second request joins instead of downloading over its file and session. It
+        // runs here rather than in a screen's scope, so one screen leaving does not end it for another still waiting.
+        private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        private var running: Deferred<Boolean>? = null
 
         // MicroG-RE-TV serves only the stable app; Preview and debug builds could install it and still get no token.
         val isAvailable: Boolean = context.packageName == STABLE_PACKAGE
@@ -70,25 +77,22 @@ class MicroGInstaller
         fun installPermissionIntent(): Intent =
             Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${context.packageName}"))
 
-        /** Downloads and commits the install; false when the download is not MicroG-RE-TV or fails. */
-        suspend fun install(): Boolean {
-            val (owner, result) =
+        /**
+         * Downloads and commits the install for [waiter], a sign-in screen that waits for it until [release]; false
+         * when the download is not MicroG-RE-TV or fails.
+         */
+        suspend fun install(waiter: Any): Boolean {
+            val install =
                 synchronized(lock) {
-                    running?.let { false to it } ?: (true to CompletableDeferred<Boolean>().also { running = it })
+                    waiters += waiter
+                    running?.takeIf { it.isActive } ?: generation.let { attempt -> scope.async { download(attempt) } }.also { running = it }
                 }
-            if (!owner) return result.await()
-            try {
-                return download().also { result.complete(it) }
-            } finally {
-                result.complete(false)
-                synchronized(lock) { if (running === result) running = null }
-            }
+            return install.await()
         }
 
-        private suspend fun download(): Boolean =
+        private suspend fun download(attempt: Long): Boolean =
             withContext(Dispatchers.IO) {
                 _failed.value = false
-                val attempt = synchronized(lock) { generation }
                 val apk = File(context.cacheDir, "microg/microg-re-tv.apk")
                 try {
                     fetch(apk)
@@ -109,11 +113,15 @@ class MicroGInstaller
                 }
             }
 
-        /** The sign-in moved on: a session it committed earlier opens no confirmation over what came next. */
-        fun release() =
+        /** [waiter] moved on. Once no screen waits, a session committed earlier opens no confirmation over what came next. */
+        fun release(waiter: Any) =
             synchronized(lock) {
-                generation++
-                awaited = null
+                if (waiters.remove(waiter) && waiters.isEmpty()) {
+                    generation++
+                    awaited = null
+                    running?.cancel()
+                    running = null
+                }
             }
 
         internal fun awaits(sessionId: Int): Boolean = synchronized(lock) { sessionId != -1 && awaited == sessionId }

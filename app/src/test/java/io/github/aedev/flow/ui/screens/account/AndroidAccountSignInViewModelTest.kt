@@ -181,7 +181,7 @@ class AndroidAccountSignInViewModelTest {
         runTest(dispatcher) {
             every { microG.installed() } returns false
             every { installer.canInstall() } returns true
-            coEvery { installer.install() } returns true
+            coEvery { installer.install(any()) } returns true
             val vm = viewModel()
             vm.start()
             assertThat(vm.state.value).isEqualTo(AndroidAccountSignInState.OfferInstall)
@@ -212,14 +212,14 @@ class AndroidAccountSignInViewModelTest {
             vm.onInstallPermissionClosed()
             runCurrent()
 
-            coVerify { installer.install() }
+            coVerify { installer.install(any()) }
         }
 
     @Test fun `a rejected install offers another try`() =
         runTest(dispatcher) {
             every { microG.installed() } returns false
             every { installer.canInstall() } returns true
-            coEvery { installer.install() } returns true
+            coEvery { installer.install(any()) } returns true
             val vm = viewModel()
             vm.start()
             vm.install()
@@ -235,7 +235,7 @@ class AndroidAccountSignInViewModelTest {
         runTest(dispatcher) {
             every { microG.installed() } returns false
             every { installer.canInstall() } returns true
-            coEvery { installer.install() } returns true
+            coEvery { installer.install(any()) } returns true
             val vm = viewModel()
             vm.start()
             vm.install()
@@ -413,7 +413,7 @@ class AndroidAccountSignInViewModelTest {
             every { microG.installed() } returns false
             every { installer.canInstall() } returns true
             var downloadCancelled = false
-            coEvery { installer.install() } coAnswers {
+            coEvery { installer.install(any()) } coAnswers {
                 try {
                     awaitCancellation()
                 } finally {
@@ -484,13 +484,13 @@ class AndroidAccountSignInViewModelTest {
                     listOf(plugin.copy(manifest = plugin.manifest.copy(signIn = listOf(DeviceCodeMethod("google", "Pair"))))),
                 )
             runCurrent()
-            verify(exactly = 1) { installer.release() }
+            verify(exactly = 1) { installer.release(vm) }
 
             ViewModelStore().apply {
                 put("vm", vm)
                 clear()
             }
-            verify(exactly = 2) { installer.release() }
+            verify(exactly = 2) { installer.release(vm) }
         }
 
     @Test fun `a completion that fails after the plugin may have kept the account signs it out`() =
@@ -512,7 +512,7 @@ class AndroidAccountSignInViewModelTest {
         runTest(dispatcher) {
             every { microG.outdated() } returns true
             every { installer.canInstall() } returns true
-            coEvery { installer.install() } returns true
+            coEvery { installer.install(any()) } returns true
             val vm = viewModel()
             vm.start()
             assertThat(vm.state.value).isEqualTo(AndroidAccountSignInState.OfferUpdate)
@@ -536,4 +536,21 @@ class AndroidAccountSignInViewModelTest {
 
         assertThat(vm.state.value).isEqualTo(AndroidAccountSignInState.MicroGOutdated)
     }
+
+    @Test fun `a binding the store fails to delete does not keep the plugin from being signed out`() =
+        runTest(dispatcher) {
+            val widened = plugin.copy(manifest = plugin.manifest.copy(versionCode = 2))
+            coEvery { microG.confirm(plugin.id, "google", "nonce") } coAnswers {
+                installed.value = PluginRegistryState(listOf(widened))
+            }
+            coEvery { microG.forget(any(), any(), any()) } throws java.io.IOException("no space left")
+            val vm = viewModel()
+            vm.start()
+
+            vm.onAccountChosen(account)
+            runCurrent()
+
+            assertThat(vm.state.value).isInstanceOf(AndroidAccountSignInState.Failed::class.java)
+            coVerify { accounts.undoSignIn(plugin.id, any()) }
+        }
 }
