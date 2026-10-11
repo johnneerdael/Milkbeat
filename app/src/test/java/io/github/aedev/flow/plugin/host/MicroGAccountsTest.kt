@@ -307,4 +307,38 @@ class MicroGAccountsTest {
             val error = failure { microG.token(plugin, AccountTokenRequest("google", AccountIdentity.YOUTUBE_MUSIC)) }
             assertThat(error?.code).isEqualTo(PluginErrorCode.SIGN_IN_REQUIRED)
         }
+
+    @Test fun `a sign-out or removal during an attempt fails its bind and its confirm`() =
+        runTest {
+            val microG = accounts()
+            every { gateway.hasAccount(any()) } returns true
+            every { gateway.token(any(), any()) } returns MicroGTokenResult.Granted("ya29.music")
+
+            val beforeBind =
+                runCatching {
+                    microG.signingIn(plugin.id) {
+                        microG.forgetAll(plugin.id)
+                        microG.bind(plugin, google, "listener@example.com")
+                    }
+                }
+            assertThat(beforeBind.isFailure).isTrue()
+
+            val beforeConfirm =
+                runCatching {
+                    microG.signingIn(plugin.id) {
+                        val nonce = microG.bind(plugin, google, "listener@example.com")
+                        microG.forgetAll(plugin.id)
+                        microG.confirm(plugin.id, google.id, nonce)
+                    }
+                }
+            assertThat(beforeConfirm.isFailure).isTrue()
+            val error = failure { microG.token(plugin, AccountTokenRequest("google", AccountIdentity.YOUTUBE_MUSIC)) }
+            assertThat(error?.code).isEqualTo(PluginErrorCode.SIGN_IN_REQUIRED)
+
+            microG.signingIn(plugin.id) {
+                val nonce = microG.bind(plugin, google, "listener@example.com")
+                microG.confirm(plugin.id, google.id, nonce)
+            }
+            assertThat(microG.token(plugin, AccountTokenRequest("google", AccountIdentity.YOUTUBE_MUSIC)).token).isEqualTo("ya29.music")
+        }
 }

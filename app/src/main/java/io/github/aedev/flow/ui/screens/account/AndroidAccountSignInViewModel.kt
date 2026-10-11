@@ -109,6 +109,9 @@ class AndroidAccountSignInViewModel
         val state: StateFlow<AndroidAccountSignInState> = _state.asStateFlow()
 
         private var accountName: String? = null
+
+        // A sign-out or removal after the listener chose the account fails the attempt that follows.
+        private var since = 0L
         private val prompted = mutableSetOf<AccountIdentity>()
 
         init {
@@ -190,6 +193,7 @@ class AndroidAccountSignInViewModel
                 return
             }
             accountName = name
+            since = microG.revocationMark(pluginId)
             prompted.clear()
             confirmNext()
         }
@@ -245,7 +249,7 @@ class AndroidAccountSignInViewModel
             method: AndroidAccountMethod,
             account: String,
         ) {
-            microG.signingIn(pluginId) {
+            microG.signingIn(pluginId, since) {
                 // Read inside the attempt's lock: an update may have landed while another attempt held it.
                 val plugin = registry.state.value.plugin(pluginId) ?: error("The plugin is no longer installed")
                 if (this.method != method) {

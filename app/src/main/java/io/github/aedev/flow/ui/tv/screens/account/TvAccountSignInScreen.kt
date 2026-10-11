@@ -38,6 +38,7 @@ import io.github.aedev.flow.ui.tv.theme.LocalTvDimens
 import kotlinx.coroutines.delay
 import nl.neerdael.milkbeat.plugin.AndroidAccountMethod
 import nl.neerdael.milkbeat.plugin.DeviceCodeMethod
+import nl.neerdael.milkbeat.plugin.WebLoginMethod
 
 private const val SIGNED_IN_DISMISS_MS = 1_500L
 
@@ -47,8 +48,8 @@ fun TvAccountSignInScreen(
     viewModel: AccountSignInViewModel = hiltViewModel(),
 ) {
     val signInMethod by viewModel.currentSignInMethod.collectAsStateWithLifecycle()
-    val webSignIn = signInMethod !is DeviceCodeMethod && signInMethod !is AndroidAccountMethod
-    LaunchedEffect(webSignIn) { if (!webSignIn) viewModel.leaveWebSignIn() }
+    val method = signInMethod as? WebLoginMethod
+    LaunchedEffect(method) { viewModel.followMethod(method) }
     if (signInMethod is DeviceCodeMethod) {
         TvDeviceCodeSignInScreen(onNavigateBack = onNavigateBack)
         return
@@ -61,7 +62,6 @@ fun TvAccountSignInScreen(
     val context = LocalContext.current
     val window = LocalActivity.current?.window
     val supported = remember { loginProfileSupported() }
-    val method = viewModel.method
     val controller =
         remember(supported, method) {
             if (supported &&

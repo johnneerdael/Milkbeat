@@ -15,6 +15,7 @@ import io.github.aedev.flow.plugin.registry.InstalledPlugin
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -29,6 +30,8 @@ import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.coroutines.AbstractCoroutineContextElement
+import kotlin.coroutines.CoroutineContext
 
 private val Context.pluginAndroidAccounts: DataStore<Preferences> by safePreferencesDataStore(name = "plugin_android_accounts")
 
@@ -64,8 +67,35 @@ class MicroGAccounts internal constructor(
      */
     suspend fun <T> signingIn(
         pluginId: String,
+        since: Long = revocationMark(pluginId),
         attempt: suspend () -> T,
-    ): T = attempts.getOrPut(pluginId) { Mutex() }.withLock { attempt() }
+    ): T =
+        attempts.getOrPut(pluginId) { Mutex() }.withLock {
+            withContext(Attempt(pluginId, since)) { attempt() }
+        }
+
+    /** Marks when a sign-in began, for [signingIn]: a sign-out or removal after it fails the attempt. */
+    fun revocationMark(pluginId: String): Long = revocations[pluginId] ?: 0L
+
+    // How often each plugin's sign-in was revoked (sign-out, removal). An attempt notes the count it began with,
+    // and its bind and confirm fail once a revocation came since: the attempt's own rollback signs the plugin
+    // out, so revocation cannot simply wait for the attempt's lock.
+    private val revocations = ConcurrentHashMap<String, Long>()
+
+    private class Attempt(
+        val pluginId: String,
+        val revocation: Long,
+    ) : AbstractCoroutineContextElement(Attempt) {
+        companion object Key : CoroutineContext.Key<Attempt>
+    }
+
+    /** Fails a sign-in attempt for [pluginId] that a sign-out or removal overtook. */
+    private suspend fun checkNotRevoked(pluginId: String) {
+        val attempt = currentCoroutineContext()[Attempt] ?: return
+        check(attempt.pluginId != pluginId || revocationMark(pluginId) == attempt.revocation) {
+            "The plugin was signed out or removed during sign-in"
+        }
+    }
 
     fun chooseAccountIntent(): Intent = gateway.chooseAccountIntent()
 
@@ -91,6 +121,7 @@ class MicroGAccounts internal constructor(
     ): String {
         val nonce = UUID.randomUUID().toString()
         // Recorded before the write: until the write lands the stored record carries an older nonce, which fails.
+        checkNotRevoked(plugin.id)
         provisional[key(plugin.id, method.id).name] = nonce
         try {
             store.edit {
@@ -99,6 +130,7 @@ class MicroGAccounts internal constructor(
                 it[identitiesKey(plugin.id, method.id)] = method.identities.joinToString(",") { identity -> identity.name }
                 it[pendingKey(plugin.id, method.id)] = nonce
             }
+            checkNotRevoked(plugin.id)
         } catch (e: Throwable) {
             // The write may have landed before a cancellation reached us; the caller never learns the nonce.
             withContext(NonCancellable) { forget(plugin.id, method.id, nonce) }
@@ -113,8 +145,12 @@ class MicroGAccounts internal constructor(
         methodId: String,
         nonce: String,
     ) {
+        val attempt = currentCoroutineContext()[Attempt]?.takeIf { it.pluginId == pluginId }
         store.edit {
             check(it[pendingKey(pluginId, methodId)] == nonce) { "The binding was replaced or ended meanwhile" }
+            check(
+                attempt == null || revocationMark(pluginId) == attempt.revocation,
+            ) { "The plugin was signed out or removed during sign-in" }
             it.remove(pendingKey(pluginId, methodId))
         }
         provisional.remove(key(pluginId, methodId).name, nonce)
@@ -150,6 +186,8 @@ class MicroGAccounts internal constructor(
 
     /** Every binding of [pluginId], as its sign-out or removal ends them. */
     suspend fun forgetAll(pluginId: String) {
+        // Counted first, so an attempt that writes after this deletion still sees it was revoked.
+        revocations.merge(pluginId, 1L, Long::plus)
         store.edit { preferences ->
             preferences
                 .asMap()

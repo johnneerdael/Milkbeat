@@ -306,10 +306,62 @@ class AccountSignInViewModelTest {
             vm.start(loginSupported = true)
             runCurrent()
 
-            vm.leaveWebSignIn()
+            vm.followMethod(null)
             advanceTimeBy(AccountSignInViewModel.SIGN_IN_TIMEOUT_MS + 1)
 
             assertThat(stops).isEqualTo(1)
             assertThat(vm.state.value).isEqualTo(AccountSignInState.Starting)
+        }
+
+    @Test
+    fun `the method shown at first and after a configuration change keeps the running sign-in`() =
+        runTest(dispatcher) {
+            val vm = viewModel()
+            vm.start(loginSupported = true)
+            runCurrent()
+
+            vm.followMethod(method)
+            vm.followMethod(method)
+
+            assertThat(stops).isEqualTo(0)
+            assertThat(vm.state.value).isInstanceOf(AccountSignInState.Ready::class.java)
+        }
+
+    @Test
+    fun `an update that turns another method into web sign-in starts it with the declared method`() =
+        runTest(dispatcher) {
+            installed.value =
+                PluginRegistryState(
+                    plugins = listOf(plugin.copy(manifest = plugin.manifest.copy(signIn = listOf(DeviceCodeMethod("google", "Pair"))))),
+                )
+            val vm = viewModel()
+            assertThat(vm.method).isNull()
+
+            installed.value = PluginRegistryState(plugins = listOf(plugin))
+            vm.followMethod(method)
+            vm.start(loginSupported = true)
+            runCurrent()
+
+            assertThat(vm.method).isEqualTo(method)
+            assertThat(vm.state.value).isInstanceOf(AccountSignInState.Ready::class.java)
+        }
+
+    @Test
+    fun `an update to the web sign-in restarts it with the new method`() =
+        runTest(dispatcher) {
+            val vm = viewModel()
+            vm.start(loginSupported = true)
+            runCurrent()
+
+            val moved = method.copy(startUrl = "https://accounts.example/v2/login")
+            installed.value = PluginRegistryState(plugins = listOf(plugin.copy(manifest = plugin.manifest.copy(signIn = listOf(moved)))))
+            vm.followMethod(moved)
+            assertThat(stops).isEqualTo(1)
+            assertThat(vm.state.value).isEqualTo(AccountSignInState.Starting)
+
+            vm.start(loginSupported = true)
+            runCurrent()
+            assertThat(vm.method).isEqualTo(moved)
+            assertThat(launches).isEqualTo(2)
         }
 }

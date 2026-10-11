@@ -79,7 +79,7 @@ class AndroidAccountSignInViewModelTest {
         every { microG.installed() } returns true
         every { microG.supported() } returns true
         coEvery { microG.bind(any(), any(), any()) } returns "nonce"
-        coEvery { microG.signingIn<Unit>(any(), any()) } coAnswers { secondArg<suspend () -> Unit>().invoke() }
+        coEvery { microG.signingIn<Unit>(any(), any(), any()) } coAnswers { thirdArg<suspend () -> Unit>().invoke() }
         every { microG.chooseAccountIntent() } returns chooser
         coEvery { microG.request(account, any()) } returns MicroGTokenResult.Granted("token")
         coEvery { accounts.completeAccountSignIn(plugin.id, AndroidAccountSignIn("google", account)) } returns
@@ -366,5 +366,23 @@ class AndroidAccountSignInViewModelTest {
             assertThat(vm.state.value).isInstanceOf(AndroidAccountSignInState.Failed::class.java)
             coVerify(exactly = 0) { microG.confirm(any(), any(), any()) }
             coVerify { accounts.signOut(plugin.id) }
+        }
+
+    @Test fun `the attempt dates from the account choice, so a sign-out during the prompts ends it`() =
+        runTest(dispatcher) {
+            every { microG.revocationMark(plugin.id) } returnsMany listOf(7L, 8L)
+            coEvery { microG.request(account, AccountIdentity.YOUTUBE_MUSIC) } returnsMany
+                listOf(MicroGTokenResult.NeedsConsent(musicPrompt), MicroGTokenResult.Granted("music"))
+            val vm = viewModel()
+            vm.start()
+            vm.onLaunched()
+            vm.onAccountChosen(account)
+            runCurrent()
+
+            vm.onLaunched()
+            vm.onPromptClosed()
+            runCurrent()
+
+            coVerify { microG.signingIn<Unit>(plugin.id, 7L, any()) }
         }
 }
