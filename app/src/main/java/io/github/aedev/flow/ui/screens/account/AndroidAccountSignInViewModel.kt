@@ -245,13 +245,28 @@ class AndroidAccountSignInViewModel
             method: AndroidAccountMethod,
             account: String,
         ) {
-            val plugin = registry.state.value.plugin(pluginId) ?: error("The plugin is no longer installed")
-            if (this.method != method) {
-                // The plugin was updated meanwhile: confirm what it declares now before binding anything.
-                confirmNext()
-                return
+            microG.signingIn(pluginId, method.id) {
+                // Read inside the attempt's lock: an update may have landed while another attempt held it.
+                val plugin = registry.state.value.plugin(pluginId) ?: error("The plugin is no longer installed")
+                if (this.method != method) {
+                    // The plugin was updated meanwhile: confirm what it declares now before binding anything.
+                    confirmNext()
+                } else {
+                    attempt(plugin, method, account)
+                }
             }
-            microG.signingIn(pluginId, method.id) { attempt(plugin, method, account) }
+        }
+
+        /** Whether [plugin] still runs as the same release with the same [method], as the attempt began. */
+        private fun unchanged(
+            plugin: InstalledPlugin,
+            method: AndroidAccountMethod,
+        ): Boolean {
+            val now = registry.state.value.plugin(pluginId)
+            return now != null &&
+                now.signerFingerprint == plugin.signerFingerprint &&
+                now.manifest.versionCode == plugin.manifest.versionCode &&
+                this.method == method
         }
 
         private suspend fun attempt(
@@ -267,6 +282,8 @@ class AndroidAccountSignInViewModel
                 completed =
                     accounts.completeAccountSignIn(pluginId, AndroidAccountSignIn(method.id, account)) as? ProviderAccount.SignedIn
                         ?: error("The plugin did not accept the account")
+                // An update during the completion may need more than was confirmed: undo it and sign in again.
+                check(unchanged(plugin, method)) { "The plugin changed during sign-in" }
                 microG.confirm(pluginId, method.id, nonce)
                 confirmed = true
                 _state.value = AndroidAccountSignInState.SignedIn(completed.name)

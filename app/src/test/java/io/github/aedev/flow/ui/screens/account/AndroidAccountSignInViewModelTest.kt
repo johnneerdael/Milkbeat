@@ -349,4 +349,22 @@ class AndroidAccountSignInViewModelTest {
 
         assertThat(vm.state.value).isEqualTo(AndroidAccountSignInState.UnsupportedBuild)
     }
+
+    @Test fun `an update that lands while the plugin completes is undone, not confirmed`() =
+        runTest(dispatcher) {
+            val widened = plugin.copy(manifest = plugin.manifest.copy(versionCode = 2))
+            coEvery { accounts.completeAccountSignIn(any(), any()) } coAnswers {
+                installed.value = PluginRegistryState(listOf(widened))
+                ProviderAccount.SignedIn("channel", "Listener")
+            }
+            val vm = viewModel()
+            vm.start()
+
+            vm.onAccountChosen(account)
+            runCurrent()
+
+            assertThat(vm.state.value).isInstanceOf(AndroidAccountSignInState.Failed::class.java)
+            coVerify(exactly = 0) { microG.confirm(any(), any(), any()) }
+            coVerify { accounts.signOut(plugin.id) }
+        }
 }
