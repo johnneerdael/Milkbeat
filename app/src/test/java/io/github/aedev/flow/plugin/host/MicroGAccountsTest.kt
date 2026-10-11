@@ -8,7 +8,10 @@ import io.github.aedev.flow.plugin.registry.InstalledPlugin
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
@@ -192,5 +195,22 @@ class MicroGAccountsTest {
 
             assertThat(error?.code).isEqualTo(PluginErrorCode.SIGN_IN_EXPIRED)
             verify(exactly = 0) { gateway.token(any(), AccountIdentity.YOUTUBE) }
+        }
+
+    @Test fun `a sign-out while MicroG answers keeps its token from the plugin`() =
+        runTest {
+            // The store runs on its own threads, so the sign-out can complete inside MicroG's blocking answer.
+            val store = PreferenceDataStoreFactory.create(scope = CoroutineScope(Dispatchers.IO)) { temp.newFile("race.preferences_pb") }
+            val microG = MicroGAccounts(gateway, store, StandardTestDispatcher(testScheduler))
+            every { gateway.hasAccount(any()) } returns true
+            every { gateway.token(any(), any()) } answers {
+                runBlocking { microG.forgetAll(plugin.id) }
+                MicroGTokenResult.Granted("ya29.minted-during-sign-out")
+            }
+            microG.bind(plugin, google, "listener@example.com")
+
+            val error = failure { microG.token(plugin, AccountTokenRequest("google", AccountIdentity.YOUTUBE_MUSIC)) }
+
+            assertThat(error?.code).isEqualTo(PluginErrorCode.SIGN_IN_REQUIRED)
         }
 }

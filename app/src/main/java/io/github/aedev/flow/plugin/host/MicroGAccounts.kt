@@ -99,6 +99,36 @@ class MicroGAccounts internal constructor(
         if (request.identity !in method.identities) {
             throw HostCallException(PluginErrorCode.UNSUPPORTED, "${method.id} does not declare ${request.identity}")
         }
+        val account = boundAccount(plugin, method, request.identity)
+        val token =
+            withContext(io) {
+                authenticator {
+                    if (!gateway.hasAccount(account)) {
+                        throw HostCallException(PluginErrorCode.SIGN_IN_EXPIRED, "The chosen account is no longer on this device")
+                    }
+                    when (val result = gateway.token(account, request.identity)) {
+                        is MicroGTokenResult.Granted -> result.token
+
+                        is MicroGTokenResult.NeedsConsent -> throw HostCallException(
+                            PluginErrorCode.SIGN_IN_EXPIRED,
+                            "MicroG asks to confirm ${request.identity} again",
+                        )
+                    }
+                }
+            }
+        // A sign-out or removal while MicroG answered ends the binding: its token is not handed out.
+        if (runCatching { boundAccount(plugin, method, request.identity) }.getOrNull() != account) {
+            throw HostCallException(PluginErrorCode.SIGN_IN_REQUIRED, "The sign-in for ${method.id} ended")
+        }
+        return AccountToken(token)
+    }
+
+    /** The account [method] of [plugin] is bound to for [identity], or why it may not have a token. */
+    private suspend fun boundAccount(
+        plugin: InstalledPlugin,
+        method: AndroidAccountMethod,
+        identity: AccountIdentity,
+    ): String {
         val stored = store.data.first()
         val account = stored[key(plugin.id, method.id)]
         if (account == null || stored[signerKey(plugin.id, method.id)] != plugin.signerFingerprint) {
@@ -107,24 +137,10 @@ class MicroGAccounts internal constructor(
         }
         // An identity an update added was never confirmed for this plugin: it signs in again for it.
         val approved = stored[identitiesKey(plugin.id, method.id)].orEmpty().split(',')
-        if (request.identity.name !in approved) {
-            throw HostCallException(PluginErrorCode.SIGN_IN_EXPIRED, "${request.identity} was not confirmed for ${method.id}")
+        if (identity.name !in approved) {
+            throw HostCallException(PluginErrorCode.SIGN_IN_EXPIRED, "$identity was not confirmed for ${method.id}")
         }
-        return withContext(io) {
-            authenticator {
-                if (!gateway.hasAccount(account)) {
-                    throw HostCallException(PluginErrorCode.SIGN_IN_EXPIRED, "The chosen account is no longer on this device")
-                }
-                when (val result = gateway.token(account, request.identity)) {
-                    is MicroGTokenResult.Granted -> AccountToken(result.token)
-
-                    is MicroGTokenResult.NeedsConsent -> throw HostCallException(
-                        PluginErrorCode.SIGN_IN_EXPIRED,
-                        "MicroG asks to confirm ${request.identity} again",
-                    )
-                }
-            }
-        }
+        return account
     }
 
     internal suspend fun invalidate(
