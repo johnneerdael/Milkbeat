@@ -669,7 +669,8 @@ for `oauth2:` + the `youtube` and `youtube.force-ssl` scopes, with the option `o
 A prompt MicroG returns is launched once; closing it without a grant ends the attempt as declined. Only when every identity is granted
 does `MicroGAccounts` bind the account name, the plugin's signer and the confirmed identities to the method, and call
 `signIn.completeAccount`. The binding is provisional until the plugin completes: it serves tokens only in the run that made
-it, and one a process that died left behind expires the plugin's sign-in. A refusal or an unfinished sign-in removes it;
+it, and one a process that died left behind signs the plugin out at its next account check, since the plugin may
+still report the account it cannot get a token for. A refusal or an unfinished sign-in removes it;
 a completion whose binding cannot be confirmed signs the plugin out again. Bindings are never backed up.
 
 At run time `signIn.token({method, identity})` resolves the bound account. It refuses identities the method did not

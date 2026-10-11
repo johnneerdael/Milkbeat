@@ -497,7 +497,7 @@ class MicroGAccountsTest {
             assertThat(transitioned).isTrue()
         }
 
-    @Test fun `bindings the store fails to delete stay revoked until a later revocation deletes them`() =
+    @Test fun `bindings the store fails to delete stay revoked until a later revocation deletes them, and the plugin signs out`() =
         runTest {
             val real = PreferenceDataStoreFactory.create(scope = backgroundScope) { temp.newFile("full.preferences_pb") }
             var failNext = false
@@ -521,7 +521,8 @@ class MicroGAccountsTest {
 
             assertThat(runCatching { microG.revoke(plugin.id) { transitioned = true } }.isFailure).isTrue()
 
-            assertThat(transitioned).isFalse()
+            // The plugin still signs out; only the bindings wait for a later revocation.
+            assertThat(transitioned).isTrue()
             assertThat(failure { microG.token(plugin, request) }?.code).isEqualTo(PluginErrorCode.SIGN_IN_REQUIRED)
             microG.revoke(plugin.id)
             microG.signingIn(plugin.id) { microG.confirm(plugin.id, google.id, microG.bind(plugin, google, "listener@example.com")) }
@@ -620,5 +621,20 @@ class MicroGAccountsTest {
                 }
 
             assertThat(confirmation.isFailure).isTrue()
+        }
+
+    @Test fun `a sign-in a run that ended left unfinished is orphaned, one this run completes is not`() =
+        runTest {
+            val store = PreferenceDataStoreFactory.create(scope = backgroundScope) { temp.newFile("orphans.preferences_pb") }
+            val ended = MicroGAccounts(gateway, store, StandardTestDispatcher(testScheduler))
+            ended.bind(plugin, google, "listener@example.com")
+            assertThat(ended.orphaned(plugin.id)).isFalse()
+
+            val restarted = MicroGAccounts(gateway, store, StandardTestDispatcher(testScheduler))
+            assertThat(restarted.orphaned(plugin.id)).isTrue()
+            assertThat(restarted.orphaned("dev.other")).isFalse()
+
+            restarted.confirm(plugin.id, google.id, restarted.bind(plugin, google, "listener@example.com"))
+            assertThat(restarted.orphaned(plugin.id)).isFalse()
         }
 }

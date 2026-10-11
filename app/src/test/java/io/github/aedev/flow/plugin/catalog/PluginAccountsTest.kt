@@ -400,4 +400,29 @@ class PluginAccountsTest {
 
             coVerify(exactly = 1) { host.call("youtube", PluginOperations.signOut, Unit) }
         }
+
+    @Test fun `a plugin whose host sign-in a run left unfinished is signed out rather than believed`() =
+        runTest {
+            coEvery { host.call("youtube", PluginOperations.account, Unit) } returns ProviderAccount.SignedIn("listener")
+            coEvery { host.call("youtube", PluginOperations.signOut, Unit) } returns Unit
+            val revoked = mutableListOf<String>()
+            val accounts =
+                PluginAccounts(
+                    host,
+                    backgroundScope,
+                    { testScheduler.currentTime },
+                    { id, transition ->
+                        revoked += id
+                        transition()
+                    },
+                    { it == "youtube" },
+                )
+
+            assertThat(accounts.refresh("youtube")).isEqualTo(ProviderAccount.Anonymous)
+
+            assertThat(revoked).containsExactly("youtube")
+            coVerify(exactly = 1) { host.call("youtube", PluginOperations.signOut, Unit) }
+            coVerify(exactly = 0) { host.call("youtube", PluginOperations.account, Unit) }
+            assertThat(accounts.accounts.value["youtube"]).isEqualTo(ProviderAccount.Anonymous)
+        }
 }

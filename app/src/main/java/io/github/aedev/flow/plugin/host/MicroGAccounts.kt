@@ -37,6 +37,8 @@ import kotlin.coroutines.CoroutineContext
 // No count equals it, so whatever dates from a running revocation counts as revoked.
 private const val REVOKING = -1L
 
+private const val PENDING_SUFFIX = "#pending"
+
 private val Context.pluginAndroidAccounts: DataStore<Preferences> by safePreferencesDataStore(name = "plugin_android_accounts")
 
 /**
@@ -245,26 +247,45 @@ class MicroGAccounts internal constructor(
             // away meanwhile; plugin calls are bounded by the runtime's call timeout.
             withContext(NonCancellable) {
                 provisional.keys.removeIf { it.startsWith(prefix(pluginId)) }
-                try {
-                    store.edit { preferences ->
-                        preferences
-                            .asMap()
-                            .keys
-                            .filter { it.name.startsWith(prefix(pluginId)) }
-                            .forEach { preferences.remove(it) }
+                val deletion =
+                    try {
+                        store.edit { preferences ->
+                            preferences
+                                .asMap()
+                                .keys
+                                .filter { it.name.startsWith(prefix(pluginId)) }
+                                .forEach { preferences.remove(it) }
+                        }
+                        null
+                    } catch (e: Exception) {
+                        e
                     }
-                } catch (e: Exception) {
-                    // Bindings the store failed to delete stay revoked in this run until a later revocation deletes them.
-                    revocations.computeIfPresent(pluginId) { _, now -> now.copy(undeleted = true) }
+                // Bindings the store failed to delete stay revoked in this run until a later revocation deletes them,
+                // and the plugin still signs out, so neither outlives the listener's request.
+                revocations.computeIfPresent(pluginId) { _, now -> now.copy(undeleted = deletion != null) }
+                try {
+                    transition()
+                } catch (e: Throwable) {
+                    deletion?.let(e::addSuppressed)
                     throw e
                 }
-                revocations.computeIfPresent(pluginId) { _, now -> now.copy(undeleted = false) }
-                transition()
+                deletion?.let { throw it }
             }
         } finally {
             revocations.computeIfPresent(pluginId) { _, now -> now.copy(running = now.running - 1) }
         }
     }
+
+    /**
+     * Whether [pluginId] has a binding a sign-in left unfinished that no attempt of this run is completing, as one in a
+     * run that died: its plugin may believe in an account it cannot get a token for, and is signed out.
+     */
+    suspend fun orphaned(pluginId: String): Boolean =
+        store.data.first().asMap().any { (key, value) ->
+            key.name.startsWith(prefix(pluginId)) &&
+                key.name.endsWith(PENDING_SUFFIX) &&
+                provisional[key.name.removeSuffix(PENDING_SUFFIX)] != value
+        }
 
     internal suspend fun token(
         plugin: InstalledPlugin,
@@ -386,5 +407,5 @@ class MicroGAccounts internal constructor(
     private fun pendingKey(
         pluginId: String,
         methodId: String,
-    ) = stringPreferencesKey(base(pluginId, methodId) + "#pending")
+    ) = stringPreferencesKey(base(pluginId, methodId) + PENDING_SUFFIX)
 }

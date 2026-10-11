@@ -48,6 +48,8 @@ class PluginAccounts internal constructor(
     private val nowMs: () -> Long,
     /** Ends what the host itself holds for a plugin's sign-in, its MicroG account bindings, through a transition. */
     private val revoke: suspend (String, suspend () -> Unit) -> Unit = { _, transition -> transition() },
+    /** Whether a host-held sign-in of the plugin was left unfinished by a run that ended, so the plugin signs out. */
+    private val orphaned: suspend (String) -> Boolean = { false },
 ) {
     constructor(host: PluginHost) : this(
         host,
@@ -61,6 +63,7 @@ class PluginAccounts internal constructor(
         CoroutineScope(SupervisorJob() + PerformanceDispatcher.networkIO),
         SystemClock::elapsedRealtime,
         microG::revoke,
+        microG::orphaned,
     )
 
     private val _accounts = MutableStateFlow<Map<String, ProviderAccount>>(emptyMap())
@@ -353,12 +356,18 @@ class PluginAccounts internal constructor(
         }
     }
 
-    private suspend fun ask(pluginId: String): ProviderAccount =
-        try {
+    private suspend fun ask(pluginId: String): ProviderAccount {
+        // The plugin may still report the account an unfinished host sign-in gave it; it cannot get a token for it.
+        if (orphaned(pluginId)) {
+            signOut(pluginId)
+            return ProviderAccount.Anonymous
+        }
+        return try {
             host.call(pluginId, PluginOperations.account, Unit)
         } catch (e: PluginCallException) {
             if (e.error.code == PluginErrorCode.UNSUPPORTED) ProviderAccount.Anonymous else throw e
         }
+    }
 
     private fun cancelRevalidation(pluginId: String) {
         synchronized(revalidations) {
