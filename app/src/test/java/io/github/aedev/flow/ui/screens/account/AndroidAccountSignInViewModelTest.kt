@@ -309,4 +309,32 @@ class AndroidAccountSignInViewModelTest {
 
         assertThat(vm.state.value).isEqualTo(AndroidAccountSignInState.Failed())
     }
+
+    @Test fun `a completion the binding cannot follow is undone with a sign-out`() =
+        runTest(dispatcher) {
+            coEvery { microG.confirm(any(), any()) } throws java.io.IOException("disk full")
+            val vm = viewModel()
+            vm.start()
+
+            vm.onAccountChosen(account)
+            runCurrent()
+
+            assertThat(vm.state.value).isInstanceOf(AndroidAccountSignInState.Failed::class.java)
+            coVerify { accounts.signOut(plugin.id) }
+        }
+
+    @Test fun `leaving between the completion and its binding signs the plugin out again`() =
+        runTest(dispatcher) {
+            coEvery { microG.confirm(any(), any()) } coAnswers { awaitCancellation() }
+            val vm = viewModel()
+            val store = ViewModelStore().apply { put("sign-in", vm) }
+            vm.start()
+            vm.onAccountChosen(account)
+            runCurrent()
+
+            store.clear()
+            runCurrent()
+
+            coVerify { accounts.signOut(plugin.id) }
+        }
 }

@@ -6,7 +6,6 @@ import android.content.Context
 import android.content.Intent
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -22,6 +21,7 @@ import nl.neerdael.milkbeat.plugin.AccountTokenInvalidation
 import nl.neerdael.milkbeat.plugin.AccountTokenRequest
 import nl.neerdael.milkbeat.plugin.AndroidAccountMethod
 import nl.neerdael.milkbeat.plugin.PluginErrorCode
+import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -58,8 +58,9 @@ class MicroGAccounts internal constructor(
         identity: AccountIdentity,
     ): MicroGTokenResult = withContext(io) { gateway.token(accountName, identity) }
 
-    // Bindings this run made and the plugin has not completed yet; one left by a process that died is not here.
-    private val provisional = ConcurrentHashMap.newKeySet<String>()
+    // The nonce of each binding this run made that the plugin has not completed yet. A record carries the
+    // nonce it was written with, so one a process that died left behind never matches this run's.
+    private val provisional = ConcurrentHashMap<String, String>()
 
     /**
      * Binds [method] of [plugin] to [accountName], for the identities the listener has just confirmed. The
@@ -71,12 +72,14 @@ class MicroGAccounts internal constructor(
         method: AndroidAccountMethod,
         accountName: String,
     ) {
-        provisional += key(plugin.id, method.id).name
+        val nonce = UUID.randomUUID().toString()
+        // Recorded before the write: until the write lands the stored record carries an older nonce, which fails.
+        provisional[key(plugin.id, method.id).name] = nonce
         store.edit {
             it[key(plugin.id, method.id)] = accountName
             it[signerKey(plugin.id, method.id)] = plugin.signerFingerprint
             it[identitiesKey(plugin.id, method.id)] = method.identities.joinToString(",") { identity -> identity.name }
-            it[pendingKey(plugin.id, method.id)] = true
+            it[pendingKey(plugin.id, method.id)] = nonce
         }
     }
 
@@ -86,7 +89,7 @@ class MicroGAccounts internal constructor(
         methodId: String,
     ) {
         store.edit { it.remove(pendingKey(pluginId, methodId)) }
-        provisional -= key(pluginId, methodId).name
+        provisional.remove(key(pluginId, methodId).name)
     }
 
     suspend fun forget(
@@ -99,7 +102,7 @@ class MicroGAccounts internal constructor(
             it.remove(identitiesKey(pluginId, methodId))
             it.remove(pendingKey(pluginId, methodId))
         }
-        provisional -= key(pluginId, methodId).name
+        provisional.remove(key(pluginId, methodId).name)
     }
 
     /** Every binding of [pluginId], as its sign-out or removal ends them. */
@@ -111,7 +114,7 @@ class MicroGAccounts internal constructor(
                 .filter { it.name.startsWith("$pluginId/") }
                 .forEach { preferences.remove(it) }
         }
-        provisional.removeIf { it.startsWith("$pluginId/") }
+        provisional.keys.removeIf { it.startsWith("$pluginId/") }
     }
 
     internal suspend fun token(
@@ -154,10 +157,15 @@ class MicroGAccounts internal constructor(
     ): String {
         val stored = store.data.first()
         val account = stored[key(plugin.id, method.id)]
-        val unfinished = stored[pendingKey(plugin.id, method.id)] == true && key(plugin.id, method.id).name !in provisional
-        if (account == null || unfinished || stored[signerKey(plugin.id, method.id)] != plugin.signerFingerprint) {
+        if (account == null || stored[signerKey(plugin.id, method.id)] != plugin.signerFingerprint) {
             if (account != null) forget(plugin.id, method.id)
             throw HostCallException(PluginErrorCode.SIGN_IN_REQUIRED, "No account was chosen for ${method.id}")
+        }
+        // A sign-in that never finished, in this run or one that died, ends the plugin's sign-in rather than
+        // serving it; the record stays, since a sign-in running now may be replacing it.
+        val pending = stored[pendingKey(plugin.id, method.id)]
+        if (pending != null && provisional[key(plugin.id, method.id).name] != pending) {
+            throw HostCallException(PluginErrorCode.SIGN_IN_EXPIRED, "The sign-in for ${method.id} did not finish")
         }
         // An identity an update added was never confirmed for this plugin: it signs in again for it.
         val approved = stored[identitiesKey(plugin.id, method.id)].orEmpty().split(',')
@@ -213,5 +221,5 @@ class MicroGAccounts internal constructor(
     private fun pendingKey(
         pluginId: String,
         methodId: String,
-    ) = booleanPreferencesKey("$pluginId/$methodId#pending")
+    ) = stringPreferencesKey("$pluginId/$methodId#pending")
 }

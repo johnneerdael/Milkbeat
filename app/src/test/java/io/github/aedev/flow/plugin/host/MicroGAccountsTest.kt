@@ -214,7 +214,7 @@ class MicroGAccountsTest {
             assertThat(error?.code).isEqualTo(PluginErrorCode.SIGN_IN_REQUIRED)
         }
 
-    @Test fun `a binding a dead run left unfinished serves no token, a completed one survives the restart`() =
+    @Test fun `a binding a dead run left unfinished expires the sign-in, a new or completed one serves`() =
         runTest {
             val store = PreferenceDataStoreFactory.create(scope = backgroundScope) { temp.newFile("restart.preferences_pb") }
             every { gateway.hasAccount(any()) } returns true
@@ -225,7 +225,9 @@ class MicroGAccountsTest {
             firstRun.bind(plugin, google, "listener@example.com")
             assertThat(firstRun.token(plugin, request).token).isEqualTo("ya29.music")
             val afterDeath = MicroGAccounts(gateway, store, StandardTestDispatcher(testScheduler))
-            assertThat(failure { afterDeath.token(plugin, request) }?.code).isEqualTo(PluginErrorCode.SIGN_IN_REQUIRED)
+            assertThat(failure { afterDeath.token(plugin, request) }?.code).isEqualTo(PluginErrorCode.SIGN_IN_EXPIRED)
+            afterDeath.bind(plugin, google, "listener@example.com")
+            assertThat(afterDeath.token(plugin, request).token).isEqualTo("ya29.music")
 
             val signingIn = MicroGAccounts(gateway, store, StandardTestDispatcher(testScheduler))
             signingIn.bind(plugin, google, "listener@example.com")
