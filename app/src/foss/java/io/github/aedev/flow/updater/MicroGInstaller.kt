@@ -22,4 +22,6 @@ class MicroGInstaller
         fun installPermissionIntent(): Intent = Intent()
 
         suspend fun install(): Boolean = false
+
+        fun release() = Unit
     }

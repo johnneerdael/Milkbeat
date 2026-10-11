@@ -15,6 +15,7 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.verify
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
@@ -468,5 +469,24 @@ class AndroidAccountSignInViewModelTest {
             assertThat(vm.state.value).isInstanceOf(AndroidAccountSignInState.Failed::class.java)
             coVerify(exactly = 0) { microG.confirm(any(), any(), any()) }
             coVerify { accounts.signOut(plugin.id) }
+        }
+
+    @Test fun `an install the sign-in committed opens no confirmation once it moved on or closed`() =
+        runTest(dispatcher) {
+            val vm = viewModel()
+            runCurrent()
+
+            installed.value =
+                PluginRegistryState(
+                    listOf(plugin.copy(manifest = plugin.manifest.copy(signIn = listOf(DeviceCodeMethod("google", "Pair"))))),
+                )
+            runCurrent()
+            verify(exactly = 1) { installer.release() }
+
+            ViewModelStore().apply {
+                put("vm", vm)
+                clear()
+            }
+            verify(exactly = 2) { installer.release() }
         }
 }

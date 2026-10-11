@@ -259,7 +259,10 @@ class AndroidAccountSignInViewModel
             }
         }
 
+        override fun onCleared() = installer.release()
+
         private fun leave() {
+            installer.release()
             session.cancel()
             session = Job(viewModelScope.coroutineContext[Job])
             accountName = null

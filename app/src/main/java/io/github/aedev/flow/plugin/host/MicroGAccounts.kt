@@ -78,13 +78,14 @@ class MicroGAccounts internal constructor(
     /** Marks when a sign-in began, for [signingIn]: a sign-out or removal after it fails the attempt. */
     fun revocationMark(pluginId: String): Long = revocations[pluginId]?.count ?: 0L
 
-    // Per plugin, how often its sign-in was revoked (sign-out, removal) and how many revocations still run, kept as
-    // one value so both change and are read together. An attempt notes the count it began with, and its bind and
+    // Per plugin, how often its sign-in was revoked (sign-out, removal), how many revocations still run and whether
+    // a failed deletion left bindings behind, kept as one value so all change and are read together. An attempt notes the count it began with, and its bind and
     // confirm fail once a revocation came since or while one runs: the attempt's own rollback signs the plugin out,
     // so revocation cannot simply wait for the attempt's lock.
     private data class Revocations(
         val count: Long = 0L,
         val running: Int = 0,
+        val undeleted: Boolean = false,
     )
 
     private val revocations = ConcurrentHashMap<String, Revocations>()
@@ -94,7 +95,7 @@ class MicroGAccounts internal constructor(
         since: Long,
     ): Boolean {
         val now = revocations[pluginId] ?: Revocations()
-        return now.count != since || now.running > 0
+        return now.count != since || now.running > 0 || now.undeleted
     }
 
     private class Attempt(
@@ -215,13 +216,20 @@ class MicroGAccounts internal constructor(
             // away meanwhile; plugin calls are bounded by the runtime's call timeout.
             withContext(NonCancellable) {
                 provisional.keys.removeIf { it.startsWith(prefix(pluginId)) }
-                store.edit { preferences ->
-                    preferences
-                        .asMap()
-                        .keys
-                        .filter { it.name.startsWith(prefix(pluginId)) }
-                        .forEach { preferences.remove(it) }
+                try {
+                    store.edit { preferences ->
+                        preferences
+                            .asMap()
+                            .keys
+                            .filter { it.name.startsWith(prefix(pluginId)) }
+                            .forEach { preferences.remove(it) }
+                    }
+                } catch (e: Exception) {
+                    // Bindings the store failed to delete stay revoked in this run until a later revocation deletes them.
+                    revocations.computeIfPresent(pluginId) { _, now -> now.copy(undeleted = true) }
+                    throw e
                 }
+                revocations.computeIfPresent(pluginId) { _, now -> now.copy(undeleted = false) }
                 transition()
             }
         } finally {

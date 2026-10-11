@@ -495,4 +495,35 @@ class MicroGAccountsTest {
 
             assertThat(transitioned).isTrue()
         }
+
+    @Test fun `bindings the store fails to delete stay revoked until a later revocation deletes them`() =
+        runTest {
+            val real = PreferenceDataStoreFactory.create(scope = backgroundScope) { temp.newFile("full.preferences_pb") }
+            var failNext = false
+            val store =
+                object : DataStore<Preferences> by real {
+                    override suspend fun updateData(transform: suspend (t: Preferences) -> Preferences): Preferences {
+                        if (failNext) {
+                            failNext = false
+                            throw java.io.IOException("no space left")
+                        }
+                        return real.updateData(transform)
+                    }
+                }
+            val microG = MicroGAccounts(gateway, store, StandardTestDispatcher(testScheduler))
+            every { gateway.hasAccount(any()) } returns true
+            every { gateway.token(any(), any()) } returns MicroGTokenResult.Granted("ya29.music")
+            val request = AccountTokenRequest("google", AccountIdentity.YOUTUBE_MUSIC)
+            microG.confirm(plugin.id, google.id, microG.bind(plugin, google, "listener@example.com"))
+            failNext = true
+            var transitioned = false
+
+            assertThat(runCatching { microG.revoke(plugin.id) { transitioned = true } }.isFailure).isTrue()
+
+            assertThat(transitioned).isFalse()
+            assertThat(failure { microG.token(plugin, request) }?.code).isEqualTo(PluginErrorCode.SIGN_IN_REQUIRED)
+            microG.revoke(plugin.id)
+            microG.signingIn(plugin.id) { microG.confirm(plugin.id, google.id, microG.bind(plugin, google, "listener@example.com")) }
+            assertThat(microG.token(plugin, request).token).isEqualTo("ya29.music")
+        }
 }

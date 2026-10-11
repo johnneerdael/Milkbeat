@@ -52,6 +52,9 @@ class MicroGInstaller
         /** Counts installs the installer reported done, so a screen still waiting moves on. */
         val installed: StateFlow<Int> = _installed.asStateFlow()
 
+        // The committed install session a sign-in screen still waits for; its confirmation opens only while it does.
+        @Volatile private var awaited: Int? = null
+
         // MicroG-RE-TV serves only the stable app; Preview and debug builds could install it and still get no token.
         val isAvailable: Boolean = context.packageName == STABLE_PACKAGE
 
@@ -83,6 +86,13 @@ class MicroGInstaller
                     apk.delete()
                 }
             }
+
+        /** The sign-in moved on: a session it committed earlier opens no confirmation over what came next. */
+        fun release() {
+            awaited = null
+        }
+
+        internal fun awaits(sessionId: Int): Boolean = sessionId != -1 && awaited == sessionId
 
         internal fun reportFailure() {
             _failed.value = true
@@ -136,6 +146,7 @@ class MicroGInstaller
                             Intent(context, MicroGInstallReceiver::class.java),
                             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE,
                         )
+                    awaited = sessionId
                     session.commit(callback.intentSender)
                 }
             } catch (e: Exception) {
