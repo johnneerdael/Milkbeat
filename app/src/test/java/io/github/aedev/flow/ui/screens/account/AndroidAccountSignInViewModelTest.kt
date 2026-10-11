@@ -63,9 +63,11 @@ class AndroidAccountSignInViewModelTest {
     private val chooser = mockk<Intent>()
     private val musicPrompt = mockk<Intent>()
     private val installFailed = MutableStateFlow(false)
+    private val installedCount = MutableStateFlow(0)
     private val installer =
         mockk<MicroGInstaller>(relaxed = true) {
             every { failed } returns installFailed
+            every { installed } returns installedCount
             every { isAvailable } returns true
         }
 
@@ -216,5 +218,24 @@ class AndroidAccountSignInViewModelTest {
             runCurrent()
 
             assertThat(vm.state.value).isEqualTo(AndroidAccountSignInState.InstallFailed)
+        }
+
+    @Test fun `an install the installer reports after the screen resumed still moves on to the chooser`() =
+        runTest(dispatcher) {
+            every { microG.installed() } returns false
+            every { installer.canInstall() } returns true
+            coEvery { installer.install() } returns true
+            val vm = viewModel()
+            vm.start()
+            vm.install()
+            runCurrent()
+            vm.onResumed()
+            assertThat(vm.state.value).isEqualTo(AndroidAccountSignInState.Installing)
+
+            every { microG.installed() } returns true
+            installedCount.value = 1
+            runCurrent()
+
+            assertThat(vm.state.value).isEqualTo(AndroidAccountSignInState.ChooseAccount(chooser))
         }
 }

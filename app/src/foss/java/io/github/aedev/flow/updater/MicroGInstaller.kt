@@ -13,6 +13,8 @@ class MicroGInstaller
     constructor() {
         val failed: StateFlow<Boolean> = MutableStateFlow(false)
 
+        val installed: StateFlow<Int> = MutableStateFlow(0)
+
         val isAvailable: Boolean = false
 
         fun canInstall(): Boolean = false

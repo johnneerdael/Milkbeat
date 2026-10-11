@@ -28,6 +28,7 @@ private const val MICROG_APK_URL = "https://github.com/johnneerdael/MicroG-RE-TV
 private const val MAX_APK_BYTES = 256L * 1024 * 1024
 private const val INSTALL_REQUEST = 7302
 private const val TAG = "MicroGInstaller"
+private const val STABLE_PACKAGE = "nl.neerdael.milkbeat"
 
 /**
  * Installs MicroG-RE-TV for account sign-in: the latest release's APK, downloaded while the sign-in
@@ -46,7 +47,13 @@ class MicroGInstaller
         /** True once the installer reported a failure, until the next attempt. */
         val failed: StateFlow<Boolean> = _failed.asStateFlow()
 
-        val isAvailable: Boolean = true
+        private val _installed = MutableStateFlow(0)
+
+        /** Counts installs the installer reported done, so a screen still waiting moves on. */
+        val installed: StateFlow<Int> = _installed.asStateFlow()
+
+        // MicroG-RE-TV serves only the stable app; Preview and debug builds could install it and still get no token.
+        val isAvailable: Boolean = context.packageName == STABLE_PACKAGE
 
         fun canInstall(): Boolean = context.packageManager.canRequestPackageInstalls()
 
@@ -77,6 +84,10 @@ class MicroGInstaller
 
         internal fun reportFailure() {
             _failed.value = true
+        }
+
+        internal fun reportInstalled() {
+            _installed.value++
         }
 
         private suspend fun download(target: File) {

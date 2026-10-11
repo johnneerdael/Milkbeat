@@ -15,6 +15,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 import nl.neerdael.milkbeat.catalog.ProviderAccount
 import nl.neerdael.milkbeat.plugin.AccountIdentity
@@ -108,6 +109,8 @@ class AndroidAccountSignInViewModel
                     }
                 }
             }
+            // The installer's success can land after the screen resumed from its prompt.
+            viewModelScope.launch { installer.installed.drop(1).collect { onResumed() } }
         }
 
         fun start() {

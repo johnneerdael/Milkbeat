@@ -36,7 +36,7 @@ class MicroGInstallReceiver : BroadcastReceiver() {
             }
 
             PackageInstaller.STATUS_SUCCESS -> {
-                Unit
+                installer.reportInstalled()
             }
 
             else -> {
