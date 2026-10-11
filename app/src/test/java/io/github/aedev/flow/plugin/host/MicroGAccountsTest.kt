@@ -474,4 +474,25 @@ class MicroGAccountsTest {
             val error = failure { microG.token(plugin, AccountTokenRequest("google", AccountIdentity.YOUTUBE_MUSIC)) }
             assertThat(error?.code).isEqualTo(PluginErrorCode.SIGN_IN_REQUIRED)
         }
+
+    @Test fun `a sign-out or removal whose caller is cancelled still completes its transition`() =
+        runTest {
+            val microG = accounts()
+            val pluginSignOut = CompletableDeferred<Unit>()
+            var transitioned = false
+            val signOut =
+                launch {
+                    microG.revoke(plugin.id) {
+                        pluginSignOut.await()
+                        transitioned = true
+                    }
+                }
+            testScheduler.runCurrent()
+
+            signOut.cancel()
+            pluginSignOut.complete(Unit)
+            signOut.join()
+
+            assertThat(transitioned).isTrue()
+        }
 }

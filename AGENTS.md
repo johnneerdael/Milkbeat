@@ -934,7 +934,8 @@ run that occupies a physical device, and the resulting diff is thousands of line
   chooser/prompt/settings intents must not crash on `SecurityException`. GitHub builds install MicroG-RE-TV through
   the flavor-split `updater/MicroGInstaller` (package check before the installer session); foss builds only explain.
   MicroG-RE-TV serves only `nl.neerdael.milkbeat`, so on-device token tests need the stable package.
-  Sign-out and removal go through `MicroGAccounts.revoke`, which stays in force for the whole plugin transition.
+  Sign-out and removal go through `MicroGAccounts.revoke`, which stays in force for the whole plugin transition
+  and completes it non-cancellably (plugin calls are bounded by the runtime timeout).
   It must never take the per-plugin `signingIn` lock, because an attempt's own rollback signs the plugin out;
   attempts and token issuance check the revocation count and in-flight revocations instead.
 - Plugin API 5 adds `DeviceCodeMethod` and `signIn.begin/poll/confirm/cancel`; keep the generic TV pairing

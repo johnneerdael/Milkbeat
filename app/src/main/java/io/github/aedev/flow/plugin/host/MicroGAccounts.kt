@@ -206,7 +206,8 @@ class MicroGAccounts internal constructor(
         revocations.merge(pluginId, 1L, Long::plus)
         revoking.merge(pluginId, 1, Int::plus)
         try {
-            // The listener's revocation completes even if whoever started it goes away meanwhile.
+            // The listener's sign-out or removal completes, transition included, even if whoever started it goes
+            // away meanwhile; plugin calls are bounded by the runtime's call timeout.
             withContext(NonCancellable) {
                 provisional.keys.removeIf { it.startsWith(prefix(pluginId)) }
                 store.edit { preferences ->
@@ -216,8 +217,8 @@ class MicroGAccounts internal constructor(
                         .filter { it.name.startsWith(prefix(pluginId)) }
                         .forEach { preferences.remove(it) }
                 }
+                transition()
             }
-            transition()
         } finally {
             revoking.computeIfPresent(pluginId) { _, running -> (running - 1).takeIf { it > 0 } }
         }
