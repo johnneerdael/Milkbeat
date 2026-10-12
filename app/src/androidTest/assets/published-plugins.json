@@ -30,14 +30,14 @@
     {
       "id": "nl.neerdael.youtube-music",
       "name": "YouTube Music",
-      "version": "0.3.0",
-      "versionCode": 15,
+      "version": "0.3.1",
+      "versionCode": 16,
       "apiMin": 3,
       "format": 1,
-      "sha256": "29acd7e25faf02ec1726c9c92438f49cc41ec1ee11babfdb9dfdfa734c5ad603",
-      "size": 129211,
+      "sha256": "44bc33a6432a93354a8bc47c7a30cc31d41c46c51585cd175f8aad049f0e552c",
+      "size": 129273,
       "fingerprint": "39dca3d132c56262c0873ec96faf22cc8ed9ca30c7ed1f135049f8570b943adc",
-      "contentDigest": "479f1f2d363a4f1db8d287a6e3564be0d0f2063db094760b742f4a0781b0f551",
+      "contentDigest": "6ea7117aa311a160b6e590f976ba1416549a1d6deb817f820078f18dbd109bf8",
       "code": "728"
     },
     {
@@ -82,14 +82,14 @@
     {
       "id": "nl.neerdael.youtube",
       "name": "YouTube",
-      "version": "0.1.0",
-      "versionCode": 1,
+      "version": "0.1.2",
+      "versionCode": 3,
       "apiMin": 11,
       "format": 1,
-      "sha256": "b1429633d2a8f7f91e75aae4d4185612b09d6874fa6cc4a0f97dcc4f55710180",
-      "size": 124237,
+      "sha256": "b666e59a896d7986e39ff9e3f1366ecc49cb0b1bf4691b02df87f5b849b57840",
+      "size": 124747,
       "fingerprint": "39dca3d132c56262c0873ec96faf22cc8ed9ca30c7ed1f135049f8570b943adc",
-      "contentDigest": "98dd1360611b41aca69a0728e7283d406b13a44d87295492ccd4493caf3f944e",
+      "contentDigest": "01300a4f4bae07267d4a982438443a6771c93fcda260085b5de9902724987a7f",
       "code": "563"
     }
   ]
