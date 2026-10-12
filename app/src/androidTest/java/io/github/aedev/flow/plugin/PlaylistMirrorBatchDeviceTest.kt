@@ -335,7 +335,13 @@ class PlaylistMirrorBatchDeviceTest {
             }
         val registry = PluginRegistry(context)
         val client = OkHttpClient.Builder().addInterceptor(fixture).build()
-        val installer = PluginInstaller(client, registry, PluginDownloadCodes(context, PluginPublication(client)))
+        val installer =
+            PluginInstaller(
+                client,
+                registry,
+                PluginDownloadCodes(context, PluginPublication(client)),
+                MicroGAccounts(context, AndroidMicroGAccountGateway(context)),
+            )
         val spotify =
             assets.open("spotify.mbplugin").use(PluginPackageReader::read).let {
                 installer.install(installer.check(it, "test://spotify"))

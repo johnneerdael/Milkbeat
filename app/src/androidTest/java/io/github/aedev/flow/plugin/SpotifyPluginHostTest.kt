@@ -133,6 +133,12 @@ class SpotifyPluginHostTest {
                         client,
                         registry,
                         PluginDownloadCodes(InstrumentationRegistry.getInstrumentation().targetContext, PluginPublication(client)),
+                        InstrumentationRegistry.getInstrumentation().targetContext.let {
+                            MicroGAccounts(
+                                it,
+                                AndroidMicroGAccountGateway(it),
+                            )
+                        },
                     )
                 val pack = assets.open("youtube-music.mbplugin").use(PluginPackageReader::read)
                 val youtube = installer.install(installer.check(pack, "test://youtube-music"))
@@ -200,7 +206,13 @@ class SpotifyPluginHostTest {
             }
         val registry = PluginRegistry(context)
         val client = OkHttpClient()
-        val installer = PluginInstaller(client, registry, PluginDownloadCodes(context, PluginPublication(client)))
+        val installer =
+            PluginInstaller(
+                client,
+                registry,
+                PluginDownloadCodes(context, PluginPublication(client)),
+                MicroGAccounts(context, AndroidMicroGAccountGateway(context)),
+            )
         val pack = assets.open("spotify.mbplugin").use(PluginPackageReader::read)
         val plugin = installer.install(installer.check(pack, "test://spotify"))
         val host =

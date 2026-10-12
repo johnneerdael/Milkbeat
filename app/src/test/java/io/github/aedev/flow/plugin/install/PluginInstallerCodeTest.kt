@@ -5,12 +5,20 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Truth.assertThat
 import io.github.aedev.flow.R
+import io.github.aedev.flow.plugin.host.AndroidMicroGAccountGateway
+import io.github.aedev.flow.plugin.host.HostCallException
+import io.github.aedev.flow.plugin.host.MicroGAccounts
 import io.github.aedev.flow.plugin.pkg.PluginPackage
 import io.github.aedev.flow.plugin.pkg.PluginPackageReader
 import io.github.aedev.flow.plugin.pkg.signedTestPackage
+import io.github.aedev.flow.plugin.registry.InstalledPlugin
 import io.github.aedev.flow.plugin.registry.PluginRegistry
 import kotlinx.coroutines.runBlocking
+import nl.neerdael.milkbeat.plugin.AccountIdentity
+import nl.neerdael.milkbeat.plugin.AccountTokenRequest
+import nl.neerdael.milkbeat.plugin.AndroidAccountMethod
 import nl.neerdael.milkbeat.plugin.PLUGIN_API_VERSION
+import nl.neerdael.milkbeat.plugin.PluginErrorCode
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Protocol
@@ -69,14 +77,23 @@ class PluginInstallerCodeTest {
             .body("<title>Just a moment...</title>".toResponseBody("text/html".toMediaType()))
             .build()
 
+    private val context = ApplicationProvider.getApplicationContext<Context>()
+
     private fun withInstaller(
         respond: (Request) -> Response = ::serveFixture,
+        microG: MicroGAccounts = MicroGAccounts(context, AndroidMicroGAccountGateway(context)),
         block: (PluginInstaller) -> Unit,
     ) {
-        val context = ApplicationProvider.getApplicationContext<Context>()
         val client = OkHttpClient.Builder().addInterceptor { chain -> respond(chain.request()) }.build()
         try {
-            block(PluginInstaller(client, PluginRegistry(context), PluginDownloadCodes(context, PluginPublication(client))))
+            block(
+                PluginInstaller(
+                    client,
+                    PluginRegistry(context),
+                    PluginDownloadCodes(context, PluginPublication(client)),
+                    microG,
+                ),
+            )
         } finally {
             client.dispatcher.executorService.shutdown()
         }
@@ -172,4 +189,34 @@ class PluginInstallerCodeTest {
                 assertThat(failure.messageResource).isEqualTo(R.string.tv_plugins_update_mismatch)
             }
         }
+
+    @Test
+    fun `a fresh install starts without the host sign-in a removed plugin left, and an update keeps it`() {
+        val microG = MicroGAccounts(context, AndroidMicroGAccountGateway(context))
+        withInstaller(microG = microG) { installer ->
+            val pack = PluginPackageReader.read(fixture.inputStream())
+            val method = AndroidAccountMethod("google", "Google", listOf(AccountIdentity.YOUTUBE_MUSIC))
+            val plugin =
+                InstalledPlugin(
+                    pack.manifest.copy(signIn = listOf(method)),
+                    pack.signerFingerprint,
+                    "https://example.org/p",
+                    0,
+                    emptyList(),
+                    emptyList(),
+                )
+            val request = AccountTokenRequest("google", AccountIdentity.YOUTUBE_MUSIC)
+
+            fun tokenFailure() = runBlocking { runCatching { microG.token(plugin, request) }.exceptionOrNull() as? HostCallException }?.code
+
+            runBlocking { microG.confirm(plugin.id, method.id, microG.bind(plugin, method, "listener@example.com")) }
+            runBlocking { installer.install(installer.check(pack, "https://buzzheavier.com/fixture12345")) }
+            assertThat(tokenFailure()).isEqualTo(PluginErrorCode.SIGN_IN_REQUIRED)
+
+            runBlocking { microG.confirm(plugin.id, method.id, microG.bind(plugin, method, "listener@example.com")) }
+            runBlocking { installer.install(installer.check(pack, "https://buzzheavier.com/fixture12345")) }
+            // Still bound: only the account's absence from this device stops the token.
+            assertThat(tokenFailure()).isEqualTo(PluginErrorCode.SIGN_IN_EXPIRED)
+        }
+    }
 }

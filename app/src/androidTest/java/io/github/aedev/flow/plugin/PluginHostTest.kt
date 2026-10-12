@@ -52,7 +52,12 @@ class PluginHostTest {
             val registry = PluginRegistry(context)
             val installer =
                 OkHttpClient().let { client ->
-                    PluginInstaller(client, registry, PluginDownloadCodes(context, PluginPublication(client)))
+                    PluginInstaller(
+                        client,
+                        registry,
+                        PluginDownloadCodes(context, PluginPublication(client)),
+                        MicroGAccounts(context, AndroidMicroGAccountGateway(context)),
+                    )
                 }
             val pack = assets.open("fixture.mbplugin").use(PluginPackageReader::read)
             installer.install(installer.check(pack, "test://fixture"))

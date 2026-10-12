@@ -282,6 +282,7 @@ class MicroGAccounts internal constructor(
                 revocations.computeIfPresent(pluginId) { _, now -> now.copy(undeleted = deletion != null) }
                 withContext(io) {
                     runCatching { if (deletion != null) tombstones.add(pluginId) else tombstones.remove(pluginId) }
+                        .onFailure { deletion?.addSuppressed(it) }
                 }
                 try {
                     transition()

@@ -10,6 +10,7 @@ import android.util.Log
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.aedev.flow.plugin.host.MICROG_PACKAGE
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
@@ -64,6 +65,10 @@ class MicroGInstaller
         private var generation = 0L
         private var awaited: Int? = null
 
+        // The awaited session's outcome; the install under way lasts until Android reports it, so a request in
+        // between joins it rather than committing a second session.
+        private var outcome: CompletableDeferred<Boolean>? = null
+
         // The install under way, which a second request joins instead of downloading over its file and session. It
         // runs here rather than in a screen's scope, so one screen leaving does not end it for another still waiting.
         private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -100,8 +105,7 @@ class MicroGInstaller
                     if (archive?.packageName != MICROG_PACKAGE) return@withContext false
                     // A sign-in screen that moved on while the download ran opens no installer.
                     ensureActive()
-                    commit(apk, attempt)
-                    true
+                    commit(apk, attempt).await()
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
@@ -119,6 +123,8 @@ class MicroGInstaller
                 if (waiters.remove(waiter) && waiters.isEmpty()) {
                     generation++
                     awaited = null
+                    outcome?.complete(false)
+                    outcome = null
                     running?.cancel()
                     running = null
                 }
@@ -127,12 +133,12 @@ class MicroGInstaller
         internal fun awaits(sessionId: Int): Boolean = synchronized(lock) { sessionId != -1 && awaited == sessionId }
 
         internal fun reportFailure() {
-            synchronized(lock) { awaited = null }
+            finish(false)
             _failed.value = true
         }
 
         internal fun reportInstalled() {
-            synchronized(lock) { awaited = null }
+            finish(true)
             _installed.value++
         }
 
@@ -159,10 +165,19 @@ class MicroGInstaller
             }
         }
 
+        private fun finish(installed: Boolean) =
+            synchronized(lock) {
+                awaited = null
+                outcome?.complete(installed)
+                outcome = null
+            }
+
+        /** Commits [apk] as a session of [attempt]; the result completes with Android's final answer for it. */
         private fun commit(
             apk: File,
             attempt: Long,
-        ) {
+        ): CompletableDeferred<Boolean> {
+            val result = CompletableDeferred<Boolean>()
             val installer = context.packageManager.packageInstaller
             val params =
                 PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL).apply {
@@ -185,7 +200,12 @@ class MicroGInstaller
                         )
                     val current =
                         synchronized(lock) {
-                            (generation == attempt).also { if (it) awaited = sessionId }
+                            (generation == attempt).also {
+                                if (it) {
+                                    awaited = sessionId
+                                    outcome = result
+                                }
+                            }
                         }
                     check(current) { "The sign-in left before its install was committed" }
                     session.commit(callback.intentSender)
@@ -193,7 +213,14 @@ class MicroGInstaller
             } catch (e: Exception) {
                 // An uncommitted session keeps its staged APK until abandoned.
                 installer.abandonSession(sessionId)
+                synchronized(lock) {
+                    if (outcome === result) {
+                        outcome = null
+                        awaited = null
+                    }
+                }
                 throw e
             }
+            return result
         }
     }

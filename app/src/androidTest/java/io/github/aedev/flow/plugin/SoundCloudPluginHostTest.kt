@@ -245,7 +245,13 @@ class SoundCloudPluginHostTest {
                         .build()
                 }.build()
         val registry = PluginRegistry(context)
-        val installer = PluginInstaller(client, registry, PluginDownloadCodes(context, PluginPublication(client)))
+        val installer =
+            PluginInstaller(
+                client,
+                registry,
+                PluginDownloadCodes(context, PluginPublication(client)),
+                MicroGAccounts(context, AndroidMicroGAccountGateway(context)),
+            )
         val pack = assets.open("soundcloud.mbplugin").use(PluginPackageReader::read)
         val plugin = installer.install(installer.check(pack, "test://soundcloud"))
         val host =

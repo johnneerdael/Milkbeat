@@ -684,7 +684,10 @@ plugin run one at a time and date from the listener's account choice: an attempt
 that runs while a revocation is in progress, neither binds nor confirms. A token MicroG issues while a revocation began
 or was running is not handed out. If an update replaces or removes the method while its screen is open, the screen's
 download and attempt are cancelled. An update that lands during the completion or the confirmation signs the plugin
-out again. Binding keys encode the plugin and method ids, so no id can address another binding.
+out again. Binding keys encode the plugin and method ids, so no id can address another binding. A revocation whose
+deletion fails still signs the plugin out and leaves a marker in `noBackupFilesDir/microg_revocations`, which keeps
+the plugin revoked across restarts until a later revocation deletes the bindings. A fresh install of a plugin id
+(none installed under it) first clears any binding a removed plugin left, and fails if that cannot be done.
 
 ### Additive API 7 music presentations
 
