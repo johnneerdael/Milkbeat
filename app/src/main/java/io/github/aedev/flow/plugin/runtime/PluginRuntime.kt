@@ -104,12 +104,11 @@ internal class PluginRuntime(
     suspend fun <Request, Response> call(
         operation: PluginOperation<Request, Response>,
         request: Request,
-    ): Response = call(operation, request, CALL_TIMEOUT_MS, raisedMemoryLimit = null)
+    ): Response = call(operation, request, raisedMemoryLimit = null)
 
     private suspend fun <Request, Response> call(
         operation: PluginOperation<Request, Response>,
         request: Request,
-        timeoutMs: Long,
         raisedMemoryLimit: Long?,
     ): Response {
         if (disabled) throw PluginCallException(plugin.id, PluginError(PluginErrorCode.UNAVAILABLE, "Disabled after repeated failures"))
@@ -122,21 +121,20 @@ internal class PluginRuntime(
                 running.incrementAndGet()
                 try {
                     contexts
-                        .call(timeoutMs) { active ->
+                        .call(CALL_TIMEOUT_MS) { active ->
                             trace.event(TraceEvent.RUNTIME_CONTEXT_ACQUIRED, TraceField.GENERATION to contextGeneration)
                             if (raisedMemoryLimit == null) {
-                                invoke(active, operation, request, timeoutMs, trace, queuedMs)
+                                invoke(active, operation, request, CALL_TIMEOUT_MS, trace, queuedMs)
                             } else {
-                                active.withAllowance(
+                                active.withMemoryLimit(
                                     raisedMemoryLimit,
-                                    timeoutMs,
-                                ) { invoke(active, operation, request, timeoutMs, trace, queuedMs) }
+                                ) { invoke(active, operation, request, CALL_TIMEOUT_MS, trace, queuedMs) }
                             }
                         }.also { success = true }
                 } catch (e: TimeoutCancellationException) {
                     throw PluginCallException(
                         plugin.id,
-                        PluginError(PluginErrorCode.TIMEOUT, "${operation.path} took longer than $timeoutMs ms"),
+                        PluginError(PluginErrorCode.TIMEOUT, "${operation.path} took longer than $CALL_TIMEOUT_MS ms"),
                     )
                 } finally {
                     running.decrementAndGet()
@@ -154,9 +152,9 @@ internal class PluginRuntime(
         val startedMs = SystemClock.elapsedRealtime()
         if (plugin.manifest.api.target >= 8) {
             try {
-                // Warm-up may compile large code (a player's solvers), so it keeps the isolated warm-up's memory
-                // and time on the playback owner; calls return to their own limit afterwards.
-                call(PluginOperations.warmUp, Unit, WARM_UP_TIMEOUT_MS, WARM_UP_MEMORY_LIMIT)
+                // Warm-up may compile large code (a player's solvers), so it gets the isolated warm-up's memory on
+                // the playback owner. It keeps the call's time budget: foreground calls queue behind it there.
+                call(PluginOperations.warmUp, Unit, WARM_UP_MEMORY_LIMIT)
                 Log.i(TAG, "Persistent warm-up of ${plugin.id} took ${SystemClock.elapsedRealtime() - startedMs} ms")
             } catch (e: PluginCallException) {
                 if (e.error.code != PluginErrorCode.UNSUPPORTED) Log.w(TAG, "Warm-up of ${plugin.id} failed: ${e.error.code}")
@@ -394,24 +392,18 @@ internal class PluginRuntime(
     }
 
     /**
-     * Runs [block] with this context allowed [memoryLimit] bytes and [timeoutMs] per evaluation, then collects what it
-     * left behind and returns to the call limits: memory to what the context still holds plus headroom when its
-     * retained state needs more than a call's.
+     * Runs [block] with this context allowed [memoryLimit] bytes, then collects what it left behind and returns to the
+     * call limit, or to what the context still holds plus headroom when its retained state needs more than a call's.
      */
-    private suspend fun <T> PluginContext.withAllowance(
+    private suspend fun <T> PluginContext.withMemoryLimit(
         memoryLimit: Long,
-        timeoutMs: Long,
         block: suspend () -> T,
     ): T {
-        withContext(thread) {
-            js.memoryLimit = memoryLimit
-            js.evaluationTimeoutMillis = timeoutMs
-        }
+        withContext(thread) { js.memoryLimit = memoryLimit }
         try {
             return block()
         } finally {
             withContext(NonCancellable + thread) {
-                js.evaluationTimeoutMillis = CALL_TIMEOUT_MS
                 js.gc()
                 val retained = js.memoryUsage.mallocSize
                 js.memoryLimit = maxOf(MEMORY_LIMIT, retained + MEMORY_HEADROOM)
