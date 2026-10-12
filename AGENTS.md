@@ -1010,8 +1010,13 @@ run that occupies a physical device, and the resulting diff is thousands of line
   resolution; never re-extract streams for progress reporting. Do not log session IDs or credentials.
 
 - API 8 lifecycle warm-up uses the persistent runtime through the same call/context ownership,
-  memory limit, timeout and grants as playback; earlier APIs retain their isolated compilation
-  warm-up. Deduplicate provider preparation and do not invent account-independent token caches.
+  call timeout and grants as playback; earlier APIs retain their isolated compilation warm-up.
+  Only its memory differs: compiling a player's solvers exceeds the 96 MB call limit, so the
+  warm-up call runs with the isolated warm-up's 256 MB (`WARM_UP_MEMORY_LIMIT`), then collects
+  garbage and restores the call limit, or retained state plus 32 MB headroom (logged as a warning)
+  when the prepared state itself exceeds it. Never extend the warm-up's time budget, since foreground
+  calls queue behind it on the playback owner. `PluginRuntimeWarmUpDeviceTest` covers this.
+  Deduplicate provider preparation and do not invent account-independent token caches.
 
 - Initial prepared-network video joins require current-video media coverage before attaching the
   visible surface. Use Media3 ForwardingRenderer only for the finite initial readiness phase;
