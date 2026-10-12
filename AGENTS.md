@@ -759,10 +759,11 @@ revision must pass the configured ktlint rules.
   verified `apiMin` and `format`.
   YouTube Video accepts valid empty TV Liked Music results without a WEB request since 0.2.1; Home
   continues with the regular TV Music feed. Deezer 0.2.1 / versionCode 3 uses code 734 and requires
-  API 9 for its encrypted audio. Stable YouTube Music 0.3.0 / versionCode 15 uses code 728; Preview
+  API 9 for its encrypted audio. Stable YouTube Music 0.3.1 / versionCode 16 uses code 728; Preview
   keeps code 494 pinned to 0.2.9-preview.1 / versionCode 14, so stable docs must not cite 494.
-  These three releases target API 10 and declare no `rangeRequestBytes`. Preserve each original
-  signed archive when retrying publication.
+  These three releases target API 10 and declare no `rangeRequestBytes`. Stable and Preview publish
+  YouTube 0.1.2 / versionCode 3 under code 563; it requires API 11 (MicroG-RE-TV sign-in). Preserve
+  each original signed archive when retrying publication.
   Preview (`.nightly`) update checks return no stable-publication candidates; automatic updates
   and Update all plugins must not replace its pinned packages. Stable hosts retain normal lookup.
   Never promote preview packages through stable metadata or automatic updates.
