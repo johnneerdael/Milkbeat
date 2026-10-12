@@ -108,3 +108,10 @@
 -dontwarn com.sun.security.auth.UnixNumericUserPrincipal
 # RPCSEC_GSS (Kerberos) support in oncrpc4j; Android has no org.ietf.jgss and the app only uses AUTH_SYS.
 -dontwarn org.ietf.jgss.MessageProp
+
+## QuickJS (plugin runtime): its native getMemoryUsage builds MemoryUsage through its 26-long constructor,
+## which Kotlin never calls and the library's consumer rules do not keep. Without it R8 removes the
+## constructor and the first memory reading aborts the process (JNI "mid == null").
+-keep class com.dokar.quickjs.MemoryUsage {
+    <init>(long, long, long, long, long, long, long, long, long, long, long, long, long, long, long, long, long, long, long, long, long, long, long, long, long, long);
+}
