@@ -12,17 +12,22 @@ import io.github.aedev.flow.data.account.signin.PhoneInput
 import io.github.aedev.flow.data.account.signin.PhoneStatus
 import io.github.aedev.flow.plugin.catalog.PluginAccounts
 import io.github.aedev.flow.plugin.registry.PluginRegistry
+import io.github.aedev.flow.plugin.registry.PluginRegistryState
 import io.github.aedev.flow.plugin.runtime.PluginCallException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import nl.neerdael.milkbeat.catalog.ProviderAccount
+import nl.neerdael.milkbeat.plugin.SignInMethod
 import nl.neerdael.milkbeat.plugin.WebLoginMethod
 import nl.neerdael.milkbeat.plugin.WebLoginResult
 import java.io.IOException
@@ -84,22 +89,34 @@ class AccountSignInViewModel
     @Inject
     constructor(
         savedStateHandle: SavedStateHandle,
-        registry: PluginRegistry,
+        private val registry: PluginRegistry,
         private val accounts: PluginAccounts,
         private val lan: LanAddressProvider,
         private val launcher: PhoneServerLauncher,
     ) : ViewModel() {
         private val pluginId: String = checkNotNull(savedStateHandle[PLUGIN_ARG])
+        private val methodId: String? = savedStateHandle[METHOD_ARG]
 
-        /** The sign-in the plugin declared under the route's method id, or null when it has none. */
-        val signInMethod =
-            registry.state.value
+        /** The sign-in the plugin declares under the route's method id now, or null when it has none. */
+        private fun declared(state: PluginRegistryState): SignInMethod? =
+            state
                 .plugin(pluginId)
                 ?.manifest
                 ?.signIn
-                ?.firstOrNull { it.id == savedStateHandle.get<String>(METHOD_ARG) }
+                ?.firstOrNull { it.id == methodId }
 
-        val method: WebLoginMethod? = signInMethod as? WebLoginMethod
+        /** The web sign-in the installed plugin declares now; an update can change its URLs or replace it. */
+        val method: WebLoginMethod?
+            get() = declared(registry.state.value) as? WebLoginMethod
+
+        /** The method as the installed plugin declares it now, which picks the screen; an update can change its kind. */
+        val currentSignInMethod: StateFlow<SignInMethod?> =
+            registry.state
+                .map(::declared)
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), declared(registry.state.value))
+
+        // The web sign-in the screen last showed; survives configuration changes, so only an update restarts it.
+        private var followed: WebLoginMethod? = method
 
         private val _state = MutableStateFlow<AccountSignInState>(AccountSignInState.Starting)
         val state: StateFlow<AccountSignInState> = _state.asStateFlow()
@@ -203,6 +220,16 @@ class AccountSignInViewModel
             actions = emptyList()
             fields = emptyList()
             _state.value = AccountSignInState.Starting
+        }
+
+        /**
+         * The screen shows [method] now. When an update replaced the web sign-in, or the route left it for another
+         * kind, the running phone server and timeout stop at once and the sign-in starts afresh with what is declared.
+         */
+        fun followMethod(method: WebLoginMethod?) {
+            if (method == followed) return
+            followed = method
+            if (_state.value !is AccountSignInState.SignedIn) retry()
         }
 
         override fun onCleared() {

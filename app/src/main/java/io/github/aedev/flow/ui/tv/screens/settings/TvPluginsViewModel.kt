@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import io.github.aedev.flow.R
 import io.github.aedev.flow.data.account.AccountPlayHistory
 import io.github.aedev.flow.data.update.AutoUpdater
 import io.github.aedev.flow.plugin.catalog.PluginAccounts
@@ -31,6 +32,7 @@ import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import nl.neerdael.milkbeat.catalog.ProviderAccount
+import java.io.IOException
 import javax.inject.Inject
 
 /** Where adding a plugin stands: nothing, fetching it, waiting on a browser check or for consent, needing a newer app, or failed. */
@@ -185,7 +187,14 @@ class TvPluginsViewModel
         }
 
         fun remove(id: String) {
-            viewModelScope.launch { registry.remove(id) }
+            viewModelScope.launch {
+                // Revoked first and throughout, so no token or sign-in still running survives the removal.
+                try {
+                    accounts.removing(id) { registry.remove(id) }
+                } catch (e: IOException) {
+                    adding.value = AddPluginState.Failed(e.message.orEmpty(), R.string.tv_plugins_storage_failed)
+                }
+            }
         }
 
         fun select(selection: ProviderSelection) {
@@ -226,6 +235,8 @@ class TvPluginsViewModel
                     accounts.signOut(id)
                 } catch (e: PluginCallException) {
                     adding.value = AddPluginState.Failed(e.error.userMessage ?: e.error.message)
+                } catch (e: IOException) {
+                    adding.value = AddPluginState.Failed(e.message.orEmpty(), R.string.tv_plugins_storage_failed)
                 }
             }
         }

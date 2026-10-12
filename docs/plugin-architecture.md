@@ -4,7 +4,11 @@ Status: architecture proposal, 2026-09-29. It replaces the earlier metadata plug
 (installed APKs, isolated processes) and keeps the block vocabulary of the
 [Metadata plugin UI contract](metadata-plugin-ui-contract.md).
 
-Current host extension (plugin API 10): `AudioStream.rangeRequestBytes` lets a provider whose
+Current host extension (plugin API 11): `androidAccount` sign-in with a Google account in
+MicroG-RE-TV, and the `signIn.token` / `signIn.invalidateToken` host functions; see
+[MicroG account sign-in (API 11)](#microg-account-sign-in-api-11).
+
+Plugin API 10: `AudioStream.rangeRequestBytes` lets a provider whose
 server throttles or refuses long ranges cap each progressive request. Without it the host fetches the
 file in one request; Media3 treats a bounded open as the end of the file, so the host never imposes
 another provider's limit. Providers targeting API 9 or older keep the former host-wide 512 KiB
@@ -648,6 +652,42 @@ catalogs through the existing `PluginAccounts` flow. Existing web sign-in method
 `crypto.randomBytes` uses `SecureRandom` with a request bounded to 1–256 bytes. It exposes no system
 identifier. A provider can store its generated installation identity in its own secret namespace.
 `env.get` optionally includes OS version and device model for provider protocol headers.
+
+## MicroG account sign-in (API 11)
+
+A manifest can declare
+`{ "type": "androidAccount", "id": "google", "label": "Sign in with your Google account", "identities": ["youtubeMusic", "youtube"] }`.
+The TV screen (`ui/tv/screens/account/TvAndroidAccountSignInScreen.kt`, driven by
+`ui/screens/account/AndroidAccountSignInViewModel.kt`) checks for MicroG-RE-TV (`app.revanced.android.gms`). The GitHub
+build offers to download `microg-re-tv.apk` from the fork's latest release. It installs it through a platform installer
+session only if the archive is that package. It also offers that download as an update when the installed MicroG is
+signed with MicroG-RE-TV's release key but older than 7.2.1.5, the first release that serves Milkbeat; other MicroG
+builds under the package are used as they are, since Android would refuse the update. Concurrent install requests
+join the one under way. It then opens Android's account chooser for type `app.revanced`, which also
+makes the account visible to Milkbeat on API 26+. For each declared identity it asks `AccountManager.getAuthToken`
+for `oauth2:` + the `youtube` and `youtube.force-ssl` scopes, with the option `overridePackage` naming the official app.
+A prompt MicroG returns is launched once; closing it without a grant ends the attempt as declined. Only when every identity is granted
+does `MicroGAccounts` bind the account name, the plugin's signer and the confirmed identities to the method, and call
+`signIn.completeAccount`. The binding is provisional until the plugin completes: it serves tokens only in the run that made
+it, and one a process that died left behind signs the plugin out at its next account check, since the plugin may
+still report the account it cannot get a token for. A refusal or an unfinished sign-in removes it;
+a completion whose binding cannot be confirmed signs the plugin out again. Bindings are never backed up.
+
+At run time `signIn.token({method, identity})` resolves the bound account. It refuses identities the method did not
+declare, and answers from MicroG's own token cache. Milkbeat stores no token. `signIn.invalidateToken` passes a refused
+token to `invalidateAuthToken`. MicroG-RE-TV grants these identities only to the caller package `nl.neerdael.milkbeat`
+(its `TrustedCallerIdentity`), so Preview and debug builds cannot use the method.
+
+Sign-out and removal revoke a plugin's bindings through `MicroGAccounts.revoke`, which deletes them first and keeps the
+revocation in force until the plugin's own sign-out or its registry removal has finished. Sign-in attempts for one
+plugin run one at a time and date from the listener's account choice: an attempt that a revocation overtook, or one
+that runs while a revocation is in progress, neither binds nor confirms. A token MicroG issues while a revocation began
+or was running is not handed out. If an update replaces or removes the method while its screen is open, the screen's
+download and attempt are cancelled. An update that lands during the completion or the confirmation signs the plugin
+out again. Binding keys encode the plugin and method ids, so no id can address another binding. A revocation whose
+deletion fails still signs the plugin out and leaves a marker in `noBackupFilesDir/microg_revocations`, which keeps
+the plugin revoked across restarts until a later revocation deletes the bindings. A fresh install of a plugin id
+(none installed under it) first clears any binding a removed plugin left, and fails if that cannot be done.
 
 ### Additive API 7 music presentations
 

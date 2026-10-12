@@ -18,6 +18,8 @@ import androidx.test.platform.app.InstrumentationRegistry
 import io.github.aedev.flow.data.local.AppDatabase
 import io.github.aedev.flow.plugin.catalog.PluginAccounts
 import io.github.aedev.flow.plugin.catalog.toMusicTrack
+import io.github.aedev.flow.plugin.host.AndroidMicroGAccountGateway
+import io.github.aedev.flow.plugin.host.MicroGAccounts
 import io.github.aedev.flow.plugin.host.WebLoginRefresher
 import io.github.aedev.flow.plugin.install.PluginDownloadCodes
 import io.github.aedev.flow.plugin.install.PluginInstaller
@@ -131,6 +133,12 @@ class SpotifyPluginHostTest {
                         client,
                         registry,
                         PluginDownloadCodes(InstrumentationRegistry.getInstrumentation().targetContext, PluginPublication(client)),
+                        InstrumentationRegistry.getInstrumentation().targetContext.let {
+                            MicroGAccounts(
+                                it,
+                                AndroidMicroGAccountGateway(it),
+                            )
+                        },
                     )
                 val pack = assets.open("youtube-music.mbplugin").use(PluginPackageReader::read)
                 val youtube = installer.install(installer.check(pack, "test://youtube-music"))
@@ -198,10 +206,17 @@ class SpotifyPluginHostTest {
             }
         val registry = PluginRegistry(context)
         val client = OkHttpClient()
-        val installer = PluginInstaller(client, registry, PluginDownloadCodes(context, PluginPublication(client)))
+        val installer =
+            PluginInstaller(
+                client,
+                registry,
+                PluginDownloadCodes(context, PluginPublication(client)),
+                MicroGAccounts(context, AndroidMicroGAccountGateway(context)),
+            )
         val pack = assets.open("spotify.mbplugin").use(PluginPackageReader::read)
         val plugin = installer.install(installer.check(pack, "test://spotify"))
-        val host = PluginHost(context, registry, client, WebLoginRefresher(context))
+        val host =
+            PluginHost(context, registry, client, WebLoginRefresher(context), MicroGAccounts(context, AndroidMicroGAccountGateway(context)))
         try {
             block(host, plugin.id, registry, client)
         } finally {

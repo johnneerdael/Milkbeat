@@ -214,6 +214,8 @@ object HostOperations {
     val settings = HostOperation("settings.get", Unit.serializer(), ListSerializer(StorageEntry.serializer()))
     val sleep = HostOperation("time.sleep", SleepRequest.serializer(), Unit.serializer())
     val signInRefresh = HostOperation("signIn.refresh", WebLoginRefreshRequest.serializer(), WebLoginResult.serializer())
+    val signInToken = HostOperation("signIn.token", AccountTokenRequest.serializer(), AccountToken.serializer())
+    val signInInvalidateToken = HostOperation("signIn.invalidateToken", AccountTokenInvalidation.serializer(), Unit.serializer())
 
     val all: List<HostOperation<*, *>> =
         listOf(
@@ -237,5 +239,7 @@ object HostOperations {
             settings,
             sleep,
             signInRefresh,
+            signInToken,
+            signInInvalidateToken,
         )
 }

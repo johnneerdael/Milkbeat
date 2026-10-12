@@ -20,6 +20,7 @@ import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -30,6 +31,7 @@ import kotlinx.coroutines.test.setMain
 import nl.neerdael.milkbeat.catalog.ProviderAccount
 import nl.neerdael.milkbeat.plugin.ApiRange
 import nl.neerdael.milkbeat.plugin.AudioRole
+import nl.neerdael.milkbeat.plugin.DeviceCodeMethod
 import nl.neerdael.milkbeat.plugin.PluginError
 import nl.neerdael.milkbeat.plugin.PluginErrorCode
 import nl.neerdael.milkbeat.plugin.PluginManifest
@@ -71,7 +73,8 @@ class AccountSignInViewModelTest {
             grantedNetwork = emptyList(),
             grantedBrowser = emptyList(),
         )
-    private val registry = mockk<PluginRegistry> { every { state } returns MutableStateFlow(PluginRegistryState(plugins = listOf(plugin))) }
+    private val installed = MutableStateFlow(PluginRegistryState(plugins = listOf(plugin)))
+    private val registry = mockk<PluginRegistry> { every { state } returns installed }
     private val accounts =
         mockk<PluginAccounts> { coEvery { complete(any(), any()) } returns ProviderAccount.SignedIn(key = "k", name = "Test User") }
     private var launches = 0
@@ -279,5 +282,86 @@ class AccountSignInViewModelTest {
             runCurrent()
             assertThat(lastStatus().actions).isEmpty()
             assertThat(lastStatus().fields).isEmpty()
+        }
+
+    @Test
+    fun `the screen follows the method kind an update gives the plugin`() =
+        runTest(dispatcher) {
+            val vm = viewModel()
+            backgroundScope.launch { vm.currentSignInMethod.collect {} }
+            runCurrent()
+            assertThat(vm.currentSignInMethod.value).isInstanceOf(WebLoginMethod::class.java)
+
+            val paired = plugin.copy(manifest = plugin.manifest.copy(signIn = listOf(DeviceCodeMethod("google", "Pair"))))
+            installed.value = PluginRegistryState(plugins = listOf(paired))
+            runCurrent()
+
+            assertThat(vm.currentSignInMethod.value).isEqualTo(DeviceCodeMethod("google", "Pair"))
+        }
+
+    @Test
+    fun `leaving web sign-in for another method stops its server and timeout at once`() =
+        runTest(dispatcher) {
+            val vm = viewModel()
+            vm.start(loginSupported = true)
+            runCurrent()
+
+            vm.followMethod(null)
+            advanceTimeBy(AccountSignInViewModel.SIGN_IN_TIMEOUT_MS + 1)
+
+            assertThat(stops).isEqualTo(1)
+            assertThat(vm.state.value).isEqualTo(AccountSignInState.Starting)
+        }
+
+    @Test
+    fun `the method shown at first and after a configuration change keeps the running sign-in`() =
+        runTest(dispatcher) {
+            val vm = viewModel()
+            vm.start(loginSupported = true)
+            runCurrent()
+
+            vm.followMethod(method)
+            vm.followMethod(method)
+
+            assertThat(stops).isEqualTo(0)
+            assertThat(vm.state.value).isInstanceOf(AccountSignInState.Ready::class.java)
+        }
+
+    @Test
+    fun `an update that turns another method into web sign-in starts it with the declared method`() =
+        runTest(dispatcher) {
+            installed.value =
+                PluginRegistryState(
+                    plugins = listOf(plugin.copy(manifest = plugin.manifest.copy(signIn = listOf(DeviceCodeMethod("google", "Pair"))))),
+                )
+            val vm = viewModel()
+            assertThat(vm.method).isNull()
+
+            installed.value = PluginRegistryState(plugins = listOf(plugin))
+            vm.followMethod(method)
+            vm.start(loginSupported = true)
+            runCurrent()
+
+            assertThat(vm.method).isEqualTo(method)
+            assertThat(vm.state.value).isInstanceOf(AccountSignInState.Ready::class.java)
+        }
+
+    @Test
+    fun `an update to the web sign-in restarts it with the new method`() =
+        runTest(dispatcher) {
+            val vm = viewModel()
+            vm.start(loginSupported = true)
+            runCurrent()
+
+            val moved = method.copy(startUrl = "https://accounts.example/v2/login")
+            installed.value = PluginRegistryState(plugins = listOf(plugin.copy(manifest = plugin.manifest.copy(signIn = listOf(moved)))))
+            vm.followMethod(moved)
+            assertThat(stops).isEqualTo(1)
+            assertThat(vm.state.value).isEqualTo(AccountSignInState.Starting)
+
+            vm.start(loginSupported = true)
+            runCurrent()
+            assertThat(vm.method).isEqualTo(moved)
+            assertThat(launches).isEqualTo(2)
         }
 }

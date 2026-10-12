@@ -13,6 +13,8 @@ import io.github.aedev.flow.data.account.signin.PhoneFrame
 import io.github.aedev.flow.data.account.signin.PhoneInput
 import io.github.aedev.flow.data.account.signin.PhoneInputServer
 import io.github.aedev.flow.data.account.signin.PhoneStatus
+import io.github.aedev.flow.plugin.host.AndroidMicroGAccountGateway
+import io.github.aedev.flow.plugin.host.MicroGAccountGateway
 import io.github.aedev.flow.sync.transport.LanAddress
 import io.github.aedev.flow.ui.screens.account.LanAddressProvider
 import io.github.aedev.flow.ui.screens.account.PhoneServerHandle
@@ -25,6 +27,9 @@ import kotlinx.coroutines.withContext
 object AccountModule {
     @Provides
     fun provideLanAddressProvider(): LanAddressProvider = LanAddressProvider { LanAddress.resolve() }
+
+    @Provides
+    fun provideMicroGAccountGateway(gateway: AndroidMicroGAccountGateway): MicroGAccountGateway = gateway
 
     @Provides
     fun providePhoneServerLauncher(

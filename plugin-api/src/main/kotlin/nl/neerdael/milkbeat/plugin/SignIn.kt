@@ -104,3 +104,53 @@ data class DeviceCodePollResult(
     /** The provider may increase the minimum delay after a pending response. */
     val intervalMs: Long? = null,
 )
+
+/**
+ * A sign-in with a Google account already on the device in MicroG-RE-TV. The host lets the listener
+ * pick the account and confirm, in MicroG's own prompt, each of [identities]; afterwards the plugin
+ * asks the host for an access token per identity with `signIn.token`. The host fixes the account
+ * type and the scopes, so a plugin can only name which of the supported apps a token is issued as.
+ */
+@Serializable
+@SerialName("androidAccount")
+data class AndroidAccountMethod(
+    override val id: String,
+    override val label: String,
+    val identities: List<AccountIdentity>,
+) : SignInMethod
+
+/** The official app a token is issued as; each is confirmed separately by the listener. */
+@Serializable
+enum class AccountIdentity {
+    @SerialName("youtube")
+    YOUTUBE,
+
+    @SerialName("youtubeMusic")
+    YOUTUBE_MUSIC,
+}
+
+/** The account the listener chose, handed to the plugin once every identity is confirmed. */
+@Serializable
+data class AndroidAccountSignIn(
+    val method: String,
+    val accountName: String,
+)
+
+@Serializable
+data class AccountTokenRequest(
+    val method: String,
+    val identity: AccountIdentity,
+)
+
+/** A short-lived access token; the host keeps none and the plugin keeps it only in memory. */
+@Serializable
+data class AccountToken(
+    val token: String,
+)
+
+/** A token the provider refused, so the next `signIn.token` mints a fresh one. */
+@Serializable
+data class AccountTokenInvalidation(
+    val method: String,
+    val token: String,
+)

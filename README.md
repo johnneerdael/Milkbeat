@@ -182,6 +182,13 @@ app updater. Each plugin's details offer sign-in, play
 reporting, **Index playlists** and, for Spotify, **Prepare private playlists in YouTube Music**.
 [Providers and sign-in](https://johnneerdael.github.io/Milkbeat/providers/).
 
+Plugin API 11 adds a third way to sign in: **Sign in with your Google account**, for plugins that
+offer it. It uses a Google account already in [MicroG-RE-TV](https://github.com/johnneerdael/MicroG-RE-TV),
+which the stable GitHub build offers to install when it is missing. You pick the account and confirm
+each request in MicroG on the TV, with the remote. Milkbeat keeps only the account name; MicroG keeps
+the grants and tokens. It works in the stable app (`nl.neerdael.milkbeat`) only, not in Preview or
+debug builds. No published plugin uses it yet.
+
 ## Playback, queue and radio
 
 **OK** in the full player shows the controls: audio level, seek bar, shuffle, previous,

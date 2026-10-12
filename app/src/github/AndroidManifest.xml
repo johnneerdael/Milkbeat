@@ -8,6 +8,9 @@
         <receiver
             android:name="io.github.aedev.flow.updater.UpdateInstallReceiver"
             android:exported="false" />
+        <receiver
+            android:name="io.github.aedev.flow.updater.MicroGInstallReceiver"
+            android:exported="false" />
 
         <service
             android:name="androidx.work.impl.foreground.SystemForegroundService"

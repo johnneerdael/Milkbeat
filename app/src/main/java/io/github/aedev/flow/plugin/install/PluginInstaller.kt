@@ -1,6 +1,7 @@
 package io.github.aedev.flow.plugin.install
 
 import io.github.aedev.flow.R
+import io.github.aedev.flow.plugin.host.MicroGAccounts
 import io.github.aedev.flow.plugin.pkg.PluginPackage
 import io.github.aedev.flow.plugin.pkg.PluginPackageException
 import io.github.aedev.flow.plugin.pkg.PluginPackageReader
@@ -10,6 +11,7 @@ import io.github.aedev.flow.plugin.registry.PluginRegistry
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
+import java.io.IOException
 import java.security.MessageDigest
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -72,6 +74,7 @@ class PluginInstaller
         private val client: OkHttpClient,
         private val registry: PluginRegistry,
         private val codes: PluginDownloadCodes,
+        private val microG: MicroGAccounts,
     ) {
         /** Fetches the plugin [url] names; for an [update], only the exact release it offered is accepted. */
         suspend fun fetch(
@@ -142,6 +145,13 @@ class PluginInstaller
         /** Installs with the permissions the manifest asks for; call only after the listener agreed to [PendingInstall.needsConsent]. */
         suspend fun install(pending: PendingInstall): InstalledPlugin =
             try {
+                // A fresh installation starts signed out of the host: an account binding a removed plugin under this id
+                // left behind does not carry over, and the plugin does not install while one cannot be cleared.
+                if (registry.state.value.plugins
+                        .none { it.id == pending.pack.manifest.id }
+                ) {
+                    microG.revoke(pending.pack.manifest.id)
+                }
                 registry.install(
                     pack = pending.pack,
                     sourceUrl = pending.sourceUrl,
@@ -150,6 +160,8 @@ class PluginInstaller
                 )
             } catch (e: NewerPluginInstalledException) {
                 throw PluginInstallException(cause = e, messageResource = R.string.tv_plugins_newer_installed)
+            } catch (e: IOException) {
+                throw PluginInstallException(cause = e, messageResource = R.string.tv_plugins_storage_failed)
             }
     }
 

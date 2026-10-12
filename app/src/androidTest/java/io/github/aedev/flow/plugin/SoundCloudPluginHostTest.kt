@@ -24,6 +24,8 @@ import androidx.compose.ui.test.pressKey
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import io.github.aedev.flow.plugin.catalog.toMusicTrack
+import io.github.aedev.flow.plugin.host.AndroidMicroGAccountGateway
+import io.github.aedev.flow.plugin.host.MicroGAccounts
 import io.github.aedev.flow.plugin.host.WebLoginRefresher
 import io.github.aedev.flow.plugin.install.PluginDownloadCodes
 import io.github.aedev.flow.plugin.install.PluginInstaller
@@ -243,10 +245,17 @@ class SoundCloudPluginHostTest {
                         .build()
                 }.build()
         val registry = PluginRegistry(context)
-        val installer = PluginInstaller(client, registry, PluginDownloadCodes(context, PluginPublication(client)))
+        val installer =
+            PluginInstaller(
+                client,
+                registry,
+                PluginDownloadCodes(context, PluginPublication(client)),
+                MicroGAccounts(context, AndroidMicroGAccountGateway(context)),
+            )
         val pack = assets.open("soundcloud.mbplugin").use(PluginPackageReader::read)
         val plugin = installer.install(installer.check(pack, "test://soundcloud"))
-        val host = PluginHost(context, registry, client, WebLoginRefresher(context))
+        val host =
+            PluginHost(context, registry, client, WebLoginRefresher(context), MicroGAccounts(context, AndroidMicroGAccountGateway(context)))
         try {
             host.call(
                 plugin.id,

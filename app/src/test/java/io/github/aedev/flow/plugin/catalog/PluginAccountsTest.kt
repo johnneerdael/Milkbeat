@@ -17,6 +17,7 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import nl.neerdael.milkbeat.catalog.Artwork
 import nl.neerdael.milkbeat.catalog.ProviderAccount
+import nl.neerdael.milkbeat.plugin.AndroidAccountSignIn
 import nl.neerdael.milkbeat.plugin.DeviceCodeSession
 import nl.neerdael.milkbeat.plugin.PluginError
 import nl.neerdael.milkbeat.plugin.PluginErrorCode
@@ -339,5 +340,89 @@ class PluginAccountsTest {
                 assertThat(runCatching { accounts.acceptDeviceSignIn("soundcloud", "pairing") }.isFailure).isTrue()
                 assertThat(accounts.accounts.value["soundcloud"]).isEqualTo(old)
             }
+        }
+
+    @Test fun `signing out and removing a plugin end its host-held account bindings`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val forgotten = mutableListOf<String>()
+            val accounts =
+                PluginAccounts(host, backgroundScope, { testScheduler.currentTime }, { id, transition ->
+                    forgotten += id
+                    transition()
+                })
+            coEvery { host.call("youtube", PluginOperations.signOut, Unit) } throws failure(PluginErrorCode.UNAVAILABLE)
+
+            runCatching { accounts.signOut("youtube") }
+            var removed = false
+            accounts.removing("spotify") { removed = true }
+
+            assertThat(forgotten).containsExactly("youtube", "spotify").inOrder()
+            assertThat(removed).isTrue()
+        }
+
+    @Test fun `an obsolete sign-in's rollback leaves the account another method completed after it`() =
+        runTest {
+            coEvery { host.call("youtube", PluginOperations.completeAccountSignIn, any()) } returns ProviderAccount.SignedIn("microg")
+            coEvery { host.call("youtube", PluginOperations.completeSignIn, any()) } returns ProviderAccount.SignedIn("web")
+            coEvery { host.call("youtube", PluginOperations.signOut, Unit) } returns Unit
+            val accounts = accounts()
+
+            val overtaken = PluginAccounts.Completion()
+            accounts.completeAccountSignIn("youtube", AndroidAccountSignIn("google", "listener@example.com"), overtaken)
+            accounts.complete("youtube", WebLoginResult(method = "web", cookies = "SAPISID=x"))
+            accounts.undoSignIn("youtube", overtaken)
+
+            coVerify(exactly = 0) { host.call("youtube", PluginOperations.signOut, Unit) }
+            assertThat(accounts.accounts.value["youtube"]).isEqualTo(ProviderAccount.SignedIn("web"))
+
+            // A completion of another method before this one leaves this one the plugin's latest: it is undone.
+            val latest = PluginAccounts.Completion()
+            accounts.completeAccountSignIn("youtube", AndroidAccountSignIn("google", "listener@example.com"), latest)
+            accounts.undoSignIn("youtube", latest)
+
+            coVerify(exactly = 1) { host.call("youtube", PluginOperations.signOut, Unit) }
+            assertThat(accounts.accounts.value["youtube"]).isEqualTo(ProviderAccount.Anonymous)
+            accounts.undoSignIn("youtube", PluginAccounts.Completion())
+            coVerify(exactly = 1) { host.call("youtube", PluginOperations.signOut, Unit) }
+        }
+
+    @Test fun `a completion that fails after a MicroG one does not keep it from being undone`() =
+        runTest {
+            coEvery { host.call("youtube", PluginOperations.completeAccountSignIn, any()) } returns ProviderAccount.SignedIn("microg")
+            coEvery { host.call("youtube", PluginOperations.completeSignIn, any()) } throws failure(PluginErrorCode.NETWORK)
+            coEvery { host.call("youtube", PluginOperations.signOut, Unit) } returns Unit
+            val accounts = accounts()
+            val microg = PluginAccounts.Completion()
+            accounts.completeAccountSignIn("youtube", AndroidAccountSignIn("google", "listener@example.com"), microg)
+
+            runCatching { accounts.complete("youtube", WebLoginResult(method = "web", cookies = "SAPISID=x")) }
+            accounts.undoSignIn("youtube", microg)
+
+            coVerify(exactly = 1) { host.call("youtube", PluginOperations.signOut, Unit) }
+        }
+
+    @Test fun `a plugin whose host sign-in a run left unfinished is signed out rather than believed`() =
+        runTest {
+            coEvery { host.call("youtube", PluginOperations.account, Unit) } returns ProviderAccount.SignedIn("listener")
+            coEvery { host.call("youtube", PluginOperations.signOut, Unit) } returns Unit
+            val revoked = mutableListOf<String>()
+            val accounts =
+                PluginAccounts(
+                    host,
+                    backgroundScope,
+                    { testScheduler.currentTime },
+                    { id, transition ->
+                        revoked += id
+                        transition()
+                    },
+                    { it == "youtube" },
+                )
+
+            assertThat(accounts.refresh("youtube")).isEqualTo(ProviderAccount.Anonymous)
+
+            assertThat(revoked).containsExactly("youtube")
+            coVerify(exactly = 1) { host.call("youtube", PluginOperations.signOut, Unit) }
+            coVerify(exactly = 0) { host.call("youtube", PluginOperations.account, Unit) }
+            assertThat(accounts.accounts.value["youtube"]).isEqualTo(ProviderAccount.Anonymous)
         }
 }

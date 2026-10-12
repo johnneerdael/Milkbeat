@@ -490,6 +490,7 @@
     </plurals>
     <string name="tv_plugins_update_to">Update %1$s</string>
     <string name="tv_plugins_update_check_failed">Could not check for updates. Check the connection and try again.</string>
+    <string name="tv_plugins_storage_failed">Milkbeat could not save the change. Free up some storage and try again.</string>
     <string name="tv_plugins_newer_installed">A newer version of this plugin is already installed.</string>
     <plurals name="tv_plugins_updates_failed">
         <item quantity="one">Could not download %1$d update. Select to try again</item>
@@ -848,6 +849,24 @@
     <string name="tv_device_code_expired">This code expired. Request a new code to sign in.</string>
     <string name="tv_device_code_denied">Sign-in was declined. Request a new code to try again.</string>
     <string name="tv_device_code_failed">Unable to sign in. Request a new code to try again.</string>
+    <string name="tv_microg_sign_in_title">Sign in with your Google account</string>
+    <string name="tv_microg_sign_in_waiting">Choose your account, then confirm each request on this TV.</string>
+    <string name="tv_microg_sign_in_missing">MicroG-RE-TV isn\'t installed. Install it, add your Google account there, then try again.</string>
+    <string name="tv_microg_sign_in_no_account">No account was chosen.</string>
+    <string name="tv_microg_sign_in_unsupported_build">Google account sign-in works only in the stable Milkbeat app, not in Milkbeat Preview or debug builds.</string>
+    <string name="tv_microg_install_title">Install MicroG-RE-TV?</string>
+    <string name="tv_microg_install_message">This sign-in uses your Google account through MicroG-RE-TV, which isn\'t installed yet. Install it now, then add your Google account in it when asked.</string>
+    <string name="tv_microg_install_action">Install MicroG-RE-TV</string>
+    <string name="tv_microg_installing">Downloading and installing MicroG-RE-TV…</string>
+    <string name="tv_microg_install_failed">MicroG-RE-TV couldn\'t be installed.</string>
+    <string name="tv_microg_sign_in_outdated">This MicroG-RE-TV is too old to sign Milkbeat in. Update it to 7.2.1.5 or later, then try again.</string>
+    <string name="tv_microg_update_title">Update MicroG-RE-TV?</string>
+    <string name="tv_microg_update_message">The installed MicroG-RE-TV is too old to sign Milkbeat in. Update it to the latest release now; your Google account in it stays.</string>
+    <string name="tv_microg_update_action">Update MicroG-RE-TV</string>
+    <string name="tv_microg_sign_in_denied">Milkbeat wasn\'t allowed to use your account as %1$s.</string>
+    <string name="tv_microg_sign_in_failed">Unable to sign in. Try again.</string>
+    <string name="tv_microg_identity_youtube">YouTube</string>
+    <string name="tv_microg_identity_youtube_music">YouTube Music</string>
     <string name="music_matching_provider">Finding a match on %1$s…</string>
     <string name="music_loading_provider">Loading audio from %1$s…</string>
     <string name="music_loading_saved_match">Loading saved %1$s match…</string>

@@ -1,0 +1,227 @@
+package io.github.aedev.flow.ui.tv.screens.account
+
+import android.accounts.AccountManager
+import android.content.ActivityNotFoundException
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.LifecycleResumeEffect
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import io.github.aedev.flow.R
+import io.github.aedev.flow.ui.screens.account.AndroidAccountSignInState
+import io.github.aedev.flow.ui.screens.account.AndroidAccountSignInViewModel
+import io.github.aedev.flow.ui.tv.components.TvButton
+import io.github.aedev.flow.ui.tv.components.TvLoadingState
+import io.github.aedev.flow.ui.tv.components.TvMessageState
+import io.github.aedev.flow.ui.tv.components.TvScreenScaffold
+import io.github.aedev.flow.ui.tv.focus.tvInitialFocus
+import io.github.aedev.flow.ui.tv.theme.LocalTvDimens
+import kotlinx.coroutines.delay
+import nl.neerdael.milkbeat.plugin.AccountIdentity
+
+private const val SIGNED_IN_DISMISS_MS = 1_500L
+
+@Composable
+fun TvAndroidAccountSignInScreen(
+    onNavigateBack: () -> Unit,
+    viewModel: AndroidAccountSignInViewModel = hiltViewModel(),
+) {
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    val chooser =
+        rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            viewModel.onAccountChosen(result.data?.getStringExtra(AccountManager.KEY_ACCOUNT_NAME))
+        }
+    val prompt = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { viewModel.onPromptClosed() }
+    val installPermission =
+        rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { viewModel.onInstallPermissionClosed() }
+    LifecycleResumeEffect(viewModel) {
+        viewModel.onResumed()
+        onPauseOrDispose { }
+    }
+    LaunchedEffect(state) {
+        when (val current = state) {
+            AndroidAccountSignInState.Starting -> {
+                viewModel.start()
+            }
+
+            is AndroidAccountSignInState.ChooseAccount -> {
+                viewModel.onLaunched()
+                launchOrFail({ chooser.launch(current.intent) }, viewModel::onLaunchFailed)
+            }
+
+            is AndroidAccountSignInState.Confirm -> {
+                viewModel.onLaunched()
+                launchOrFail({ prompt.launch(current.intent) }, viewModel::onLaunchFailed)
+            }
+
+            is AndroidAccountSignInState.InstallPermission -> {
+                viewModel.onLaunched()
+                launchOrFail({ installPermission.launch(current.intent) }, viewModel::onLaunchFailed)
+            }
+
+            is AndroidAccountSignInState.SignedIn -> {
+                delay(SIGNED_IN_DISMISS_MS)
+                onNavigateBack()
+            }
+
+            else -> {
+                Unit
+            }
+        }
+    }
+    TvScreenScaffold(title = stringResource(R.string.tv_microg_sign_in_title)) {
+        TvAndroidAccountSignInPanel(state, viewModel::retry, viewModel::install, onNavigateBack)
+    }
+}
+
+@Composable
+internal fun TvAndroidAccountSignInPanel(
+    state: AndroidAccountSignInState,
+    onRetry: () -> Unit,
+    onInstall: () -> Unit,
+    onCancel: () -> Unit,
+) {
+    Column(
+        Modifier.fillMaxSize().padding(horizontal = LocalTvDimens.current.overscanHorizontal),
+        verticalArrangement = Arrangement.spacedBy(24.dp),
+    ) {
+        when (state) {
+            AndroidAccountSignInState.Starting,
+            is AndroidAccountSignInState.ChooseAccount,
+            is AndroidAccountSignInState.Confirm,
+            is AndroidAccountSignInState.InstallPermission,
+            -> {
+                TvLoadingState(modifier = Modifier.weight(1f))
+            }
+
+            AndroidAccountSignInState.Waiting -> {
+                TvMessageState(title = stringResource(R.string.tv_microg_sign_in_waiting), modifier = Modifier.weight(1f))
+            }
+
+            AndroidAccountSignInState.UnsupportedBuild -> {
+                TvMessageState(title = stringResource(R.string.tv_microg_sign_in_unsupported_build), modifier = Modifier.weight(1f))
+            }
+
+            AndroidAccountSignInState.MicroGMissing -> {
+                TvMessageState(title = stringResource(R.string.tv_microg_sign_in_missing), modifier = Modifier.weight(1f))
+            }
+
+            AndroidAccountSignInState.OfferInstall -> {
+                TvMessageState(
+                    title = stringResource(R.string.tv_microg_install_title),
+                    message = stringResource(R.string.tv_microg_install_message),
+                    modifier = Modifier.weight(1f),
+                )
+            }
+
+            AndroidAccountSignInState.MicroGOutdated -> {
+                TvMessageState(title = stringResource(R.string.tv_microg_sign_in_outdated), modifier = Modifier.weight(1f))
+            }
+
+            AndroidAccountSignInState.OfferUpdate -> {
+                TvMessageState(
+                    title = stringResource(R.string.tv_microg_update_title),
+                    message = stringResource(R.string.tv_microg_update_message),
+                    modifier = Modifier.weight(1f),
+                )
+            }
+
+            AndroidAccountSignInState.Installing -> {
+                TvMessageState(title = stringResource(R.string.tv_microg_installing), modifier = Modifier.weight(1f))
+            }
+
+            AndroidAccountSignInState.InstallFailed -> {
+                TvMessageState(title = stringResource(R.string.tv_microg_install_failed), modifier = Modifier.weight(1f))
+            }
+
+            AndroidAccountSignInState.NoAccountChosen -> {
+                TvMessageState(title = stringResource(R.string.tv_microg_sign_in_no_account), modifier = Modifier.weight(1f))
+            }
+
+            is AndroidAccountSignInState.Denied -> {
+                TvMessageState(
+                    title = stringResource(R.string.tv_microg_sign_in_denied, identityLabel(state.identity)),
+                    modifier = Modifier.weight(1f),
+                )
+            }
+
+            is AndroidAccountSignInState.Failed -> {
+                TvMessageState(title = state.message ?: stringResource(R.string.tv_microg_sign_in_failed), modifier = Modifier.weight(1f))
+            }
+
+            is AndroidAccountSignInState.SignedIn -> {
+                TvMessageState(
+                    modifier = Modifier.weight(1f),
+                    title =
+                        state.accountName?.let { stringResource(R.string.tv_account_signed_in_as, it) }
+                            ?: stringResource(R.string.tv_account_signed_in),
+                )
+            }
+        }
+        val installable =
+            state == AndroidAccountSignInState.OfferInstall ||
+                state == AndroidAccountSignInState.OfferUpdate ||
+                state == AndroidAccountSignInState.InstallFailed
+        if (installable) {
+            TvButton(
+                text =
+                    stringResource(
+                        if (state ==
+                            AndroidAccountSignInState.OfferUpdate
+                        ) {
+                            R.string.tv_microg_update_action
+                        } else {
+                            R.string.tv_microg_install_action
+                        },
+                    ),
+                onClick = onInstall,
+                modifier = Modifier.tvInitialFocus(state),
+            )
+        }
+        val retryable =
+            state == AndroidAccountSignInState.NoAccountChosen ||
+                state is AndroidAccountSignInState.Denied ||
+                state is AndroidAccountSignInState.Failed
+        if (retryable) {
+            TvButton(text = stringResource(R.string.retry), onClick = onRetry, modifier = Modifier.tvInitialFocus(state))
+        }
+        if (state !is AndroidAccountSignInState.SignedIn) {
+            TvButton(
+                text = stringResource(R.string.cancel),
+                onClick = onCancel,
+                modifier = if (retryable || installable) Modifier else Modifier.tvInitialFocus(state),
+            )
+        }
+    }
+}
+
+@Composable
+private fun identityLabel(identity: AccountIdentity): String =
+    when (identity) {
+        AccountIdentity.YOUTUBE -> stringResource(R.string.tv_microg_identity_youtube)
+        AccountIdentity.YOUTUBE_MUSIC -> stringResource(R.string.tv_microg_identity_youtube_music)
+    }
+
+// A prompt another app returns may not be startable from Milkbeat; that ends the attempt instead of the app.
+private inline fun launchOrFail(
+    launch: () -> Unit,
+    onFailure: () -> Unit,
+) {
+    try {
+        launch()
+    } catch (_: ActivityNotFoundException) {
+        onFailure()
+    } catch (_: SecurityException) {
+        onFailure()
+    }
+}

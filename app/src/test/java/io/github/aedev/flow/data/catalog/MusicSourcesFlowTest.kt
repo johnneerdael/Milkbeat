@@ -48,7 +48,7 @@ class MusicSourcesFlowTest {
     }
 
     private fun TestScope.sources(): MusicSources {
-        val accounts = PluginAccounts(host, backgroundScope) { 0L }
+        val accounts = PluginAccounts(host, backgroundScope, nowMs = { 0L })
         val store = PreferenceDataStoreFactory.create(scope = backgroundScope) { temp.newFile("music_tabs.preferences_pb") }
         return MusicSources(registry, accounts, folders, store, backgroundScope)
     }

@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import io.github.aedev.flow.plugin.host.AndroidMicroGAccountGateway
+import io.github.aedev.flow.plugin.host.MicroGAccounts
 import io.github.aedev.flow.plugin.host.WebLoginRefresher
 import io.github.aedev.flow.plugin.install.PluginDownloadCodes
 import io.github.aedev.flow.plugin.install.PluginInstaller
@@ -50,11 +52,23 @@ class PluginHostTest {
             val registry = PluginRegistry(context)
             val installer =
                 OkHttpClient().let { client ->
-                    PluginInstaller(client, registry, PluginDownloadCodes(context, PluginPublication(client)))
+                    PluginInstaller(
+                        client,
+                        registry,
+                        PluginDownloadCodes(context, PluginPublication(client)),
+                        MicroGAccounts(context, AndroidMicroGAccountGateway(context)),
+                    )
                 }
             val pack = assets.open("fixture.mbplugin").use(PluginPackageReader::read)
             installer.install(installer.check(pack, "test://fixture"))
-            host = PluginHost(context, registry, OkHttpClient(), WebLoginRefresher(context))
+            host =
+                PluginHost(
+                    context,
+                    registry,
+                    OkHttpClient(),
+                    WebLoginRefresher(context),
+                    MicroGAccounts(context, AndroidMicroGAccountGateway(context)),
+                )
         }
 
     private fun probe(name: String): String =

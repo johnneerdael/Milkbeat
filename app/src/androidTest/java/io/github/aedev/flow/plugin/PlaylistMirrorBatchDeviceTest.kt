@@ -8,6 +8,8 @@ import androidx.test.platform.app.InstrumentationRegistry
 import io.github.aedev.flow.data.local.AppDatabase
 import io.github.aedev.flow.plugin.catalog.PluginAccounts
 import io.github.aedev.flow.plugin.catalog.toMusicTrack
+import io.github.aedev.flow.plugin.host.AndroidMicroGAccountGateway
+import io.github.aedev.flow.plugin.host.MicroGAccounts
 import io.github.aedev.flow.plugin.host.WebLoginRefresher
 import io.github.aedev.flow.plugin.install.PluginDownloadCodes
 import io.github.aedev.flow.plugin.install.PluginInstaller
@@ -333,7 +335,13 @@ class PlaylistMirrorBatchDeviceTest {
             }
         val registry = PluginRegistry(context)
         val client = OkHttpClient.Builder().addInterceptor(fixture).build()
-        val installer = PluginInstaller(client, registry, PluginDownloadCodes(context, PluginPublication(client)))
+        val installer =
+            PluginInstaller(
+                client,
+                registry,
+                PluginDownloadCodes(context, PluginPublication(client)),
+                MicroGAccounts(context, AndroidMicroGAccountGateway(context)),
+            )
         val spotify =
             assets.open("spotify.mbplugin").use(PluginPackageReader::read).let {
                 installer.install(installer.check(it, "test://spotify"))
@@ -347,7 +355,8 @@ class PlaylistMirrorBatchDeviceTest {
             youtube.manifest.roles.audio!!
                 .batchMatching,
         )
-        val host = PluginHost(context, registry, client, WebLoginRefresher(context))
+        val host =
+            PluginHost(context, registry, client, WebLoginRefresher(context), MicroGAccounts(context, AndroidMicroGAccountGateway(context)))
         val database = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java).build()
         try {
             val accounts = PluginAccounts(host)

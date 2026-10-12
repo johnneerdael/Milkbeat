@@ -1,7 +1,7 @@
 {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "title": "MilkbeatPluginApi",
-    "description": "Plugin API v10, generated from the plugin-api module. Do not edit.",
+    "description": "Plugin API v11, generated from the plugin-api module. Do not edit.",
     "type": "object",
     "properties": {
         "manifest": {
@@ -458,6 +458,22 @@
                     ],
                     "additionalProperties": false
                 },
+                "signIn.completeAccount": {
+                    "type": "object",
+                    "properties": {
+                        "request": {
+                            "$ref": "#/$defs/nl.neerdael.milkbeat.plugin.AndroidAccountSignIn"
+                        },
+                        "response": {
+                            "$ref": "#/$defs/nl.neerdael.milkbeat.catalog.ProviderAccount"
+                        }
+                    },
+                    "required": [
+                        "request",
+                        "response"
+                    ],
+                    "additionalProperties": false
+                },
                 "signIn.account": {
                     "type": "object",
                     "properties": {
@@ -527,6 +543,7 @@
                 "signIn.confirm",
                 "signIn.cancel",
                 "signIn.complete",
+                "signIn.completeAccount",
                 "signIn.account",
                 "signIn.signOut",
                 "settings.options"
@@ -822,6 +839,34 @@
                         "response"
                     ],
                     "additionalProperties": false
+                },
+                "signIn.token": {
+                    "type": "object",
+                    "properties": {
+                        "request": {
+                            "$ref": "#/$defs/nl.neerdael.milkbeat.plugin.AccountTokenRequest"
+                        },
+                        "response": {
+                            "$ref": "#/$defs/nl.neerdael.milkbeat.plugin.AccountToken"
+                        }
+                    },
+                    "required": [
+                        "request",
+                        "response"
+                    ],
+                    "additionalProperties": false
+                },
+                "signIn.invalidateToken": {
+                    "type": "object",
+                    "properties": {
+                        "request": {
+                            "$ref": "#/$defs/nl.neerdael.milkbeat.plugin.AccountTokenInvalidation"
+                        }
+                    },
+                    "required": [
+                        "request"
+                    ],
+                    "additionalProperties": false
                 }
             },
             "required": [
@@ -844,7 +889,9 @@
                 "browser.close",
                 "settings.get",
                 "time.sleep",
-                "signIn.refresh"
+                "signIn.refresh",
+                "signIn.token",
+                "signIn.invalidateToken"
             ],
             "additionalProperties": false
         },
@@ -859,6 +906,33 @@
         "error"
     ],
     "$defs": {
+        "androidAccount": {
+            "type": "object",
+            "required": [
+                "type",
+                "id",
+                "label",
+                "identities"
+            ],
+            "properties": {
+                "type": {
+                    "const": "androidAccount"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "label": {
+                    "type": "string"
+                },
+                "identities": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/$defs/nl.neerdael.milkbeat.plugin.AccountIdentity"
+                    }
+                }
+            },
+            "title": "SignInMethodAndroidAccount"
+        },
         "anonymous": {
             "type": "object",
             "required": [
@@ -2161,6 +2235,73 @@
                 }
             },
             "title": "TracksRequest"
+        },
+        "nl.neerdael.milkbeat.plugin.AccountIdentity": {
+            "enum": [
+                "youtube",
+                "youtubeMusic"
+            ],
+            "title": "AccountIdentity"
+        },
+        "nl.neerdael.milkbeat.plugin.AccountToken": {
+            "type": "object",
+            "required": [
+                "token"
+            ],
+            "properties": {
+                "token": {
+                    "type": "string"
+                }
+            },
+            "title": "AccountToken"
+        },
+        "nl.neerdael.milkbeat.plugin.AccountTokenInvalidation": {
+            "type": "object",
+            "required": [
+                "method",
+                "token"
+            ],
+            "properties": {
+                "method": {
+                    "type": "string"
+                },
+                "token": {
+                    "type": "string"
+                }
+            },
+            "title": "AccountTokenInvalidation"
+        },
+        "nl.neerdael.milkbeat.plugin.AccountTokenRequest": {
+            "type": "object",
+            "required": [
+                "method",
+                "identity"
+            ],
+            "properties": {
+                "method": {
+                    "type": "string"
+                },
+                "identity": {
+                    "$ref": "#/$defs/nl.neerdael.milkbeat.plugin.AccountIdentity"
+                }
+            },
+            "title": "AccountTokenRequest"
+        },
+        "nl.neerdael.milkbeat.plugin.AndroidAccountSignIn": {
+            "type": "object",
+            "required": [
+                "method",
+                "accountName"
+            ],
+            "properties": {
+                "method": {
+                    "type": "string"
+                },
+                "accountName": {
+                    "type": "string"
+                }
+            },
+            "title": "AndroidAccountSignIn"
         },
         "nl.neerdael.milkbeat.plugin.ApiRange": {
             "type": "object",
@@ -3883,6 +4024,9 @@
         },
         "nl.neerdael.milkbeat.plugin.SignInMethod": {
             "anyOf": [
+                {
+                    "$ref": "#/$defs/androidAccount"
+                },
                 {
                     "$ref": "#/$defs/deviceCode"
                 },
