@@ -227,6 +227,13 @@ Co-Authored-By: Agent <agent@example.org>
         self.assertLess(result.index("## Visualizer engine"), result.index("## Install on Android TV"))
         self.assertLess(result.index("## Install on Android TV"), result.index("## Plugins"))
 
+    def test_the_youtube_plugin_names_its_microg_sign_in(self):
+        line = notes.plugin_line({"id": "nl.neerdael.youtube", "name": "YouTube", "version": "0.1.0", "code": "563"})
+        self.assertEqual(
+            line,
+            "- **YouTube 0.1.0** (YouTube Music and YouTube; signs in with a Google account from MicroG-RE-TV): downloader code `563`",
+        )
+
     def test_plugins_come_from_the_published_descriptor(self):
         with tempfile.TemporaryDirectory() as directory:
             checkout = Path(directory)

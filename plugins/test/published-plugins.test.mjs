@@ -48,6 +48,17 @@ test('Deezer is required in the registered provider set while unknown and duplic
  }
 });
 
+test('YouTube, signed in through MicroG-RE-TV, is required in both channels and needs plugin API 11',()=>{
+ for(const [file,catalogPath,channel] of [['../published.json','../../app/src/main/assets/plugin-download-catalog.json','stable'],['../published-preview.json','../../app/src/nightly/assets/plugin-preview-download-catalog.json','preview']]){
+  const descriptor=JSON.parse(readFileSync(new URL(file,import.meta.url)));
+  const catalog=readCatalog(new URL(catalogPath,import.meta.url)).entries;
+  const rows=verifyPublishedPlugins({descriptor,catalog,channel});
+  assert.equal(rows.find(row=>row.id==='nl.neerdael.youtube').apiMin,11);
+  const withoutYouTube={...descriptor,plugins:descriptor.plugins.filter(row=>row.id!=='nl.neerdael.youtube')};
+  assert.throws(()=>verifyPublishedPlugins({descriptor:withoutYouTube,catalog,channel}),/Invalid published plugin descriptor/);
+ }
+});
+
 test('stable publication rejects prerelease packages before an automatic update can advertise them',()=>{
  const value=fixture();value.descriptor.plugins[0].version='1.0.1-preview.1';
  assert.throws(()=>verifyPublishedPlugins(value),/prerelease.*stable/i);

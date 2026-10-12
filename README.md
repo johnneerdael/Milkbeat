@@ -139,6 +139,7 @@ Add **third-party plugins** in **Settings → Plugins** with their downloader co
 | SoundCloud | **089** | — |
 | YouTube Video | **932** | — |
 | Deezer | **734** | — |
+| YouTube | **563** | — |
 <!-- /plugin-codes -->
 
 A plugin download URL also works, including a supported Buzzheavier file page. Plugins are
@@ -184,10 +185,12 @@ reporting, **Index playlists** and, for Spotify, **Prepare private playlists in 
 
 Plugin API 11 adds a third way to sign in: **Sign in with your Google account**, for plugins that
 offer it. It uses a Google account already in [MicroG-RE-TV](https://github.com/johnneerdael/MicroG-RE-TV),
-which the stable GitHub build offers to install when it is missing. You pick the account and confirm
-each request in MicroG on the TV, with the remote. Milkbeat keeps only the account name; MicroG keeps
-the grants and tokens. It works in the stable app (`nl.neerdael.milkbeat`) only, not in Preview or
-debug builds. No published plugin uses it yet.
+which the stable GitHub build offers to install, or to update when it is older than 7.2.1.5. You pick
+the account with the remote; MicroG-RE-TV 7.2.1.5 and later grant Milkbeat its access without a
+prompt. Milkbeat keeps only the account name; MicroG keeps the grants and tokens. It works in the
+stable app (`nl.neerdael.milkbeat`) only, not in Preview or debug builds. The **YouTube** plugin
+(downloader code **563**) signs in this way: YouTube Music for Home, search and radio, and YouTube for
+playback.
 
 ## Playback, queue and radio
 
