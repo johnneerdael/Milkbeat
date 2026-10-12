@@ -35,4 +35,24 @@ class MicroGAccountPickerTest {
             unmockkStatic(AccountManager::class)
         }
     }
+
+    @Test fun `chooser preserves a non Google OEM account picker`() {
+        val gateway = AndroidMicroGAccountGateway(ApplicationProvider.getApplicationContext())
+        val oemPicker = ComponentName("tv.vendor.accounts", "tv.vendor.accounts.RemoteAccountPickerActivity")
+        val configured =
+            AccountManager
+                .newChooseAccountIntent(null, null, arrayOf(MICROG_ACCOUNT_TYPE), null, null, null, null)
+                .setComponent(oemPicker)
+        mockkStatic(AccountManager::class)
+        try {
+            every { AccountManager.newChooseAccountIntent(null, null, any<Array<String>>(), null, null, null, null) } returns configured
+
+            val intent = gateway.chooseAccountIntent()
+
+            assertThat(intent.component).isEqualTo(oemPicker)
+            assertThat(intent.getStringArrayExtra("allowableAccountTypes")).asList().containsExactly(MICROG_ACCOUNT_TYPE)
+        } finally {
+            unmockkStatic(AccountManager::class)
+        }
+    }
 }

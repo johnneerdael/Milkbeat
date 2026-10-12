@@ -667,11 +667,12 @@ build offers to download `microg-re-tv.apk` from the fork's latest release. It i
 session only if the archive is that package. It also offers that download as an update when the installed MicroG is
 signed with MicroG-RE-TV's release key but older than 7.2.1.5, the first release that serves Milkbeat; other MicroG
 builds under the package are used as they are, since Android would refuse the update. Concurrent install requests
-join the one under way. It then opens Android's standard account chooser for type `app.revanced`, explicitly
-targeting `android.accounts.ChooseTypeAndAccountActivity` in package `android`. Some TVs configure the
-AccountManager chooser to open Google Play Services' `NoTouchAccountPickerActivity`, which does not serve
-the MicroG account flow. Launch the standard picker directly from Milkbeat so selection also makes the
-account visible to Milkbeat on API 26+; MicroG's forwarding picker changes the launching package.
+join the one under way. It then opens the account chooser for type `app.revanced`, preserving the
+platform-selected component except when it is Google Play Services' `com.google.android.gms.common.account.NoTouchAccountPickerActivity`
+in package `com.google.android.gms`. That known override does not serve the MicroG account flow, so
+Milkbeat targets `android.accounts.ChooseTypeAndAccountActivity` in package `android` instead. Keep other
+OEM pickers intact. Launch directly from Milkbeat so selection also makes the account visible to Milkbeat
+on API 26+; MicroG's forwarding picker changes the launching package.
 For each declared identity it asks `AccountManager.getAuthToken`
 for `oauth2:` + the `youtube` and `youtube.force-ssl` scopes, with the option `overridePackage` naming the official app.
 A prompt MicroG returns is launched once; closing it without a grant ends the attempt as declined. Only when every identity is granted

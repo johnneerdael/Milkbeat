@@ -3,6 +3,7 @@ package io.github.aedev.flow.plugin.host
 import android.accounts.Account
 import android.accounts.AccountManager
 import android.accounts.AuthenticatorException
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -119,7 +120,13 @@ class AndroidMicroGAccountGateway
         override fun chooseAccountIntent(): Intent =
             AccountManager
                 .newChooseAccountIntent(null, null, arrayOf(MICROG_ACCOUNT_TYPE), null, null, null, null)
-                .setClassName("android", "android.accounts.ChooseTypeAndAccountActivity")
+                .apply {
+                    if (component ==
+                        ComponentName("com.google.android.gms", "com.google.android.gms.common.account.NoTouchAccountPickerActivity")
+                    ) {
+                        setClassName("android", "android.accounts.ChooseTypeAndAccountActivity")
+                    }
+                }
 
         override fun hasAccount(name: String): Boolean = manager.getAccountsByType(MICROG_ACCOUNT_TYPE).any { it.name == name }
 

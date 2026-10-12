@@ -186,8 +186,8 @@ reporting, **Index playlists** and, for Spotify, **Prepare private playlists in 
 Plugin API 11 adds a third way to sign in: **Sign in with your Google account**, for plugins that
 offer it. It uses a Google account already in [MicroG-RE-TV](https://github.com/johnneerdael/MicroG-RE-TV),
 which the stable GitHub build offers to install, or to update when it is older than 7.2.1.5. You pick
-the MicroG account with the remote in Android's standard account picker, including on TVs whose
-default chooser opens Google Play Services. MicroG-RE-TV 7.2.1.5 and later grant Milkbeat its access without a
+the MicroG account with the remote in the TV's account picker, using Android's standard picker
+on affected Google TVs. MicroG-RE-TV 7.2.1.5 and later grant Milkbeat its access without a
 prompt. Milkbeat keeps only the account name; MicroG keeps the grants and tokens. It works in the
 stable app (`nl.neerdael.milkbeat`) only, not in Preview or debug builds. The **YouTube** plugin
 (downloader code **563**) signs in this way: YouTube Music for Home, search and radio, and YouTube for
