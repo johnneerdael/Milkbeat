@@ -203,6 +203,7 @@ class MicroGAccounts internal constructor(
             }
             // A sign-out or removal that began while the write ran is caught here and undone like any failure.
             check(attempt == null || !revoked(pluginId, attempt.revocation)) { "The plugin was signed out or removed during sign-in" }
+            expired -= pluginId
         } catch (e: Throwable) {
             // The write may have landed before a cancellation reached us. A confirmation the caller never learned of
             // is undone: still this run's nonce, no longer pending, so nothing newer replaced or revoked it.
@@ -321,13 +322,17 @@ class MicroGAccounts internal constructor(
     internal suspend fun token(
         plugin: InstalledPlugin,
         request: AccountTokenRequest,
-    ): AccountToken =
-        try {
+    ): AccountToken {
+        load(plugin.id)
+        val since = revocationMark(plugin.id)
+        return try {
             issue(plugin, request)
         } catch (e: HostCallException) {
-            if (e.code == PluginErrorCode.SIGN_IN_EXPIRED) expired += plugin.id
+            // Only the binding the request found: one a revocation ended meanwhile was replaced or is gone.
+            if (e.code == PluginErrorCode.SIGN_IN_EXPIRED && !revoked(plugin.id, since)) expired += plugin.id
             throw e
         }
+    }
 
     private suspend fun issue(
         plugin: InstalledPlugin,

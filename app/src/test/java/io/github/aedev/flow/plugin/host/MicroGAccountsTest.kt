@@ -690,4 +690,20 @@ class MicroGAccountsTest {
             microG.revoke(plugin.id)
             assertThat(microG.orphaned(plugin.id)).isFalse()
         }
+
+    @Test fun `an expiry answered while a sign-out ran does not mark the next sign-in`() =
+        runTest {
+            val store = PreferenceDataStoreFactory.create(scope = CoroutineScope(Dispatchers.IO)) { temp.newFile("expiry.preferences_pb") }
+            val microG = MicroGAccounts(gateway, store, Dispatchers.IO)
+            every { gateway.hasAccount(any()) } returns true
+            every { gateway.token(any(), any()) } answers {
+                runBlocking { microG.revoke(plugin.id) }
+                MicroGTokenResult.NeedsConsent(mockk<Intent>())
+            }
+            microG.confirm(plugin.id, google.id, microG.bind(plugin, google, "listener@example.com"))
+
+            failure { microG.token(plugin, AccountTokenRequest("google", AccountIdentity.YOUTUBE_MUSIC)) }
+
+            assertThat(microG.orphaned(plugin.id)).isFalse()
+        }
 }

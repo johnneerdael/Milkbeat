@@ -34,13 +34,14 @@ class MicroGInstallReceiver : BroadcastReceiver() {
                 val confirm = IntentCompat.getParcelableExtra(intent, Intent.EXTRA_INTENT, Intent::class.java)
                 // An installer whose confirmation cannot be started fails the install instead of the app.
                 try {
-                    confirm?.let { context.startActivity(it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } ?: installer.reportFailure()
+                    confirm?.let { context.startActivity(it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+                        ?: failConfirmation(context, sessionId)
                 } catch (e: ActivityNotFoundException) {
                     Log.w(TAG, "MicroG-RE-TV install confirmation could not open", e)
-                    installer.reportFailure()
+                    failConfirmation(context, sessionId)
                 } catch (e: SecurityException) {
                     Log.w(TAG, "MicroG-RE-TV install confirmation could not open", e)
-                    installer.reportFailure()
+                    failConfirmation(context, sessionId)
                 }
             }
 
@@ -53,6 +54,15 @@ class MicroGInstallReceiver : BroadcastReceiver() {
                 installer.reportFailure()
             }
         }
+    }
+
+    // A committed session whose confirmation cannot open has no way left to finish; it is abandoned, not left staged.
+    private fun failConfirmation(
+        context: Context,
+        sessionId: Int,
+    ) {
+        runCatching { context.packageManager.packageInstaller.abandonSession(sessionId) }
+        installer.reportFailure()
     }
 
     private companion object {
