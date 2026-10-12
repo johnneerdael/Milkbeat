@@ -167,11 +167,11 @@ Open the installed plugin's details and choose its sign-in method.
 
 **Web sign-in (YouTube Music, Spotify, Beatport and Deezer):** scan the TV's QR code with a phone on the same network. The [phone viewer](https://github.com/johnneerdael/Milkbeat/blob/main/docs/phone-sign-in-remote-view.md) streams the provider's real sign-in page from the TV; use touch and typing on the phone to complete sign-in and any verification. Browsing and playback stay in Milkbeat's TV interface.
 
-**Google account through MicroG-RE-TV (plugins that offer it):** select **Sign in with your Google account**. Everything happens on the TV with the remote; no phone is needed.
+**Google account through MicroG-RE-TV (plugins that offer it, such as YouTube, code 563):** select **Sign in with your Google account**. Everything happens on the TV with the remote; no phone is needed.
 
 1. If MicroG-RE-TV is not installed, the stable GitHub build offers **Install MicroG-RE-TV**. It downloads the latest release from [MicroG-RE-TV](https://github.com/johnneerdael/MicroG-RE-TV/releases) and opens Android's install prompt. The first time, Android asks you to allow Milkbeat to install apps; allow it and press Back. The stable foss build asks you to install it yourself. Milkbeat Preview and debug builds cannot use this sign-in at all, so installing MicroG-RE-TV for them does not help. A MicroG-RE-TV older than 7.2.1.5 cannot sign Milkbeat in: the stable GitHub build offers **Update MicroG-RE-TV**, which installs the latest release over it and keeps your account, and the foss build asks you to update it. Other MicroG builds under the same package are used as they are.
 2. Pick your Google account. If there is none yet, add it in MicroG-RE-TV when Android offers to.
-3. MicroG-RE-TV asks once per account for each kind of access the plugin needs, such as "use your account as YouTube Music". Select **Allow**. Declining ends the attempt; select **Retry** to be asked again.
+3. MicroG-RE-TV 7.2.1.5 and later grant Milkbeat the access the plugin needs, such as "use your account as YouTube Music", without asking. If your MicroG build asks instead, select **Allow**; declining ends the attempt, and **Retry** asks again.
 
 Milkbeat keeps the account name, never a password or token. MicroG-RE-TV keeps your grants and issues short-lived tokens; to withdraw access, remove it in MicroG-RE-TV. This sign-in works only in the stable app (`nl.neerdael.milkbeat`), not in Milkbeat Preview or debug builds.
 
