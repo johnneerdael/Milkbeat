@@ -674,4 +674,20 @@ class MicroGAccountsTest {
             ) { restarted.confirm(plugin.id, google.id, restarted.bind(plugin, google, "listener@example.com")) }
             assertThat(restarted.token(plugin, request).token).isEqualTo("ya29.music")
         }
+
+    @Test fun `a binding that expired counts as orphaned until a sign-out clears it`() =
+        runTest {
+            val microG = accounts()
+            every { gateway.hasAccount(any()) } returns true
+            every { gateway.token(any(), any()) } returns MicroGTokenResult.NeedsConsent(mockk<Intent>())
+            val request = AccountTokenRequest("google", AccountIdentity.YOUTUBE_MUSIC)
+            microG.confirm(plugin.id, google.id, microG.bind(plugin, google, "listener@example.com"))
+            assertThat(microG.orphaned(plugin.id)).isFalse()
+
+            assertThat(failure { microG.token(plugin, request) }?.code).isEqualTo(PluginErrorCode.SIGN_IN_EXPIRED)
+            assertThat(microG.orphaned(plugin.id)).isTrue()
+
+            microG.revoke(plugin.id)
+            assertThat(microG.orphaned(plugin.id)).isFalse()
+        }
 }

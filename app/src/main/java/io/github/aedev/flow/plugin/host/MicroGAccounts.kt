@@ -280,6 +280,7 @@ class MicroGAccounts internal constructor(
                 // Bindings the store failed to delete stay revoked, in this run and on disk, until a later revocation
                 // deletes them, and the plugin still signs out, so neither outlives the listener's request.
                 revocations.computeIfPresent(pluginId) { _, now -> now.copy(undeleted = deletion != null) }
+                if (deletion == null) expired -= pluginId
                 withContext(io) {
                     runCatching { if (deletion != null) tombstones.add(pluginId) else tombstones.remove(pluginId) }
                         .onFailure { deletion?.addSuppressed(it) }
@@ -303,8 +304,9 @@ class MicroGAccounts internal constructor(
      */
     suspend fun orphaned(pluginId: String): Boolean {
         load(pluginId)
-        // Bindings a revocation failed to delete are retried by the sign-out this answer leads to.
-        if (revocations[pluginId]?.undeleted == true) return true
+        // Bindings a revocation failed to delete are retried by the sign-out this answer leads to, and a binding that
+        // expired (an identity an update added, a withdrawn grant, a removed account) needs a new sign-in.
+        if (revocations[pluginId]?.undeleted == true || pluginId in expired) return true
         return store.data.first().asMap().any { (key, value) ->
             key.name.startsWith(prefix(pluginId)) &&
                 key.name.endsWith(PENDING_SUFFIX) &&
@@ -312,7 +314,22 @@ class MicroGAccounts internal constructor(
         }
     }
 
+    // Plugins whose binding answered SIGN_IN_EXPIRED in this run: the plugin may still report its account, so it
+    // counts as orphaned until a sign-out clears the binding and the listener signs in again.
+    private val expired = ConcurrentHashMap.newKeySet<String>()
+
     internal suspend fun token(
+        plugin: InstalledPlugin,
+        request: AccountTokenRequest,
+    ): AccountToken =
+        try {
+            issue(plugin, request)
+        } catch (e: HostCallException) {
+            if (e.code == PluginErrorCode.SIGN_IN_EXPIRED) expired += plugin.id
+            throw e
+        }
+
+    private suspend fun issue(
         plugin: InstalledPlugin,
         request: AccountTokenRequest,
     ): AccountToken {
