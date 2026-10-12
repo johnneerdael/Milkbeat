@@ -1017,6 +1017,9 @@ run that occupies a physical device, and the resulting diff is thousands of line
   garbage and restores the call limit, or retained state plus 32 MB headroom (logged as a warning)
   when the prepared state itself exceeds it. Never extend the warm-up's time budget, since foreground
   calls queue behind it on the playback owner. `PluginRuntimeWarmUpDeviceTest` covers this.
+  QuickJS builds `MemoryUsage` from native code, so `app/proguard-rules.pro` keeps its constructor; device
+  tests run unshrunk and cannot catch a stripped JNI target. After using another natively constructed
+  library class, check it in a shrunk `:app:assembleGithubNightly` APK (`apkanalyzer dex packages`).
   Deduplicate provider preparation and do not invent account-independent token caches.
 
 - Initial prepared-network video joins require current-video media coverage before attaching the
