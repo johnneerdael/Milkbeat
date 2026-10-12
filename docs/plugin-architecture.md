@@ -333,7 +333,11 @@ Rejected:
   (section 5.4). Five failures in a row disable the plugin until the next app start, and the
   plugin manager says so.
 - **Warm-up:** after a plugin starts, the host calls its optional `warmUp()` at low priority, with a
-  longer time budget (up to 2 minutes). This is where one-off work goes, such as preprocessing a new
+  longer time budget (up to 2 minutes) and more memory (256 MB instead of a call's 96 MB). For API 8
+  plugins this runs on the playback context itself, with a call's 20-second budget because foreground
+  calls wait behind it there. Once warm-up's garbage is collected, the context returns to the call
+  memory limit, or to what its retained state needs plus 32 MB of headroom when that is more (the
+  host logs a warning). This is where one-off work goes, such as preprocessing a new
   YouTube player (13.5 s on the AM6). Until it finishes, the plugin answers with what does not need
   it, for example stream clients that do not need the solver.
 - **Plugin thread:** each context runs on its own thread with a deep stack (16 MB in the spike).
