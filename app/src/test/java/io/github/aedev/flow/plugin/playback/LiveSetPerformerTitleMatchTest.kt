@@ -42,4 +42,51 @@ class LiveSetPerformerTitleMatchTest {
             assertThat(TrackMatchScore.best(original, listOf(candidate))).isNull()
         }
     }
+
+    private val bodzin =
+        TrackDescriptor(
+            EntityRef(EntityKind.TRACK, "soundcloud:tracks:2"),
+            "STEPHAN BODZIN - VSNZ Winter Festival 2025",
+            artists = listOf(ArtistCredit("Stephan Bodzin")),
+            durationMs = 6_468_000L,
+        )
+    private val promoterUpload =
+        TrackDescriptor(
+            EntityRef(EntityKind.MUSIC_VIDEO, "bpEVpBr5lK4"),
+            "VSNZ pres. STEPHAN BODZIN - VSNZ Winter Festival 2025",
+            artists = listOf(ArtistCredit("VSNZ")),
+            durationMs = 7_085_000L,
+            hasVideo = true,
+            ids = mapOf("yt" to "bpEVpBr5lK4"),
+        )
+
+    @Test
+    fun `a promoter's longer upload of the same set, event and year matches`() {
+        assertThat(TrackMatchScore.best(bodzin, listOf(promoterUpload))?.candidate).isEqualTo(promoterUpload)
+    }
+
+    @Test
+    fun `the set length allowance needs a long set, 15 percent and the same event year`() {
+        for (candidate in listOf(
+            promoterUpload.copy(durationMs = 7_500_000L),
+            promoterUpload.copy(title = promoterUpload.title.replace("2025", "2024")),
+            promoterUpload.copy(title = promoterUpload.title.replace(" 2025", "")),
+            promoterUpload.copy(title = promoterUpload.title.replace("Winter", "Summer")),
+            promoterUpload.copy(title = "VSNZ pres. ANNA - VSNZ Winter Festival 2025"),
+        )) {
+            assertThat(TrackMatchScore.best(bodzin, listOf(candidate))).isNull()
+        }
+        val undated = bodzin.copy(title = "STEPHAN BODZIN - VSNZ Winter Festival")
+        assertThat(
+            TrackMatchScore.best(undated, listOf(promoterUpload.copy(title = "VSNZ pres. STEPHAN BODZIN - VSNZ Winter Festival"))),
+        ).isNull()
+    }
+
+    @Test
+    fun `tracks shorter than a set keep the ten second length rule`() {
+        val song = bodzin.copy(title = "Stephan Bodzin - Powers of Ten 2025", durationMs = 600_000L)
+        val video = promoterUpload.copy(title = "Stephan Bodzin - Powers of Ten 2025", durationMs = 660_000L)
+        assertThat(TrackMatchScore.best(song, listOf(video))).isNull()
+        assertThat(TrackMatchScore.best(song, listOf(video.copy(durationMs = 605_000L)))?.candidate).isNotNull()
+    }
 }

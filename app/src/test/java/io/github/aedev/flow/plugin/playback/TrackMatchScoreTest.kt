@@ -91,10 +91,10 @@ class TrackMatchScoreTest {
     }
 
     @Test
-    fun `live set matching requires complete video duration and dated event evidence`() {
+    fun `live set matching requires a set length within 15 percent and dated event evidence`() {
         for (candidate in listOf(
-            fidelesVideo.copy(durationMs = 4_000_000),
-            fidelesVideo.copy(durationMs = 5_000_000),
+            fidelesVideo.copy(durationMs = 3_700_000),
+            fidelesVideo.copy(durationMs = 5_200_000),
             fidelesVideo.copy(durationMs = null),
             fidelesVideo.copy(hasVideo = false),
             fidelesVideo.copy(ids = emptyMap()),

@@ -7,7 +7,7 @@ import java.util.Locale
 import kotlin.math.abs
 
 internal object TrackMatchScore {
-    const val POLICY_VERSION = 4
+    const val POLICY_VERSION = 5
     const val MIN_SCORE = 0.35
     private const val CERTAIN = 1.0
     private const val EARLY_EXIT = 0.95
@@ -21,11 +21,18 @@ internal object TrackMatchScore {
     private const val ISRC = "isrc"
     private const val MIN_LIVE_SET_DURATION_MS = 20 * 60 * 1000L
 
+    // Uploads of one live set differ by intros, outros and trimmed edges, so two sets of 20 minutes or
+    // more may differ by this share of the source's length when artist, event and year all match.
+    private const val LIVE_SET_LENGTH_TOLERANCE = 0.15
+
     private val titleCredit = Regex("^(.+?)\\s*(?:[|@•]|\\s+[-–—:]\\s+)\\s*(.+)$")
     private val trailingUploader = Regex("\\s*[|•]\\s*([^|•]+)$")
     private val liveWord = Regex("\\blive\\b")
     private val liveSetWords = Regex("\\b(?:recorded|live|set|mix|festival|at)\\b")
     private val eventYear = Regex("\\b(?:19|20)\\d{2}\\b")
+
+    // A promoter's upload credit before the performer, as in "VSNZ pres. Stephan Bodzin - …" (normalized text).
+    private val presenterPrefix = Regex("^(?:\\S+ ){1,4}?(?:pres|presents) ")
 
     private val bracketedFeature = Regex("[\\[(]\\s*(?:feat(?:uring)?|ft|with)\\b[^)\\]]*[)\\]]", RegexOption.IGNORE_CASE)
     private val trailingFeature = Regex("\\s+(?:feat(?:uring)?|ft)\\.?\\s+.*?(?=\\s*[\\[(]|\\s+[-–—]\\s+|$)", RegexOption.IGNORE_CASE)
@@ -110,7 +117,13 @@ internal object TrackMatchScore {
         if (candidate.ids["yt"].isNullOrBlank() && candidate.ids["ytm"].isNullOrBlank()) return null
         val sourceMs = track.durationMs ?: return null
         val candidateMs = candidate.durationMs ?: return null
-        if (sourceMs <= 0 || candidateMs <= 0 || abs(sourceMs - candidateMs) > MAX_DURATION_DELTA_MS) return null
+        if (sourceMs <= 0 || candidateMs <= 0) return null
+        val lengthDelta = abs(sourceMs - candidateMs)
+        val sameLength = lengthDelta <= MAX_DURATION_DELTA_MS
+        val setLength =
+            sourceMs >= MIN_LIVE_SET_DURATION_MS && candidateMs >= MIN_LIVE_SET_DURATION_MS &&
+                lengthDelta <= sourceMs * LIVE_SET_LENGTH_TOLERANCE
+        if (!sameLength && !setLength) return null
         val sourceArtist = performerCredits(track).firstOrNull() ?: return null
         val normalizedArtist = foldLatinAccents(normalizeText(sourceArtist.replace(topicSuffix, "")))
         if (normalizedArtist in unavailableArtists) return null
@@ -127,11 +140,15 @@ internal object TrackMatchScore {
             return null
         }
         val sourceTitle = foldLatinAccents(normalize(track.title))
-        val candidateTitle = foldLatinAccents(normalize(candidate.title))
+        val candidateTitle =
+            foldLatinAccents(normalize(candidate.title)).let { title ->
+                title.replace(presenterPrefix, "").takeIf { it.startsWith("$normalizedArtist ") } ?: title
+            }
         if (sourceMs >= MIN_LIVE_SET_DURATION_MS && candidateMs >= MIN_LIVE_SET_DURATION_MS &&
             sourceTitle.startsWith("$normalizedArtist ") && candidateTitle.startsWith("$normalizedArtist ") &&
             liveSetWords.containsMatchIn(sourceTitle) && liveSetWords.containsMatchIn(candidateTitle) &&
-            eventYear.findAll(sourceTitle).map { it.value }.toSet() == eventYear.findAll(candidateTitle).map { it.value }.toSet()
+            eventYear.findAll(sourceTitle).map { it.value }.toSet() == eventYear.findAll(candidateTitle).map { it.value }.toSet() &&
+            (sameLength || sameDatedEvent(sourceTitle, candidateTitle))
         ) {
             val titleSimilarity = textSimilarity(sourceTitle, candidateTitle)
             if (titleSimilarity >= MIN_TITLE_SIMILARITY && versionsCompatible(sourceTitle, candidateTitle)) {
@@ -143,7 +160,8 @@ internal object TrackMatchScore {
         val title = normalize(credit.groupValues[2])
         val titleSimilarity = textSimilarity(recordingTitle(track), title)
         if (normalizedArtist == performer && titleSimilarity >= MIN_TITLE_SIMILARITY &&
-            versionsCompatible(recordingTitle(track), title)
+            versionsCompatible(recordingTitle(track), title) &&
+            (sameLength || sameDatedEvent(recordingTitle(track), title))
         ) {
             return Evidence(titleSimilarity, CERTAIN, durationScore(sourceMs, candidateMs))
         }
@@ -165,6 +183,15 @@ internal object TrackMatchScore {
             return null
         }
         return Evidence(CERTAIN, CERTAIN, durationScore(sourceMs, candidateMs))
+    }
+
+    // Without matching lengths a similar title is not enough: the event words and year must be the same.
+    private fun sameDatedEvent(
+        a: String,
+        b: String,
+    ): Boolean {
+        val event = liveSetEvent(a)
+        return eventYear.containsMatchIn(event) && event == liveSetEvent(b)
     }
 
     private fun liveSetEvent(title: String): String =
