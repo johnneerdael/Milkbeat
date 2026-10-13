@@ -236,21 +236,30 @@ class AndroidAccountSignInViewModelTest {
             assertThat(vm.state.value).isEqualTo(AndroidAccountSignInState.OfferDownload)
         }
 
-    @Test fun `a download started before the process was recreated is not started again`() =
+    @Test fun `after process recreation a landed download goes on to the chooser and an unfinished one is offered again`() =
         runTest(dispatcher) {
             every { installer.canInstall() } returns true
             coEvery { installer.install(any()) } returns true
+            every { microG.installedAt() } returns 1_000L
             val saved = SavedStateHandle(mapOf(PLUGIN_ARG to plugin.id, METHOD_ARG to "google", DOWNLOAD_MICROG_ARG to true))
             AndroidAccountSignInViewModel(saved, registry, accounts, microG, installer).start()
             runCurrent()
             coVerify(exactly = 1) { installer.install(any()) }
 
-            // Android restores the route with the same saved state in a new process.
-            val restored = AndroidAccountSignInViewModel(saved, registry, accounts, microG, installer)
-            restored.start()
+            // Android restores the route with the same saved state in a new process; the update did not land.
+            val unfinished = AndroidAccountSignInViewModel(saved, registry, accounts, microG, installer)
+            unfinished.start()
             runCurrent()
+            assertThat(unfinished.state.value).isEqualTo(AndroidAccountSignInState.OfferDownload)
+            unfinished.onResumed()
+            assertThat(unfinished.state.value).isEqualTo(AndroidAccountSignInState.OfferDownload)
+            coVerify(exactly = 1) { installer.install(any()) }
 
-            assertThat(restored.state.value).isEqualTo(AndroidAccountSignInState.ChooseAccount(chooser))
+            // This time the installer finished before the process went.
+            every { microG.installedAt() } returns 2_000L
+            val landed = AndroidAccountSignInViewModel(saved, registry, accounts, microG, installer)
+            landed.start()
+            assertThat(landed.state.value).isEqualTo(AndroidAccountSignInState.ChooseAccount(chooser))
             coVerify(exactly = 1) { installer.install(any()) }
         }
 

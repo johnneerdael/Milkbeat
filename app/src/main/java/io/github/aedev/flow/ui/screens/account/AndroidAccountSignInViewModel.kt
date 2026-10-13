@@ -114,9 +114,11 @@ class AndroidAccountSignInViewModel
         private val savedState = savedStateHandle
 
         // Until the installer reports this download done, the MicroG already installed must not count as the update.
-        // A download started before the process was recreated counts as done: the installer's result is gone with the
-        // old process, and asking again could loop, so the installed MicroG is then judged as on any other sign-in.
-        private var downloadInstalled = savedStateHandle.get<Boolean>(DOWNLOAD_STARTED_KEY) == true
+        // The installer's report is lost with the process, so a recreated screen compares MicroG's install time with
+        // the one saved when the download started: changed, the update landed; unchanged, the listener is offered the
+        // download again rather than having it start by itself, which could loop.
+        private val downloadBaseline: Long? = savedStateHandle[DOWNLOAD_BASELINE_KEY]
+        private var downloadInstalled = downloadBaseline != null && microG.installedAt()?.let { it != downloadBaseline } == true
 
         /** The method as the installed plugin declares it now; an update can change it while the screen is open. */
         val method: AndroidAccountMethod?
@@ -180,9 +182,13 @@ class AndroidAccountSignInViewModel
                 }
 
                 downloadMicroG && installer.isAvailable && !downloadInstalled -> {
-                    savedState[DOWNLOAD_STARTED_KEY] = true
                     offered = AndroidAccountSignInState.OfferDownload
-                    install()
+                    if (downloadBaseline != null) {
+                        _state.value = AndroidAccountSignInState.OfferDownload
+                    } else {
+                        savedState[DOWNLOAD_BASELINE_KEY] = microG.installedAt() ?: NOT_INSTALLED
+                        install()
+                    }
                 }
 
                 !microG.installed() -> {
@@ -410,4 +416,5 @@ class AndroidAccountSignInViewModel
             (error as? PluginCallException)?.error?.let { (it.userMessage ?: it.message).takeIf(String::isNotBlank) }
     }
 
-private const val DOWNLOAD_STARTED_KEY = "microgDownloadStarted"
+private const val DOWNLOAD_BASELINE_KEY = "microgDownloadBaseline"
+private const val NOT_INSTALLED = -1L
