@@ -11,7 +11,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import nl.neerdael.milkbeat.catalog.EntityKind
 import nl.neerdael.milkbeat.catalog.EntityRef
 import nl.neerdael.milkbeat.catalog.PageRequest
@@ -23,10 +26,12 @@ import nl.neerdael.milkbeat.plugin.PluginOperations
 import nl.neerdael.milkbeat.plugin.Roles
 import okhttp3.OkHttpClient
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
+import java.security.MessageDigest
 import java.util.Locale
 
 @RunWith(AndroidJUnit4::class)
@@ -141,6 +146,57 @@ class PluginRuntimeWarmUpDeviceTest {
                 assertEquals("prepared", runtime.call(PluginOperations.entity, page).id)
             } finally {
                 runtime.close()
+                scope.cancel()
+                directory.deleteRecursively()
+            }
+        }
+
+    @Test
+    fun closingTheRuntimeEndsAnIsolatedWarmUpBeforeItCachesAnything(): Unit =
+        runBlocking {
+            val context = ApplicationProvider.getApplicationContext<Context>()
+            val directory = File(context.cacheDir, "runtime-warm-up-closed").apply { mkdirs() }
+            val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+            val manifest =
+                PluginManifest(
+                    format = 1,
+                    api = ApiRange(8, 8),
+                    id = "dev.milkbeat.warm-up-closed",
+                    name = "Closed warm-up probe",
+                    version = "0.0.1",
+                    versionCode = 1,
+                    roles = Roles(metadata = MetadataRole(setOf(MetadataSurface.ENTITY), setOf(EntityKind.PLAYLIST), "fixture")),
+                )
+            val plugin = InstalledPlugin(manifest, "test", "test://warm-up-closed", 0, emptyList(), emptyList())
+            File(directory, "plugin.js").writeText(
+                """
+                var __mbDispatch = async (path, json) => {
+                    if (path === 'lifecycle.warmUp') {
+                        const until = Date.now() + 25000;
+                        while (Date.now() < until) {}
+                        await __mbHost('code.load', JSON.stringify({ key: 'prepared', source: "globalThis.prepared = 'prepared';" }));
+                        return JSON.stringify({ result: {} });
+                    }
+                    return JSON.stringify({ result: { id: 'cold', title: 'Warm-up probe', blocks: [] } });
+                };
+                """.trimIndent(),
+            )
+            val api =
+                PluginHostApi(plugin, directory, File(directory, "data"), OkHttpClient(), Locale::getDefault, WebLoginRefresher(context))
+            val code = File(directory, "code")
+            val runtime = PluginRuntime(plugin, directory, api, PluginBrowser(context, emptyList(), api::asset), CodeCache(code), scope)
+            try {
+                val warming = scope.launch { runtime.warmUp() }
+                // Past the persistent attempt's 20 s, into the isolated run's 25 s of work.
+                delay(27_000)
+
+                runtime.close()
+                withTimeout(60_000) { warming.join() }
+
+                val prepared =
+                    MessageDigest.getInstance("SHA-256").digest("prepared".toByteArray()).joinToString("") { "%02x".format(it) }
+                assertFalse("A closed runtime's warm-up must not reach the code cache", File(code, "$prepared.qjsbc").exists())
+            } finally {
                 scope.cancel()
                 directory.deleteRecursively()
             }

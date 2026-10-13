@@ -21,7 +21,9 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
@@ -101,6 +103,12 @@ internal class PluginRuntime(
     private var disabled = false
     private var idleJob: Job? = null
 
+    // The isolated warm-up under way, which closing the runtime ends: a removed or updated plugin must not keep
+    // its memory, host calls or code cache for the rest of the warm-up's budget.
+    private val isolatedLock = Any()
+    private var isolatedWarmUp: Job? = null
+    private var closing = false
+
     suspend fun <Request, Response> call(
         operation: PluginOperation<Request, Response>,
         request: Request,
@@ -165,14 +173,23 @@ internal class PluginRuntime(
             // and never be cached. It finishes in an isolated context instead, off the playback owner, and what it
             // compiles reaches the shared code cache that the persistent context loads from on its next call.
         }
-        val warm = start(WARM_UP_MEMORY_LIMIT, WARM_UP_TIMEOUT_MS)
+        val warming = currentCoroutineContext().job
+        synchronized(isolatedLock) {
+            if (closing) return
+            isolatedWarmUp = warming
+        }
         try {
-            invoke(warm, PluginOperations.warmUp, Unit, WARM_UP_TIMEOUT_MS)
-            Log.i(TAG, "Warm-up of ${plugin.id} took ${SystemClock.elapsedRealtime() - startedMs} ms")
-        } catch (e: PluginCallException) {
-            if (e.error.code != PluginErrorCode.UNSUPPORTED) Log.w(TAG, "Warm-up of ${plugin.id} failed: ${e.error.message}")
+            val warm = start(WARM_UP_MEMORY_LIMIT, WARM_UP_TIMEOUT_MS)
+            try {
+                invoke(warm, PluginOperations.warmUp, Unit, WARM_UP_TIMEOUT_MS)
+                Log.i(TAG, "Warm-up of ${plugin.id} took ${SystemClock.elapsedRealtime() - startedMs} ms")
+            } catch (e: PluginCallException) {
+                if (e.error.code != PluginErrorCode.UNSUPPORTED) Log.w(TAG, "Warm-up of ${plugin.id} failed: ${e.error.message}")
+            } finally {
+                withContext(NonCancellable) { warm.close() }
+            }
         } finally {
-            warm.close()
+            synchronized(isolatedLock) { if (isolatedWarmUp === warming) isolatedWarmUp = null }
         }
     }
 
@@ -187,6 +204,10 @@ internal class PluginRuntime(
     }
 
     suspend fun close() {
+        synchronized(isolatedLock) {
+            closing = true
+            isolatedWarmUp
+        }?.cancel(CancellationException("Plugin runtime closed"))
         idleJob?.cancel()
         contexts.close()
         browser.closeAll()
