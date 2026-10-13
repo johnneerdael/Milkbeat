@@ -7,6 +7,7 @@ Every merged change to `main` publishes a new release with its own notes on [Git
 - The **YouTube** plugin (code **563**) is now the one YouTube provider: YouTube Music Home with mood chips, search, pages, library and radio, plus YouTube playback and music videos. It gets the **YouTube** tab also signed out, and holds it when the old plugins are still installed. [YouTube](providers.md#youtube)
 - The **YouTube Music** and **YouTube Video** plugins are retired and their codes (728, 416, 494, 932, 304 and 744) removed. An installed copy keeps working without updates; its tab and Settings → Plugins page offer **Add YouTube**. [Retired plugins](providers.md#retired-plugins)
 - Signed out, the YouTube tab and Settings → Plugins → YouTube offer **Download MicroG-RE-TV** in the stable GitHub build, which installs the latest MicroG-RE-TV and continues to sign-in. [Sign in](providers.md#sign-in)
+- **YouTube 0.1.4** plays a stream that YouTube's TV player refuses through YouTube's other players, and leaves the TV player out for 30 minutes. [YouTube](providers.md#youtube)
 
 ## Playlist syncing to YouTube removed
 
