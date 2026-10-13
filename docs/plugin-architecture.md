@@ -675,6 +675,12 @@ OEM pickers intact. Launch directly from Milkbeat so selection also makes the ac
 on API 26+; MicroG's forwarding picker changes the launching package.
 For each declared identity it asks `AccountManager.getAuthToken`
 for `oauth2:` + the `youtube` and `youtube.force-ssl` scopes, with the option `overridePackage` naming the official app.
+Each request first binds MicroG's exported `GmsCommonService` (action `app.revanced.android.gms.common.service.START`,
+in the process that hosts its authenticator) and releases it when the request ends, waiting at most five seconds for
+the connection. TCL's boot manager (`TclAppBoot`) refuses to start a stopped MicroG for the account service's own
+authenticator binding (TCL app-op `AUTO_START`), which fails the request with "bind failure"; a binding from Milkbeat
+in the foreground starts it. TCL also refuses that binding from a background app (`ASSOC_START`), so a token refresh
+during background playback can still fail while MicroG is stopped.
 A prompt MicroG returns is launched once; closing it without a grant ends the attempt as declined. Only when every identity is granted
 does `MicroGAccounts` bind the account name, the plugin's signer and the confirmed identities to the method, and call
 `signIn.completeAccount`. The binding is provisional until the plugin completes: it serves tokens only in the run that made
