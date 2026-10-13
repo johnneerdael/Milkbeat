@@ -4,7 +4,7 @@ Every merged change to `main` publishes a new release with its own notes on [Git
 
 ## Milkbeat 1.0
 
-Milkbeat 1.0 follows the 0.9 builds directly: it installs over 0.9 with your settings, sign-ins, plugins and downloads intact, and the in-app updater offers it like any other update. It is the first release with the single **YouTube** plugin and without playlist syncing, both described below.
+Milkbeat 1.0 follows the 0.9 builds directly: it installs over 0.9 with your settings, sign-ins, plugins and downloads intact, and the in-app updater offers it like any other update. It includes everything from the 0.9 builds, among them the single **YouTube** plugin and the removal of playlist syncing, both described below.
 
 ## YouTube replaces YouTube Music and YouTube Video
 
