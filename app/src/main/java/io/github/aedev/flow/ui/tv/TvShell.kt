@@ -74,6 +74,7 @@ fun TvShell(
     badged: TvDestination? = null,
     musicTabs: TvMusicTabsState = TvMusicTabsState(),
     onSelectMusic: (MusicSource) -> Unit = {},
+    pluginLinkPending: Boolean = false,
 ) {
     val dimens = LocalTvDimens.current
     val backStack by navController.currentBackStack.collectAsState()
@@ -196,6 +197,7 @@ fun TvShell(
             Box(modifier = Modifier.weight(1f)) {
                 TvNavHost(
                     navController = navController,
+                    pluginLinkPending = pluginLinkPending,
                     onPlayTrack = onPlayTrack,
                     onPlayMix = onPlayMix,
                     onPlayCollection = onPlayCollection,

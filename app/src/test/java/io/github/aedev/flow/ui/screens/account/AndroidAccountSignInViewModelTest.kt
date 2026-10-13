@@ -212,6 +212,11 @@ class AndroidAccountSignInViewModelTest {
             installedCount.value = 1
             runCurrent()
             assertThat(vm.state.value).isEqualTo(AndroidAccountSignInState.ChooseAccount(chooser))
+            // A retry after the chooser was dismissed goes back to it without downloading again.
+            vm.onAccountChosen(null)
+            vm.retry()
+            assertThat(vm.state.value).isEqualTo(AndroidAccountSignInState.ChooseAccount(chooser))
+            coVerify(exactly = 1) { installer.install(any()) }
         }
 
     @Test fun `the download button asks for the install permission and offers the download again`() =

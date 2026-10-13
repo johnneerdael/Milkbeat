@@ -14,6 +14,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -51,6 +52,7 @@ fun TvSettingsScreen(
     onOpenPluginSignIn: (pluginId: String, methodId: String, downloadMicroG: Boolean) -> Unit = { _, _, _ -> },
     initialCategory: TvSettingsCategory = TvSettingsCategory.PLUGINS,
     initiallyFocusPane: Boolean = false,
+    pluginLinkPending: Boolean = false,
 ) {
     val context = LocalContext.current
     val playerPreferences = remember { PlayerPreferences(context.applicationContext) }
@@ -58,6 +60,10 @@ fun TvSettingsScreen(
     var paneFocusRequests by remember { mutableIntStateOf(0) }
     var pluginHomeRevision by rememberSaveable { mutableIntStateOf(0) }
     val categoryFocus = remember { TvSettingsCategory.entries.associateWith { FocusRequester() } }
+    // Plugins fetches a pending plugin link; another restored category would leave it waiting unseen.
+    LaunchedEffect(pluginLinkPending) {
+        if (pluginLinkPending) selectedCategory = TvSettingsCategory.PLUGINS
+    }
     val dimens = LocalTvDimens.current
 
     TvScreenScaffold(

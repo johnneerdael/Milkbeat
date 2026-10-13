@@ -79,7 +79,7 @@ class ProviderNoticeViewModel
                 )
             }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
-        /** Hands [code] to Settings, Plugins, which fetches it and asks the listener to install it. */
+        /** Hands [code] to Settings, Plugins as a plugin link: the app opens it there and asks the listener to install it. */
         fun addReplacement(code: String) {
             links.offer(Uri.parse("milkbeat://add-plugin?url=$code"))
         }

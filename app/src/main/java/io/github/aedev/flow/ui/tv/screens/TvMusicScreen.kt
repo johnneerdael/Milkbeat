@@ -94,10 +94,7 @@ fun TvMusicScreen(
                     TvProviderNotice(
                         notice = it,
                         onSignIn = onSignIn,
-                        onAddReplacement = { code ->
-                            noticeViewModel.addReplacement(code)
-                            onOpenPlugins()
-                        },
+                        onAddReplacement = noticeViewModel::addReplacement,
                     )
                 }
             },

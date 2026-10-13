@@ -257,6 +257,7 @@ fun FlowTvApp(
                 } else if (video == null) {
                     TvShell(
                         navController = navController,
+                        pluginLinkPending = pluginLinkPending,
                         onPlayTrack = ::playTrack,
                         onPlayMix = ::playMix,
                         onPlayCollection = ::playCollection,

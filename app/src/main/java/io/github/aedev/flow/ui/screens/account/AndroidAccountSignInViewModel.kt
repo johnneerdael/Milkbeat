@@ -175,7 +175,7 @@ class AndroidAccountSignInViewModel
                     _state.value = AndroidAccountSignInState.UnsupportedBuild
                 }
 
-                downloadMicroG && installer.isAvailable -> {
+                downloadMicroG && installer.isAvailable && !downloadInstalled -> {
                     offered = AndroidAccountSignInState.OfferDownload
                     install()
                 }

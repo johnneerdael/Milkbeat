@@ -40,6 +40,7 @@ fun TvNavHost(
     onOpenPlugins: () -> Unit,
     musicTabs: TvMusicTabsState,
     modifier: Modifier = Modifier,
+    pluginLinkPending: Boolean = false,
 ) {
     NavHost(
         navController = navController,
@@ -131,6 +132,7 @@ fun TvNavHost(
         }
         composable(TvDestination.SETTINGS.route) {
             TvSettingsScreen(
+                pluginLinkPending = pluginLinkPending,
                 onOpenPluginSignIn = {
                     plugin,
                     method,
