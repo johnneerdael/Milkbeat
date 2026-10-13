@@ -1030,7 +1030,11 @@ run that occupies a physical device, and the resulting diff is thousands of line
   warm-up call runs with the isolated warm-up's 256 MB (`WARM_UP_MEMORY_LIMIT`), then collects
   garbage and restores the call limit, or retained state plus 32 MB headroom (logged as a warning)
   when the prepared state itself exceeds it. Never extend the warm-up's time budget, since foreground
-  calls queue behind it on the playback owner. `PluginRuntimeWarmUpDeviceTest` covers this.
+  calls queue behind it on the playback owner. A persistent warm-up that times out runs again in an
+  isolated context (`WARM_UP_TIMEOUT_MS`, `WARM_UP_MEMORY_LIMIT`, own thread); what it compiles with
+  `mb.code.load` reaches the shared `CodeCache`, which the persistent context loads on its next call.
+  Without this a YouTube player too slow to prepare in 20 s (TCL ARMv7: about 25 s) is never cached and
+  signed-in TV streams fall back to anonymous clients. `PluginRuntimeWarmUpDeviceTest` covers both.
   QuickJS builds `MemoryUsage` from native code, so `app/proguard-rules.pro` keeps its constructor; device
   tests run unshrunk and cannot catch a stripped JNI target. After using another natively constructed
   library class, check it in a shrunk `:app:assembleGithubNightly` APK (`apkanalyzer dex packages`).

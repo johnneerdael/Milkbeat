@@ -156,10 +156,14 @@ internal class PluginRuntime(
                 // the playback owner. It keeps the call's time budget: foreground calls queue behind it there.
                 call(PluginOperations.warmUp, Unit, WARM_UP_MEMORY_LIMIT)
                 Log.i(TAG, "Persistent warm-up of ${plugin.id} took ${SystemClock.elapsedRealtime() - startedMs} ms")
+                return
             } catch (e: PluginCallException) {
                 if (e.error.code != PluginErrorCode.UNSUPPORTED) Log.w(TAG, "Warm-up of ${plugin.id} failed: ${e.error.code}")
+                if (e.error.code != PluginErrorCode.TIMEOUT) return
             }
-            return
+            // A preparation longer than a call, such as a player's solvers on a slow TV, would time out on every start
+            // and never be cached. It finishes in an isolated context instead, off the playback owner, and what it
+            // compiles reaches the shared code cache that the persistent context loads from on its next call.
         }
         val warm = start(WARM_UP_MEMORY_LIMIT, WARM_UP_TIMEOUT_MS)
         try {

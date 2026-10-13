@@ -89,4 +89,60 @@ class PluginRuntimeWarmUpDeviceTest {
                 directory.deleteRecursively()
             }
         }
+
+    @Test
+    fun anApi8PreparationLongerThanACallFinishesInIsolationAndReachesTheCodeCache(): Unit =
+        runBlocking {
+            val context = ApplicationProvider.getApplicationContext<Context>()
+            val directory = File(context.cacheDir, "runtime-warm-up-slow").apply { mkdirs() }
+            val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+            val manifest =
+                PluginManifest(
+                    format = 1,
+                    api = ApiRange(8, 8),
+                    id = "dev.milkbeat.warm-up-slow",
+                    name = "Slow warm-up probe",
+                    version = "0.0.1",
+                    versionCode = 1,
+                    roles = Roles(metadata = MetadataRole(setOf(MetadataSurface.ENTITY), setOf(EntityKind.PLAYLIST), "fixture")),
+                )
+            val plugin = InstalledPlugin(manifest, "test", "test://warm-up-slow", 0, emptyList(), emptyList())
+            // Like a slow TV preparing a player's solvers: the work outlasts a call's 20 s, and its result is cached code.
+            File(directory, "plugin.js").writeText(
+                """
+                const load = async (source) => JSON.parse(await __mbHost('code.load', JSON.stringify(source ? { key: 'prepared', source } : { key: 'prepared' })));
+                var __mbDispatch = async (path, json) => {
+                    if (path === 'lifecycle.warmUp') {
+                        const until = Date.now() + 25000;
+                        while (Date.now() < until) {}
+                        await load("globalThis.prepared = 'prepared';");
+                        return JSON.stringify({ result: {} });
+                    }
+                    const cached = await load();
+                    return JSON.stringify({ result: { id: cached.result.loaded ? globalThis.prepared : 'cold', title: 'Warm-up probe', blocks: [] } });
+                };
+                """.trimIndent(),
+            )
+            val api =
+                PluginHostApi(plugin, directory, File(directory, "data"), OkHttpClient(), Locale::getDefault, WebLoginRefresher(context))
+            val runtime =
+                PluginRuntime(
+                    plugin,
+                    directory,
+                    api,
+                    PluginBrowser(context, emptyList(), api::asset),
+                    CodeCache(File(directory, "code")),
+                    scope,
+                )
+            val page = PageRequest(EntityRef(EntityKind.PLAYLIST, "after"))
+            try {
+                runtime.warmUp()
+
+                assertEquals("prepared", runtime.call(PluginOperations.entity, page).id)
+            } finally {
+                runtime.close()
+                scope.cancel()
+                directory.deleteRecursively()
+            }
+        }
 }
