@@ -2,6 +2,10 @@
 
 Every merged change to `main` publishes a new release with its own notes on [GitHub Releases](https://github.com/johnneerdael/Milkbeat/releases). This page summarizes the larger changes.
 
+## Milkbeat 1.0
+
+Milkbeat 1.0 follows the 0.9 builds directly: it installs over 0.9 with your settings, sign-ins, plugins and downloads intact, and the in-app updater offers it like any other update. It includes everything from the 0.9 builds, among them the single **YouTube** plugin and the removal of playlist syncing, both described below.
+
 ## YouTube replaces YouTube Music and YouTube Video
 
 - The **YouTube** plugin (code **563**) is now the one YouTube provider: YouTube Music Home with mood chips, search, pages, library and radio, plus YouTube playback and music videos. It gets the **YouTube** tab also signed out, and holds it when the old plugins are still installed. [YouTube](providers.md#youtube)

@@ -54,6 +54,12 @@ class ReleaseLinkTest {
     }
 
     @Test
+    fun `a new major line is newer than every patch of the old one`() {
+        assertThat(releaseIfNewer("v1.0.0", currentVersion = "0.9.105", sha256 = universalSha)?.version).isEqualTo("1.0.0")
+        assertThat(releaseIfNewer("v0.9.105", currentVersion = "1.0.0", sha256 = universalSha)).isNull()
+    }
+
+    @Test
     fun `checks run shortly after launch, then six hours after the last`() {
         val now = 100_000_000L
 
