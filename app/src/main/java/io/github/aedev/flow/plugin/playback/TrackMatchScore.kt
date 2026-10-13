@@ -146,7 +146,7 @@ internal object TrackMatchScore {
         val candidateTitle = foldLatinAccents(normalize(withoutUploader(presentedTitle(candidate.title, normalizedArtist), candidate)))
         // Anyone can re-upload a set, so the source's credit may name only its uploader: the channel then
         // counts as the performer when both titles open with its name. A promoter's channel opens titles of
-        // other performers' sets too, so on that path the titles must be the same, not merely similar.
+        // other performers' sets too, so on that path the titles, without a trailing channel credit, must be the same.
         val channel =
             foldLatinAccents(
                 normalizeText(
@@ -158,18 +158,23 @@ internal object TrackMatchScore {
                 ),
             ).takeIf { it !in unavailableArtists }
         for (performer in listOfNotNull(normalizedArtist, channel).distinct()) {
-            if (performer != normalizedArtist && sourceTitle != candidateTitle) continue
+            val ownTitle =
+                if (performer == normalizedArtist) {
+                    sourceTitle
+                } else {
+                    foldLatinAccents(normalize(withoutUploader(track.title, candidate))).takeIf { it == candidateTitle } ?: continue
+                }
             if (sourceMs >= MIN_LIVE_SET_DURATION_MS && candidateMs >= MIN_LIVE_SET_DURATION_MS &&
-                sourceTitle.startsWith("$performer ") && candidateTitle.startsWith("$performer ") &&
-                liveSetWords.containsMatchIn(sourceTitle) && liveSetWords.containsMatchIn(candidateTitle) &&
-                eventYear.findAll(sourceTitle).map { it.value }.toSet() == eventYear.findAll(candidateTitle).map { it.value }.toSet() &&
+                ownTitle.startsWith("$performer ") && candidateTitle.startsWith("$performer ") &&
+                liveSetWords.containsMatchIn(ownTitle) && liveSetWords.containsMatchIn(candidateTitle) &&
+                eventYear.findAll(ownTitle).map { it.value }.toSet() == eventYear.findAll(candidateTitle).map { it.value }.toSet() &&
                 (
                     sameLength ||
-                        sameDatedLiveSet(sourceTitle.removePrefix("$performer "), candidateTitle.removePrefix("$performer "))
+                        sameDatedLiveSet(ownTitle.removePrefix("$performer "), candidateTitle.removePrefix("$performer "))
                 )
             ) {
-                val titleSimilarity = textSimilarity(sourceTitle, candidateTitle)
-                if (titleSimilarity >= MIN_TITLE_SIMILARITY && versionsCompatible(sourceTitle, candidateTitle)) {
+                val titleSimilarity = textSimilarity(ownTitle, candidateTitle)
+                if (titleSimilarity >= MIN_TITLE_SIMILARITY && versionsCompatible(ownTitle, candidateTitle)) {
                     return Evidence(titleSimilarity, CERTAIN, durationScore(sourceMs, candidateMs))
                 }
             }

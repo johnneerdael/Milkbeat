@@ -82,6 +82,9 @@ class TrackMatchScoreTest {
         assertThat(TrackMatchScore.best(repostedCassian, listOf(cassianVideo))?.candidate).isSameInstanceAs(cassianVideo)
         assertThat(TrackMatchScore.best(repostedCassian, listOf(cassianVideo.copy(artists = listOf(ArtistCredit("Cassian - Topic"))))))
             .isNotNull()
+        val credited = "CASSIAN Live from New York - Brooklyn Storehouse 2026 Full Set | Cassian"
+        assertThat(TrackMatchScore.best(repostedCassian.copy(title = credited), listOf(cassianVideo.copy(title = credited)))).isNotNull()
+        assertThat(TrackMatchScore.best(repostedCassian.copy(title = credited), listOf(cassianVideo))).isNotNull()
     }
 
     @Test
