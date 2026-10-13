@@ -7,7 +7,7 @@ import java.util.Locale
 import kotlin.math.abs
 
 internal object TrackMatchScore {
-    const val POLICY_VERSION = 4
+    const val POLICY_VERSION = 5
     const val MIN_SCORE = 0.35
     private const val CERTAIN = 1.0
     private const val EARLY_EXIT = 0.95
@@ -21,11 +21,21 @@ internal object TrackMatchScore {
     private const val ISRC = "isrc"
     private const val MIN_LIVE_SET_DURATION_MS = 20 * 60 * 1000L
 
+    // Uploads of one live set differ by intros, outros and trimmed edges, so two sets of 20 minutes or
+    // more may differ by this share of the source's length when artist, event and year all match.
+    private const val LIVE_SET_LENGTH_TOLERANCE = 0.15
+
     private val titleCredit = Regex("^(.+?)\\s*(?:[|@•]|\\s+[-–—:]\\s+)\\s*(.+)$")
     private val trailingUploader = Regex("\\s*[|•]\\s*([^|•]+)$")
     private val liveWord = Regex("\\blive\\b")
     private val liveSetWords = Regex("\\b(?:recorded|live|set|mix|festival|at)\\b")
+
+    // Words that name a live set on their own; "at" only joins a performer to a venue.
+    private val liveSetMarkers = Regex("\\b(?:recorded|live|set|mix|festival)\\b")
     private val eventYear = Regex("\\b(?:19|20)\\d{2}\\b")
+
+    // A promoter's upload credit before the performer, as in "VSNZ pres. Stephan Bodzin - …".
+    private val presenterPrefix = Regex("^\\s*(?:\\S+\\s+)+?(?:pres\\.?|presents)\\s+", RegexOption.IGNORE_CASE)
 
     private val bracketedFeature = Regex("[\\[(]\\s*(?:feat(?:uring)?|ft|with)\\b[^)\\]]*[)\\]]", RegexOption.IGNORE_CASE)
     private val trailingFeature = Regex("\\s+(?:feat(?:uring)?|ft)\\.?\\s+.*?(?=\\s*[\\[(]|\\s+[-–—]\\s+|$)", RegexOption.IGNORE_CASE)
@@ -110,7 +120,13 @@ internal object TrackMatchScore {
         if (candidate.ids["yt"].isNullOrBlank() && candidate.ids["ytm"].isNullOrBlank()) return null
         val sourceMs = track.durationMs ?: return null
         val candidateMs = candidate.durationMs ?: return null
-        if (sourceMs <= 0 || candidateMs <= 0 || abs(sourceMs - candidateMs) > MAX_DURATION_DELTA_MS) return null
+        if (sourceMs <= 0 || candidateMs <= 0) return null
+        val lengthDelta = abs(sourceMs - candidateMs)
+        val sameLength = lengthDelta <= MAX_DURATION_DELTA_MS
+        val setLength =
+            sourceMs >= MIN_LIVE_SET_DURATION_MS && candidateMs >= MIN_LIVE_SET_DURATION_MS &&
+                lengthDelta <= sourceMs * LIVE_SET_LENGTH_TOLERANCE
+        if (!sameLength && !setLength) return null
         val sourceArtist = performerCredits(track).firstOrNull() ?: return null
         val normalizedArtist = foldLatinAccents(normalizeText(sourceArtist.replace(topicSuffix, "")))
         if (normalizedArtist in unavailableArtists) return null
@@ -127,32 +143,42 @@ internal object TrackMatchScore {
             return null
         }
         val sourceTitle = foldLatinAccents(normalize(track.title))
-        val candidateTitle = foldLatinAccents(normalize(candidate.title))
+        val candidateTitle = foldLatinAccents(normalize(withoutUploader(presentedTitle(candidate.title, normalizedArtist), candidate)))
         if (sourceMs >= MIN_LIVE_SET_DURATION_MS && candidateMs >= MIN_LIVE_SET_DURATION_MS &&
             sourceTitle.startsWith("$normalizedArtist ") && candidateTitle.startsWith("$normalizedArtist ") &&
             liveSetWords.containsMatchIn(sourceTitle) && liveSetWords.containsMatchIn(candidateTitle) &&
-            eventYear.findAll(sourceTitle).map { it.value }.toSet() == eventYear.findAll(candidateTitle).map { it.value }.toSet()
+            eventYear.findAll(sourceTitle).map { it.value }.toSet() == eventYear.findAll(candidateTitle).map { it.value }.toSet() &&
+            (
+                sameLength ||
+                    sameDatedLiveSet(sourceTitle.removePrefix("$normalizedArtist "), candidateTitle.removePrefix("$normalizedArtist "))
+            )
         ) {
             val titleSimilarity = textSimilarity(sourceTitle, candidateTitle)
             if (titleSimilarity >= MIN_TITLE_SIMILARITY && versionsCompatible(sourceTitle, candidateTitle)) {
                 return Evidence(titleSimilarity, CERTAIN, durationScore(sourceMs, candidateMs))
             }
         }
-        val credit = titleCredit.matchEntire(candidate.title) ?: return null
+        val presented = presentedTitle(candidate.title, normalizedArtist)
+        val credit = titleCredit.matchEntire(presented) ?: return null
         val performer = foldLatinAccents(normalizeText(credit.groupValues[1]))
-        val title = normalize(credit.groupValues[2])
+        val title = normalize(withoutUploader(credit.groupValues[2], candidate))
         val titleSimilarity = textSimilarity(recordingTitle(track), title)
         if (normalizedArtist == performer && titleSimilarity >= MIN_TITLE_SIMILARITY &&
-            versionsCompatible(recordingTitle(track), title)
+            versionsCompatible(recordingTitle(track), title) &&
+            (sameLength || sameDatedLiveSet(recordingTitle(track), title))
         ) {
             return Evidence(titleSimilarity, CERTAIN, durationScore(sourceMs, candidateMs))
         }
         if (sourceMs < MIN_LIVE_SET_DURATION_MS || candidateMs < MIN_LIVE_SET_DURATION_MS) return null
-        if (!liveWord.containsMatchIn(normalize(track.title)) || !liveWord.containsMatchIn(normalize(candidate.title))) return null
         val sourceCredit = titleCredit.matchEntire(track.title) ?: return null
+        if (!liveWord.containsMatchIn(normalize(sourceCredit.groupValues[2])) ||
+            !liveWord.containsMatchIn(normalize(withoutUploader(credit.groupValues[2], candidate, exactly = true)))
+        ) {
+            return null
+        }
         if (foldLatinAccents(normalizeText(sourceCredit.groupValues[1])) != performer) return null
         if (normalizedArtist != performer && performerSimilarity(track, candidate) < MIN_ARTIST_SIMILARITY) return null
-        if ((variantMarkers.findAll(normalize(track.title)) + variantMarkers.findAll(normalize(candidate.title)))
+        if ((variantMarkers.findAll(normalize(track.title)) + variantMarkers.findAll(normalize(presented)))
                 .any { it.value != "live" && it.value != "mix" }
         ) {
             return null
@@ -167,16 +193,44 @@ internal object TrackMatchScore {
         return Evidence(CERTAIN, CERTAIN, durationScore(sourceMs, candidateMs))
     }
 
+    // The title after a promoter's "pres." credit, only when the credit it introduces is exactly the performer.
+    private fun presentedTitle(
+        title: String,
+        normalizedArtist: String,
+    ): String {
+        val presented = title.replaceFirst(presenterPrefix, "").takeIf { it != title } ?: return title
+        val credit = titleCredit.matchEntire(presented) ?: return title
+        return if (foldLatinAccents(normalizeText(credit.groupValues[1])) == normalizedArtist) presented else title
+    }
+
+    // Without matching lengths a similar title is not enough: both must name a live set, and its event
+    // words and year must be the same.
+    private fun sameDatedLiveSet(
+        a: String,
+        b: String,
+    ): Boolean {
+        val event = liveSetEvent(a)
+        return liveSetMarkers.containsMatchIn(normalize(a)) && liveSetMarkers.containsMatchIn(normalize(b)) &&
+            eventYear.containsMatchIn(event) && event == liveSetEvent(b)
+    }
+
     private fun liveSetEvent(title: String): String =
         foldLatinAccents(normalizeText(title)).replace(liveSetWords, " ").replace(spaces, " ").trim()
 
+    // "| Beatport Live" credits the uploader Beatport and keeps "live" as evidence unless [exactly] asks for
+    // the suffix to be the uploader's name alone, as "| Live" is for an uploader called Live.
     private fun withoutUploader(
         title: String,
         candidate: TrackDescriptor,
+        exactly: Boolean = false,
     ): String {
         val suffix = trailingUploader.find(title) ?: return title
-        val uploader = candidate.artists.firstOrNull()?.name ?: return title
-        return if (liveSetEvent(suffix.groupValues[1]) == foldLatinAccents(normalizeText(uploader))) {
+        val uploader = foldLatinAccents(normalizeText(candidate.artists.firstOrNull()?.name ?: return title))
+        val named = suffix.groupValues[1]
+        val credited =
+            foldLatinAccents(normalizeText(named)) == uploader ||
+                (!exactly && liveSetEvent(named).let { it.isNotEmpty() && it == uploader })
+        return if (credited) {
             title.substring(0, suffix.range.first)
         } else {
             title
