@@ -8,7 +8,8 @@ object ThumbnailUrlResolver {
     private val googleCdnSizePattern = Regex("""w\d+-h\d+""")
     private val googleCdnParamStartPattern = Regex("""=(?:w|s|h)""")
 
-    // SoundCloud serves each artwork and avatar under named sizes; t3000x3000 is the largest.
+    // SoundCloud serves each artwork and avatar under named sizes. The 1080 px cover also feeds session
+    // metadata, so it stays at t1080x1080; the full-screen view gets t3000x3000 from the playback stream.
     private val soundCloudSizePattern =
         Regex(
             """^(https://[a-z0-9-]+\.sndcdn\.com/.+)-(?:large|crop|mini|tiny|small|badge|original|t\d+x\d+)(\.[a-z]+)$""",
@@ -144,7 +145,7 @@ object ThumbnailUrlResolver {
         val match = soundCloudSizePattern.matchEntire(rawUrl) ?: return rawUrl
         val name =
             when {
-                size > 500 -> "t3000x3000"
+                size > 500 -> "t1080x1080"
                 size > 300 -> "t500x500"
                 size > 100 -> "t300x300"
                 else -> "large"

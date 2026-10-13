@@ -94,11 +94,11 @@ class ThumbnailUrlResolverTest {
     }
 
     @Test
-    fun `SoundCloud artwork is sized for its surface, largest for the player`() {
+    fun `SoundCloud artwork is sized for its surface, 1080 for the high resolution cover`() {
         val cover = "https://i1.sndcdn.com/artworks-8YHCyFdWzlsNZyj7-phesTg-large.jpg"
 
         assertThat(ThumbnailUrlResolver.resolveMusicThumbnail("101", cover, 1080))
-            .isEqualTo("https://i1.sndcdn.com/artworks-8YHCyFdWzlsNZyj7-phesTg-t3000x3000.jpg")
+            .isEqualTo("https://i1.sndcdn.com/artworks-8YHCyFdWzlsNZyj7-phesTg-t1080x1080.jpg")
         assertThat(ThumbnailUrlResolver.resolveMusicThumbnail("101", cover.replace("-large", "-t3000x3000"), 256))
             .isEqualTo("https://i1.sndcdn.com/artworks-8YHCyFdWzlsNZyj7-phesTg-t300x300.jpg")
         assertThat(ThumbnailUrlResolver.resolveMusicThumbnail("101", "https://i1.sndcdn.com/avatars-a1-t500x500.png", 400))
