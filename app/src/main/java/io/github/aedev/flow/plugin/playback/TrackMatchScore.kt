@@ -148,7 +148,7 @@ internal object TrackMatchScore {
             sourceTitle.startsWith("$normalizedArtist ") && candidateTitle.startsWith("$normalizedArtist ") &&
             liveSetWords.containsMatchIn(sourceTitle) && liveSetWords.containsMatchIn(candidateTitle) &&
             eventYear.findAll(sourceTitle).map { it.value }.toSet() == eventYear.findAll(candidateTitle).map { it.value }.toSet() &&
-            (sameLength || sameDatedEvent(sourceTitle, candidateTitle))
+            (sameLength || sameDatedLiveSet(sourceTitle, candidateTitle))
         ) {
             val titleSimilarity = textSimilarity(sourceTitle, candidateTitle)
             if (titleSimilarity >= MIN_TITLE_SIMILARITY && versionsCompatible(sourceTitle, candidateTitle)) {
@@ -161,7 +161,7 @@ internal object TrackMatchScore {
         val titleSimilarity = textSimilarity(recordingTitle(track), title)
         if (normalizedArtist == performer && titleSimilarity >= MIN_TITLE_SIMILARITY &&
             versionsCompatible(recordingTitle(track), title) &&
-            (sameLength || sameDatedEvent(recordingTitle(track), title))
+            (sameLength || sameDatedLiveSet(recordingTitle(track), title))
         ) {
             return Evidence(titleSimilarity, CERTAIN, durationScore(sourceMs, candidateMs))
         }
@@ -185,13 +185,15 @@ internal object TrackMatchScore {
         return Evidence(CERTAIN, CERTAIN, durationScore(sourceMs, candidateMs))
     }
 
-    // Without matching lengths a similar title is not enough: the event words and year must be the same.
-    private fun sameDatedEvent(
+    // Without matching lengths a similar title is not enough: both must name a live set, and its event
+    // words and year must be the same.
+    private fun sameDatedLiveSet(
         a: String,
         b: String,
     ): Boolean {
         val event = liveSetEvent(a)
-        return eventYear.containsMatchIn(event) && event == liveSetEvent(b)
+        return liveSetWords.containsMatchIn(normalize(a)) && liveSetWords.containsMatchIn(normalize(b)) &&
+            eventYear.containsMatchIn(event) && event == liveSetEvent(b)
     }
 
     private fun liveSetEvent(title: String): String =

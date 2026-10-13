@@ -83,6 +83,14 @@ class LiveSetPerformerTitleMatchTest {
     }
 
     @Test
+    fun `long recordings that do not name a live set keep the ten second length rule`() {
+        val suite = bodzin.copy(title = "Stephan Bodzin - The 2025 Suite", durationMs = 1_500_000L)
+        val upload = promoterUpload.copy(title = "Stephan Bodzin - The 2025 Suite", durationMs = 1_620_000L)
+        assertThat(TrackMatchScore.best(suite, listOf(upload))).isNull()
+        assertThat(TrackMatchScore.best(suite, listOf(upload.copy(durationMs = 1_505_000L)))?.candidate).isNotNull()
+    }
+
+    @Test
     fun `tracks shorter than a set keep the ten second length rule`() {
         val song = bodzin.copy(title = "Stephan Bodzin - Powers of Ten 2025", durationMs = 600_000L)
         val video = promoterUpload.copy(title = "Stephan Bodzin - Powers of Ten 2025", durationMs = 660_000L)
