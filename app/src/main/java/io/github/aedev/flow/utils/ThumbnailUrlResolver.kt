@@ -8,6 +8,14 @@ object ThumbnailUrlResolver {
     private val googleCdnSizePattern = Regex("""w\d+-h\d+""")
     private val googleCdnParamStartPattern = Regex("""=(?:w|s|h)""")
 
+    // SoundCloud serves each artwork and avatar under named sizes. The 1080 px cover also feeds session
+    // metadata, so it stays at t1080x1080; the full-screen view gets t3000x3000 from the playback stream.
+    private val soundCloudSizePattern =
+        Regex(
+            """^(https://[a-z0-9-]+\.sndcdn\.com/.+)-(?:large|crop|mini|tiny|small|badge|original|t\d+x\d+)(\.[a-z]+)$""",
+            RegexOption.IGNORE_CASE,
+        )
+
     fun buildHighQualityYoutubeThumbnail(videoId: String): String {
         val id = videoId.trim()
         return if (id.isEmpty() || LocalMediaIds.isLocal(id)) "" else "https://i.ytimg.com/vi/$id/hq720.jpg"
@@ -86,7 +94,7 @@ object ThumbnailUrlResolver {
                 normalizeVideoThumbnail(id, raw)
             }
 
-            raw.contains("googleusercontent.com") || raw.contains("ggpht.com") -> {
+            raw.contains("googleusercontent.com") || raw.contains("ggpht.com") || soundCloudSizePattern.matches(raw) -> {
                 resizeImageThumbnail(raw, size, size)
             }
 
@@ -126,8 +134,23 @@ object ThumbnailUrlResolver {
         return when {
             isGoogleCdn -> resizeGoogleCdnThumbnail(raw, width, height)
             isYtimg -> resizeYoutubeThumbnail(raw, width ?: height ?: 0)
-            else -> raw
+            else -> resizeSoundCloudArtwork(raw, maxOf(width ?: 0, height ?: 0))
         }
+    }
+
+    private fun resizeSoundCloudArtwork(
+        rawUrl: String,
+        size: Int,
+    ): String {
+        val match = soundCloudSizePattern.matchEntire(rawUrl) ?: return rawUrl
+        val name =
+            when {
+                size > 500 -> "t1080x1080"
+                size > 300 -> "t500x500"
+                size > 100 -> "t300x300"
+                else -> "large"
+            }
+        return "${match.groupValues[1]}-$name${match.groupValues[2]}"
     }
 
     private fun resizeGoogleCdnThumbnail(

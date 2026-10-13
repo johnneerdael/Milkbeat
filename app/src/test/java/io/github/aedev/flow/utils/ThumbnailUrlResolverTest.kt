@@ -92,4 +92,25 @@ class ThumbnailUrlResolverTest {
         const val VIDEO_ID = "dQw4w9WgXcQ"
         const val OTHER_ID = "aBcDeFgHiJk"
     }
+
+    @Test
+    fun `SoundCloud artwork is sized for its surface, 1080 for the high resolution cover`() {
+        val cover = "https://i1.sndcdn.com/artworks-8YHCyFdWzlsNZyj7-phesTg-large.jpg"
+
+        assertThat(ThumbnailUrlResolver.resolveMusicThumbnail("101", cover, 1080))
+            .isEqualTo("https://i1.sndcdn.com/artworks-8YHCyFdWzlsNZyj7-phesTg-t1080x1080.jpg")
+        assertThat(ThumbnailUrlResolver.resolveMusicThumbnail("101", cover.replace("-large", "-t3000x3000"), 256))
+            .isEqualTo("https://i1.sndcdn.com/artworks-8YHCyFdWzlsNZyj7-phesTg-t300x300.jpg")
+        assertThat(ThumbnailUrlResolver.resolveMusicThumbnail("101", "https://i1.sndcdn.com/avatars-a1-t500x500.png", 400))
+            .isEqualTo("https://i1.sndcdn.com/avatars-a1-t500x500.png")
+    }
+
+    @Test
+    fun `unsized SoundCloud and other hosts keep their url`() {
+        val unsized = "https://i1.sndcdn.com/cover.jpg"
+        val elsewhere = "https://cdn.example/artworks-a1-large.jpg"
+
+        assertThat(ThumbnailUrlResolver.resolveMusicThumbnail("101", unsized, 1080)).isEqualTo(unsized)
+        assertThat(ThumbnailUrlResolver.resolveMusicThumbnail("101", elsewhere, 1080)).isEqualTo(elsewhere)
+    }
 }
