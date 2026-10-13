@@ -98,10 +98,20 @@ class LiveSetPerformerTitleMatchTest {
 
     @Test
     fun `long recordings that do not name a live set keep the ten second length rule`() {
-        val suite = bodzin.copy(title = "Stephan Bodzin - The 2025 Suite", durationMs = 1_500_000L)
-        val upload = promoterUpload.copy(title = "Stephan Bodzin - The 2025 Suite", durationMs = 1_620_000L)
-        assertThat(TrackMatchScore.best(suite, listOf(upload))).isNull()
-        assertThat(TrackMatchScore.best(suite, listOf(upload.copy(durationMs = 1_505_000L)))?.candidate).isNotNull()
+        for (name in listOf("The 2025 Suite", "Christmas at Home 2025")) {
+            val piece = bodzin.copy(title = "Stephan Bodzin - $name", durationMs = 1_500_000L)
+            val upload = promoterUpload.copy(title = "Stephan Bodzin - $name", durationMs = 1_350_000L)
+            assertThat(TrackMatchScore.best(piece, listOf(upload))).isNull()
+            assertThat(TrackMatchScore.best(piece, listOf(upload.copy(durationMs = 1_505_000L)))?.candidate).isNotNull()
+        }
+    }
+
+    @Test
+    fun `a promoter upload matches a set whose title leaves the performer to its credits`() {
+        val set = bodzin.copy(title = "VSNZ Winter Festival 2025 Live Set")
+        val upload = promoterUpload.copy(title = "VSNZ pres. STEPHAN BODZIN - VSNZ Winter Festival 2025 Live Set")
+        assertThat(TrackMatchScore.best(set, listOf(upload))?.candidate).isEqualTo(upload)
+        assertThat(TrackMatchScore.best(set, listOf(upload.copy(title = upload.title.replace("BODZIN", "BODZIN Tribute"))))).isNull()
     }
 
     @Test

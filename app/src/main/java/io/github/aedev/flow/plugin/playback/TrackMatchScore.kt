@@ -29,6 +29,9 @@ internal object TrackMatchScore {
     private val trailingUploader = Regex("\\s*[|•]\\s*([^|•]+)$")
     private val liveWord = Regex("\\blive\\b")
     private val liveSetWords = Regex("\\b(?:recorded|live|set|mix|festival|at)\\b")
+
+    // Words that name a live set on their own; "at" only joins a performer to a venue.
+    private val liveSetMarkers = Regex("\\b(?:recorded|live|set|mix|festival)\\b")
     private val eventYear = Regex("\\b(?:19|20)\\d{2}\\b")
 
     // A promoter's upload credit before the performer, as in "VSNZ pres. Stephan Bodzin - …".
@@ -152,7 +155,7 @@ internal object TrackMatchScore {
                 return Evidence(titleSimilarity, CERTAIN, durationScore(sourceMs, candidateMs))
             }
         }
-        val credit = titleCredit.matchEntire(candidate.title) ?: return null
+        val credit = titleCredit.matchEntire(presentedTitle(candidate.title, normalizedArtist)) ?: return null
         val performer = foldLatinAccents(normalizeText(credit.groupValues[1]))
         val title = normalize(credit.groupValues[2])
         val titleSimilarity = textSimilarity(recordingTitle(track), title)
@@ -199,7 +202,7 @@ internal object TrackMatchScore {
         b: String,
     ): Boolean {
         val event = liveSetEvent(a)
-        return liveSetWords.containsMatchIn(normalize(a)) && liveSetWords.containsMatchIn(normalize(b)) &&
+        return liveSetMarkers.containsMatchIn(normalize(a)) && liveSetMarkers.containsMatchIn(normalize(b)) &&
             eventYear.containsMatchIn(event) && event == liveSetEvent(b)
     }
 
