@@ -762,12 +762,14 @@ revision must pass the configured ktlint rules.
   API 9 for its encrypted audio. Stable YouTube Music 0.3.1 / versionCode 16 uses code 728; Preview
   keeps code 494 pinned to 0.2.9-preview.1 / versionCode 14, so stable docs must not cite 494.
   These three releases target API 10 and declare no `rangeRequestBytes`. Stable and Preview publish
-  YouTube 0.1.2 / versionCode 3 under code 563; it requires API 11 (MicroG-RE-TV sign-in). Preserve
+  YouTube 0.1.3 / versionCode 4 under code 563; it requires API 11 (MicroG-RE-TV sign-in) and attaches
+  its largest playback artwork. Preserve
   each original signed archive when retrying publication.
   Preview (`.nightly`) update checks return no stable-publication candidates; automatic updates
   and Update all plugins must not replace its pinned packages. Stable hosts retain normal lookup.
   Never promote preview packages through stable metadata or automatic updates.
-  SoundCloud 0.2.0 uses API 5 TV pairing; its stable downloader code remains 089. Preserve
+  Stable and Preview publish SoundCloud 0.2.1 / versionCode 3, which uses API 5 TV pairing and attaches
+  t3000x3000 playback artwork; its stable downloader code remains 089. Preserve
   checkpointed signed bytes when retrying publication after a GitHub promotion failure.
   A stable archive missing from Buzzheavier is restored from its exact signed bytes and its code
   repointed in the stable catalog only; see `docs/plugin-download-codes.md`.
