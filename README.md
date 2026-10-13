@@ -151,7 +151,7 @@ distributed separately from Milkbeat releases, signature-checked and reviewed be
 | SoundCloud | Discover, Stream, Search, Artists, albums, playlists, Liked Songs, history | Available full tracks, matching and stations | — |
 | Deezer | Home, Flow, Search, artists, albums, playlists, library | Account streams and matching | — |
 
-**YouTube 0.1.3** (code **563**, plugin API 11) replaces the retired YouTube Music (728) and
+**YouTube 0.1.4** (code **563**, plugin API 11) replaces the retired YouTube Music (728) and
 YouTube Video (932) plugins; their codes no longer install anything. An installed copy keeps
 working without updates until you remove it.
 [Retired plugins](https://johnneerdael.github.io/Milkbeat/providers/#retired-plugins).
