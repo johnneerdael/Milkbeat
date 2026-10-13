@@ -111,8 +111,12 @@ class AndroidAccountSignInViewModel
         // Opened from a "Download MicroG-RE-TV" button: install the latest release first, even over an installed one.
         private val downloadMicroG: Boolean = savedStateHandle[DOWNLOAD_MICROG_ARG] ?: false
 
+        private val savedState = savedStateHandle
+
         // Until the installer reports this download done, the MicroG already installed must not count as the update.
-        private var downloadInstalled = false
+        // A download started before the process was recreated counts as done: the installer's result is gone with the
+        // old process, and asking again could loop, so the installed MicroG is then judged as on any other sign-in.
+        private var downloadInstalled = savedStateHandle.get<Boolean>(DOWNLOAD_STARTED_KEY) == true
 
         /** The method as the installed plugin declares it now; an update can change it while the screen is open. */
         val method: AndroidAccountMethod?
@@ -176,6 +180,7 @@ class AndroidAccountSignInViewModel
                 }
 
                 downloadMicroG && installer.isAvailable && !downloadInstalled -> {
+                    savedState[DOWNLOAD_STARTED_KEY] = true
                     offered = AndroidAccountSignInState.OfferDownload
                     install()
                 }
@@ -404,3 +409,5 @@ class AndroidAccountSignInViewModel
         private fun failureMessage(error: Exception): String? =
             (error as? PluginCallException)?.error?.let { (it.userMessage ?: it.message).takeIf(String::isNotBlank) }
     }
+
+private const val DOWNLOAD_STARTED_KEY = "microgDownloadStarted"

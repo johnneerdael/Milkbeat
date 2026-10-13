@@ -236,6 +236,24 @@ class AndroidAccountSignInViewModelTest {
             assertThat(vm.state.value).isEqualTo(AndroidAccountSignInState.OfferDownload)
         }
 
+    @Test fun `a download started before the process was recreated is not started again`() =
+        runTest(dispatcher) {
+            every { installer.canInstall() } returns true
+            coEvery { installer.install(any()) } returns true
+            val saved = SavedStateHandle(mapOf(PLUGIN_ARG to plugin.id, METHOD_ARG to "google", DOWNLOAD_MICROG_ARG to true))
+            AndroidAccountSignInViewModel(saved, registry, accounts, microG, installer).start()
+            runCurrent()
+            coVerify(exactly = 1) { installer.install(any()) }
+
+            // Android restores the route with the same saved state in a new process.
+            val restored = AndroidAccountSignInViewModel(saved, registry, accounts, microG, installer)
+            restored.start()
+            runCurrent()
+
+            assertThat(restored.state.value).isEqualTo(AndroidAccountSignInState.ChooseAccount(chooser))
+            coVerify(exactly = 1) { installer.install(any()) }
+        }
+
     @Test fun `a build that cannot install MicroG ignores the download request`() {
         every { installer.isAvailable } returns false
         val vm = viewModel(downloadMicroG = true)
