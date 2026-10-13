@@ -206,7 +206,11 @@ class AndroidAccountSignInViewModelTest {
 
             assertThat(vm.state.value).isEqualTo(AndroidAccountSignInState.Installing)
             coVerify(exactly = 1) { installer.install(any()) }
+            // Back from the installer's prompt: the MicroG already there is not the update until the installer says so.
             vm.onResumed()
+            assertThat(vm.state.value).isEqualTo(AndroidAccountSignInState.Installing)
+            installedCount.value = 1
+            runCurrent()
             assertThat(vm.state.value).isEqualTo(AndroidAccountSignInState.ChooseAccount(chooser))
         }
 
@@ -220,6 +224,10 @@ class AndroidAccountSignInViewModelTest {
 
             assertThat(vm.state.value).isEqualTo(AndroidAccountSignInState.InstallPermission(permission))
             vm.onLaunched()
+            assertThat(vm.state.value).isEqualTo(AndroidAccountSignInState.OfferDownload)
+            // Back from the setting without the permission: still offering the download, not signing in.
+            vm.onInstallPermissionClosed()
+            vm.onResumed()
             assertThat(vm.state.value).isEqualTo(AndroidAccountSignInState.OfferDownload)
         }
 

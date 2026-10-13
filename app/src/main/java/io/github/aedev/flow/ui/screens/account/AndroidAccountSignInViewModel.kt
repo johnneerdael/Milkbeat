@@ -111,6 +111,9 @@ class AndroidAccountSignInViewModel
         // Opened from a "Download MicroG-RE-TV" button: install the latest release first, even over an installed one.
         private val downloadMicroG: Boolean = savedStateHandle[DOWNLOAD_MICROG_ARG] ?: false
 
+        // Until the installer reports this download done, the MicroG already installed must not count as the update.
+        private var downloadInstalled = false
+
         /** The method as the installed plugin declares it now; an update can change it while the screen is open. */
         val method: AndroidAccountMethod?
             get() =
@@ -152,7 +155,12 @@ class AndroidAccountSignInViewModel
                 }
             }
             // The installer's success can land after the screen resumed from its prompt.
-            viewModelScope.launch { installer.installed.drop(1).collect { onResumed() } }
+            viewModelScope.launch {
+                installer.installed.drop(1).collect {
+                    downloadInstalled = true
+                    onResumed()
+                }
+            }
         }
 
         fun start() {
@@ -234,7 +242,8 @@ class AndroidAccountSignInViewModel
                     _state.value == AndroidAccountSignInState.InstallFailed ||
                     _state.value == AndroidAccountSignInState.MicroGMissing ||
                     _state.value == AndroidAccountSignInState.MicroGOutdated
-            if (waitingForMicroG && microG.installed() && !microG.outdated()) {
+            val downloading = downloadMicroG && installer.isAvailable && !downloadInstalled
+            if (waitingForMicroG && !downloading && microG.installed() && !microG.outdated()) {
                 _state.value = AndroidAccountSignInState.ChooseAccount(microG.chooseAccountIntent())
             }
         }
