@@ -23,6 +23,7 @@ import io.github.aedev.flow.plugin.registry.InstalledPlugin
 import io.github.aedev.flow.plugin.registry.PluginRegistry
 import io.github.aedev.flow.plugin.registry.ProviderSelection
 import io.github.aedev.flow.plugin.runtime.PluginCallException
+import io.github.aedev.flow.updater.MicroGInstaller
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -83,7 +84,11 @@ class TvPluginsViewModel
         val preloadJobs: PlaylistPreloadJobs,
         private val savedState: SavedStateHandle,
         val mirrors: io.github.aedev.flow.plugin.mirror.PlaylistMirrorCoordinator,
+        microGInstaller: MicroGInstaller,
     ) : ViewModel() {
+        /** Whether this build can download and install MicroG-RE-TV for a plugin's Google account sign-in. */
+        val microGDownloadable: Boolean = microGInstaller.isAvailable
+
         private val adding = MutableStateFlow<AddPluginState>(AddPluginState.Idle)
 
         /** Whether this build installs Milkbeat updates itself, so a plugin needing a newer app can point there. */

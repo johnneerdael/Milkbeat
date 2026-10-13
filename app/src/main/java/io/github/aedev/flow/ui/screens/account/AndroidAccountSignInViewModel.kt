@@ -48,6 +48,9 @@ sealed interface AndroidAccountSignInState {
     /** The installed MicroG-RE-TV is too old to sign Milkbeat in; the listener can update it from here. */
     data object OfferUpdate : AndroidAccountSignInState
 
+    /** The listener asked to download the latest MicroG-RE-TV, and is asked again after the install permission. */
+    data object OfferDownload : AndroidAccountSignInState
+
     /** The screen opens the setting that lets Milkbeat install apps with [intent], once. */
     data class InstallPermission(
         val intent: Intent,
@@ -105,6 +108,9 @@ class AndroidAccountSignInViewModel
 
         private val methodId: String? = savedStateHandle[METHOD_ARG]
 
+        // Opened from a "Download MicroG-RE-TV" button: install the latest release first, even over an installed one.
+        private val downloadMicroG: Boolean = savedStateHandle[DOWNLOAD_MICROG_ARG] ?: false
+
         /** The method as the installed plugin declares it now; an update can change it while the screen is open. */
         val method: AndroidAccountMethod?
             get() =
@@ -153,11 +159,30 @@ class AndroidAccountSignInViewModel
             if (_state.value != AndroidAccountSignInState.Starting) return
             val method = method
             when {
-                method == null || method.identities.isEmpty() -> _state.value = AndroidAccountSignInState.Failed()
-                !microG.supported() -> _state.value = AndroidAccountSignInState.UnsupportedBuild
-                !microG.installed() -> _state.value = missing()
-                microG.outdated() -> _state.value = outdated()
-                else -> _state.value = AndroidAccountSignInState.ChooseAccount(microG.chooseAccountIntent())
+                method == null || method.identities.isEmpty() -> {
+                    _state.value = AndroidAccountSignInState.Failed()
+                }
+
+                !microG.supported() -> {
+                    _state.value = AndroidAccountSignInState.UnsupportedBuild
+                }
+
+                downloadMicroG && installer.isAvailable -> {
+                    offered = AndroidAccountSignInState.OfferDownload
+                    install()
+                }
+
+                !microG.installed() -> {
+                    _state.value = missing()
+                }
+
+                microG.outdated() -> {
+                    _state.value = outdated()
+                }
+
+                else -> {
+                    _state.value = AndroidAccountSignInState.ChooseAccount(microG.chooseAccountIntent())
+                }
             }
         }
 
@@ -204,6 +229,7 @@ class AndroidAccountSignInViewModel
             val waitingForMicroG =
                 _state.value == AndroidAccountSignInState.OfferInstall ||
                     _state.value == AndroidAccountSignInState.OfferUpdate ||
+                    _state.value == AndroidAccountSignInState.OfferDownload ||
                     _state.value == AndroidAccountSignInState.Installing ||
                     _state.value == AndroidAccountSignInState.InstallFailed ||
                     _state.value == AndroidAccountSignInState.MicroGMissing ||

@@ -59,7 +59,7 @@ private enum class ProviderRole { AUDIO, VIDEO }
  */
 @Composable
 fun TvPluginsSettingsPane(
-    onSignIn: (pluginId: String, methodId: String) -> Unit,
+    onSignIn: (pluginId: String, methodId: String, downloadMicroG: Boolean) -> Unit,
     onOpenAppUpdates: () -> Unit,
     modifier: Modifier = Modifier,
     homeRevision: Int = 0,
@@ -168,8 +168,14 @@ fun TvPluginsSettingsPane(
                         plugin = plugin,
                         account = state.accounts[plugin.id],
                         playHistory = playHistory,
+                        microGDownloadable = viewModel.microGDownloadable,
+                        replacementInstalled = { id -> state.plugins.any { it.id == id } },
+                        onAddReplacement = { code ->
+                            openPlugin = null
+                            viewModel.fetch(code)
+                        },
                         onPlayHistoryChange = viewModel::setPlayHistoryEnabled,
-                        onSignIn = { method -> onSignIn(plugin.id, method) },
+                        onSignIn = { method, download -> onSignIn(plugin.id, method, download) },
                         onSignOut = { viewModel.signOut(plugin.id) },
                         onRemove = {
                             viewModel.remove(plugin.id)

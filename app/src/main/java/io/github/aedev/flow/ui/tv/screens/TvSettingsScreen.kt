@@ -48,7 +48,7 @@ import io.github.aedev.flow.ui.tv.theme.LocalTvDimens
 @Composable
 fun TvSettingsScreen(
     modifier: Modifier = Modifier,
-    onOpenPluginSignIn: (pluginId: String, methodId: String) -> Unit = { _, _ -> },
+    onOpenPluginSignIn: (pluginId: String, methodId: String, downloadMicroG: Boolean) -> Unit = { _, _, _ -> },
     initialCategory: TvSettingsCategory = TvSettingsCategory.PLUGINS,
     initiallyFocusPane: Boolean = false,
 ) {

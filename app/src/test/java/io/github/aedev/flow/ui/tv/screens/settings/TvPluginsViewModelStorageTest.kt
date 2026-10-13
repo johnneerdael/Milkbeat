@@ -54,6 +54,7 @@ class TvPluginsViewModelStorageTest {
             mockk(relaxed = true),
             SavedStateHandle(),
             mirrors,
+            mockk(relaxed = true),
         )
 
     @Test

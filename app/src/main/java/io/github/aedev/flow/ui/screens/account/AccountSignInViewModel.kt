@@ -36,6 +36,7 @@ import javax.inject.Inject
 /** Navigation arguments of the sign-in route. */
 const val PLUGIN_ARG = "pluginId"
 const val METHOD_ARG = "methodId"
+const val DOWNLOAD_MICROG_ARG = "downloadMicroG"
 
 fun interface LanAddressProvider {
     fun resolve(): String?

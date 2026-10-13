@@ -11,6 +11,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import io.github.aedev.flow.data.model.Video
 import io.github.aedev.flow.data.music.model.MusicTrack
+import io.github.aedev.flow.ui.screens.account.DOWNLOAD_MICROG_ARG
 import io.github.aedev.flow.ui.screens.account.METHOD_ARG
 import io.github.aedev.flow.ui.screens.account.PLUGIN_ARG
 import io.github.aedev.flow.ui.screens.music.CatalogPageViewModel
@@ -54,6 +55,7 @@ fun TvNavHost(
                 onOpen = { entity, source -> navController.navigate(TvRoutes.catalog(entity, source.providerId)) },
                 onOpenPlugins = onOpenPlugins,
                 onOpenMusicFolders = { navController.navigate(TvRoutes.MUSIC_FOLDERS_SETTINGS) },
+                onSignIn = { plugin, method, download -> navController.navigate(TvRoutes.pluginSignIn(plugin, method, download)) },
                 modifier = Modifier.fillMaxSize(),
             )
         }
@@ -117,13 +119,25 @@ fun TvNavHost(
             TvSettingsScreen(
                 initialCategory = TvSettingsCategory.MUSIC_FOLDERS,
                 initiallyFocusPane = true,
-                onOpenPluginSignIn = { plugin, method -> navController.navigate(TvRoutes.pluginSignIn(plugin, method)) },
+                onOpenPluginSignIn = {
+                    plugin,
+                    method,
+                    download,
+                    ->
+                    navController.navigate(TvRoutes.pluginSignIn(plugin, method, download))
+                },
                 modifier = Modifier.fillMaxSize(),
             )
         }
         composable(TvDestination.SETTINGS.route) {
             TvSettingsScreen(
-                onOpenPluginSignIn = { plugin, method -> navController.navigate(TvRoutes.pluginSignIn(plugin, method)) },
+                onOpenPluginSignIn = {
+                    plugin,
+                    method,
+                    download,
+                    ->
+                    navController.navigate(TvRoutes.pluginSignIn(plugin, method, download))
+                },
                 modifier = Modifier.fillMaxSize(),
             )
         }
@@ -133,6 +147,10 @@ fun TvNavHost(
                 listOf(
                     navArgument(PLUGIN_ARG) { type = NavType.StringType },
                     navArgument(METHOD_ARG) { type = NavType.StringType },
+                    navArgument(DOWNLOAD_MICROG_ARG) {
+                        type = NavType.BoolType
+                        defaultValue = false
+                    },
                 ),
         ) {
             TvAccountSignInScreen(onNavigateBack = { navController.popBackStack() })

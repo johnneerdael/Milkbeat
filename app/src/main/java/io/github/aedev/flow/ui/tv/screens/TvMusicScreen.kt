@@ -32,6 +32,7 @@ import io.github.aedev.flow.data.catalog.MusicSource
 import io.github.aedev.flow.data.music.model.MusicTrack
 import io.github.aedev.flow.ui.screens.folders.LibraryScanViewModel
 import io.github.aedev.flow.ui.screens.music.MusicHomeFeedViewModel
+import io.github.aedev.flow.ui.screens.music.ProviderNoticeViewModel
 import io.github.aedev.flow.ui.tv.catalog.TvCatalogActions
 import io.github.aedev.flow.ui.tv.catalog.TvCatalogFilterChips
 import io.github.aedev.flow.ui.tv.catalog.catalogBlocks
@@ -41,6 +42,7 @@ import io.github.aedev.flow.ui.tv.components.TvMessageState
 import io.github.aedev.flow.ui.tv.components.TvScreenScaffold
 import io.github.aedev.flow.ui.tv.components.TvShimmerRow
 import io.github.aedev.flow.ui.tv.focus.ProvideTvColumnPivot
+import io.github.aedev.flow.ui.tv.screens.music.TvProviderNotice
 import io.github.aedev.flow.ui.tv.theme.LocalTvDimens
 import nl.neerdael.milkbeat.catalog.EntityRef
 
@@ -58,6 +60,7 @@ fun TvMusicScreen(
     onOpen: (EntityRef, MusicSource) -> Unit,
     onOpenPlugins: () -> Unit,
     onOpenMusicFolders: () -> Unit,
+    onSignIn: (pluginId: String, methodId: String, downloadMicroG: Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     // Above the loading return, so a moment of not knowing the tab keeps every tab's saved scroll and focus.
@@ -72,6 +75,12 @@ fun TvMusicScreen(
                 key = "music-feed:${source?.key ?: NO_SOURCE_KEY}",
                 creationCallback = { factory -> factory.create(source) },
             )
+        val noticeViewModel =
+            hiltViewModel<ProviderNoticeViewModel, ProviderNoticeViewModel.Factory>(
+                key = "provider-notice:${source?.key ?: NO_SOURCE_KEY}",
+                creationCallback = { factory -> factory.create((source as? MusicSource.Plugin)?.id) },
+            )
+        val notice by noticeViewModel.notice.collectAsStateWithLifecycle()
         TvMusicFeed(
             viewModel = viewModel,
             onPlayCollection = onPlayCollection,
@@ -80,6 +89,18 @@ fun TvMusicScreen(
             onOpenPlugins = onOpenPlugins,
             onOpenMusicFolders = onOpenMusicFolders,
             modifier = modifier,
+            header = {
+                notice?.let {
+                    TvProviderNotice(
+                        notice = it,
+                        onSignIn = onSignIn,
+                        onAddReplacement = { code ->
+                            noticeViewModel.addReplacement(code)
+                            onOpenPlugins()
+                        },
+                    )
+                }
+            },
         )
     }
 }
@@ -95,6 +116,7 @@ private fun TvMusicFeed(
     onOpenPlugins: () -> Unit,
     onOpenMusicFolders: () -> Unit,
     modifier: Modifier,
+    header: @Composable () -> Unit = {},
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val accountExpired by viewModel.isAccountExpired.collectAsStateWithLifecycle()
@@ -156,6 +178,7 @@ private fun TvMusicFeed(
         // The moods stay pinned above the shelves, as in YouTube Music: in the scrolling list, pivoting a
         // shelf into place pushed them off the top.
         Column(Modifier.fillMaxSize()) {
+            header()
             if (state.filters.isNotEmpty()) {
                 TvCatalogFilterChips(state.filters, state.selectedFilterId, viewModel::selectFilter)
             }
