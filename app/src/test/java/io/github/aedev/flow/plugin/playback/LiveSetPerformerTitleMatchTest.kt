@@ -111,6 +111,26 @@ class LiveSetPerformerTitleMatchTest {
     }
 
     @Test
+    fun `a performer named Live is not live set evidence`() {
+        val album =
+            bodzin.copy(
+                title = "Live - Secret Samadhi Festival 2025",
+                artists = listOf(ArtistCredit("Live")),
+                durationMs = 1_500_000L,
+            )
+        val studio = album.copy(title = "Live - Secret Samadhi 2025")
+        val video =
+            promoterUpload.copy(
+                title = "Live - Secret Samadhi 2025",
+                artists = listOf(ArtistCredit("Label")),
+                durationMs = 1_350_000L,
+            )
+        assertThat(TrackMatchScore.best(studio, listOf(video))).isNull()
+        val festival = video.copy(title = "Live - Secret Samadhi Festival 2025")
+        assertThat(TrackMatchScore.best(album, listOf(festival))?.candidate).isEqualTo(festival)
+    }
+
+    @Test
     fun `long recordings that do not name a live set keep the ten second length rule`() {
         for (name in listOf("The 2025 Suite", "Christmas at Home 2025")) {
             val piece = bodzin.copy(title = "Stephan Bodzin - $name", durationMs = 1_500_000L)

@@ -148,7 +148,10 @@ internal object TrackMatchScore {
             sourceTitle.startsWith("$normalizedArtist ") && candidateTitle.startsWith("$normalizedArtist ") &&
             liveSetWords.containsMatchIn(sourceTitle) && liveSetWords.containsMatchIn(candidateTitle) &&
             eventYear.findAll(sourceTitle).map { it.value }.toSet() == eventYear.findAll(candidateTitle).map { it.value }.toSet() &&
-            (sameLength || sameDatedLiveSet(sourceTitle, candidateTitle))
+            (
+                sameLength ||
+                    sameDatedLiveSet(sourceTitle.removePrefix("$normalizedArtist "), candidateTitle.removePrefix("$normalizedArtist "))
+            )
         ) {
             val titleSimilarity = textSimilarity(sourceTitle, candidateTitle)
             if (titleSimilarity >= MIN_TITLE_SIMILARITY && versionsCompatible(sourceTitle, candidateTitle)) {
@@ -167,8 +170,12 @@ internal object TrackMatchScore {
             return Evidence(titleSimilarity, CERTAIN, durationScore(sourceMs, candidateMs))
         }
         if (sourceMs < MIN_LIVE_SET_DURATION_MS || candidateMs < MIN_LIVE_SET_DURATION_MS) return null
-        if (!liveWord.containsMatchIn(normalize(track.title)) || !liveWord.containsMatchIn(normalize(presented))) return null
         val sourceCredit = titleCredit.matchEntire(track.title) ?: return null
+        if (!liveWord.containsMatchIn(normalize(sourceCredit.groupValues[2])) ||
+            !liveWord.containsMatchIn(normalize(credit.groupValues[2]))
+        ) {
+            return null
+        }
         if (foldLatinAccents(normalizeText(sourceCredit.groupValues[1])) != performer) return null
         if (normalizedArtist != performer && performerSimilarity(track, candidate) < MIN_ARTIST_SIMILARITY) return null
         if ((variantMarkers.findAll(normalize(track.title)) + variantMarkers.findAll(normalize(presented)))
