@@ -62,7 +62,7 @@ class PluginAudioDrmValidationTest {
         PluginAudio(
             host,
             registry,
-            PluginTrackMatcher(host, MemoryTrackMatches()),
+            PluginTrackMatcher(host, MemoryTrackMatches(), registry),
             PluginAccounts(host, CoroutineScope(StandardTestDispatcher()), { 0L }),
         )
 

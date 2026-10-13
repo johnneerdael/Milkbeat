@@ -156,7 +156,8 @@ class SpotifyPluginHostTest {
                             PluginOperations.tracks,
                             TracksRequest(EntityRef(EntityKind.ALBUM, "spotify:album:0gNodTZAdNht0OpLirkGBW")),
                         )
-                    val audio = PluginAudio(host, registry, PluginTrackMatcher(host, database.trackMatchDao()), PluginAccounts(host))
+                    val audio =
+                        PluginAudio(host, registry, PluginTrackMatcher(host, database.trackMatchDao(), registry), PluginAccounts(host))
                     val resolved = audio.resolve(tracks.tracks.first(), null)
                     assertEquals("Prophecy", resolved.track.title)
                     assertEquals(youtube.id, resolved.pluginId)

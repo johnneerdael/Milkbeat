@@ -78,7 +78,7 @@ class PlaylistPreloadRunnerTest {
             ),
         )
     private val matches = TestMatches()
-    private val matcher = PluginTrackMatcher(host, matches)
+    private val matcher = PluginTrackMatcher(host, matches, registry)
     private val runner = PlaylistPreloadRunner(host, registry, accounts, matcher)
     private val first = EntityRef(EntityKind.PLAYLIST, "first")
     private val liked = EntityRef(EntityKind.PLAYLIST, "liked")

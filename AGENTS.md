@@ -685,7 +685,8 @@ revision must pass the configured ktlint rules.
 ## Track matching, radio seeding and the TV queue
 
 - Recording identity checks live in `plugin/playback/TrackMatchScore.kt`; track matches use Room's
-  `TrackMatchDao`. Matching-policy revisions invalidate saved misses; preserve successful match caching.
+  `TrackMatchDao`. Matching-policy revisions and plugin updates invalidate saved misses (miss keys carry `POLICY_VERSION` and
+  the plugin's versionCode); preserve successful match caching.
 - Radio for any queue not from YouTube (a track seed whose descriptor has no `ytm` id) is seeded
   from the queue's first track through YouTube matching in `plugin/playback/PluginRadio.kt`; the
   queue's own provider radio is only the fallback when YouTube cannot match. Seeds come from
