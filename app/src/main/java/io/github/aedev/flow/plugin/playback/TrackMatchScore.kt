@@ -7,7 +7,7 @@ import java.util.Locale
 import kotlin.math.abs
 
 internal object TrackMatchScore {
-    const val POLICY_VERSION = 5
+    const val POLICY_VERSION = 6
     const val MIN_SCORE = 0.35
     private const val CERTAIN = 1.0
     private const val EARLY_EXIT = 0.95
@@ -144,18 +144,39 @@ internal object TrackMatchScore {
         }
         val sourceTitle = foldLatinAccents(normalize(track.title))
         val candidateTitle = foldLatinAccents(normalize(withoutUploader(presentedTitle(candidate.title, normalizedArtist), candidate)))
-        if (sourceMs >= MIN_LIVE_SET_DURATION_MS && candidateMs >= MIN_LIVE_SET_DURATION_MS &&
-            sourceTitle.startsWith("$normalizedArtist ") && candidateTitle.startsWith("$normalizedArtist ") &&
-            liveSetWords.containsMatchIn(sourceTitle) && liveSetWords.containsMatchIn(candidateTitle) &&
-            eventYear.findAll(sourceTitle).map { it.value }.toSet() == eventYear.findAll(candidateTitle).map { it.value }.toSet() &&
-            (
-                sameLength ||
-                    sameDatedLiveSet(sourceTitle.removePrefix("$normalizedArtist "), candidateTitle.removePrefix("$normalizedArtist "))
-            )
-        ) {
-            val titleSimilarity = textSimilarity(sourceTitle, candidateTitle)
-            if (titleSimilarity >= MIN_TITLE_SIMILARITY && versionsCompatible(sourceTitle, candidateTitle)) {
-                return Evidence(titleSimilarity, CERTAIN, durationScore(sourceMs, candidateMs))
+        // Anyone can re-upload a set, so the source's credit may name only its uploader: the channel then
+        // counts as the performer when both titles open with its name. A promoter's channel opens titles of
+        // other performers' sets too, so on that path the titles, without a trailing channel credit, must be the same.
+        val channel =
+            foldLatinAccents(
+                normalizeText(
+                    candidate.artists
+                        .firstOrNull()
+                        ?.name
+                        .orEmpty()
+                        .replace(topicSuffix, ""),
+                ),
+            ).takeIf { it !in unavailableArtists }
+        for (performer in listOfNotNull(normalizedArtist, channel).distinct()) {
+            val ownTitle =
+                if (performer == normalizedArtist) {
+                    sourceTitle
+                } else {
+                    foldLatinAccents(normalize(withoutUploader(track.title, candidate))).takeIf { it == candidateTitle } ?: continue
+                }
+            if (sourceMs >= MIN_LIVE_SET_DURATION_MS && candidateMs >= MIN_LIVE_SET_DURATION_MS &&
+                ownTitle.startsWith("$performer ") && candidateTitle.startsWith("$performer ") &&
+                liveSetWords.containsMatchIn(ownTitle) && liveSetWords.containsMatchIn(candidateTitle) &&
+                eventYear.findAll(ownTitle).map { it.value }.toSet() == eventYear.findAll(candidateTitle).map { it.value }.toSet() &&
+                (
+                    sameLength ||
+                        sameDatedLiveSet(ownTitle.removePrefix("$performer "), candidateTitle.removePrefix("$performer "))
+                )
+            ) {
+                val titleSimilarity = textSimilarity(ownTitle, candidateTitle)
+                if (titleSimilarity >= MIN_TITLE_SIMILARITY && versionsCompatible(ownTitle, candidateTitle)) {
+                    return Evidence(titleSimilarity, CERTAIN, durationScore(sourceMs, candidateMs))
+                }
             }
         }
         val presented = presentedTitle(candidate.title, normalizedArtist)
@@ -225,11 +246,12 @@ internal object TrackMatchScore {
         exactly: Boolean = false,
     ): String {
         val suffix = trailingUploader.find(title) ?: return title
-        val uploader = foldLatinAccents(normalizeText(candidate.artists.firstOrNull()?.name ?: return title))
+        val channel = candidate.artists.firstOrNull()?.name ?: return title
+        val uploader = setOf(channel, channel.replace(topicSuffix, "")).map { foldLatinAccents(normalizeText(it)) }
         val named = suffix.groupValues[1]
         val credited =
-            foldLatinAccents(normalizeText(named)) == uploader ||
-                (!exactly && liveSetEvent(named).let { it.isNotEmpty() && it == uploader })
+            foldLatinAccents(normalizeText(named)) in uploader ||
+                (!exactly && liveSetEvent(named).let { it.isNotEmpty() && it in uploader })
         return if (credited) {
             title.substring(0, suffix.range.first)
         } else {

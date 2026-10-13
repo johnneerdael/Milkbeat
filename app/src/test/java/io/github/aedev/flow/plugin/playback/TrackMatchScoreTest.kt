@@ -73,6 +73,44 @@ class TrackMatchScoreTest {
         assertThat(agentsVideo.artists.single().name).isEqualTo("Hï Ibiza")
     }
 
+    private val repostedCassian =
+        track("CASSIAN Live from New York - Brooklyn Storehouse 2026 Full Set", "CHU", 11_156, id = "soundcloud:2347394561")
+    private val cassianVideo = video("CASSIAN Live from New York - Brooklyn Storehouse 2026 Full Set", "Cassian", 11_157_000, "yr2Ycxgn7MQ")
+
+    @Test
+    fun `a set someone else uploaded matches the performer's own upload`() {
+        assertThat(TrackMatchScore.best(repostedCassian, listOf(cassianVideo))?.candidate).isSameInstanceAs(cassianVideo)
+        assertThat(TrackMatchScore.best(repostedCassian, listOf(cassianVideo.copy(artists = listOf(ArtistCredit("Cassian - Topic"))))))
+            .isNotNull()
+        val credited = "CASSIAN Live from New York - Brooklyn Storehouse 2026 Full Set | Cassian"
+        assertThat(TrackMatchScore.best(repostedCassian.copy(title = credited), listOf(cassianVideo.copy(title = credited)))).isNotNull()
+        assertThat(TrackMatchScore.best(repostedCassian.copy(title = credited), listOf(cassianVideo))).isNotNull()
+        val topic = cassianVideo.copy(artists = listOf(ArtistCredit("Cassian - Topic")))
+        assertThat(TrackMatchScore.best(repostedCassian.copy(title = credited), listOf(topic))).isNotNull()
+    }
+
+    @Test
+    fun `a re-uploaded set still needs the channel named in both titles and the same set`() {
+        for (candidate in listOf(
+            cassianVideo.copy(artists = listOf(ArtistCredit("Another Channel"))),
+            cassianVideo.copy(title = "Brooklyn Storehouse 2026 Full Set - CASSIAN Live from New York"),
+            cassianVideo.copy(title = "CASSIAN Live from New York - Brooklyn Storehouse 2025 Full Set"),
+            cassianVideo.copy(title = "CASSIAN Live from Miami - Club Space 2026 Full Set"),
+            cassianVideo.copy(title = "CASSIAN Live from New York - Brooklyn Storehouse 2026 Full Set Remix"),
+            cassianVideo.copy(durationMs = 7_200_000),
+            cassianVideo.copy(hasVideo = false),
+        )) {
+            assertThat(TrackMatchScore.best(repostedCassian, listOf(candidate))).isNull()
+        }
+        assertThat(TrackMatchScore.best(repostedCassian.copy(title = "Brooklyn Storehouse 2026 Full Set"), listOf(cassianVideo))).isNull()
+        val promoted = track("Boiler Room DJ Alpha Live Festival Event 2026 Full Set", "Reposts", 3_600)
+        val otherSet = video("Boiler Room DJ Beta Live Festival Event 2026 Full Set", "Boiler Room", 3_600_000)
+        assertThat(TrackMatchScore.best(promoted, listOf(otherSet))).isNull()
+        assertThat(TrackMatchScore.best(promoted, listOf(otherSet.copy(title = promoted.title)))?.candidate).isNotNull()
+        val song = track("CASSIAN - Magic", "CHU", 240)
+        assertThat(TrackMatchScore.best(song, listOf(video("CASSIAN - Magic", "Cassian", 240_000)))).isNull()
+    }
+
     @Test
     fun `live set title agreement cannot rescue a different performer event or year`() {
         for (title in listOf(
