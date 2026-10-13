@@ -122,6 +122,20 @@ class PluginTrackMatcherTest {
         }
 
     @Test
+    fun `a miss found while the plugin updates belongs to the version that started the search`() =
+        runTest {
+            coEvery { host.call("youtube", PluginOperations.matchAudio, any()) } answers {
+                plugins.value = PluginRegistryState(listOf(youtubePlugin(versionCode = 6)))
+                AudioMatches()
+            }
+            assertThat(matcher.match(original, "youtube")).isNull()
+
+            coEvery { host.call("youtube", PluginOperations.matchAudio, any()) } returns AudioMatches(listOf(candidate))
+            assertThat(matcher.match(original, "youtube")).isEqualTo(candidate)
+            coVerify(exactly = 2) { host.call("youtube", PluginOperations.matchAudio, any()) }
+        }
+
+    @Test
     fun `a transient search failure remains uncached`() =
         runTest {
             coEvery { host.call("youtube", PluginOperations.matchAudio, any()) } throws

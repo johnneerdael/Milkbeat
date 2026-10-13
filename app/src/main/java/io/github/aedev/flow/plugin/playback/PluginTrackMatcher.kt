@@ -65,13 +65,14 @@ class PluginTrackMatcher
             onProgress: (TrackMatchProgress) -> Unit = {},
         ): TrackDescriptor? {
             val fingerprint = fingerprint(track)
-            validatedCache(track, fingerprint, pluginId, strategy)?.let {
+            val version = versionOf(pluginId)
+            validatedCache(track, fingerprint, pluginId, strategy, version)?.let {
                 if (excludedId == null || it.candidate?.ref?.providerId != excludedId) {
                     if (it.candidate != null) onProgress(TrackMatchProgress.SAVED_MATCH)
                     return it.candidate
                 }
             }
-            val key = "$pluginId|$fingerprint|${strategy.name}|${excludedId.orEmpty()}"
+            val key = "$pluginId@$version|$fingerprint|${strategy.name}|${excludedId.orEmpty()}"
             val mine = CompletableDeferred<TrackDescriptor?>()
             inFlight.putIfAbsent(key, mine)?.let { owner ->
                 onProgress(TrackMatchProgress.WAITING)
@@ -85,7 +86,7 @@ class PluginTrackMatcher
             }
             try {
                 onProgress(TrackMatchProgress.SEARCHING)
-                return lookup(track, fingerprint, pluginId, excludedId, strategy).also(mine::complete)
+                return lookup(track, fingerprint, pluginId, excludedId, strategy, version).also(mine::complete)
             } catch (e: Throwable) {
                 mine.completeExceptionally(e)
                 throw e
@@ -113,7 +114,8 @@ class PluginTrackMatcher
             }
         }
 
-        // A miss belongs to the plugin version that searched: an update may find what it could not.
+        // A miss belongs to the plugin version installed when its search started: an update may find what
+        // it could not, so a search running across an update is no answer for the new version.
         private fun versionOf(pluginId: String): Int =
             registry.state.value
                 .plugin(pluginId)
@@ -144,8 +146,8 @@ class PluginTrackMatcher
             fingerprint: String,
             pluginId: String,
             strategy: AudioMatchStrategy,
+            version: Int,
         ): Cached? {
-            val version = versionOf(pluginId)
             val hit =
                 cached(fingerprint, pluginId)?.takeIf { it.candidate != null }
                     ?: cached(missFingerprint(fingerprint, strategy, version), pluginId)
@@ -163,6 +165,7 @@ class PluginTrackMatcher
             pluginId: String,
             excludedId: String?,
             strategy: AudioMatchStrategy,
+            version: Int,
         ): TrackDescriptor? {
             val result = host.call(pluginId, PluginOperations.matchAudio, MatchAudioRequest(track, strategy))
             result.error?.let { throw PluginCallException(pluginId, it) }
@@ -173,7 +176,7 @@ class PluginTrackMatcher
                 "${track.title}: ${candidates.size} candidates from $pluginId, best ${best?.score?.let { "%.2f".format(it) } ?: "none"}",
             )
             if (best == null && excludedId != null) return null
-            return remember(fingerprint, pluginId, best, strategy)
+            return remember(fingerprint, pluginId, best, strategy, version)
         }
 
         private suspend fun remember(
@@ -181,8 +184,8 @@ class PluginTrackMatcher
             pluginId: String,
             best: TrackMatchScore.Scored?,
             strategy: AudioMatchStrategy,
+            version: Int,
         ): TrackDescriptor? {
-            val version = versionOf(pluginId)
             if (best != null) {
                 for (scope in AudioMatchStrategy.entries) {
                     matches.delete(batchMissFingerprint(fingerprint, scope, version), pluginId)
