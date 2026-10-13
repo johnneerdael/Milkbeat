@@ -171,6 +171,24 @@ class MusicSourcesTest {
         assertNull(MusicSource.fromKey(null))
     }
 
+    @Test
+    fun theYouTubePluginHasASignedOutTabAndHoldsTheYouTubeTabOverRetiredOnes() {
+        val replacement = plugin(YOUTUBE_PLUGIN, "YouTube")
+        val signedOut = musicTabs(registry(replacement), mapOf(YOUTUBE_PLUGIN to ProviderAccount.Anonymous), false, emptySet())
+        assertEquals(listOf(MusicSource.Plugin(YOUTUBE_PLUGIN)), signedOut.tabs.map { it.source })
+        assertFalse(signedOut.tabs.single().signedIn)
+        assertEquals(R.string.provider_youtube, signedOut.tabs.single().labelRes)
+
+        val alongside =
+            musicTabs(
+                registry(youtube, youtubeVideo, replacement),
+                mapOf(YOUTUBE to signedIn, YOUTUBE_VIDEO to signedIn, YOUTUBE_PLUGIN to ProviderAccount.Anonymous),
+                false,
+                emptySet(),
+            )
+        assertEquals(listOf(MusicSource.Plugin(YOUTUBE_PLUGIN)), alongside.tabs.map { it.source })
+    }
+
     private fun registry(vararg plugins: InstalledPlugin) = PluginRegistryState(plugins = plugins.toList())
 
     private fun plugin(
@@ -201,6 +219,7 @@ class MusicSourcesTest {
         const val SOUNDCLOUD = "nl.neerdael.soundcloud"
         const val BEATPORT = "nl.neerdael.beatport"
         const val YOUTUBE_VIDEO = "nl.neerdael.youtube-video"
+        const val YOUTUBE_PLUGIN = "nl.neerdael.youtube"
         val signedIn = ProviderAccount.SignedIn(key = "k")
     }
 }

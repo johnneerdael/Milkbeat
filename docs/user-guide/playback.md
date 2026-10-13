@@ -26,7 +26,7 @@ Turn on **Show audio quality** in [Settings → Playback](settings.md#playback) 
 
 | Example | Meaning |
 | --- | --- |
-| `YouTube Video · 134 kb/s Opus · 48 kHz` | Opus from the YouTube Video plugin, at the bitrate the plugin reported |
+| `YouTube Video · 134 kb/s Opus · 48 kHz` | Opus from the plugin named YouTube Video, at the bitrate the plugin reported. That plugin is retired; the YouTube plugin's line starts with `YouTube` |
 | `On this device · 1411 kb/s FLAC · 44.1 kHz / 16-bit` | A CD-quality FLAC file on the TV's storage |
 | `On this device · 4608 kb/s FLAC · 96 kHz / 24-bit` | A hi-res FLAC file |
 | `On this device · 320 kb/s MP3 · 44.1 kHz` | A 320 kb/s MP3 |
@@ -89,7 +89,7 @@ Switching a preset replaces the upcoming radio suggestions while keeping the pla
 
 ## Local music and radio
 
-Local and network-folder music always plays from its file. With an enabled YouTube Music plugin, Milkbeat matches the first queued local song's title, artists and duration in the background and uses that match only to seed YouTube Music radio. A local album, playlist or artist queue uses its first song; collection queues continue with suggestions when endless radio is on. Without the plugin, a connection or a confident match, the local queue still plays and earlier radio suggestions are cleared.
+Local and network-folder music always plays from its file. With an enabled YouTube plugin, Milkbeat matches the first queued local song's title, artists and duration in the background and uses that match only to seed YouTube Music radio. A local album, playlist or artist queue uses its first song; collection queues continue with suggestions when endless radio is on. Without the plugin, a connection or a confident match, the local queue still plays and earlier radio suggestions are cleared.
 
 In the **Local library** tab, selecting a track on an artist, release, playlist, year, genre or label page plays that track followed by its radio; **Play** and **Shuffle** queue the whole collection. **Play folder** in Library → Folders queues the current folder.
 
@@ -122,7 +122,7 @@ Each provider decides how Milkbeat requests its audio. A plugin built for plugin
 When **Report plays to** the provider is enabled in its plugin details, compatible API 8 providers receive qualified listening
 updates while music is playing, about every 30 seconds, as well as pause, seek and final updates.
 A listen qualifies after 30 seconds, or half of a shorter track. Skipped sections do not count as
-listened time. Signed-in YouTube Video uses these updates for your account history and recommendations;
+listened time. A signed-in provider can use these updates for your account history and recommendations;
 anonymous playback does not update an account. Older providers receive a report when the listen ends.
 Reporting reuses the recording that actually played and does not delay startup by resolving it again.
 If the final update of a listen fails because of a network problem, a timeout or rate limiting, Milkbeat

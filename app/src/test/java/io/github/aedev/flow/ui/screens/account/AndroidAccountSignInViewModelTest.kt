@@ -93,9 +93,9 @@ class AndroidAccountSignInViewModelTest {
 
     @After fun after() = Dispatchers.resetMain()
 
-    private fun viewModel() =
+    private fun viewModel(downloadMicroG: Boolean = false) =
         AndroidAccountSignInViewModel(
-            SavedStateHandle(mapOf(PLUGIN_ARG to plugin.id, METHOD_ARG to "google")),
+            SavedStateHandle(mapOf(PLUGIN_ARG to plugin.id, METHOD_ARG to "google", DOWNLOAD_MICROG_ARG to downloadMicroG)),
             registry,
             accounts,
             microG,
@@ -195,6 +195,82 @@ class AndroidAccountSignInViewModelTest {
 
             assertThat(vm.state.value).isEqualTo(AndroidAccountSignInState.ChooseAccount(chooser))
         }
+
+    @Test fun `the download button installs the latest MicroG over the installed one, then opens the chooser`() =
+        runTest(dispatcher) {
+            every { installer.canInstall() } returns true
+            coEvery { installer.install(any()) } returns true
+            val vm = viewModel(downloadMicroG = true)
+            vm.start()
+            runCurrent()
+
+            assertThat(vm.state.value).isEqualTo(AndroidAccountSignInState.Installing)
+            coVerify(exactly = 1) { installer.install(any()) }
+            // Back from the installer's prompt: the MicroG already there is not the update until the installer says so.
+            vm.onResumed()
+            assertThat(vm.state.value).isEqualTo(AndroidAccountSignInState.Installing)
+            installedCount.value = 1
+            runCurrent()
+            assertThat(vm.state.value).isEqualTo(AndroidAccountSignInState.ChooseAccount(chooser))
+            // A retry after the chooser was dismissed goes back to it without downloading again.
+            vm.onAccountChosen(null)
+            vm.retry()
+            assertThat(vm.state.value).isEqualTo(AndroidAccountSignInState.ChooseAccount(chooser))
+            coVerify(exactly = 1) { installer.install(any()) }
+        }
+
+    @Test fun `the download button asks for the install permission and offers the download again`() =
+        runTest(dispatcher) {
+            every { installer.canInstall() } returns false
+            val permission = mockk<Intent>()
+            every { installer.installPermissionIntent() } returns permission
+            val vm = viewModel(downloadMicroG = true)
+            vm.start()
+
+            assertThat(vm.state.value).isEqualTo(AndroidAccountSignInState.InstallPermission(permission))
+            vm.onLaunched()
+            assertThat(vm.state.value).isEqualTo(AndroidAccountSignInState.OfferDownload)
+            // Back from the setting without the permission: still offering the download, not signing in.
+            vm.onInstallPermissionClosed()
+            vm.onResumed()
+            assertThat(vm.state.value).isEqualTo(AndroidAccountSignInState.OfferDownload)
+        }
+
+    @Test fun `after process recreation a landed download goes on to the chooser and an unfinished one is offered again`() =
+        runTest(dispatcher) {
+            every { installer.canInstall() } returns true
+            coEvery { installer.install(any()) } returns true
+            every { microG.installedAt() } returns 1_000L
+            val saved = SavedStateHandle(mapOf(PLUGIN_ARG to plugin.id, METHOD_ARG to "google", DOWNLOAD_MICROG_ARG to true))
+            AndroidAccountSignInViewModel(saved, registry, accounts, microG, installer).start()
+            runCurrent()
+            coVerify(exactly = 1) { installer.install(any()) }
+
+            // Android restores the route with the same saved state in a new process; the update did not land.
+            val unfinished = AndroidAccountSignInViewModel(saved, registry, accounts, microG, installer)
+            unfinished.start()
+            runCurrent()
+            assertThat(unfinished.state.value).isEqualTo(AndroidAccountSignInState.OfferDownload)
+            unfinished.onResumed()
+            assertThat(unfinished.state.value).isEqualTo(AndroidAccountSignInState.OfferDownload)
+            coVerify(exactly = 1) { installer.install(any()) }
+
+            // This time the installer finished before the process went.
+            every { microG.installedAt() } returns 2_000L
+            val landed = AndroidAccountSignInViewModel(saved, registry, accounts, microG, installer)
+            landed.start()
+            assertThat(landed.state.value).isEqualTo(AndroidAccountSignInState.ChooseAccount(chooser))
+            coVerify(exactly = 1) { installer.install(any()) }
+        }
+
+    @Test fun `a build that cannot install MicroG ignores the download request`() {
+        every { installer.isAvailable } returns false
+        val vm = viewModel(downloadMicroG = true)
+        vm.start()
+
+        assertThat(vm.state.value).isEqualTo(AndroidAccountSignInState.ChooseAccount(chooser))
+        coVerify(exactly = 0) { installer.install(any()) }
+    }
 
     @Test fun `installing first asks for the install permission and continues once it is granted`() =
         runTest(dispatcher) {

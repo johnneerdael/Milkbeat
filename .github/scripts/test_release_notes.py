@@ -19,7 +19,7 @@ CORE = "2.2.4"
 PUBLISHED = {"format": 1, "plugins": [
     {"id": "nl.neerdael.beatport", "name": "Beatport", "version": "0.1.3", "versionCode": 4, "code": "393"},
     {"id": "nl.neerdael.spotify", "name": "Spotify", "version": "0.2.2", "versionCode": 6, "code": "981"},
-    {"id": "nl.neerdael.youtube-music", "name": "YouTube Music", "version": "0.2.2", "versionCode": 7, "code": "494"},
+    {"id": "nl.neerdael.youtube", "name": "YouTube", "version": "0.1.3", "versionCode": 4, "code": "563"},
 ]}
 PLUGINS = [{key: str(row[key]) for key in ("id", "name", "version", "code")} for row in PUBLISHED["plugins"]]
 
@@ -218,8 +218,8 @@ Co-Authored-By: Agent <agent@example.org>
             "https://github.com/johnneerdael/Milkbeat/releases/latest/download/milkbeat-universal.apk",
             "`checksums.txt`",
             "- **Beatport 0.1.3** (full-length streaming needs a Beatport streaming subscription): downloader code `393`",
-            "- **Spotify 0.2.2** (metadata; select YouTube Music for audio): downloader code `981`",
-            "- **YouTube Music 0.2.2** (music and YouTube videos): downloader code `494`",
+            "- **Spotify 0.2.2** (metadata; select YouTube for audio): downloader code `981`",
+            "- **YouTube 0.1.3** (YouTube Music and YouTube; signs in with a Google account from MicroG-RE-TV): downloader code `563`",
             "**Full changelog:** https://github.com/johnneerdael/Milkbeat/compare/v2.1.4...v2.1.5",
         ):
             self.assertIn(expected, result)

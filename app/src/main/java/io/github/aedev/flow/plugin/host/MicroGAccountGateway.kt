@@ -82,6 +82,9 @@ interface MicroGAccountGateway {
 
     fun installed(): Boolean
 
+    /** When MicroG was last installed or updated, or null when it is not installed. */
+    fun installedAt(): Long? = null
+
     /** Whether the installed MicroG is a MicroG-RE-TV release too old to sign Milkbeat in, which its latest updates. */
     fun outdated(): Boolean
 
@@ -112,6 +115,13 @@ class AndroidMicroGAccountGateway
                 true
             } catch (_: PackageManager.NameNotFoundException) {
                 false
+            }
+
+        override fun installedAt(): Long? =
+            try {
+                context.packageManager.getPackageInfo(MICROG_PACKAGE, 0).lastUpdateTime
+            } catch (_: PackageManager.NameNotFoundException) {
+                null
             }
 
         override fun outdated(): Boolean =

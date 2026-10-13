@@ -21,11 +21,12 @@ import java.util.Base64
 
 class PluginDownloadCodesTest {
     @Test
-    fun `the generated encrypted catalog resolves the three registered packages`() {
+    fun `the generated encrypted catalog resolves registered packages and no retired code`() {
         val catalog = decodePluginDownloadCatalog(File("src/main/assets/plugin-download-catalog.json").readText())
         assertThat(pluginDownloadSource("102") { catalog }.url).isEqualTo("https://buzzheavier.com/j8i6nbdomf9d")
         assertThat(pluginDownloadSource("772") { catalog }.pluginId).isEqualTo("nl.neerdael.spotify")
-        assertThat(pluginDownloadSource("416") { catalog }.pluginId).isEqualTo("nl.neerdael.youtube-music")
+        assertThat(pluginDownloadSource("563") { catalog }.pluginId).isEqualTo("nl.neerdael.youtube")
+        for (retired in listOf("304", "416", "494", "728", "744", "932")) assertThat(catalog).doesNotContainKey(retired)
     }
 
     @Test
@@ -65,16 +66,16 @@ class PluginDownloadCodesTest {
             val publication = mockk<PluginPublication>()
             coEvery { publication.current() } returns
                 Publication(
-                    PublishedPlugins(listOf(PublishedPlugin("nl.neerdael.youtube-music", "0.2.8", 13, "f", "494", "sha"))),
-                    mapOf("494" to PluginDownloadCode("494", "nl.neerdael.youtube-music", "YouTube Music", stableUrl)),
+                    PublishedPlugins(listOf(PublishedPlugin("nl.neerdael.youtube", "0.1.3", 4, "f", "563", "sha"))),
+                    mapOf("563" to PluginDownloadCode("563", "nl.neerdael.youtube", "YouTube", stableUrl)),
                 )
-            val source = PluginDownloadCodes(context, publication).resolve(" 494 ")
+            val source = PluginDownloadCodes(context, publication).resolve(" 563 ")
             val bundled = decodePluginDownloadCatalog(File("src/nightly/assets/plugin-preview-download-catalog.json").readText())
-            assertThat(source.url).isEqualTo(bundled.getValue("494").url)
-            assertThat(source.pluginId).isEqualTo("nl.neerdael.youtube-music")
+            assertThat(source.url).isEqualTo(bundled.getValue("563").url)
+            assertThat(source.pluginId).isEqualTo("nl.neerdael.youtube")
             coVerify(exactly = 0) { publication.current() }
             every { context.packageName } returns "nl.neerdael.milkbeat"
-            assertThat(PluginDownloadCodes(context, publication).resolve("494").url).isEqualTo(stableUrl)
+            assertThat(PluginDownloadCodes(context, publication).resolve("563").url).isEqualTo(stableUrl)
             coVerify(exactly = 1) { publication.current() }
         }
 

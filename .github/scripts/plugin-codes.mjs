@@ -15,7 +15,6 @@ import { fileURLToPath } from 'node:url';
 const ORIGINAL_CODES = {
   'nl.neerdael.beatport': '102',
   'nl.neerdael.spotify': '772',
-  'nl.neerdael.youtube-music': '416',
 };
 
 const LAYOUTS = {

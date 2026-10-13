@@ -28,19 +28,6 @@
       "code": "981"
     },
     {
-      "id": "nl.neerdael.youtube-music",
-      "name": "YouTube Music",
-      "version": "0.3.1",
-      "versionCode": 16,
-      "apiMin": 3,
-      "format": 1,
-      "sha256": "44bc33a6432a93354a8bc47c7a30cc31d41c46c51585cd175f8aad049f0e552c",
-      "size": 129273,
-      "fingerprint": "39dca3d132c56262c0873ec96faf22cc8ed9ca30c7ed1f135049f8570b943adc",
-      "contentDigest": "6ea7117aa311a160b6e590f976ba1416549a1d6deb817f820078f18dbd109bf8",
-      "code": "728"
-    },
-    {
       "id": "nl.neerdael.soundcloud",
       "name": "SoundCloud",
       "version": "0.2.1",
@@ -52,19 +39,6 @@
       "fingerprint": "39dca3d132c56262c0873ec96faf22cc8ed9ca30c7ed1f135049f8570b943adc",
       "contentDigest": "b2c3550c63d27a2bee6a459ba18ce37b052cbed13b906911854c8460d8d9a5fb",
       "code": "089"
-    },
-    {
-      "id": "nl.neerdael.youtube-video",
-      "name": "YouTube Video",
-      "version": "0.2.2",
-      "versionCode": 13,
-      "apiMin": 8,
-      "format": 1,
-      "sha256": "7525932e6019f20994d9329b20931d5e532b56f34828d406e0e0072c94aae437",
-      "size": 99590,
-      "fingerprint": "39dca3d132c56262c0873ec96faf22cc8ed9ca30c7ed1f135049f8570b943adc",
-      "contentDigest": "762281892395d995474f8739fffc33beaf65ecba7afe695e9b7d970d0f26392a",
-      "code": "932"
     },
     {
       "id": "nl.neerdael.deezer",

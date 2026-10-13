@@ -20,8 +20,8 @@
 ---
 
 Milkbeat plays music from your TV's storage, USB drives and network folders (SMB, WebDAV, SFTP
-and NFS) without any plugin or account. Optional plugins add YouTube Music, Spotify, Beatport and
-SoundCloud, each as its own tab in the sidebar, and let one service's catalog play through another
+and NFS) without any plugin or account. Optional plugins add YouTube, Spotify, Beatport, SoundCloud
+and Deezer, each as its own tab in the sidebar, and let one service's catalog play through another
 service's audio. Behind the music runs [ProjectM TV](https://github.com/johnneerdael/ProjectM-TV),
 a MilkDrop visualizer up to 4K, or the music video, or the cover. Everything is built for the remote.
 
@@ -43,7 +43,7 @@ and sign-in method, playback and radio, the visualizer, every Settings page and 
 ## Highlights
 
 - **A tab per music service.** Every catalog you can use gets its own sidebar tab with its logo:
-  YouTube as soon as YouTube Music or YouTube Video is installed, the others once you are signed in. There is no
+  YouTube as soon as the YouTube plugin is installed, the others once you are signed in. There is no
   metadata provider to choose any more, and Milkbeat opens on the tab you used last.
 - **Your own music first.** Local folders, USB drives and SMB 2/3, WebDAV, SFTP and NFS (v3, 4.0,
   4.1) servers, read-only. Their tags build a **Local library** tab of genres, artists, releases,
@@ -57,7 +57,8 @@ and sign-in method, playback and radio, the visualizer, every Settings page and 
   Deep cuts, moods and decades) pinned above the queue. Local music seeds a radio too while the
   file keeps playing.
 - **Optional private playlists:** a Spotify playlist can be prepared as a private YouTube Music
-  copy, so autoplay follows the whole playlist rather than its first song.
+  copy, so autoplay follows the whole playlist rather than its first song. This needs a plugin
+  that supports it, such as the retired YouTube Music plugin; YouTube 0.1.3 does not.
 - **Visualizer, music video or artwork.** 9,606 MilkDrop presets from the ProjectM TV engine,
   reacting to Milkbeat's own audio, up to 4K with automatic resolution. Artwork uses the accepted
   audio provider's best available thumbnail, with the original catalog cover as a fallback.
@@ -95,15 +96,16 @@ and sign-in method, playback and radio, the visualizer, every Settings page and 
 
 | Tab | Appears |
 | --- | --- |
-| **YouTube** | As soon as the YouTube Music or YouTube Video plugin is installed and enabled; sign-in is optional |
+| **YouTube** | As soon as the YouTube plugin is installed and enabled; sign-in is optional |
 | **Spotify**, **Beatport**, **SoundCloud** | Once installed, enabled and signed in |
 | **Local library** | Once a music folder is linked |
 
-The YouTube Video plugin shares the YouTube tab, which is named YouTube whichever plugin provides it:
-with YouTube Music also installed, the tab shows YouTube Music's catalog; with only YouTube Video, it
-shows YouTube Video's. Each tab shows that provider's own feed through Milkbeat's TV components and keeps its place while
-you visit another. **Search** offers a chip per music tab, including Local library (video search comes with the
-YouTube Video plugin's own chip), each with only its own provider's filters and suggestions (Local library suggests only your recent searches). **Library** starts with a chip per signed-in
+Signed out, the YouTube tab shows a line above its mood chips with **Sign in** and, in the stable
+GitHub build, **Download MicroG-RE-TV**. A retired YouTube Music or YouTube Video plugin that is still
+installed keeps working without updates; its tab and its Settings → Plugins page point to YouTube
+(code **563**) with **Add YouTube**, and once YouTube is installed it holds the tab. Each tab shows that provider's own feed through Milkbeat's TV components and keeps its place while
+you visit another. **Search** offers a chip per music tab, including Local library (the YouTube chip's Videos
+filter finds music videos), each with only its own provider's filters and suggestions (Local library suggests only your recent searches). **Library** starts with a chip per signed-in
 account, then Folders, History, Watch later and Playlists (app and provider playlists together,
 including Liked songs). Pages opened from a tab, chip or page stay on their provider, the tab they
 came from stays highlighted, and pressing it again returns to its first page.
@@ -135,9 +137,7 @@ Add **third-party plugins** in **Settings → Plugins** with their downloader co
 | --- | --- | --- |
 | Beatport | **393** | 102 |
 | Spotify | **981** | 772 |
-| YouTube Music | **728** | 416 |
 | SoundCloud | **089** | — |
-| YouTube Video | **932** | — |
 | Deezer | **734** | — |
 | YouTube | **563** | — |
 <!-- /plugin-codes -->
@@ -147,27 +147,24 @@ distributed separately from Milkbeat releases, signature-checked and reviewed be
 
 | Plugin | Catalog | Audio | Video |
 | --- | --- | --- | --- |
-| YouTube Music | Home, Search, artists, albums, playlists, library | Streams, matching and radio | YouTube videos, channels and playlists |
+| YouTube | YouTube Music Home with mood chips, Search, artists, albums, playlists, library | YouTube streams, matching and radio | Music videos |
 | Spotify | Home, Search, artists, albums, playlists, library | **None: use another audio provider** | — |
 | Beatport | Catalog, genres, charts, artists, labels, library | Full streams with a streaming subscription | — |
 | SoundCloud | Discover, Stream, Search, Artists, albums, playlists, Liked Songs, history | Available full tracks, matching and stations | — |
-| YouTube Video | YouTube's TV Music Home, Search, artists, albums, playlists, library | Streams, matching and radio | YouTube videos and playlists |
 | Deezer | Home, Flow, Search, artists, albums, playlists, library | Account streams and matching | — |
 
-**YouTube Video 0.2.2** is a separate provider for stable Milkbeat, installed with code **932**.
-It requires plugin API 8 and keeps its own account alongside
-YouTube Music. It supplies SmartTube's regular YouTube TV Music feeds, TV-code/QR sign-in and
-native SABR playback through Milkbeat's existing Media3 player.
-[Setup and limitations](docs/user-guide/providers.md#youtube-video).
+**YouTube 0.1.3** (code **563**, plugin API 11) replaces the retired YouTube Music (728) and
+YouTube Video (932) plugins; their codes no longer install anything. An installed copy keeps
+working without updates until you remove it.
+[Retired plugins](https://johnneerdael.github.io/Milkbeat/providers/#retired-plugins).
 
-- **YouTube Music:** sign-in is optional and personalizes Home; free accounts work.
+- **YouTube:** Home works signed out; signing in with the Google account in MicroG-RE-TV (below)
+  personalizes Home, library and history.
 - **Spotify:** sign in for your feed, playlists and library; playback comes from your audio providers.
 - **Beatport:** sign in for the catalog and library; Beatport's own full-length audio needs a
   streaming subscription, otherwise another provider can match the recording.
 - **SoundCloud:** pair with a TV code from any phone. Full-track availability depends on the
   recording and your listening subscription. TV-paired accounts currently play clear HLS streams only.
-- **YouTube Video:** works signed out; pairing with a TV code from any phone personalizes Home and
-  Library. An empty Liked Music library still loads Home normally since 0.2.1.
 - **Deezer:** sign in for Home, Flow and your library. Stream availability and FLAC/MP3 quality
   depend on the account and recording. Deezer 0.2.1 needs plugin API 9; update Milkbeat first. With
   plugin API 10 it fetches each track in one request, so songs no longer pause mid-play.
@@ -180,7 +177,8 @@ highest-ranked match. **Update plugins automatically** (on by default) installs 
 every six hours; **Update all plugins** checks now. A plugin version that needs a newer Milkbeat is
 not downloaded: Settings → Plugins says to update Milkbeat first and, in the GitHub build, opens the
 app updater. Each plugin's details offer sign-in, play
-reporting, **Index playlists** and, for Spotify, **Prepare private playlists in YouTube Music**.
+reporting, **Index playlists** and, for Spotify with a plugin that supports it,
+**Prepare private playlists in** *plugin*.
 [Providers and sign-in](https://johnneerdael.github.io/Milkbeat/providers/).
 
 Plugin API 11 adds a third way to sign in: **Sign in with your Google account**, for plugins that
@@ -192,7 +190,10 @@ Android start it in the background. MicroG-RE-TV 7.2.1.5 and later grant Milkbea
 prompt. Milkbeat keeps only the account name; MicroG keeps the grants and tokens. It works in the
 stable app (`nl.neerdael.milkbeat`) only, not in Preview or debug builds. The **YouTube** plugin
 (downloader code **563**) signs in this way: YouTube Music for Home, search and radio, and YouTube for
-playback.
+playback. While it is signed out, its tab and its Settings → Plugins page offer **Download
+MicroG-RE-TV** in the stable GitHub build: it installs the latest MicroG-RE-TV release, also over an
+installed copy (keeping its account), then continues to the account picker. If Milkbeat may not
+install apps yet, Android's permission setting opens first.
 
 ## Playback, queue and radio
 
@@ -297,8 +298,8 @@ It also builds on:
 - **[PipePipe](https://codeberg.org/NullPointerException/PipePipe)** and its
   [developer docs](https://priveetee.github.io/Docs-PipePipe/): SABR and InnerTube playback
 - **[LibreTube](https://github.com/LibreTube/LibreTube)**: SponsorBlock and DeArrow handling
-- **[SmartTube](https://github.com/yuliskov/SmartTube)**: the parallel YouTube Video provider's
-  TV Music, account and playback approach, with pinned native SABR adaptation
+- **[SmartTube](https://github.com/yuliskov/SmartTube)**: the TV Music, account and playback
+  approach of the retired YouTube Video provider, and the pinned native SABR adaptation
 - **[Media3 / ExoPlayer](https://github.com/androidx/media)**,
   **[Jetpack Compose](https://developer.android.com/jetpack/compose)** and
   **[Material Design 3](https://m3.material.io/)**

@@ -101,7 +101,7 @@ class TvPluginsFocusTest {
                 Row {
                     Button({}, Modifier.width(180.dp)) { Text("Left menu") }
                     TvPluginsSettingsPane(
-                        onSignIn = { _, _ -> },
+                        onSignIn = { _, _, _ -> },
                         onOpenAppUpdates = { openedAppUpdates++ },
                         modifier = Modifier.width(650.dp),
                         viewModel = viewModel,
