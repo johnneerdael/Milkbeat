@@ -7,7 +7,7 @@ import java.util.Locale
 import kotlin.math.abs
 
 internal object TrackMatchScore {
-    const val POLICY_VERSION = 5
+    const val POLICY_VERSION = 6
     const val MIN_SCORE = 0.35
     private const val CERTAIN = 1.0
     private const val EARLY_EXIT = 0.95
@@ -144,18 +144,32 @@ internal object TrackMatchScore {
         }
         val sourceTitle = foldLatinAccents(normalize(track.title))
         val candidateTitle = foldLatinAccents(normalize(withoutUploader(presentedTitle(candidate.title, normalizedArtist), candidate)))
-        if (sourceMs >= MIN_LIVE_SET_DURATION_MS && candidateMs >= MIN_LIVE_SET_DURATION_MS &&
-            sourceTitle.startsWith("$normalizedArtist ") && candidateTitle.startsWith("$normalizedArtist ") &&
-            liveSetWords.containsMatchIn(sourceTitle) && liveSetWords.containsMatchIn(candidateTitle) &&
-            eventYear.findAll(sourceTitle).map { it.value }.toSet() == eventYear.findAll(candidateTitle).map { it.value }.toSet() &&
-            (
-                sameLength ||
-                    sameDatedLiveSet(sourceTitle.removePrefix("$normalizedArtist "), candidateTitle.removePrefix("$normalizedArtist "))
-            )
-        ) {
-            val titleSimilarity = textSimilarity(sourceTitle, candidateTitle)
-            if (titleSimilarity >= MIN_TITLE_SIMILARITY && versionsCompatible(sourceTitle, candidateTitle)) {
-                return Evidence(titleSimilarity, CERTAIN, durationScore(sourceMs, candidateMs))
+        // Anyone can re-upload a set, so the source's credit may name only its uploader: the channel then
+        // counts as the performer when both titles open with its name.
+        val channel =
+            foldLatinAccents(
+                normalizeText(
+                    candidate.artists
+                        .firstOrNull()
+                        ?.name
+                        .orEmpty()
+                        .replace(topicSuffix, ""),
+                ),
+            ).takeIf { it !in unavailableArtists }
+        for (performer in listOfNotNull(normalizedArtist, channel).distinct()) {
+            if (sourceMs >= MIN_LIVE_SET_DURATION_MS && candidateMs >= MIN_LIVE_SET_DURATION_MS &&
+                sourceTitle.startsWith("$performer ") && candidateTitle.startsWith("$performer ") &&
+                liveSetWords.containsMatchIn(sourceTitle) && liveSetWords.containsMatchIn(candidateTitle) &&
+                eventYear.findAll(sourceTitle).map { it.value }.toSet() == eventYear.findAll(candidateTitle).map { it.value }.toSet() &&
+                (
+                    sameLength ||
+                        sameDatedLiveSet(sourceTitle.removePrefix("$performer "), candidateTitle.removePrefix("$performer "))
+                )
+            ) {
+                val titleSimilarity = textSimilarity(sourceTitle, candidateTitle)
+                if (titleSimilarity >= MIN_TITLE_SIMILARITY && versionsCompatible(sourceTitle, candidateTitle)) {
+                    return Evidence(titleSimilarity, CERTAIN, durationScore(sourceMs, candidateMs))
+                }
             }
         }
         val presented = presentedTitle(candidate.title, normalizedArtist)
