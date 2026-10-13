@@ -12,6 +12,7 @@ Milkbeat 1.0 follows the 0.9 builds directly: it installs over 0.9 with your set
 - The **YouTube Music** and **YouTube Video** plugins are retired and their codes (728, 416, 494, 932, 304 and 744) removed. An installed copy keeps working without updates; its tab and Settings → Plugins page offer **Add YouTube**. [Retired plugins](providers.md#retired-plugins)
 - Signed out, the YouTube tab and Settings → Plugins → YouTube offer **Download MicroG-RE-TV** in the stable GitHub build, which installs the latest MicroG-RE-TV and continues to sign-in. [Sign in](providers.md#sign-in)
 - **YouTube 0.1.4** plays a stream that YouTube's TV player refuses through YouTube's other players, and leaves the TV player out for 30 minutes. [YouTube](providers.md#youtube)
+- **YouTube 0.1.5** with Milkbeat 1.0.1 plays a live set someone else re-uploaded, such as a SoundCloud copy credited to the uploader, through the performer's own YouTube upload. [Playback](playback.md)
 
 ## Playlist syncing to YouTube removed
 
