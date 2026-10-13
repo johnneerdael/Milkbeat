@@ -118,7 +118,7 @@ class AndroidAccountSignInViewModel
         // the one saved when the download started: changed, the update landed; unchanged, the listener is offered the
         // download again rather than having it start by itself, which could loop.
         private val downloadBaseline: Long? = savedStateHandle[DOWNLOAD_BASELINE_KEY]
-        private var downloadInstalled = downloadBaseline != null && microG.installedAt()?.let { it != downloadBaseline } == true
+        private var downloadInstalled = false
 
         /** The method as the installed plugin declares it now; an update can change it while the screen is open. */
         val method: AndroidAccountMethod?
@@ -171,6 +171,10 @@ class AndroidAccountSignInViewModel
 
         fun start() {
             if (_state.value != AndroidAccountSignInState.Starting) return
+            // Judged here with the other MicroG package checks, never while the ViewModel is constructed.
+            if (downloadBaseline != null && !downloadInstalled) {
+                downloadInstalled = microG.installedAt()?.let { it != downloadBaseline } == true
+            }
             val method = method
             when {
                 method == null || method.identities.isEmpty() -> {
