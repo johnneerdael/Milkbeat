@@ -145,7 +145,8 @@ internal object TrackMatchScore {
         val sourceTitle = foldLatinAccents(normalize(track.title))
         val candidateTitle = foldLatinAccents(normalize(withoutUploader(presentedTitle(candidate.title, normalizedArtist), candidate)))
         // Anyone can re-upload a set, so the source's credit may name only its uploader: the channel then
-        // counts as the performer when both titles open with its name.
+        // counts as the performer when both titles open with its name. A promoter's channel opens titles of
+        // other performers' sets too, so on that path the titles must be the same, not merely similar.
         val channel =
             foldLatinAccents(
                 normalizeText(
@@ -157,6 +158,7 @@ internal object TrackMatchScore {
                 ),
             ).takeIf { it !in unavailableArtists }
         for (performer in listOfNotNull(normalizedArtist, channel).distinct()) {
+            if (performer != normalizedArtist && sourceTitle != candidateTitle) continue
             if (sourceMs >= MIN_LIVE_SET_DURATION_MS && candidateMs >= MIN_LIVE_SET_DURATION_MS &&
                 sourceTitle.startsWith("$performer ") && candidateTitle.startsWith("$performer ") &&
                 liveSetWords.containsMatchIn(sourceTitle) && liveSetWords.containsMatchIn(candidateTitle) &&

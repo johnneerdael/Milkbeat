@@ -98,6 +98,10 @@ class TrackMatchScoreTest {
             assertThat(TrackMatchScore.best(repostedCassian, listOf(candidate))).isNull()
         }
         assertThat(TrackMatchScore.best(repostedCassian.copy(title = "Brooklyn Storehouse 2026 Full Set"), listOf(cassianVideo))).isNull()
+        val promoted = track("Boiler Room DJ Alpha Live Festival Event 2026 Full Set", "Reposts", 3_600)
+        val otherSet = video("Boiler Room DJ Beta Live Festival Event 2026 Full Set", "Boiler Room", 3_600_000)
+        assertThat(TrackMatchScore.best(promoted, listOf(otherSet))).isNull()
+        assertThat(TrackMatchScore.best(promoted, listOf(otherSet.copy(title = promoted.title)))?.candidate).isNotNull()
         val song = track("CASSIAN - Magic", "CHU", 240)
         assertThat(TrackMatchScore.best(song, listOf(video("CASSIAN - Magic", "Cassian", 240_000)))).isNull()
     }
