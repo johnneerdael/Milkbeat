@@ -129,6 +129,8 @@ class LiveSetPerformerTitleMatchTest {
         val festival = bodzin.copy(title = "VSNZ Winter Festival 2025")
         val signed = promoterUpload.copy(title = "VSNZ pres. Stephan Bodzin - VSNZ Winter Festival 2025 | VSNZ")
         assertThat(TrackMatchScore.best(festival, listOf(signed))?.candidate).isEqualTo(signed)
+        val signedSet = upload.copy(title = upload.title + " | VSNZ")
+        assertThat(TrackMatchScore.best(set, listOf(signedSet))?.candidate).isEqualTo(signedSet)
     }
 
     @Test

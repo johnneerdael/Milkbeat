@@ -158,11 +158,11 @@ internal object TrackMatchScore {
         val presented = presentedTitle(candidate.title, normalizedArtist)
         val credit = titleCredit.matchEntire(presented) ?: return null
         val performer = foldLatinAccents(normalizeText(credit.groupValues[1]))
-        val title = normalize(credit.groupValues[2])
+        val title = normalize(withoutUploader(credit.groupValues[2], candidate))
         val titleSimilarity = textSimilarity(recordingTitle(track), title)
         if (normalizedArtist == performer && titleSimilarity >= MIN_TITLE_SIMILARITY &&
             versionsCompatible(recordingTitle(track), title) &&
-            (sameLength || sameDatedLiveSet(recordingTitle(track), normalize(withoutUploader(credit.groupValues[2], candidate))))
+            (sameLength || sameDatedLiveSet(recordingTitle(track), title))
         ) {
             return Evidence(titleSimilarity, CERTAIN, durationScore(sourceMs, candidateMs))
         }
