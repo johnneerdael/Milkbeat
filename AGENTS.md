@@ -947,6 +947,12 @@ run that occupies a physical device, and the resulting diff is thousands of line
   chooser/prompt/settings intents must not crash on `SecurityException`. GitHub builds install MicroG-RE-TV through
   the flavor-split `updater/MicroGInstaller` (package check before the installer session); foss builds only explain.
   MicroG-RE-TV serves only `nl.neerdael.milkbeat`, so on-device token tests need the stable package.
+  The chooser retains AccountManager's `app.revanced` filter and configured component, except for
+  `com.google.android.gms/com.google.android.gms.common.account.NoTouchAccountPickerActivity`, used by
+  TCL Google TV: replace that target with `android/android.accounts.ChooseTypeAndAccountActivity`.
+  Preserve other OEM pickers and launch directly from Milkbeat for caller account visibility;
+  MicroG's forwarding picker changes that caller. Regressions:
+  `--tests '*MicroGAccountPickerTest'` and `MicroGAccountPickerDeviceTest` (requires MicroG and an account).
   Sign-out and removal go through `MicroGAccounts.revoke`, which stays in force for the whole plugin transition
   and completes it non-cancellably (plugin calls are bounded by the runtime timeout).
   It must never take the per-plugin `signingIn` lock, because an attempt's own rollback signs the plugin out;
