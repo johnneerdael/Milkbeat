@@ -3,6 +3,7 @@ package io.github.aedev.flow.plugin.playback
 import com.google.common.truth.Truth.assertThat
 import io.github.aedev.flow.plugin.PluginHost
 import io.github.aedev.flow.plugin.catalog.PluginAccounts
+import io.github.aedev.flow.plugin.catalog.ProviderEntityReference
 import io.github.aedev.flow.plugin.registry.InstalledPlugin
 import io.github.aedev.flow.plugin.registry.PluginRegistry
 import io.github.aedev.flow.plugin.registry.PluginRegistryState
@@ -78,6 +79,18 @@ class OtherProviderRadioTest {
             coVerify(exactly = 1) { host.call("youtube", PluginOperations.matchAudio, match { it.track.ids["isrc"] == "NL0000000001" }) }
             coVerify(exactly = 0) { host.call("spotify", PluginOperations.radio, any()) }
             coVerify(exactly = 0) { host.call(any(), PluginOperations.resolveAudio, any()) }
+        }
+
+    @Test
+    fun `a provider-scoped playback id still gets YouTube's radio for another provider's track`() =
+        runTest {
+            val seed = EntityRef(EntityKind.TRACK, ProviderEntityReference.encode("spotify", spotifyTrack.ref))
+
+            val page = radio.page(seed, spotifyTrack)
+
+            assertThat(page?.pluginId).isEqualTo("youtube")
+            assertThat(page?.seed?.providerId).isEqualTo("yt-rakata")
+            coVerify(exactly = 0) { host.call("spotify", PluginOperations.radio, any()) }
         }
 
     @Test

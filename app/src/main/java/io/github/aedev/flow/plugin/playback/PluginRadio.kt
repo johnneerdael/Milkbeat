@@ -105,7 +105,8 @@ class PluginRadio
                 }
             // A queue that does not come from YouTube gets YouTube's radio for its track, matched by its metadata;
             // the track's own provider radio remains only for a track YouTube cannot match.
-            if (seedTrack != null && scoped == null && YOUTUBE_ID_SPACE !in seedTrack.ids) {
+            // Whether a track is YouTube's own comes from its descriptor, not from a provider-scoped playback id.
+            if (seedTrack != null && YOUTUBE_ID_SPACE !in seedTrack.ids) {
                 youTubeRadio(state, if (local) seedTrack.copy(ids = emptyMap()) else seedTrack)?.let { return it }
             }
             if (local) return null
