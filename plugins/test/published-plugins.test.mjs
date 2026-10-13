@@ -64,28 +64,22 @@ test('stable publication rejects prerelease packages before an automatic update 
  assert.throws(()=>verifyPublishedPlugins(value),/prerelease.*stable/i);
 });
 
-test('preview metadata uses only its pinned nightly catalog and retains the original signed archive',()=>{
+test('preview metadata uses only its pinned nightly catalog',()=>{
  const descriptor=JSON.parse(readFileSync(new URL('../published-preview.json',import.meta.url)));
  const catalog=readCatalog(new URL('../../app/src/nightly/assets/plugin-preview-download-catalog.json',import.meta.url)).entries;
- const rows=verifyPublishedPlugins({descriptor,catalog,channel:'preview'});
- const preview=rows.find(row=>row.id==='nl.neerdael.youtube-music');
- assert.equal(preview.versionCode,14);
- assert.equal(preview.sha256,'7f7354fdebb8cce461edd84669bc553fd4bebbe2b5c243631ca46191fa8db346');
- assert.equal(catalog.find(entry=>entry.code===preview.code).url,'https://buzzheavier.com/2t67lln3fh00');
- const expectedIds=descriptor.plugins.map(row=>row.id);
- assert.throws(()=>verifyPublishedPlugins({descriptor,catalog,expectedIds}),/prerelease.*stable/i);
+ assert.deepEqual(verifyPublishedPlugins({descriptor,catalog,channel:'preview'}).map(row=>row.id).sort(),[...descriptor.plugins.map(row=>row.id)].sort());
 });
 
-test('stable and preview both publish YouTube Video, and stable rejects a list without it',()=>{
- const preview=JSON.parse(readFileSync(new URL('../published-preview.json',import.meta.url)));
- const previewCatalog=readCatalog(new URL('../../app/src/nightly/assets/plugin-preview-download-catalog.json',import.meta.url)).entries;
- assert.ok(verifyPublishedPlugins({descriptor:preview,catalog:previewCatalog,channel:'preview'}).some(row=>row.id==='nl.neerdael.youtube-video'));
+test('the retired YouTube Music and YouTube Video are gone from both channels and catalogs; YouTube replaces them',()=>{
+ const retired=['nl.neerdael.youtube-music','nl.neerdael.youtube-video'];
  const stable=JSON.parse(readFileSync(new URL('../published.json',import.meta.url)));
+ const preview=JSON.parse(readFileSync(new URL('../published-preview.json',import.meta.url)));
  const catalog=readCatalog(new URL('../../app/src/main/assets/plugin-download-catalog.json',import.meta.url)).entries;
- const video=verifyPublishedPlugins({descriptor:stable,catalog}).find(row=>row.id==='nl.neerdael.youtube-video');
- assert.equal(video.code,'932');
- const withoutVideo={...stable,plugins:stable.plugins.filter(row=>row.id!=='nl.neerdael.youtube-video')};
- assert.throws(()=>verifyPublishedPlugins({descriptor:withoutVideo,catalog}),/Invalid published plugin descriptor/);
+ const previewCatalog=readCatalog(new URL('../../app/src/nightly/assets/plugin-preview-download-catalog.json',import.meta.url)).entries;
+ for(const rows of [stable.plugins,preview.plugins,catalog,previewCatalog])assert.ok(rows.every(row=>!retired.includes(row.id)));
+ assert.equal(verifyPublishedPlugins({descriptor:stable,catalog}).find(row=>row.id==='nl.neerdael.youtube').code,'563');
+ const withRetired={...stable,plugins:[...stable.plugins,{...stable.plugins[0],id:'nl.neerdael.youtube-music'}]};
+ assert.throws(()=>verifyPublishedPlugins({descriptor:withRetired,catalog}),/Invalid published plugin descriptor/);
 });
 
 test('a published row may state the API minimum and format Milkbeat needs, as positive integers',()=>{
@@ -97,16 +91,16 @@ test('a published row may state the API minimum and format Milkbeat needs, as po
  }
 });
 
-test('every stable and preview row states its package compatibility, and preview offers the released YouTube Video',()=>{
+test('every stable and preview row states its package compatibility, and preview offers the released YouTube',()=>{
  const read=path=>JSON.parse(readFileSync(new URL(path,import.meta.url)));
  const stable=read('../published.json'),preview=read('../published-preview.json');
  for(const row of [...stable.plugins,...preview.plugins]){
   assert.ok(Number.isInteger(row.apiMin),`${row.id} ${row.version} states apiMin`);
   assert.ok(Number.isInteger(row.format),`${row.id} ${row.version} states format`);
  }
- const video=descriptor=>descriptor.plugins.find(row=>row.id==='nl.neerdael.youtube-video');
- assert.deepEqual(video(preview),video(stable));
+ const youtube=descriptor=>descriptor.plugins.find(row=>row.id==='nl.neerdael.youtube');
+ assert.deepEqual(youtube(preview),youtube(stable));
  const previewCatalog=readCatalog(new URL('../../app/src/nightly/assets/plugin-preview-download-catalog.json',import.meta.url)).entries;
  const catalog=readCatalog(new URL('../../app/src/main/assets/plugin-download-catalog.json',import.meta.url)).entries;
- assert.equal(previewCatalog.find(entry=>entry.code==='932').url,catalog.find(entry=>entry.code==='932').url);
+ assert.equal(previewCatalog.find(entry=>entry.code==='563').url,catalog.find(entry=>entry.code==='563').url);
 });

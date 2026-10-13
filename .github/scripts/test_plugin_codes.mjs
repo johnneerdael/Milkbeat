@@ -10,7 +10,7 @@ const published = {
   plugins: [
     { id: 'nl.neerdael.beatport', name: 'Beatport', version: '0.1.3', code: '393' },
     { id: 'nl.neerdael.spotify', name: 'Spotify', version: '0.2.2', code: '981' },
-    { id: 'nl.neerdael.youtube-music', name: 'YouTube Music', version: '0.2.2', code: '494' },
+    { id: 'nl.neerdael.youtube', name: 'YouTube', version: '0.1.3', code: '563' },
   ],
 };
 
@@ -34,11 +34,11 @@ test('renders every layout from the published plugins', () => {
     '| --- | --- | --- |',
     '| Beatport | **393** | 102 |',
     '| Spotify | **981** | 772 |',
-    '| YouTube Music | **494** | 416 |',
+    '| YouTube | **563** | — |',
     '<!-- /plugin-codes -->',
   ].join('\n'));
   assert.match(renderTables(marked('user-guide'), plugins), /\| Code \| Plugin \|\n\| --- \| --- \|\n\| \*\*393\*\* \| Beatport \|/);
-  assert.match(renderTables(marked('maintainer'), plugins), /\| 416 \| YouTube Music \|\n\| 393 \| Beatport, private publisher \|/);
+  assert.match(renderTables(marked('maintainer'), plugins), /\| 772 \| Spotify \|\n\| 393 \| Beatport, private publisher \|/);
   assert.throws(() => renderTables(marked('unknown'), plugins), /Unknown plugin-codes layout/);
 });
 
@@ -50,7 +50,7 @@ test('sync rewrites only marked tables and check reports them until synced', () 
     assert.deepEqual(syncDocs(root, { write: true }), ['README.md', 'docs/user-guide/providers.md']);
     const readme = readFileSync(join(root, 'README.md'), 'utf8');
     assert.match(readme, /^Intro\n\n<!-- plugin-codes:readme -->\n\| Third-party plugin/);
-    assert.match(readme, /\| YouTube Music \| \*\*494\*\* \| 416 \|\n<!-- \/plugin-codes -->\n\nOutro\n$/);
+    assert.match(readme, /\| YouTube \| \*\*563\*\* \| — \|\n<!-- \/plugin-codes -->\n\nOutro\n$/);
     assert.equal(readFileSync(join(root, 'docs/unmarked.md'), 'utf8'), '| **393** | Beatport |\n');
     assert.deepEqual(syncDocs(root), []);
   } finally {

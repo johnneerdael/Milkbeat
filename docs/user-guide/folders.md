@@ -111,7 +111,7 @@ There are two ways to play folder music:
 
 Embedded title, artist, album, duration and cover art load in the background for visible or playing tracks. MP3, FLAC and M4A have been tested, including seeking and embedded artwork; other formats depend on the device's codecs. Files without readable tags fall back to their filenames.
 
-Local audio always plays from its file. With an enabled YouTube Music plugin, Milkbeat matches the first queued song's title, artists and duration in the background only to seed [radio](playback.md#radio-and-its-presets); it never swaps the local file for a stream. Without the plugin, a connection or a match, the local queue still plays.
+Local audio always plays from its file. With an enabled YouTube plugin, Milkbeat matches the first queued song's title, artists and duration in the background only to seed [radio](playback.md#radio-and-its-presets); it never swaps the local file for a stream. Without the plugin, a connection or a match, the local queue still plays.
 
 ## The local library index
 

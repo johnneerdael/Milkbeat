@@ -166,9 +166,8 @@ DOWNLOADER_URL = "https://play.google.com/store/apps/details?id=com.esaba.downlo
 # What each plugin provides; names, versions and downloader codes come from plugins/published.json,
 # which the plugin publisher updates on main whenever it publishes a release.
 PLUGIN_ROLES = {
-    "nl.neerdael.youtube-music": "music and YouTube videos",
     "nl.neerdael.beatport": "full-length streaming needs a Beatport streaming subscription",
-    "nl.neerdael.spotify": "metadata; select YouTube Music for audio",
+    "nl.neerdael.spotify": "metadata; select YouTube for audio",
     "nl.neerdael.youtube": "YouTube Music and YouTube; signs in with a Google account from MicroG-RE-TV",
 }
 

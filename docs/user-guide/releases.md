@@ -2,6 +2,12 @@
 
 Every merged change to `main` publishes a new release with its own notes on [GitHub Releases](https://github.com/johnneerdael/Milkbeat/releases). This page summarizes the larger changes.
 
+## YouTube replaces YouTube Music and YouTube Video
+
+- The **YouTube** plugin (code **563**) is now the one YouTube provider: YouTube Music Home with mood chips, search, pages, library and radio, plus YouTube playback and music videos. It gets the **YouTube** tab also signed out, and holds it when the old plugins are still installed. [YouTube](providers.md#youtube)
+- The **YouTube Music** and **YouTube Video** plugins are retired and their codes (728, 416, 494, 932, 304 and 744) removed. An installed copy keeps working without updates; its tab and Settings → Plugins page offer **Add YouTube**. [Retired plugins](providers.md#retired-plugins)
+- Signed out, the YouTube tab and Settings → Plugins → YouTube offer **Download MicroG-RE-TV** in the stable GitHub build, which installs the latest MicroG-RE-TV and continues to sign-in. [Sign in](providers.md#sign-in)
+
 ## Since 0.9.0 (up to 0.9.55)
 
 ### Browsing
@@ -60,7 +66,7 @@ Update your existing Milkbeat installation to retain sign-ins and settings. Loca
 
 | Third-party plugin | Downloader code |
 | --- | --- |
-| YouTube Music and YouTube | **728** |
+| YouTube Music and YouTube | **728** (retired: install YouTube with **563**) |
 | Spotify metadata | **981** |
 | Beatport | **393** |
 
