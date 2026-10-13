@@ -362,7 +362,7 @@ class DownloadUtil
             val picture = uri.scheme == MusicVideoItems.SCHEME
             val limits = if (picture) PictureLimits(maxVideoHeight, pictureCodecs(VideoCodecUtils.NO_PREFERENCE)) else null
             val quality = AudioQuality.valueOf(playerPreferences.musicAudioQuality.first().name)
-            return pluginAudio.prepareQueue(descriptor, null, quality, MusicVideoItems.preferredProvider(uri), preparePicture = limits)
+            return pluginAudio.prepareQueue(descriptor, null, quality, preparePicture = limits)
         }
 
         private suspend fun resolveForPlayback(
@@ -383,7 +383,6 @@ class DownloadUtil
                 limits,
                 AudioQuality.valueOf(quality.name),
                 uri.authority ?: descriptor.ref.providerId,
-                MusicVideoItems.preferredProvider(uri),
                 preparePicture = prepared,
             )
         }

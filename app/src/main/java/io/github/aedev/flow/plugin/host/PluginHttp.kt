@@ -1,18 +1,14 @@
 package io.github.aedev.flow.plugin.host
 
-import android.util.Log
-import io.github.aedev.flow.BuildConfig
 import io.github.aedev.flow.player.diagnostics.PlaybackTrace
 import io.github.aedev.flow.player.diagnostics.TraceEvent
 import io.github.aedev.flow.player.diagnostics.TraceField
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.json.jsonObject
 import nl.neerdael.milkbeat.plugin.HttpBodyEncoding
 import nl.neerdael.milkbeat.plugin.HttpRequest
 import nl.neerdael.milkbeat.plugin.HttpResponse
-import nl.neerdael.milkbeat.plugin.PluginJson
 import okhttp3.Call
 import okhttp3.Callback
 import okhttp3.Interceptor
@@ -107,24 +103,6 @@ internal class PluginHttp(
                         } else {
                             bytes.toString(Charsets.UTF_8)
                         }
-                    if (BuildConfig.DEBUG && url.host == "music.youtube.com" && url.encodedPath.endsWith("/browse") &&
-                        request.body?.contains("\"browseId\":\"VL") == true
-                    ) {
-                        Log.i(
-                            "PlaylistMirrorHttp",
-                            "Playlist response: " +
-                                "status=${response.code}, keys=${runCatching {
-                                    PluginJson
-                                        .parseToJsonElement(
-                                            responseText,
-                                        ).jsonObject.keys
-                                }.getOrNull()}, " +
-                                "editable=${responseText.contains("musicEditablePlaylistDetailHeaderRenderer")}, " +
-                                "marker=${responseText.contains("[milkbeat-mirror:")}, " +
-                                "legacyHeader=${responseText.contains("musicDetailHeaderRenderer")}, " +
-                                "responsiveHeader=${responseText.contains("musicResponsiveHeaderRenderer")}",
-                        )
-                    }
                     HttpResponse(
                         status = response.code,
                         url = response.request.url.toString(),

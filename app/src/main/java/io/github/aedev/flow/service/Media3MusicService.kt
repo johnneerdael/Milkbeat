@@ -130,7 +130,6 @@ class Media3MusicService : MediaLibraryService() {
     internal var radioSeedId: String? = null
     internal var radioGeneration = 0L
     internal var radioSeedPending = false
-    internal var radioCollectionId: String? = null
     internal var radioContinuation: String? = null
     internal var radioPage: RadioPage? = null
     internal var radioTopUpJob: Job? = null
@@ -357,7 +356,7 @@ class Media3MusicService : MediaLibraryService() {
         val mediaSourceFactory =
             MusicMediaSourceFactory(DefaultMediaSourceFactory(playerDataSourceFactory), playerDataSourceFactory) { item ->
                 item.localConfiguration?.uri?.let {
-                    pluginAudio.deliveryFor(MusicVideoItems.descriptor(it), MusicVideoItems.preferredProvider(it)) ==
+                    pluginAudio.deliveryFor(MusicVideoItems.descriptor(it)) ==
                         AudioDelivery.HLS
                 } ==
                     true

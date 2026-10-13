@@ -8,6 +8,12 @@ Every merged change to `main` publishes a new release with its own notes on [Git
 - The **YouTube Music** and **YouTube Video** plugins are retired and their codes (728, 416, 494, 932, 304 and 744) removed. An installed copy keeps working without updates; its tab and Settings → Plugins page offer **Add YouTube**. [Retired plugins](providers.md#retired-plugins)
 - Signed out, the YouTube tab and Settings → Plugins → YouTube offer **Download MicroG-RE-TV** in the stable GitHub build, which installs the latest MicroG-RE-TV and continues to sign-in. [Sign in](providers.md#sign-in)
 
+## Playlist syncing to YouTube removed
+
+- Milkbeat no longer prepares **private YouTube copies** of Spotify and other playlists: the **Prepare private playlists in** option, its background preparation and progress, and playback through those copies are gone. Copies made earlier stay in your YouTube account and show in Library like your other playlists.
+- A queue that does not come from YouTube continues with **YouTube's radio for its first song**, matched by title, artist and length, and with that service's own radio only when YouTube has no match. [Playback](playback.md)
+- Entries below that describe private playlist preparation, mirroring pairs or batch playlist copying are history.
+
 ## Since 0.9.0 (up to 0.9.55)
 
 ### Browsing
@@ -73,7 +79,7 @@ Update your existing Milkbeat installation to retain sign-ins and settings. Loca
 Plugin capabilities depend on the installed version, account and subscription. After an app update, Milkbeat reads each installed plugin's capabilities again, so features a plugin already declared, such as parallel playlist matching, become available without reinstalling it. YouTube sign-in is optional for normal playback and supports personalized Home with free accounts. Spotify supplies metadata and requires a separate audio provider. Beatport requires sign-in and a streaming subscription for full streams.
 
 - [Install Milkbeat](getting-started.md)
-- [Prepare private playlists](providers.md#prepare-private-playlists)
+- [Set audio priority](providers.md#set-audio-priority)
 - [Use radio modes and the queue](playback.md#radio-and-its-presets)
 - [All GitHub releases](https://github.com/johnneerdael/Milkbeat/releases)
 

@@ -65,7 +65,6 @@ data class TvPluginsState(
     val selection: ProviderSelection = ProviderSelection(),
     val accounts: Map<String, ProviderAccount> = emptyMap(),
     val adding: AddPluginState = AddPluginState.Idle,
-    val mirrorPairs: Set<String> = emptySet(),
     val updates: PluginUpdatesState = PluginUpdatesState.Idle,
 )
 
@@ -83,7 +82,6 @@ class TvPluginsViewModel
         links: PluginLinks,
         val preloadJobs: PlaylistPreloadJobs,
         private val savedState: SavedStateHandle,
-        val mirrors: io.github.aedev.flow.plugin.mirror.PlaylistMirrorCoordinator,
         microGInstaller: MicroGInstaller,
     ) : ViewModel() {
         /** Whether this build can download and install MicroG-RE-TV for a plugin's Google account sign-in. */
@@ -100,10 +98,9 @@ class TvPluginsViewModel
                 registry.state,
                 accounts.accounts,
                 adding,
-                mirrors.store.enabledPairs,
                 pluginUpdater.state,
-            ) { registryState, known, add, pairs, found ->
-                TvPluginsState(registryState.plugins, registryState.selection, known, add, pairs, found)
+            ) { registryState, known, add, found ->
+                TvPluginsState(registryState.plugins, registryState.selection, known, add, found)
             }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), TvPluginsState())
 
         init {
@@ -223,15 +220,6 @@ class TvPluginsViewModel
 
         fun setPlayHistoryEnabled(enabled: Boolean) {
             viewModelScope.launch { playHistory.setEnabled(enabled) }
-        }
-
-        fun setMirrorEnabled(
-            source: String,
-            target: String,
-            enabled: Boolean,
-        ) {
-            if (enabled && !mirrors.available(source, target)) return
-            viewModelScope.launch { mirrors.store.setEnabled(source, target, enabled) }
         }
 
         fun signOut(id: String) {

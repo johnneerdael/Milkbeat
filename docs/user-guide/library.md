@@ -84,7 +84,7 @@ The fixed sections follow the provider chips:
 | **Watch later** | Videos saved for later |
 | **Playlists** | App playlists and playlists from every enabled, signed-in provider, including **Liked songs** |
 
-Liked videos are not shown in this TV library. When Spotify is signed in and [private playlist preparation](providers.md#prepare-private-playlists) is on, Library hides the managed YouTube copies that duplicate their Spotify source.
+Liked videos are not shown in this TV library. Private YouTube copies that earlier Milkbeat versions made of Spotify playlists stay in your YouTube account and appear under Playlists like any other YouTube playlist.
 
 <div class="mb-pair" markdown>
 ![Library → Folders with an SMB source](images/library-folders.png)
@@ -98,14 +98,9 @@ Pages are laid out like YouTube Music on the web, with the same components for e
 - **Albums and playlists** keep the cover, details, **Play** and **Shuffle** on the left, with the tracks beside them. From Play or Shuffle, Right jumps to the first track.
 - **Artists** open on their name, audience, description and portrait, with **Play**, **Shuffle**, **Mix** and **Subscribe**, followed by Top songs, Albums, Singles & EPs, Videos and more.
 
-<div class="mb-pair" markdown>
 ![A YouTube Music album page: cover and buttons on the left, numbered tracks on the right](images/album-page.png)
-![A Spotify playlist with its YouTube private copy ready](images/playlist-ready.png)
-</div>
 
 <div class="mb-pair" markdown>
 ![A YouTube Music artist page with portrait, buttons and Top songs](images/artist-page.png)
 ![The artist's Singles & EPs and Videos shelves](images/artist-page-shelves.png)
 </div>
-
-A Spotify playlist with [private preparation](providers.md#prepare-private-playlists) shows its progress under the description, and a small YouTube mark beside **Private playlist ready** once its copy is complete.

@@ -6,6 +6,7 @@ import io.github.aedev.flow.plugin.PluginHost
 import io.github.aedev.flow.plugin.catalog.PluginAccounts
 import io.github.aedev.flow.plugin.catalog.ProviderEntityReference
 import io.github.aedev.flow.plugin.registry.PluginRegistry
+import io.github.aedev.flow.plugin.registry.PluginRegistryState
 import io.github.aedev.flow.plugin.runtime.PluginCallException
 import nl.neerdael.milkbeat.catalog.EntityRef
 import nl.neerdael.milkbeat.catalog.RadioRequest
@@ -18,6 +19,9 @@ import nl.neerdael.milkbeat.plugin.PluginOperation
 import nl.neerdael.milkbeat.plugin.PluginOperations
 import javax.inject.Inject
 import javax.inject.Singleton
+
+// The id space of YouTube's music catalog, whose tracks keep their own radio.
+private const val YOUTUBE_ID_SPACE = "ytm"
 
 /**
  * A page of a radio, from the plugin [pluginId] that built it from [seed], its own id for what the
@@ -89,24 +93,23 @@ class PluginRadio
             seedTrack: TrackDescriptor? = null,
         ): RadioPage? {
             val state = registry.state.value
-            if (LocalMediaIds.isLocal(seed.providerId)) {
-                val track = seedTrack ?: return null
-                for (plugin in state.plugins.filter {
-                    it.enabled &&
-                        it.manifest.roles.audio
-                            ?.let { role -> "ytm" in role.idSpaces && role.match && role.radio } == true
-                }) {
-                    try {
-                        val matched = audio.playableIn(track.copy(ids = emptyMap()), plugin.id) ?: continue
-                        val tracks = request(plugin.id, PluginOperations.audioRadio, RadioRequest(matched.ref))
-                        if (tracks.tracks.isNotEmpty()) return RadioPage(plugin.id, tracks, matched.ref, fromAudio = true)
-                    } catch (e: PluginCallException) {
-                        Log.w("PluginRadio", "Local song radio unavailable from ${plugin.id}: ${e.error.code}")
+            val local = LocalMediaIds.isLocal(seed.providerId)
+            val scoped =
+                if (local) {
+                    null
+                } else {
+                    ProviderEntityReference.decode(seed.providerId)?.takeIf {
+                        seedTrack == null ||
+                            it.entity == seedTrack.ref
                     }
                 }
-                return null
+            // A queue that does not come from YouTube gets YouTube's radio for its track, matched by its metadata;
+            // the track's own provider radio remains only for a track YouTube cannot match.
+            // Whether a track is YouTube's own comes from its descriptor, not from a provider-scoped playback id.
+            if (seedTrack != null && YOUTUBE_ID_SPACE !in seedTrack.ids) {
+                youTubeRadio(state, if (local) seedTrack.copy(ids = emptyMap()) else seedTrack)?.let { return it }
             }
-            val scoped = ProviderEntityReference.decode(seed.providerId)?.takeIf { seedTrack == null || it.entity == seedTrack.ref }
+            if (local) return null
             val compatible =
                 state.plugins.filter { plugin ->
                     plugin.enabled && seedTrack?.ids?.containsKey(
@@ -168,6 +171,26 @@ class PluginRadio
                 } catch (e: PluginCallException) {
                     Log.w("PluginRadio", "Audio radio unavailable from ${plugin.id}: ${e.error.code}")
                     continue
+                }
+            }
+            return null
+        }
+
+        private suspend fun youTubeRadio(
+            state: PluginRegistryState,
+            track: TrackDescriptor,
+        ): RadioPage? {
+            for (plugin in state.plugins.filter {
+                it.enabled &&
+                    it.manifest.roles.audio
+                        ?.let { role -> YOUTUBE_ID_SPACE in role.idSpaces && role.match && role.radio } == true
+            }) {
+                try {
+                    val matched = audio.playableIn(track, plugin.id) ?: continue
+                    val tracks = request(plugin.id, PluginOperations.audioRadio, RadioRequest(matched.ref))
+                    if (tracks.tracks.isNotEmpty()) return RadioPage(plugin.id, tracks, matched.ref, fromAudio = true)
+                } catch (e: PluginCallException) {
+                    Log.w("PluginRadio", "Song radio unavailable from ${plugin.id}: ${e.error.code}")
                 }
             }
             return null

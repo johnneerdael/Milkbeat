@@ -52,9 +52,7 @@ internal fun Media3MusicService.onQueueContextChanged(currentId: String) {
     radioGeneration++
     radioTuning.reset(radioGeneration)
     val seedId = currentId
-    manager.queueCollectionState.value = manager.currentTrack.value
-        ?.playbackContext
-        ?.sourceCollectionId ?: collectionId
+    manager.queueCollectionState.value = collectionId
     radioSeedId = seedId
     radioContinuation = null
     radioPage = null
@@ -63,12 +61,6 @@ internal fun Media3MusicService.onQueueContextChanged(currentId: String) {
     automixJob?.cancel()
     radioTopUpJob?.cancel()
     manager.updateAutomixItems(emptyList())
-    radioCollectionId =
-        manager.currentTrack.value
-            ?.playbackContext
-            ?.takeIf { it.preferCollectionRadio }
-            ?.radioCollectionId
-            ?.takeUnless { context.explicit }
     radioSeedPending = true
     manager.setRadioLoading(false)
     if (player.isPlaying) startPendingRadio()
@@ -97,7 +89,6 @@ internal fun Media3MusicService.startRadio(currentId: String) {
     val generation = radioGeneration
     val seeds =
         MusicRadioPlanner.radioSeeds(
-            mirrorPlaylistId = radioCollectionId,
             queueIds =
                 manager.queue.value
                     .map { it.videoId },
@@ -110,22 +101,13 @@ internal fun Media3MusicService.startRadio(currentId: String) {
                     MusicRadioPlanner.firstStation(
                         seeds,
                         page = { candidate ->
-                            when (candidate) {
-                                is MusicRadioPlanner.RadioSeed.Playlist -> {
-                                    mix(EntityRef(EntityKind.PLAYLIST, candidate.id))
-                                }
-
-                                is MusicRadioPlanner.RadioSeed.Track -> {
-                                    mix(
-                                        EntityRef(EntityKind.TRACK, candidate.id),
-                                        queuedDescriptor(candidate.id),
-                                    )
-                                }
-                            }
+                            mix(
+                                EntityRef(EntityKind.TRACK, candidate.trackId),
+                                queuedDescriptor(candidate.trackId),
+                            )
                         },
                         station = { candidate, page ->
-                            val seedId = (candidate as? MusicRadioPlanner.RadioSeed.Track)?.id ?: currentId
-                            radioModeTuner.withoutHiddenArtists(toRadioTracks(page, seedId))
+                            radioModeTuner.withoutHiddenArtists(toRadioTracks(page, candidate.trackId))
                         },
                     )
                 val seed = seeded?.seed
@@ -134,7 +116,7 @@ internal fun Media3MusicService.startRadio(currentId: String) {
                 withContext(Dispatchers.Main) {
                     if (generation != radioGeneration) return@withContext
                     // A top-up whose mix ran out reseeds from anything but this, so it names the track actually used.
-                    radioSeedId = (seed as? MusicRadioPlanner.RadioSeed.Track)?.id ?: currentId
+                    radioSeedId = seed?.trackId ?: currentId
                     radioContinuation = result?.tracks?.next
                     radioPage = result
                     radioTuning.station(result, generation)

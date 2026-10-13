@@ -22,7 +22,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
@@ -60,7 +59,6 @@ class CatalogPageViewModel
         defaultPlayback: CatalogPlayback = NoCatalog,
         private val subscriptions: SubscriptionRepository,
         pluginCatalog: PluginMetadataProvider? = null,
-        private val mirrors: io.github.aedev.flow.plugin.mirror.PlaylistMirrorCoordinator? = null,
         localCatalog: LocalCatalogProvider? = null,
         installation: Flow<Any?> = flowOf(null),
     ) : ViewModel() {
@@ -70,7 +68,6 @@ class CatalogPageViewModel
             savedStateHandle: SavedStateHandle,
             subscriptions: SubscriptionRepository,
             pluginCatalog: PluginMetadataProvider,
-            mirrors: io.github.aedev.flow.plugin.mirror.PlaylistMirrorCoordinator,
             localCatalog: LocalCatalogProvider,
         ) : this(
             savedStateHandle,
@@ -78,7 +75,6 @@ class CatalogPageViewModel
             NoCatalog,
             subscriptions,
             pluginCatalog,
-            mirrors,
             localCatalog,
             savedStateHandle
                 .get<String>(PROVIDER_ARG)
@@ -129,52 +125,6 @@ class CatalogPageViewModel
             }
 
         private var job: Job? = null
-        private val _mirror =
-            MutableStateFlow(
-                io.github.aedev.flow.plugin.mirror
-                    .PlaylistMirrorState(),
-            )
-        val mirror: StateFlow<io.github.aedev.flow.plugin.mirror.PlaylistMirrorState> = _mirror
-        private val _mirrorTarget = MutableStateFlow<nl.neerdael.milkbeat.plugin.PluginManifest?>(null)
-        val mirrorTarget: StateFlow<nl.neerdael.milkbeat.plugin.PluginManifest?> = _mirrorTarget
-        private var mirrorJob: Job? = null
-
-        fun retryMirror() {
-            val header =
-                _state.value.blocks
-                    .filterIsInstance<EntityHeader>()
-                    .firstOrNull() ?: return
-            prepareMirror(header.title, header.artwork)
-        }
-
-        private fun prepareMirror(
-            title: String,
-            artwork: nl.neerdael.milkbeat.catalog.Artwork?,
-        ) {
-            mirrorJob?.cancel()
-            _mirror.value =
-                io.github.aedev.flow.plugin.mirror
-                    .PlaylistMirrorState()
-            val coordinator = mirrors?.takeIf { LocalRef.parse(entity) == null } ?: return
-            val identity = _state.value.sourceKey
-            mirrorJob =
-                viewModelScope.launch {
-                    combine(coordinator.observeSelectedKey(provider.id, entity), sourceIdentity) { key, currentIdentity ->
-                        key.takeIf { currentIdentity == identity }
-                    }.distinctUntilChanged().collectLatest { key ->
-                        _mirror.value =
-                            io.github.aedev.flow.plugin.mirror
-                                .PlaylistMirrorState()
-                        _mirrorTarget.value = key?.let(coordinator::target)
-                        if (key == null) return@collectLatest
-                        coordinator.open(provider.id, entity, title, artwork)
-                        coordinator.state(key).collect { progress ->
-                            currentCoroutineContext().ensureActive()
-                            if (_state.value.sourceKey == identity) _mirror.value = progress
-                        }
-                    }
-                }
-        }
 
         /** A provider's artist can be followed; an artist of the local library is only its tags. */
         val canFollow: Boolean get() = entity.kind == EntityKind.ARTIST && LocalRef.parse(entity) == null
@@ -237,10 +187,6 @@ class CatalogPageViewModel
                     currentCoroutineContext().ensureActive()
                     if (sourceIdentity.first() != identity) return@launch
                     _state.update { it.copy(blocks = emptyList<PageBlock>().withPage(first.blocks), isLoading = false) }
-                    first.blocks
-                        .filterIsInstance<EntityHeader>()
-                        .firstOrNull()
-                        ?.let { prepareMirror(it.title, it.artwork) }
                     var cursor = first.nextCursor
                     val seen = mutableSetOf<String>()
                     var pages = 0

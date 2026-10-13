@@ -76,8 +76,8 @@ Open the queue with the button at the end of the control row to see what is comi
 
 Every queue continues as a radio once its own tracks run out:
 
-- A streaming album, playlist or artist hands over to the mix of its first song. When the provider it came from has no radio, Milkbeat asks your audio providers in priority order.
-- Spotify tracks use the radio of their matched YouTube recording. A [prepared private playlist](providers.md#prepare-private-playlists) instead gives YouTube the whole playlist as its autoplay context.
+- A YouTube album, playlist or artist hands over to the mix of its first song.
+- A queue from any other provider, such as Spotify, Beatport or SoundCloud, continues with YouTube's radio for its first song, matched on YouTube with an enabled YouTube audio plugin. Only when YouTube cannot match that song does the queue use its own provider's radio; when that provider has no radio, Milkbeat asks your audio providers in priority order.
 - Selecting a single track plays it and then its radio.
 - [Local music](#local-music-and-radio) seeds the radio from its first song without leaving the local file.
 
@@ -85,7 +85,7 @@ Every queue continues as a radio once its own tracks run out:
 
 All the presets YouTube Music offers for the current radio appear in one scrolling line pinned above the queue: **All**, **Discover**, **Popular**, **Deep cuts**, moods such as **Party** or **Pump-up**, and decades such as **2010s**. Press **Right** on a queue track to reach them, **Left** and **Right** to move along them, **OK** to switch, and **Down** to return to the track you left with the queue's scroll position kept.
 
-Switching a preset replaces the upcoming radio suggestions while keeping the playing song, the original playlist or album and any tracks you added yourself. Later continuations stay in the chosen preset. Presets only appear when the provider supplies them for the current context; the queue keeps room for the focused row's border even when there are none. Radio suggestions are never written into a prepared private playlist, and artists you hide stay out of mixes.
+Switching a preset replaces the upcoming radio suggestions while keeping the playing song, the original playlist or album and any tracks you added yourself. Later continuations stay in the chosen preset. Presets only appear when the provider supplies them for the current context; the queue keeps room for the focused row's border even when there are none. Artists you hide stay out of mixes.
 
 ## Local music and radio
 

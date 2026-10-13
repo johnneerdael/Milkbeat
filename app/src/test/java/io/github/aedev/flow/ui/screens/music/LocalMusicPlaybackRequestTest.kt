@@ -93,7 +93,6 @@ class LocalMusicPlaybackRequestTest {
                 mockk(relaxed = true),
                 mockk(relaxed = true),
                 mockk(relaxed = true),
-                mockk(relaxed = true),
             )
         stores.add(ViewModelStore().apply { put("local-playback", viewModel) })
         return viewModel

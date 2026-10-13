@@ -7,7 +7,6 @@ import io.github.aedev.flow.plugin.catalog.PluginAccounts
 import io.github.aedev.flow.plugin.install.PluginAutoUpdater
 import io.github.aedev.flow.plugin.install.PluginLinks
 import io.github.aedev.flow.plugin.install.PluginUpdatesState
-import io.github.aedev.flow.plugin.mirror.PlaylistMirrorCoordinator
 import io.github.aedev.flow.plugin.registry.PluginRegistry
 import io.github.aedev.flow.plugin.registry.PluginRegistryState
 import io.mockk.coEvery
@@ -35,8 +34,6 @@ class TvPluginsViewModelStorageTest {
     private val accounts = mockk<PluginAccounts>(relaxed = true) { every { accounts } returns MutableStateFlow(emptyMap()) }
     private val updater = mockk<PluginAutoUpdater>(relaxed = true) { every { state } returns flowOf(PluginUpdatesState.Idle) }
     private val links = mockk<PluginLinks>(relaxed = true) { every { pending } returns MutableStateFlow(null) }
-    private val mirrors =
-        mockk<PlaylistMirrorCoordinator>(relaxed = true) { every { store.enabledPairs } returns flowOf(emptySet()) }
 
     @Before fun setUp() = Dispatchers.setMain(dispatcher)
 
@@ -53,7 +50,6 @@ class TvPluginsViewModelStorageTest {
             links,
             mockk(relaxed = true),
             SavedStateHandle(),
-            mirrors,
             mockk(relaxed = true),
         )
 
