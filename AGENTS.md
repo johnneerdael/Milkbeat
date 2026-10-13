@@ -953,6 +953,11 @@ run that occupies a physical device, and the resulting diff is thousands of line
   Preserve other OEM pickers and launch directly from Milkbeat for caller account visibility;
   MicroG's forwarding picker changes that caller. Regressions:
   `--tests '*MicroGAccountPickerTest'` and `MicroGAccountPickerDeviceTest` (requires MicroG and an account).
+  `AndroidMicroGAccountGateway.token` binds MicroG's exported `GmsCommonService` for each request: TCL's `TclAppBoot`
+  refuses to start a stopped MicroG for AccountManager's authenticator binding ("bind failure"), but lets the
+  foreground app start it. Keep the binding around the request and release it afterwards. Regressions:
+  `--tests '*MicroGStartTest'`; `MicroGStartDeviceTest -e microgAccount <name>` on TCL with MicroG's `AUTO_START`
+  app-op set to `ignore` (restore it afterwards).
   Sign-out and removal go through `MicroGAccounts.revoke`, which stays in force for the whole plugin transition
   and completes it non-cancellably (plugin calls are bounded by the runtime timeout).
   It must never take the per-plugin `signingIn` lock, because an attempt's own rollback signs the plugin out;

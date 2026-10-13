@@ -6,12 +6,16 @@ import android.accounts.AuthenticatorException
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.ServiceConnection
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.os.IBinder
 import androidx.core.content.pm.PackageInfoCompat
 import androidx.core.os.BundleCompat
 import dagger.hilt.android.qualifiers.ApplicationContext
 import nl.neerdael.milkbeat.plugin.AccountIdentity
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
 /** MicroG-RE-TV's package and the account type it registers its Google accounts under. */
@@ -26,6 +30,11 @@ private const val YOUTUBE_TOKEN_TYPE = "oauth2:https://www.googleapis.com/auth/y
 
 // The request option MicroG-RE-TV reads to choose which app the token is issued as.
 private const val KEY_IDENTITY = "overridePackage"
+
+// An exported MicroG service in the process that hosts its account authenticator.
+private const val MICROG_START_ACTION = "$MICROG_PACKAGE.common.service.START"
+
+private const val MICROG_START_TIMEOUT_MS = 5_000L
 
 // MicroG-RE-TV's release key. Builds signed with it can be updated in place from its releases; other MicroG builds
 // under the same package cannot, so only these are offered an update.
@@ -136,9 +145,11 @@ class AndroidMicroGAccountGateway
         ): MicroGTokenResult {
             val options = Bundle().apply { putString(KEY_IDENTITY, identity.packageName) }
             val result =
-                manager
-                    .getAuthToken(Account(accountName, MICROG_ACCOUNT_TYPE), YOUTUBE_TOKEN_TYPE, options, false, null, null)
-                    .result
+                whileMicroGRuns {
+                    manager
+                        .getAuthToken(Account(accountName, MICROG_ACCOUNT_TYPE), YOUTUBE_TOKEN_TYPE, options, false, null, null)
+                        .result
+                }
             result.getString(AccountManager.KEY_AUTHTOKEN)?.takeIf { it.isNotBlank() }?.let { return MicroGTokenResult.Granted(it) }
             val prompt =
                 BundleCompat.getParcelable(result, AccountManager.KEY_INTENT, Intent::class.java)
@@ -147,4 +158,37 @@ class AndroidMicroGAccountGateway
         }
 
         override fun invalidate(token: String) = manager.invalidateAuthToken(MICROG_ACCOUNT_TYPE, token)
+
+        // Boot managers such as TCL's refuse to start a stopped MicroG for the account service's authenticator binding,
+        // which then fails the token request. A binding from Milkbeat starts it and keeps it running for the request.
+        private fun <T> whileMicroGRuns(request: () -> T): T {
+            val connected = CountDownLatch(1)
+            val connection =
+                object : ServiceConnection {
+                    override fun onServiceConnected(
+                        name: ComponentName,
+                        service: IBinder,
+                    ) = connected.countDown()
+
+                    override fun onNullBinding(name: ComponentName) = connected.countDown()
+
+                    override fun onServiceDisconnected(name: ComponentName) = Unit
+                }
+            val bound =
+                try {
+                    context.bindService(Intent(MICROG_START_ACTION).setPackage(MICROG_PACKAGE), connection, Context.BIND_AUTO_CREATE)
+                } catch (_: SecurityException) {
+                    return request()
+                }
+            try {
+                if (bound) connected.await(MICROG_START_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+                return request()
+            } finally {
+                // Android asks for the release whatever the bind returned; a refused bind may have registered nothing.
+                try {
+                    context.unbindService(connection)
+                } catch (_: IllegalArgumentException) {
+                }
+            }
+        }
     }

@@ -173,6 +173,8 @@ Open the installed plugin's details and choose its sign-in method.
 2. Pick your Google account from MicroG-RE-TV in the TV's account picker. On affected Google TVs, Milkbeat opens Android's standard picker to show MicroG accounts; other TVs keep their configured picker. Regular Google accounts are excluded. If there is none yet, add it in MicroG-RE-TV when Android offers to.
 3. MicroG-RE-TV 7.2.1.5 and later grant Milkbeat the access the plugin needs, such as "use your account as YouTube Music", without asking. If your MicroG build asks instead, select **Allow**; declining ends the attempt, and **Retry** asks again.
 
+On TCL TVs, which stop apps from starting other apps in the background, Milkbeat starts MicroG-RE-TV itself while it signs you in. If sign-in or playback from the plugin still fails there, allow MicroG-RE-TV to start on its own with adb: `adb shell appops set app.revanced.android.gms AUTO_START allow`.
+
 Milkbeat keeps the account name, never a password or token. MicroG-RE-TV keeps your grants and issues short-lived tokens; to withdraw access, remove it in MicroG-RE-TV. This sign-in works only in the stable app (`nl.neerdael.milkbeat`), not in Milkbeat Preview or debug builds.
 
 When a provider reports an expired sign-in, Milkbeat asks the plugin again in the background, retrying temporary connection failures, and restores the account without any action when it still works; private playlist preparation then resumes on its own. With YouTube Music 0.2.4 or later, a single refused request no longer signs the account out. An account the provider confirms expired needs sign-in again; local folders keep working.
