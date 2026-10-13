@@ -26,11 +26,13 @@ Capabilities depend on the installed plugin version, the account and its subscri
 
 ## YouTube
 
-**YouTube 0.1.3** (downloader code **563**) is the one YouTube provider. It needs a Milkbeat build
+**YouTube 0.1.4** (downloader code **563**) is the one YouTube provider. It needs a Milkbeat build
 with plugin API 11; update the app before installing if your build is older. Its **YouTube** tab
 offers YouTube Music Home with mood chips, Search with YouTube Music's filters, artist, album and
 playlist pages, your library and radio. It plays YouTube audio and music videos, through YouTube's
-TV player first when you are signed in, and matches tracks from other catalogs.
+TV player first when you are signed in, and matches tracks from other catalogs. When the TV player
+refuses a stream, YouTube 0.1.4 and later play it through YouTube's other players and leave the TV
+player out for 30 minutes.
 
 The tab appears as soon as the plugin is installed and enabled; Home works signed out. While you
 are not signed in, a line above the mood chips says so and offers **Sign in** and, in the stable
@@ -153,7 +155,7 @@ Completed indexing matches are kept when you cancel. Index again after changing 
 
 ## Sign-in and account requirements
 
-- **YouTube:** sign-in is optional; Home works signed out. Signing in with the Google account in MicroG-RE-TV gives you your own Home, library and history. It works only in the stable app, not in Milkbeat Preview or debug builds. YouTube 0.1.3 needs a Milkbeat build with plugin API 11.
+- **YouTube:** sign-in is optional; Home works signed out. Signing in with the Google account in MicroG-RE-TV gives you your own Home, library and history. It works only in the stable app, not in Milkbeat Preview or debug builds. YouTube 0.1.4 needs a Milkbeat build with plugin API 11.
 - **Deezer:** sign in through the phone web viewer for your catalog, Flow and read-only library. Audio availability and quality depend on the account and recording. Deezer 0.2.1 needs a Milkbeat build with plugin API 9.
 - **Spotify:** a catalog with **no audio source**. Its value is your personalized feed, playlists, Liked Songs and library after signing in. Keep at least one audio provider enabled.
 - **Beatport:** sign in for the catalog and your library. Beatport's own full-length audio needs an active streaming subscription; otherwise SoundCloud or YouTube can match the recording. A free account does not guarantee a match.
