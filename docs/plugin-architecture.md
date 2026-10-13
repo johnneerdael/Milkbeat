@@ -340,8 +340,13 @@ Rejected:
   calls wait behind it there. Once warm-up's garbage is collected, the context returns to the call
   memory limit, or to what its retained state needs plus 32 MB of headroom when that is more (the
   host logs a warning). This is where one-off work goes, such as preprocessing a new
-  YouTube player (13.5 s on the AM6). Until it finishes, the plugin answers with what does not need
-  it, for example stream clients that do not need the solver.
+  YouTube player (13.5 s on the AM6). When an API 8 warm-up runs out of its 20 seconds, the host runs
+  the warm-up again in a separate, isolated context with the 2-minute budget, so playback calls do not
+  wait for it. Code that run compiles with `mb.code.load` reaches the plugin's shared code cache, and the
+  playback context loads it on its next call. A cold YouTube player took about 25 s there on a TCL Smart
+  TV Pro (ARMv7), which never fitted 20 s; the following start's persistent warm-up loaded it in 2.6 s.
+  Until it finishes, the plugin answers with what does not need it, for example stream clients that
+  do not need the solver.
 - **Plugin thread:** each context runs on its own thread with a deep stack (16 MB in the spike).
 - **Concurrency:** at most 4 calls in flight per plugin. Host HTTP runs on the app's shared network
   pool (AGENTS.md rule 10).
