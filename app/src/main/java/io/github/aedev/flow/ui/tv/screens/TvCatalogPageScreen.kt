@@ -74,8 +74,6 @@ fun TvCatalogPageScreen(
     viewModel: CatalogPageViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    val mirror by viewModel.mirror.collectAsStateWithLifecycle()
-    val mirrorTarget by viewModel.mirrorTarget.collectAsStateWithLifecycle()
     val following by viewModel.following.collectAsStateWithLifecycle()
     val dimens = LocalTvDimens.current
     val sourceIdentity by viewModel.sourceIdentity.collectAsStateWithLifecycle(initialValue = "")
@@ -130,9 +128,7 @@ fun TvCatalogPageScreen(
                                 currentCollection
                             },
                             playingTrack?.sourcePosition.takeIf { currentCollection },
-                        ) {
-                            TvPlaylistMirrorStatus(mirror, mirrorTarget, viewModel::retryMirror)
-                        }
+                        )
                     }
                 } else {
                     LazyColumn(

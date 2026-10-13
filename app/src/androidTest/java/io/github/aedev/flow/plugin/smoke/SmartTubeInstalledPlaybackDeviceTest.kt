@@ -49,7 +49,6 @@ import io.github.aedev.flow.data.local.nextNowPlayingView
 import io.github.aedev.flow.data.local.shownNowPlayingView
 import io.github.aedev.flow.data.music.model.MusicTrack
 import io.github.aedev.flow.player.EnhancedMusicPlayerManager
-import io.github.aedev.flow.player.MusicPlaybackContext
 import io.github.aedev.flow.player.MusicVideoItems
 import io.github.aedev.flow.player.RepeatMode
 import io.github.aedev.flow.plugin.PluginHost
@@ -249,7 +248,6 @@ class SmartTubeInstalledPlaybackDeviceTest {
                             600,
                             provider = "nl.neerdael.soundcloud",
                             descriptor = PluginJson.encodeToString(TrackDescriptor.serializer(), descriptor),
-                            playbackContext = MusicPlaybackContext("native-smoke", "", SmartTubeSmoke.PROVIDER),
                         )
                     val firstFrames =
                         java.util.concurrent.atomic

@@ -54,10 +54,9 @@ and sign-in method, playback and radio, the visualizer, every Settings page and 
   several providers at once but keeps your order. Recording identity is checked, so a
   cover, another remix or a short excerpt is rejected.
 - **Every queue continues as a radio,** steered by YouTube Music's presets (Discover, Popular,
-  Deep cuts, moods and decades) pinned above the queue. Local music seeds a radio too while the
-  file keeps playing.
-- **Optional private playlists:** a Spotify playlist can be prepared as a private YouTube Music
-  copy, so autoplay follows the whole playlist rather than its first song.
+  Deep cuts, moods and decades) pinned above the queue. A queue from Spotify or another
+  non-YouTube provider gets YouTube's radio for its first song, and local music seeds a radio
+  too while the file keeps playing.
 - **Visualizer, music video or artwork.** 9,606 MilkDrop presets from the ProjectM TV engine,
   reacting to Milkbeat's own audio, up to 4K with automatic resolution. Artwork uses the accepted
   audio provider's best available thumbnail, with the original catalog cover as a fallback.
@@ -83,7 +82,7 @@ and sign-in method, playback and radio, the visualizer, every Settings page and 
   </tr>
   <tr>
     <td><img src="docs/user-guide/images/artist-page.png" alt="An artist page with portrait, Play, Shuffle, Mix and Subscribe, and Top songs"></td>
-    <td><img src="docs/user-guide/images/playlist-ready.png" alt="A Spotify playlist with its private YouTube Music copy ready"></td>
+    <td><img src="docs/user-guide/images/album-page.png" alt="A YouTube Music album page with cover and buttons beside the numbered tracks"></td>
   </tr>
   <tr>
     <td><img src="docs/user-guide/images/player-controls-current.jpg" alt="Player controls over a MilkDrop preset"></td>
@@ -180,7 +179,7 @@ highest-ranked match. **Update plugins automatically** (on by default) installs 
 every six hours; **Update all plugins** checks now. A plugin version that needs a newer Milkbeat is
 not downloaded: Settings → Plugins says to update Milkbeat first and, in the GitHub build, opens the
 app updater. Each plugin's details offer sign-in, play
-reporting, **Index playlists** and, for Spotify, **Prepare private playlists in YouTube Music**.
+reporting and **Index playlists**.
 [Providers and sign-in](https://johnneerdael.github.io/Milkbeat/providers/).
 
 Plugin API 11 adds a third way to sign in: **Sign in with your Google account**, for plugins that

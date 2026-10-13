@@ -23,10 +23,8 @@ import io.github.aedev.flow.player.EnhancedMusicPlayerManager
 import io.github.aedev.flow.player.MusicFolderPlaybackMetadata
 import io.github.aedev.flow.utils.PerformanceDispatcher
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -46,13 +44,10 @@ class MusicPlayerViewModel
         private val viewHistory: ViewHistory,
         private val musicBrain: MusicBrainEngine,
         private val folderMetadata: MusicFolderPlaybackMetadata,
-        private val mirrorPreparation: MirrorPlaybackPreparation,
         val radioTuning: io.github.aedev.flow.plugin.playback.RadioTuningCoordinator,
     ) : ViewModel() {
         private val _uiState = MutableStateFlow(MusicPlayerUiState())
         val uiState: StateFlow<MusicPlayerUiState> = _uiState.asStateFlow()
-        private val _mirrorPlaybackWaiting = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
-        val mirrorPlaybackWaiting = _mirrorPlaybackWaiting.asSharedFlow()
 
         /**
          * Playback position is kept out of [MusicPlayerUiState] on purpose. It changes several times a
@@ -333,27 +328,7 @@ class MusicPlayerViewModel
                 viewModelScope.launch {
                     val finalSourceName = musicSourceLabel(context, displaySourceName, track)
                     _uiState.update { it.copy(isLoading = true, error = null) }
-                    val prepared =
-                        try {
-                            if (asRadio) {
-                                songRadioPlayback(track)
-                            } else {
-                                mirrorPreparation.prepare(
-                                    track,
-                                    queue,
-                                    radioPlaylistId,
-                                    displaySourceName?.takeIf { it.isNotBlank() } ?: finalSourceName,
-                                    onWaiting = { _mirrorPlaybackWaiting.tryEmit(Unit) },
-                                )
-                            }
-                        } catch (e: kotlinx.coroutines.CancellationException) {
-                            val ownsLoading = loadTrackJob == kotlinx.coroutines.currentCoroutineContext()[Job]
-                            if (ownsLoading) _uiState.update { it.copy(isLoading = false) }
-                            throw e
-                        } catch (e: Exception) {
-                            _uiState.update { it.copy(isLoading = false, error = context.getString(R.string.playlist_mirror_failed)) }
-                            return@launch
-                        }
+                    val prepared = if (asRadio) songRadioPlayback(track) else CollectionPlayback(track, queue)
                     val playbackTrack = prepared.track
                     val activeQueue = prepared.queue.ifEmpty { listOf(playbackTrack) }
                     val localUriOverrides =

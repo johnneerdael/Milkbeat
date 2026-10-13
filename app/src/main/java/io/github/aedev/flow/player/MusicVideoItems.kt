@@ -30,7 +30,6 @@ object MusicVideoItems {
         track.descriptor?.let { json ->
             builder.appendQueryParameter(DESCRIPTOR_PARAM, Base64.getUrlEncoder().withoutPadding().encodeToString(json.toByteArray()))
         }
-        track.playbackContext?.audioProviderId?.let { builder.appendQueryParameter("provider", it) }
         return builder.build()
     }
 
@@ -75,11 +74,9 @@ object MusicVideoItems {
         )
     }
 
-    fun preferredProvider(uri: Uri): String? = uri.getQueryParameter("provider")
-
     /**
-     * The song half of the item at [uri], for a fresh resolve: the track's descriptor and provider stay,
-     * since without them a provider id would be taken for a YouTube video id.
+     * The song half of the item at [uri], for a fresh resolve: the track's descriptor stays, since
+     * without it a provider id would be taken for a YouTube video id.
      */
     fun songUri(
         uri: Uri,

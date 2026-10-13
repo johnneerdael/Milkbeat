@@ -49,31 +49,22 @@ internal object MusicRadioPlanner {
         return QueueContext(reseed = false, explicit = false, knownIds = knownIds)
     }
 
-    /** What a station is built from: the private YouTube copy of a mirrored playlist, or a track. */
-    sealed interface RadioSeed {
-        data class Playlist(
-            val id: String,
-        ) : RadioSeed
-
-        data class Track(
-            val id: String,
-        ) : RadioSeed
-    }
+    /** The track a station is built from. */
+    data class RadioSeed(
+        val trackId: String,
+    )
 
     /**
-     * The seeds to try, in order, until one gives a station: a mirrored playlist always seeds from its
-     * YouTube copy, anything else from the first track of the queue. The playing track closes the
-     * list, so whatever plays always gets a radio.
+     * The seeds to try, in order, until one gives a station: the first track of the queue, then the
+     * playing track, so whatever plays always gets a radio.
      */
     fun radioSeeds(
-        mirrorPlaylistId: String?,
         queueIds: List<String>,
         currentId: String,
     ): List<RadioSeed> =
         listOfNotNull(
-            mirrorPlaylistId?.let(RadioSeed::Playlist),
-            queueIds.firstOrNull()?.let(RadioSeed::Track),
-            RadioSeed.Track(currentId),
+            queueIds.firstOrNull()?.let(::RadioSeed),
+            RadioSeed(currentId),
         ).distinct()
 
     data class SeededStation<P, T>(

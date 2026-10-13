@@ -35,7 +35,6 @@ internal class MergedLibraryPagingSource(
     private val fetch: suspend (String, LibraryRequest) -> Result<MetadataPage>,
     private val onFailure: (LibraryProvider, Throwable) -> Unit = { _, _ -> },
     private val onSuccess: (LibraryProvider) -> Unit = {},
-    private val hiddenCopies: Set<String> = emptySet(),
 ) : PagingSource<Int, ProviderLibraryItem>() {
     private data class Pending(
         val provider: LibraryProvider,
@@ -86,7 +85,7 @@ internal class MergedLibraryPagingSource(
                     onSuccess(request.provider)
                     page.pagedItems().filter { accepts(request.provider, it) }.forEach {
                         val scoped = ProviderLibraryItem(request.provider, it)
-                        if (scoped.key !in hiddenCopies && seen.add(scoped.key)) items += scoped
+                        if (seen.add(scoped.key)) items += scoped
                     }
                     page.nextCursor?.takeIf { cursors.getOrPut(request.provider.id) { mutableSetOf() }.add(it) }?.let {
                         pending.addLast(Pending(request.provider, actualSection, it))

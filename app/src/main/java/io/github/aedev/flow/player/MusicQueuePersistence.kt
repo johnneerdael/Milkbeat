@@ -47,11 +47,6 @@ internal suspend fun EnhancedMusicPlayerManager.restoreSavedQueue() {
                 else -> RepeatMode.OFF
             }
         automixState.value = savedState.automix
-        queueCollectionState.value =
-            savedState.queue
-                .firstOrNull()
-                ?.playbackContext
-                ?.sourceCollectionId
 
         val currentTrack =
             savedState.currentTrackId?.let { id ->

@@ -51,7 +51,7 @@ A music player for Android TV. Play your own files, network shares and streaming
 
     ---
 
-    YouTube Music, Spotify, Beatport and SoundCloud plugins, audio priority, automatic plugin updates and private playlists.
+    YouTube Music, Spotify, Beatport and SoundCloud plugins, audio priority and automatic plugin updates.
 
     [:octicons-arrow-right-24: Providers](providers.md)
 

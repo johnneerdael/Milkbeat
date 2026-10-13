@@ -13,7 +13,6 @@ import io.github.aedev.flow.data.download.DownloadUtil
 import io.github.aedev.flow.data.local.DebugLoggingPreferences
 import io.github.aedev.flow.data.music.model.MusicTrack
 import io.github.aedev.flow.player.EnhancedMusicPlayerManager
-import io.github.aedev.flow.player.MusicPlaybackContext
 import io.github.aedev.flow.player.diagnostics.PlaybackTrace
 import io.github.aedev.flow.plugin.catalog.PluginAccounts
 import io.github.aedev.flow.plugin.install.PluginInstaller
@@ -142,7 +141,7 @@ class SmartTubeKnownIdStartupDeviceTest {
                 SmartTubeSmoke.sanitized("KNOWN_ID_STARTUP") {
                     preferences.setEnabled(true)
                     PlaybackTrace.setEnabled(true)
-                    registry.select(savedSelection.copy(audio = (savedSelection.audio + SmartTubeSmoke.PROVIDER).distinct()))
+                    registry.select(savedSelection.copy(audio = (listOf(SmartTubeSmoke.PROVIDER) + savedSelection.audio).distinct()))
                     withContext(Dispatchers.Main) { manager.initialize(context) }
                     SmartTubeSmoke.await { manager.player != null }
                     controller = manager.player as MediaController
@@ -180,7 +179,6 @@ class SmartTubeKnownIdStartupDeviceTest {
                             0,
                             provider = SmartTubeSmoke.PROVIDER,
                             descriptor = PluginJson.encodeToString(TrackDescriptor.serializer(), descriptor),
-                            playbackContext = MusicPlaybackContext("known-id-startup", "", SmartTubeSmoke.PROVIDER),
                         )
                     traceCapture = SmartTubeLiveTrace()
                     SmartTubeSmoke.await(5000) { requireNotNull(traceCapture).ready }

@@ -116,17 +116,6 @@ fun FlowTvApp(
     val updatesViewModel: TvUpdatesViewModel = hiltViewModel(activity)
     val settingsNeedsAttention by updatesViewModel.needsAttention.collectAsStateWithLifecycle()
     val lifecycleOwner = LocalLifecycleOwner.current
-    LaunchedEffect(lifecycleOwner, musicPlayerViewModel, snackbarHostState) {
-        lifecycleOwner.repeatOnLifecycle(Lifecycle.State.RESUMED) {
-            musicPlayerViewModel.mirrorPlaybackWaiting.collectLatest {
-                snackbarHostState.currentSnackbarData?.dismiss()
-                snackbarHostState.showSnackbar(
-                    message = context.getString(R.string.playlist_mirror_playback_waiting),
-                    duration = SnackbarDuration.Short,
-                )
-            }
-        }
-    }
     LaunchedEffect(lifecycleOwner) {
         lifecycleOwner.repeatOnLifecycle(Lifecycle.State.RESUMED) {
             launch { updatesViewModel.checkWhileForeground() }

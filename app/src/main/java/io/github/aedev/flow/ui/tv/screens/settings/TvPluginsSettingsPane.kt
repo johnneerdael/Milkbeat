@@ -44,7 +44,6 @@ import io.github.aedev.flow.ui.tv.components.TvNavRow
 import io.github.aedev.flow.ui.tv.components.TvSearchField
 import io.github.aedev.flow.ui.tv.components.TvSectionHeader
 import io.github.aedev.flow.ui.tv.components.TvSelectionRow
-import io.github.aedev.flow.ui.tv.components.TvToggleRow
 import io.github.aedev.flow.ui.tv.focus.ProvideTvColumnPivot
 import io.github.aedev.flow.ui.tv.focus.tvInitialFocus
 import nl.neerdael.milkbeat.catalog.ProviderAccount
@@ -142,28 +141,6 @@ fun TvPluginsSettingsPane(
                     ) {
                         item(key = "preload-${plugin.id}") { TvPlaylistPreloadItem(plugin, viewModel.preloadJobs) }
                     }
-                    if (plugin.manifest.roles.metadata
-                            ?.personalCollections == true
-                    ) {
-                        state.plugins
-                            .filter {
-                                it.enabled && it.manifest.roles.metadata
-                                    ?.privatePlaylistImport == true &&
-                                    it.manifest.roles.audio != null
-                            }.forEach { target ->
-                                item(key = "mirror-${target.id}") {
-                                    TvPlaylistMirrorOption(
-                                        target,
-                                        io.github.aedev.flow.plugin.mirror.PlaylistMirrorStore.pairId(
-                                            plugin.id,
-                                            target.id,
-                                        ) in state.mirrorPairs,
-                                        viewModel.mirrors.available(plugin.id, target.id),
-                                        { viewModel.setMirrorEnabled(plugin.id, target.id, it) },
-                                    )
-                                }
-                            }
-                    }
                     detailItems(
                         plugin = plugin,
                         account = state.accounts[plugin.id],
@@ -196,21 +173,6 @@ fun TvPluginsSettingsPane(
             }
         }
     }
-}
-
-@Composable
-private fun TvPlaylistMirrorOption(
-    target: InstalledPlugin,
-    enabled: Boolean,
-    available: Boolean,
-    onEnabled: (Boolean) -> Unit,
-) {
-    TvToggleRow(
-        label = stringResource(R.string.playlist_mirror_option, target.manifest.name),
-        checked = enabled,
-        onCheckedChange = { if (available || !it) onEnabled(it) },
-        supportingText = stringResource(if (available) R.string.playlist_mirror_description else R.string.playlist_mirror_sign_in),
-    )
 }
 
 private fun LazyListScope.overviewItems(

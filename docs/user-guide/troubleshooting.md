@@ -120,11 +120,9 @@ The plugin was built for a newer plugin API than this Milkbeat supports. Milkbea
 
 Milkbeat 0.9.55 and earlier could leave Settings on Back from a Plugins page, show a music page with Settings still highlighted, and then ignore sidebar presses until a restart. Update Milkbeat: the highlighted tab now always follows the page on screen, and pressing the tab that owns the page returns to its first page.
 
-## Private playlist preparation fails
+## Playlist indexing pauses or stops
 
-Check that both Spotify and YouTube Music are enabled, signed in and updated to versions that support playlist preparation. Milkbeat re-checks an expired sign-in in the background and resumes preparation when the account still works; YouTube Music 0.2.4 or later is needed so that one refused request does not sign the account out. If the provider confirms the sign-in expired, reopen that plugin's details and sign in through the phone viewer, then select **Retry preparation** on the playlist page.
-
-Interrupted preparation resumes from saved progress. Confirmed unavailable songs are omitted. When a provider briefly refuses or throttles requests, preparation and indexing pause (5, 15, then 45 seconds, or longer if the provider asks) and continue where they were; only if the refusals last does the run stop and try again later in the background. Your own playlists and Liked Songs can prepare in the background, while other playlists prepare when opened. Albums use normal playback and are not mirrored. See [Prepare private playlists](providers.md#prepare-private-playlists).
+When a provider briefly refuses or throttles requests, [playlist indexing](providers.md#plugin-details) pauses (5, 15, then 45 seconds, or longer if the provider asks) and continues where it was; only if the refusals last does the run stop and try again later in the background. Completed matches are kept.
 
 ## Capture slow startup or a gap when switching views
 

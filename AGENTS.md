@@ -682,20 +682,23 @@ revision must pass the configured ktlint rules.
   embedded metadata and focus return. Its permission setup affects only the debug package.
   Android 10 opts into legacy direct storage with requestLegacyExternalStorage; no Room migration.
 
-## Playlist mirror reuse
+## Track matching, radio seeding and the TV queue
 
-- Mirror preparation lives in `app/src/main/java/io/github/aedev/flow/plugin/mirror/`; recording
-  identity checks live in `plugin/playback/TrackMatchScore.kt`. Playlist mirrors persist in
-  `files/datastore/playlist_mirrors.preferences_pb`; track matches use Room's `TrackMatchDao`.
-- Foreground preparation may reuse a ready mirror for six hours after verification, scoped to its
-  source and destination account keys and verified provider packages. Legacy ready records receive
-  that deadline and package context on first reuse.
-  Matching-policy revisions invalidate saved misses and recheck incomplete matches once; preserve
-  successful match caching. Background preparation always checks the source and reconciles the private destination. Preserve
-  that distinction when changing page opening or playback handoff.
+- Recording identity checks live in `plugin/playback/TrackMatchScore.kt`; track matches use Room's
+  `TrackMatchDao`. Matching-policy revisions invalidate saved misses; preserve successful match caching.
+- Radio for any queue not from YouTube (a track seed whose descriptor has no `ytm` id) is seeded
+  from the queue's first track through YouTube matching in `plugin/playback/PluginRadio.kt`; the
+  queue's own provider radio is only the fallback when YouTube cannot match. Seeds come from
+  `MusicRadioPlanner.radioSeeds` (first queued track, then the playing track).
+- The playlist mirror (private YouTube copies of other providers' playlists) was removed. Copies it
+  made stay in the listener's account and show in Library like any other playlist; never delete them.
+  `plugin/catalog/RetiredPlaylistMirrors.kt` cancels leftover `mirror:` work, deletes the
+  `playlist_mirror` notification channel and `files/datastore/playlist_mirrors.preferences_pb` at
+  startup; `PluginAccountRefresh` keeps the startup account refresh of sign-in plugins. The public
+  plugin contract (`personalCollections`, `importPrivatePlaylist`, `matchAudioBatch`, playlist
+  management) is unchanged and no longer called by the host.
 - TV queue rows scale on focus. Keep padding inside the lazy list for the scaled border, including
   when the radio provider supplies no presets. Do not invent radio presets for unsupported contexts.
-- Focused mirror regressions run with `./gradlew :app:testGithubDebugUnitTest --tests '*PlaylistMirror*'`.
   `:app:assembleGithubDebugAndroidTest` builds the device tests; `TvQueueFocusPaddingDeviceTest`
   exercises the queue's first-row focus without radio presets.
 
@@ -847,7 +850,8 @@ revision must pass the configured ktlint rules.
   --tests '*OutputReportingPlayerTest' --tests '*MusicOutputRecoveryTest'`.
   Local library IDs stay local throughout playback; `MusicVideoItems.descriptor` supplies
   title, artist credits and duration to `PluginRadio` for metadata-only YouTube Music matching.
-  Local queues seed radio once from their first song, never through `resolveAudio`. Track-row
+  Local queues, like every queue not from YouTube, seed radio once from their first song through
+  YouTube matching, never through `resolveAudio`. Track-row
   selection in `ui/tv/catalog/TvCatalogBlocks.kt` starts a single-track mix; collection Play/Shuffle
   retains the full queue. Never put a matched streaming ID in place of a local playback ID or URI.
 
@@ -988,7 +992,7 @@ run that occupies a physical device, and the resulting diff is thousands of line
   provider id with a file URI, so they read as Downloaded. `TvAudioQualityStatus.kt` returns no
   status slot while it is off, keeping the controls layout. Focused regression:
   `./gradlew :app:testGithubDebugUnitTest --tests '*PlaybackAudioQualityTest' --tests '*PlayingAudioFormatsTest' --tests '*MusicAudioOriginTest'`.
-- Video-capable audio providers use `AudioMatchStrategy.VIDEOS` for ordinary matching, queue preparation, preloads and mirror batches. Keep successful matches, scope misses/in-flight work by strategy, and preserve source metadata/IDs. `PluginAudio.videoCapablePlaybackIds` is a cold event-driven Flow of candidate IDs derived from accepted caches and account/provider context. The current Media3 item must also report a supported video track; track-change events update Now Playing eligibility on main, preventing cached metadata from exposing Video for audio-only HLS or completed downloads. Matching alone must not load picture. API 7's prepared DASH manifest is shared by eligibility and source construction; native SABR and eligible HLS retain picture support. Separate progressive picture URLs stay audio-only in music playback rather than preparing a hidden child. Explicit Video selection uses the prepared presentation's track selection and existing Media3 surface gating without replacing or seeking audio.
+- Video-capable audio providers use `AudioMatchStrategy.VIDEOS` for ordinary matching, queue preparation and preloads. Keep successful matches, scope misses/in-flight work by strategy, and preserve source metadata/IDs. `PluginAudio.videoCapablePlaybackIds` is a cold event-driven Flow of candidate IDs derived from accepted caches and account/provider context. The current Media3 item must also report a supported video track; track-change events update Now Playing eligibility on main, preventing cached metadata from exposing Video for audio-only HLS or completed downloads. Matching alone must not load picture. API 7's prepared DASH manifest is shared by eligibility and source construction; native SABR and eligible HLS retain picture support. Separate progressive picture URLs stay audio-only in music playback rather than preparing a hidden child. Explicit Video selection uses the prepared presentation's track selection and existing Media3 surface gating without replacing or seeking audio.
   `TrackMatchScore` video evidence requires lengths within ten seconds, except that two live sets of 20 minutes or more may differ by 15% of the source when both titles name a live set (recorded/live/set/mix/festival, not "at") and its event words and year are identical (`sameDatedLiveSet`); a "<promoter> pres." credit is skipped on every credit path only when it introduces exactly the performer (`presentedTitle`). Raise `POLICY_VERSION` whenever matching rules change so saved misses are rechecked. Focused tests: `--tests '*LiveSetPerformerTitleMatchTest' --tests '*TrackMatch*' --tests '*PluginTrackMatcher*'`.
 - The existing `githubNightly` build is the separate preview app (`nl.neerdael.milkbeat.nightly`, launcher label Milkbeat Preview), debug-signed with release-like shrinking. Use `:app:assembleGithubNightly` and build-property `milkbeatPatch` for an explicit test artifact; do not manually bump app version files. A test prerelease must remain unmerged until the maintainer tests it. Its optional signed provider package is distributed through Buzzheavier; stable publication checkpoints/catalogs remain separate. Nightly/Preview downloader codes are pinned to `app/src/nightly/assets/plugin-preview-download-catalog.json`; stable builds retain the main asset and live publication.
 

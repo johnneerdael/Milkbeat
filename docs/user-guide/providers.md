@@ -127,7 +127,7 @@ Select an installed plugin to see its version, description and account, and to s
 
 === "Spotify"
 
-    ![Spotify details: Index playlists, Prepare private playlists in YouTube Music, version, Signed in as and Sign out](images/plugin-details-spotify.png)
+    ![Spotify details: Index playlists, version, Signed in as and Sign out](images/plugin-details-spotify.png)
 
 === "Beatport"
 
@@ -140,7 +140,6 @@ Select an installed plugin to see its version, description and account, and to s
 | Item | What it does |
 | --- | --- |
 | **Index playlists** | Matches the account's playlist tracks and Liked Songs against your audio providers in priority order, so playback can reuse the matches |
-| **Prepare private playlists in YouTube Music** | Spotify and YouTube Music: see [below](#prepare-private-playlists). Needs both providers signed in |
 | **Report plays to** *provider* | Tracks you listen to for 30 seconds or more, or for half of a track shorter than a minute, are reported to that provider. Compatible API 8 music providers receive updates during playback and at pause/seek/final boundaries; older providers report when the listen ends. Unknown-length tracks require 30 seconds. Skipped sections do not count as listening |
 | **Signed in as** / **Not signed in** | The account state. *Signed out: sign in again* means the provider confirmed the session expired |
 | **Sign in** / **Sign out** | Starts the provider's [sign-in method](#sign-in) or forgets the session |
@@ -177,7 +176,7 @@ On TCL TVs, which stop apps from starting other apps in the background, Milkbeat
 
 Milkbeat keeps the account name, never a password or token. MicroG-RE-TV keeps your grants and issues short-lived tokens; to withdraw access, remove it in MicroG-RE-TV. This sign-in works only in the stable app (`nl.neerdael.milkbeat`), not in Milkbeat Preview or debug builds.
 
-When a provider reports an expired sign-in, Milkbeat asks the plugin again in the background, retrying temporary connection failures, and restores the account without any action when it still works; private playlist preparation then resumes on its own. With YouTube Music 0.2.4 or later, a single refused request no longer signs the account out. An account the provider confirms expired needs sign-in again; local folders keep working.
+When a provider reports an expired sign-in, Milkbeat asks the plugin again in the background, retrying temporary connection failures, and restores the account without any action when it still works. With YouTube Music 0.2.4 or later, a single refused request no longer signs the account out. An account the provider confirms expired needs sign-in again; local folders keep working.
 
 ## Set audio priority
 
@@ -192,7 +191,7 @@ Each provider's **play other services' tracks** switch decides whether it is in 
 
 Beatport starts with the switch off, and updating Milkbeat switches it off once for an existing setup; switch it on to add it to the order again. Updating a plugin keeps your choice.
 
-Spotify has no audio of its own, so Milkbeat searches up to four providers at once. A faster match from a lower provider is used only once every higher provider has failed; the remaining searches are cancelled as soon as the result is decided. Explicitly prepared YouTube playlist copies keep their known YouTube recordings.
+Spotify has no audio of its own, so Milkbeat searches up to four providers at once. A faster match from a lower provider is used only once every higher provider has failed; the remaining searches are cancelled as soon as the result is decided.
 
 YouTube matching searches recorded videos, including static Art Tracks and archived live sets, whichever now-playing view you use. It checks recording identity, so an unrelated performance, cover, different remix or short excerpt is rejected, and full versions are preferred over mixed excerpts. A live set of 20 minutes or more also matches a YouTube upload up to 15% longer or shorter, such as a promoter's upload with an intro, when the performer, event and year are the same. The picture loads only when you choose [the video view](playback.md#visualizer-music-video-or-artwork). With YouTube Music, recorded-video matching needs plugin 0.3.0 or later.
 
@@ -202,45 +201,4 @@ Under **Video**, choose which plugin supplies videos, or **None**.
 
 ## Spotify with YouTube audio
 
-Sign in to Spotify and keep YouTube Music enabled under Audio. Spotify supplies the catalog and playlists; YouTube supplies a matched recording, which can differ from the catalog entry. The queue then continues with the matched track's YouTube radio.
-
-## Prepare private playlists
-
-### Why prepare a YouTube playlist?
-
-The purpose is music discovery: give YouTube's radio and autoplay a reference for your whole Spotify playlist, so the continuation can follow the collection's sound rather than just its opening song.
-
-| Setting | What YouTube receives for the continuation |
-| --- | --- |
-| **Off** | The matched YouTube ID of the playlist's first song. Milkbeat asks YouTube for that song's radio, then appends suggestions after your Spotify queue. |
-| **On** | A native YouTube Music playlist containing the matched Spotify songs. Milkbeat plays that copy and requests autoplay in the playlist's context, giving YouTube the complete collection as a reference. |
-
-YouTube supplies the recommendations in both cases. Its system uses several signals, including playlists; the result is generated by YouTube, not a local shuffle or a radio model trained by Milkbeat. [YouTube's playlist explanation](https://support.google.com/youtube/answer/7665542?hl=en).
-
-Preparing the whole playlist also gives Milkbeat YouTube IDs for every matched song, so it can exclude songs already in the playlist from the radio continuation and remove repeated suggestions. This helps avoid hearing playlist tracks again as the mix begins. Radio still stays outside the private copy: choosing a preset such as **Popular**, **Discover** or **Deep cuts** changes future recommendations, not either playlist's contents.
-
-Whatever you play continues as a radio, and every radio offers all the presets YouTube Music has for it, pinned in one scrolling line at the top of the queue. Press Right on a queue track to reach them, Left and Right to move along them, and Down to return to the track you left.
-
-### Enable preparation
-
-This option is **off by default** and requires Milkbeat 0.9.0 or later and compatible Spotify and YouTube Music plugins, with both enabled and signed in. Both plugins need playlist-preparation support (Spotify and YouTube Music version 0.2.1 or later). Older plugins can still provide their existing playback features, but will not show this option.
-
-1. Open **Settings → Plugins → Spotify**.
-2. Enable **Prepare private playlists in YouTube Music**.
-3. Let your own Spotify playlists and Liked Songs prepare in the background. Other playlists, including generated mixes, begin preparing when you open them.
-4. Select Play or a track. If syncing is still in progress, Milkbeat shows a short message that playback will start when the playlist is ready. The page shows percentage progress through matching, writing and verification, plus unavailable tracks. Once the copy is ready, a small YouTube mark appears beside **Private playlist ready**: playing the playlist then uses its private YouTube Music copy. Select **Retry preparation** if it fails.
-
-   <div class="mb-pair" markdown>
-   ![Preparing: progress, matched and unavailable counts under the playlist](images/playlist-preparing.png)
-   ![The YouTube mark beside Private playlist ready](images/playlist-ready.png)
-   </div>
-
-Milkbeat creates private YouTube copies with the source playlist cover, resolves the source songs, then adds the matched songs together and verifies the copy. With a Milkbeat build that supports batch matching and YouTube Music 0.2.3 or later, matching runs in bounded parallel batches while the empty copy is prepared. Recording title, performer and named remix/edit checks reject conflicting candidates. Remixer credits can appear in the title or artist list, and explicitly listed members can identify a collective artist credit regardless of their order. Longer recordings have no duration cap or required full/extended label when the recording title, performers and named remix/edit agree; full versions are preferred over mixed excerpts. Shorter conflicting excerpts are rejected. Additional searches run only when the first search has no acceptable match. Older compatible plugins retain sequential matching. Copies refresh from Spotify in one direction and preserve track order and duplicate occurrences. Confidently unmatched songs are left out of the copy; temporary connection failures remain retryable. Spotify's playlists are not edited. Background refresh is scheduled approximately every six hours, subject to network and device constraints; opening a ready playlist reuses its saved preparation for up to six hours, without fetching the source again, re-matching tracks or rewriting the YouTube copy. Older preparations, changed titles or covers, and unfinished preparations are checked again on open.
-
-Managed copies are reused after restarting Milkbeat. When Spotify changes, Milkbeat updates the existing copy's songs and order instead of creating another same-name playlist. If a managed copy was deleted, preparation can create a replacement. Albums are not mirrored.
-
-Only the source playlist's matched songs belong in the private copy. YouTube's autoplay and radio suggestions are added to Milkbeat's playback queue, outside that copy. Changing a radio mode does not change either playlist.
-
-Prepared playback uses known YouTube IDs and native collection autoplay, while displaying Spotify's song metadata and catalog cover. [Artwork view](playback.md#visualizer-music-video-or-artwork) can show the accepted audio provider's playback thumbnail, falling back to that cover. Choosing a missing song starts at the next available match. Initial preparation can delay playback, especially for large playlists. Play shares any preparation already running on the page. Recently verified copies and their matches are reused across restarts. Previously unavailable songs are retried once when the matching rules change, so an old rejection does not hide a newly valid match. Interrupted work resumes from checkpoints.
-
-Disable the option to return to normal matching and radio based on the first playing song. Existing private copies remain in your YouTube library. While Spotify is signed in, Library hides managed copies that duplicate their source playlists.
+Sign in to Spotify and keep YouTube Music enabled under Audio. Spotify supplies the catalog and playlists; YouTube supplies a matched recording, which can differ from the catalog entry. The queue then continues with the YouTube radio of the queue's first track, matched on YouTube.

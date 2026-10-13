@@ -22,7 +22,7 @@ class MusicVideoItemsTest {
             ids = mapOf("isrc" to "NL1234567890"),
         )
 
-    private fun track(provider: String? = null) =
+    private fun track() =
         MusicTrack(
             videoId = spotify.ref.providerId,
             title = spotify.title,
@@ -31,7 +31,6 @@ class MusicVideoItemsTest {
             duration = 200,
             provider = "nl.neerdael.spotify",
             descriptor = PluginJson.encodeToString(TrackDescriptor.serializer(), spotify),
-            playbackContext = provider?.let { MusicPlaybackContext("source", "nl.neerdael.youtube-music:PLcopy", it) },
         )
 
     @Test
@@ -46,15 +45,6 @@ class MusicVideoItemsTest {
             assertThat(MusicVideoItems.descriptor(refreshed)).isEqualTo(spotify)
             assertThat(MusicVideoItems.descriptor(refreshed).ids).doesNotContainKey("ytm")
         }
-    }
-
-    @Test
-    fun `a refreshed stream item keeps its preferred audio provider`() {
-        val original = MusicVideoItems.uri(track(provider = "nl.neerdael.youtube-music"), withPicture = true)
-
-        val refreshed = MusicVideoItems.songUri(original, spotify.ref.providerId)
-
-        assertThat(MusicVideoItems.preferredProvider(refreshed)).isEqualTo("nl.neerdael.youtube-music")
     }
 
     @Test

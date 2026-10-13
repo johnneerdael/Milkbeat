@@ -215,7 +215,7 @@ internal fun TvCatalogEntityHeader(
                 text = stringResource(R.string.shuffle),
                 onClick = {
                     val shuffled = tracks.shuffled()
-                    actions.onPlayList(shuffled.first().copy(shuffleRequested = true), shuffled, header.title, queueId)
+                    actions.onPlayList(shuffled.first(), shuffled, header.title, queueId)
                 },
                 icon = Icons.Outlined.Shuffle,
                 modifier = if (header.station == null && onMoveToTracks != null) Modifier.moveRightToTracks(onMoveToTracks) else Modifier,

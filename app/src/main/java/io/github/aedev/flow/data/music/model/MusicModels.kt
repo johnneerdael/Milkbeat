@@ -49,10 +49,8 @@ data class MusicTrack(
     val provider: String? = null,
     /** The plugin's `TrackDescriptor`, as PluginJson text, so the queue survives a restart intact. */
     val descriptor: String? = null,
-    val playbackContext: io.github.aedev.flow.player.MusicPlaybackContext? = null,
     val queueOrigin: MusicQueueOrigin = MusicQueueOrigin.USER,
     val sourcePosition: Int? = null,
-    val shuffleRequested: Boolean = false,
 ) {
     val highResThumbnailUrl: String
         get() = ThumbnailUrlResolver.resolveMusicThumbnail(videoId, thumbnailUrl, 1080)

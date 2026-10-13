@@ -45,7 +45,7 @@ class FlowApplication :
     lateinit var downloadUtil: dagger.Lazy<io.github.aedev.flow.data.download.DownloadUtil>
 
     @Inject
-    lateinit var mirrorJobs: dagger.Lazy<io.github.aedev.flow.plugin.mirror.PlaylistMirrorJobs>
+    lateinit var accountRefresh: dagger.Lazy<io.github.aedev.flow.plugin.catalog.PluginAccountRefresh>
 
     @Inject
     lateinit var libraryScans: dagger.Lazy<io.github.aedev.flow.data.library.index.LibraryScanJobs>
@@ -96,7 +96,7 @@ class FlowApplication :
         super.onCreate()
         appContext = applicationContext
 
-        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch { mirrorJobs.get().start(this) }
+        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch { accountRefresh.get().start(this) }
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             // After the first screens are up, so opening the index never competes with cold start.
             delay(LIBRARY_SCAN_CHECK_DELAY_MS)
@@ -123,6 +123,10 @@ class FlowApplication :
                 cancelUniqueWork(SUBSCRIPTION_CHECK_WORK)
                 cancelUniqueWork(LEGACY_SUBSCRIPTION_CHECK_WORK)
             }
+            runCatching {
+                io.github.aedev.flow.plugin.catalog.RetiredPlaylistMirrors
+                    .clean(this@FlowApplication)
+            }.onFailure { Log.w(TAG, "Retired playlist mirror cleanup failed", it) }
 
             // A TV checks for updates while it is open; periodic checks an earlier phone build scheduled are cancelled.
             if (BuildConfig.UPDATER_ENABLED) {
