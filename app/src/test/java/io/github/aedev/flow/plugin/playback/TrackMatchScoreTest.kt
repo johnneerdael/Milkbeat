@@ -85,6 +85,8 @@ class TrackMatchScoreTest {
         val credited = "CASSIAN Live from New York - Brooklyn Storehouse 2026 Full Set | Cassian"
         assertThat(TrackMatchScore.best(repostedCassian.copy(title = credited), listOf(cassianVideo.copy(title = credited)))).isNotNull()
         assertThat(TrackMatchScore.best(repostedCassian.copy(title = credited), listOf(cassianVideo))).isNotNull()
+        val topic = cassianVideo.copy(artists = listOf(ArtistCredit("Cassian - Topic")))
+        assertThat(TrackMatchScore.best(repostedCassian.copy(title = credited), listOf(topic))).isNotNull()
     }
 
     @Test

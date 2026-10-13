@@ -246,11 +246,12 @@ internal object TrackMatchScore {
         exactly: Boolean = false,
     ): String {
         val suffix = trailingUploader.find(title) ?: return title
-        val uploader = foldLatinAccents(normalizeText(candidate.artists.firstOrNull()?.name ?: return title))
+        val channel = candidate.artists.firstOrNull()?.name ?: return title
+        val uploader = setOf(channel, channel.replace(topicSuffix, "")).map { foldLatinAccents(normalizeText(it)) }
         val named = suffix.groupValues[1]
         val credited =
-            foldLatinAccents(normalizeText(named)) == uploader ||
-                (!exactly && liveSetEvent(named).let { it.isNotEmpty() && it == uploader })
+            foldLatinAccents(normalizeText(named)) in uploader ||
+                (!exactly && liveSetEvent(named).let { it.isNotEmpty() && it in uploader })
         return if (credited) {
             title.substring(0, suffix.range.first)
         } else {
