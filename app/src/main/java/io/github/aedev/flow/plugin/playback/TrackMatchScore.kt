@@ -162,7 +162,7 @@ internal object TrackMatchScore {
         val titleSimilarity = textSimilarity(recordingTitle(track), title)
         if (normalizedArtist == performer && titleSimilarity >= MIN_TITLE_SIMILARITY &&
             versionsCompatible(recordingTitle(track), title) &&
-            (sameLength || sameDatedLiveSet(recordingTitle(track), title))
+            (sameLength || sameDatedLiveSet(recordingTitle(track), normalize(withoutUploader(credit.groupValues[2], candidate))))
         ) {
             return Evidence(titleSimilarity, CERTAIN, durationScore(sourceMs, candidateMs))
         }
