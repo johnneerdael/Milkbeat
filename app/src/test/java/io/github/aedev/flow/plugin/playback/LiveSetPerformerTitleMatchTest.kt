@@ -111,6 +111,20 @@ class LiveSetPerformerTitleMatchTest {
     }
 
     @Test
+    fun `an uploader named Live is not live set evidence`() {
+        val set = bodzin.copy(title = "Stephan Bodzin - Mayday Dortmund 2025 Live", durationMs = 1_500_000L)
+        val upload =
+            promoterUpload.copy(
+                title = "Stephan Bodzin - Mayday Dortmund 2025 | Live",
+                artists = listOf(ArtistCredit("Live")),
+                durationMs = 1_350_000L,
+            )
+        assertThat(TrackMatchScore.best(set, listOf(upload))).isNull()
+        val live = upload.copy(title = "Stephan Bodzin - Mayday Dortmund 2025 Live | Live")
+        assertThat(TrackMatchScore.best(set, listOf(live))?.candidate).isEqualTo(live)
+    }
+
+    @Test
     fun `a performer named Live is not live set evidence`() {
         val album =
             bodzin.copy(

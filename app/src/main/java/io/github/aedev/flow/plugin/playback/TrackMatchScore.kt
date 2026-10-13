@@ -143,7 +143,7 @@ internal object TrackMatchScore {
             return null
         }
         val sourceTitle = foldLatinAccents(normalize(track.title))
-        val candidateTitle = foldLatinAccents(normalize(presentedTitle(candidate.title, normalizedArtist)))
+        val candidateTitle = foldLatinAccents(normalize(withoutUploader(presentedTitle(candidate.title, normalizedArtist), candidate)))
         if (sourceMs >= MIN_LIVE_SET_DURATION_MS && candidateMs >= MIN_LIVE_SET_DURATION_MS &&
             sourceTitle.startsWith("$normalizedArtist ") && candidateTitle.startsWith("$normalizedArtist ") &&
             liveSetWords.containsMatchIn(sourceTitle) && liveSetWords.containsMatchIn(candidateTitle) &&
@@ -172,7 +172,7 @@ internal object TrackMatchScore {
         if (sourceMs < MIN_LIVE_SET_DURATION_MS || candidateMs < MIN_LIVE_SET_DURATION_MS) return null
         val sourceCredit = titleCredit.matchEntire(track.title) ?: return null
         if (!liveWord.containsMatchIn(normalize(sourceCredit.groupValues[2])) ||
-            !liveWord.containsMatchIn(normalize(credit.groupValues[2]))
+            !liveWord.containsMatchIn(normalize(withoutUploader(credit.groupValues[2], candidate, exactly = true)))
         ) {
             return null
         }
@@ -217,13 +217,20 @@ internal object TrackMatchScore {
     private fun liveSetEvent(title: String): String =
         foldLatinAccents(normalizeText(title)).replace(liveSetWords, " ").replace(spaces, " ").trim()
 
+    // "| Beatport Live" credits the uploader Beatport and keeps "live" as evidence unless [exactly] asks for
+    // the suffix to be the uploader's name alone, as "| Live" is for an uploader called Live.
     private fun withoutUploader(
         title: String,
         candidate: TrackDescriptor,
+        exactly: Boolean = false,
     ): String {
         val suffix = trailingUploader.find(title) ?: return title
-        val uploader = candidate.artists.firstOrNull()?.name ?: return title
-        return if (liveSetEvent(suffix.groupValues[1]) == foldLatinAccents(normalizeText(uploader))) {
+        val uploader = foldLatinAccents(normalizeText(candidate.artists.firstOrNull()?.name ?: return title))
+        val named = suffix.groupValues[1]
+        val credited =
+            foldLatinAccents(normalizeText(named)) == uploader ||
+                (!exactly && liveSetEvent(named).let { it.isNotEmpty() && it == uploader })
+        return if (credited) {
             title.substring(0, suffix.range.first)
         } else {
             title
