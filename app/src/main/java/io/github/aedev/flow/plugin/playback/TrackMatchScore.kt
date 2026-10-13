@@ -35,7 +35,7 @@ internal object TrackMatchScore {
     private val eventYear = Regex("\\b(?:19|20)\\d{2}\\b")
 
     // A promoter's upload credit before the performer, as in "VSNZ pres. Stephan Bodzin - …".
-    private val presenterPrefix = Regex("^\\s*(?:\\S+\\s+){1,4}?(?:pres\\.?|presents)\\s+", RegexOption.IGNORE_CASE)
+    private val presenterPrefix = Regex("^\\s*(?:\\S+\\s+)+?(?:pres\\.?|presents)\\s+", RegexOption.IGNORE_CASE)
 
     private val bracketedFeature = Regex("[\\[(]\\s*(?:feat(?:uring)?|ft|with)\\b[^)\\]]*[)\\]]", RegexOption.IGNORE_CASE)
     private val trailingFeature = Regex("\\s+(?:feat(?:uring)?|ft)\\.?\\s+.*?(?=\\s*[\\[(]|\\s+[-–—]\\s+|$)", RegexOption.IGNORE_CASE)

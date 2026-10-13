@@ -92,8 +92,13 @@ class LiveSetPerformerTitleMatchTest {
                 assertThat(TrackMatchScore.best(bodzin, listOf(promoterUpload.copy(title = title, durationMs = length)))).isNull()
             }
         }
-        val presents = promoterUpload.copy(title = "VSNZ presents Stephan Bodzin - VSNZ Winter Festival 2025")
-        assertThat(TrackMatchScore.best(bodzin, listOf(presents))?.candidate).isEqualTo(presents)
+        for (title in listOf(
+            "VSNZ presents Stephan Bodzin - VSNZ Winter Festival 2025",
+            "A State Of Trance Radio Live presents Stephan Bodzin - VSNZ Winter Festival 2025",
+        )) {
+            val presents = promoterUpload.copy(title = title)
+            assertThat(TrackMatchScore.best(bodzin, listOf(presents))?.candidate).isEqualTo(presents)
+        }
     }
 
     @Test
