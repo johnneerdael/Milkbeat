@@ -848,6 +848,15 @@
     <string name="tv_microg_update_title">Update MicroG-RE-TV?</string>
     <string name="tv_microg_update_message">The installed MicroG-RE-TV is too old to sign Milkbeat in. Update it to the latest release now; your Google account in it stays.</string>
     <string name="tv_microg_update_action">Update MicroG-RE-TV</string>
+    <string name="tv_microg_download_title">Download MicroG-RE-TV?</string>
+    <string name="tv_microg_download_message">This downloads the latest MicroG-RE-TV release and installs it, also over the one on this TV; your Google account in it stays. Then pick that account to sign in.</string>
+    <string name="tv_microg_download_action">Download MicroG-RE-TV</string>
+    <string name="tv_plugins_download_microg_summary">Installs the latest MicroG-RE-TV, then signs you in with the Google account in it</string>
+    <string name="tv_plugins_replaced">%1$s is retired and no longer updated. The YouTube plugin (code %2$s) replaces it.</string>
+    <string name="tv_plugins_replaced_installed">%1$s is retired and no longer updated. The YouTube plugin replaces it; you can remove this one.</string>
+    <string name="tv_plugins_add_youtube">Add YouTube</string>
+    <string name="tv_music_signed_out_microg">You\'re not signed in to %1$s. Sign in with the Google account in MicroG-RE-TV for your own home, library and history.</string>
+    <string name="tv_music_sign_in">Sign in</string>
     <string name="tv_microg_sign_in_denied">Milkbeat wasn\'t allowed to use your account as %1$s.</string>
     <string name="tv_microg_sign_in_failed">Unable to sign in. Try again.</string>
     <string name="tv_microg_identity_youtube">YouTube</string>

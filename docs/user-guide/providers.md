@@ -16,48 +16,50 @@ There is no metadata provider to choose: every installed, enabled catalog you ca
 
 | Plugin | Code | Catalog | Audio | Video |
 | --- | --- | --- | --- | --- |
-| YouTube Music | **728** | Home, Search, artists, albums, playlists, library | Streams, cross-provider matching and radio | YouTube videos, channels and playlists |
+| YouTube | **563** | YouTube Music Home with mood chips, Search, artists, albums, playlists, library | YouTube streams, cross-provider matching and radio | Music videos |
 | Spotify | **981** | Home, Search, artists, albums, playlists, library | **None: use another audio provider** | — |
 | Beatport | **393** | Catalog, genres, charts, artists, labels, library | Full streams with a streaming subscription | — |
 | SoundCloud | **089** | Discover, Stream, Search, Artists, albums, playlists, Liked Songs, history | Available full tracks, matching and stations | — |
-| YouTube Video | **932** | YouTube's TV Music Home, Search, artists, albums, playlists, library | Streams, cross-provider matching and radio | YouTube videos and playlists |
 | Deezer | **734** | Home, Flow, Search, artists, albums, playlists, library | Account streams and cross-provider matching | — |
 
-Capabilities depend on the installed plugin version, the account and its subscription. YouTube Video shares the YouTube tab with YouTube Music: with both installed the tab shows YouTube Music's catalog, and YouTube Video's catalog appears, also without sign-in, when it is the only one. Sign-in with a TV code is optional. The [Preview app](preview-testing.md#youtube-video-plugin) installs the same release with code **932**.
+Capabilities depend on the installed plugin version, the account and its subscription. The YouTube Music and YouTube Video plugins are retired; see [Retired plugins](#retired-plugins).
 
+## YouTube
+
+**YouTube 0.1.3** (downloader code **563**) is the one YouTube provider. It needs a Milkbeat build
+with plugin API 11; update the app before installing if your build is older. Its **YouTube** tab
+offers YouTube Music Home with mood chips, Search with YouTube Music's filters, artist, album and
+playlist pages, your library and radio. It plays YouTube audio and music videos, through YouTube's
+TV player first when you are signed in, and matches tracks from other catalogs.
+
+The tab appears as soon as the plugin is installed and enabled; Home works signed out. While you
+are not signed in, a line above the mood chips says so and offers **Sign in** and, in the stable
+GitHub build, **Download MicroG-RE-TV**. Signing in uses the Google account in MicroG-RE-TV and
+works only in the stable app; see [Sign in](#sign-in).
+
+<span id="youtube-video"></span>
 <span id="youtube-video-preview"></span>
 
-## YouTube Video
+## Retired plugins
 
-**YouTube Video 0.2.2** is available in stable Milkbeat with downloader code **932**. It requires
-a Milkbeat build with plugin API 8; update the app before installing if your build is older. It keeps its own
-account alongside YouTube Music and supplies SmartTube's regular YouTube TV Music section:
-recommended music, charts, new videos and the other rows supplied for your region or account.
-Signing in adds Liked Music before those rows when it has songs. An empty Liked Music library
-does not prevent Home from loading. Show More includes the original row and its
-continuations; playlist and mix pages retain track order.
+The **YouTube Music** and **YouTube Video** plugins are retired: the YouTube plugin (code **563**)
+replaces both. Their downloader codes (**728**, **416** and **494** for YouTube Music; **932**,
+**304** and **744** for YouTube Video) no longer install anything in current Milkbeat builds and
+are never given to another plugin. Older Milkbeat releases may still resolve them from their
+bundled catalog, but no new versions are published.
 
-To browse these feeds, disable YouTube Music when using YouTube Video for your catalog; the shared YouTube
-tab, Search and Library then show YouTube Video's catalog. YouTube Music's installed package
-and account remain independent. Choose the audio and video sources under Settings → Plugins.
+An installed YouTube Music or YouTube Video plugin keeps working but gets no more updates. Its
+page in Settings → Plugins and its YouTube tab say it is retired and that YouTube (code 563)
+replaces it, with **Add YouTube**: this opens Settings → Plugins with code 563 for you to review
+and install. Once YouTube is installed, it holds the YouTube tab, also signed out, and the notice
+says the old plugin can be removed:
 
-In YouTube Video's details, choose **Sign in with a TV code**. Scan the QR or open the displayed
-Google activation address and enter the code, then approve it in your Google account. The phone
-need not share the TV's network. Keep the TV screen open until pairing completes. Cancelled,
-declined or expired attempts need a fresh code. Guest Music browsing and playback need no
-sign-in. After signing out or changing accounts, refresh open pages; old account or guest-session
-page tokens are rejected.
+1. Sign YouTube in with your [Google account](#sign-in); it does not use the old plugins' sign-in.
+2. Check YouTube's place under [Audio](#set-audio-priority) and choose it under **Video**.
+3. Open the retired plugin's details and select **Remove**.
 
-YouTube Video searches regular YouTube recordings, including unofficial uploads. Audio starts
-without picture; choose Video in Now Playing to show the accepted recording. Artwork uses its
-highest available thumbnail, with the catalog cover as a fallback, while retaining the original
-catalog title, artist and recording identity.
-
-The paired host handles SABR through Media3. SABR streams support playback, not offline
-downloads. Audio-only HLS needs an independent audio rendition; a combined audio/video stream
-cannot silently fetch video bytes in audio-only mode. App and plugin packages are distributed
-separately. The optional Preview app installs the released YouTube Video provider with the same code;
-its retired prerelease codes stay pinned to their original packages.
+Private YouTube copies of Spotify playlists that YouTube Music prepared stay in your YouTube
+library and show in Milkbeat's Library like your other playlists.
 
 ## Deezer
 
@@ -86,14 +88,12 @@ resumes during a song.
 | --- | --- |
 | **393** | Beatport |
 | **981** | Spotify |
-| **728** | YouTube Music |
 | **089** | SoundCloud |
-| **932** | YouTube Video |
 | **734** | Deezer |
 | **563** | YouTube |
 <!-- /plugin-codes -->
 
-Stable builds prefer the publisher's live catalog and fall back to the bundled one offline, so newly published codes work without an app update. The separate [Preview app](preview-testing.md) pins its codes to its own test catalog. The original codes **102** (Beatport), **772** (Spotify) and **416** (YouTube Music) still work. An unknown code reports an error; try the plugin's full URL or update Milkbeat.
+Stable builds prefer the publisher's live catalog and fall back to the bundled one offline, so newly published codes work without an app update. The separate [Preview app](preview-testing.md) pins its codes to its own test catalog. The original codes **102** (Beatport) and **772** (Spotify) still work; codes of [retired plugins](#retired-plugins) do not. An unknown code reports an error; try the plugin's full URL or update Milkbeat.
 
 <div class="mb-pair" markdown>
 ![Beatport's code 393 entered above Add a plugin](images/plugin-download-code.png)
@@ -121,10 +121,6 @@ A plugin version can require a newer Milkbeat than the one installed. Milkbeat d
 
 Select an installed plugin to see its version, description and account, and to sign in or out, report plays, index playlists or remove it. Removing a plugin never removes local music sources. Account names are blurred in these captures.
 
-=== "YouTube Music"
-
-    ![YouTube Music details: Index playlists, version, Signed in as, Report plays, Sign out and Remove](images/plugin-details-youtube-music.png)
-
 === "Spotify"
 
     ![Spotify details: Index playlists, version, Signed in as and Sign out](images/plugin-details-spotify.png)
@@ -137,9 +133,17 @@ Select an installed plugin to see its version, description and account, and to s
 
     ![SoundCloud details while not signed in: Sign in with a TV code and Remove](images/plugin-details-soundcloud.png)
 
+=== "YouTube Music (retired)"
+
+    ![YouTube Music details: Index playlists, version, Signed in as, Report plays, Sign out and Remove](images/plugin-details-youtube-music.png)
+
+    The retired YouTube Music plugin, captured before it was retired; its page now also says that YouTube (code 563) replaces it.
+
 | Item | What it does |
 | --- | --- |
 | **Index playlists** | Matches the account's playlist tracks and Liked Songs against your audio providers in priority order, so playback can reuse the matches |
+| *Plugin* **is retired** / **Add YouTube** | Retired YouTube Music and YouTube Video plugins only: see [Retired plugins](#retired-plugins) |
+| **Download MicroG-RE-TV** | Stable GitHub build, plugins that sign in with a [Google account](#sign-in), while not signed in |
 | **Report plays to** *provider* | Tracks you listen to for 30 seconds or more, or for half of a track shorter than a minute, are reported to that provider. Compatible API 8 music providers receive updates during playback and at pause/seek/final boundaries; older providers report when the listen ends. Unknown-length tracks require 30 seconds. Skipped sections do not count as listening |
 | **Signed in as** / **Not signed in** | The account state. *Signed out: sign in again* means the provider confirmed the session expired |
 | **Sign in** / **Sign out** | Starts the provider's [sign-in method](#sign-in) or forgets the session |
@@ -149,11 +153,10 @@ Completed indexing matches are kept when you cancel. Index again after changing 
 
 ## Sign-in and account requirements
 
-- **YouTube Music:** sign-in is optional. Signing in turns Home into a personalized feed and makes your library available. Free YouTube accounts are supported; Premium is not required for personalization.
-- **YouTube Video:** sign-in is optional. Pair it with a TV code from any phone for a personalized Home and your library; signed out, it browses YouTube's TV Music feeds. YouTube Video 0.2.2 needs a Milkbeat build with plugin API 8.
+- **YouTube:** sign-in is optional; Home works signed out. Signing in with the Google account in MicroG-RE-TV gives you your own Home, library and history. It works only in the stable app, not in Milkbeat Preview or debug builds. YouTube 0.1.3 needs a Milkbeat build with plugin API 11.
 - **Deezer:** sign in through the phone web viewer for your catalog, Flow and read-only library. Audio availability and quality depend on the account and recording. Deezer 0.2.1 needs a Milkbeat build with plugin API 9.
 - **Spotify:** a catalog with **no audio source**. Its value is your personalized feed, playlists, Liked Songs and library after signing in. Keep at least one audio provider enabled.
-- **Beatport:** sign in for the catalog and your library. Beatport's own full-length audio needs an active streaming subscription; otherwise SoundCloud or YouTube Music can match the recording. A free account does not guarantee a match.
+- **Beatport:** sign in for the catalog and your library. Beatport's own full-length audio needs an active streaming subscription; otherwise SoundCloud or YouTube can match the recording. A free account does not guarantee a match.
 - **SoundCloud:** sign in for personalized Home, playlists, Liked Songs, history and Artists. Public search and catalog pages can work anonymously. Full-track availability depends on the recording and your listening subscription; Artist Pro does not grant Go+ listening rights. Preview-only or restricted recordings can appear but cannot supply full-track audio, so keep another audio provider as a fallback. SoundCloud plugin 0.2.0 needs a Milkbeat build with plugin API 5. TV-paired accounts currently play clear HLS streams only; protected-only recordings cannot play with this session, and plays from a TV-paired account are not reported to SoundCloud. Existing web sessions keep their Widevine playback path where the account and device allow it.
 
 ## Sign in
@@ -164,7 +167,7 @@ Open the installed plugin's details and choose its sign-in method.
 
 ![Example TV pairing screen with a fake demonstration code](images/soundcloud-tv-pairing-example.png)
 
-**Web sign-in (YouTube Music, Spotify, Beatport and Deezer):** scan the TV's QR code with a phone on the same network. The [phone viewer](https://github.com/johnneerdael/Milkbeat/blob/main/docs/phone-sign-in-remote-view.md) streams the provider's real sign-in page from the TV; use touch and typing on the phone to complete sign-in and any verification. Browsing and playback stay in Milkbeat's TV interface.
+**Web sign-in (Spotify, Beatport and Deezer):** scan the TV's QR code with a phone on the same network. The [phone viewer](https://github.com/johnneerdael/Milkbeat/blob/main/docs/phone-sign-in-remote-view.md) streams the provider's real sign-in page from the TV; use touch and typing on the phone to complete sign-in and any verification. Browsing and playback stay in Milkbeat's TV interface.
 
 **Google account through MicroG-RE-TV (plugins that offer it, such as YouTube, code 563):** select **Sign in with your Google account**. Everything happens on the TV with the remote; no phone is needed.
 
@@ -172,11 +175,13 @@ Open the installed plugin's details and choose its sign-in method.
 2. Pick your Google account from MicroG-RE-TV in the TV's account picker. On affected Google TVs, Milkbeat opens Android's standard picker to show MicroG accounts; other TVs keep their configured picker. Regular Google accounts are excluded. If there is none yet, add it in MicroG-RE-TV when Android offers to.
 3. MicroG-RE-TV 7.2.1.5 and later grant Milkbeat the access the plugin needs, such as "use your account as YouTube Music", without asking. If your MicroG build asks instead, select **Allow**; declining ends the attempt, and **Retry** asks again.
 
+**Download MicroG-RE-TV** (stable GitHub build): while YouTube is not signed in, its tab shows a line above the mood chips with **Sign in** and **Download MicroG-RE-TV**, and Settings → Plugins → YouTube shows a **Download MicroG-RE-TV** row under the sign-in method. It downloads the [latest MicroG-RE-TV release](https://github.com/johnneerdael/MicroG-RE-TV/releases/latest) and installs it, also over an installed copy, which keeps its Google account; then sign-in continues with the account picker as above. If Milkbeat may not install apps yet, Android's setting for that opens first: allow it and press Back. **Sign in** starts the same sign-in without downloading anything. The foss build does not show the download button.
+
 On TCL TVs, which stop apps from starting other apps in the background, Milkbeat starts MicroG-RE-TV itself while it signs you in. If sign-in or playback from the plugin still fails there, allow MicroG-RE-TV to start on its own with adb: `adb shell appops set app.revanced.android.gms AUTO_START allow`.
 
 Milkbeat keeps the account name, never a password or token. MicroG-RE-TV keeps your grants and issues short-lived tokens; to withdraw access, remove it in MicroG-RE-TV. This sign-in works only in the stable app (`nl.neerdael.milkbeat`), not in Milkbeat Preview or debug builds.
 
-When a provider reports an expired sign-in, Milkbeat asks the plugin again in the background, retrying temporary connection failures, and restores the account without any action when it still works. With YouTube Music 0.2.4 or later, a single refused request no longer signs the account out. An account the provider confirms expired needs sign-in again; local folders keep working.
+When a provider reports an expired sign-in, Milkbeat asks the plugin again in the background, retrying temporary connection failures, and restores the account without any action when it still works. An account the provider confirms expired needs sign-in again; local folders keep working.
 
 ## Set audio priority
 
@@ -193,7 +198,7 @@ Beatport starts with the switch off, and updating Milkbeat switches it off once 
 
 Spotify has no audio of its own, so Milkbeat searches up to four providers at once. A faster match from a lower provider is used only once every higher provider has failed; the remaining searches are cancelled as soon as the result is decided.
 
-YouTube matching searches recorded videos, including static Art Tracks and archived live sets, whichever now-playing view you use. It checks recording identity, so an unrelated performance, cover, different remix or short excerpt is rejected, and full versions are preferred over mixed excerpts. A live set of 20 minutes or more also matches a YouTube upload up to 15% longer or shorter, such as a promoter's upload with an intro, when the performer, event and year are the same. The picture loads only when you choose [the video view](playback.md#visualizer-music-video-or-artwork). With YouTube Music, recorded-video matching needs plugin 0.3.0 or later.
+YouTube matching searches recorded videos, including static Art Tracks and archived live sets, whichever now-playing view you use. It checks recording identity, so an unrelated performance, cover, different remix or short excerpt is rejected, and full versions are preferred over mixed excerpts. A live set of 20 minutes or more also matches a YouTube upload up to 15% longer or shorter, such as a promoter's upload with an intro, when the performer, event and year are the same. The picture loads only when you choose [the video view](playback.md#visualizer-music-video-or-artwork).
 
 ![Video: None or YouTube Music](images/settings-video-provider.png)
 
@@ -201,4 +206,4 @@ Under **Video**, choose which plugin supplies videos, or **None**.
 
 ## Spotify with YouTube audio
 
-Sign in to Spotify and keep YouTube Music enabled under Audio. Spotify supplies the catalog and playlists; YouTube supplies a matched recording, which can differ from the catalog entry. The queue then continues with the YouTube radio of the queue's first track, matched on YouTube.
+Sign in to Spotify and keep YouTube enabled under Audio. Spotify supplies the catalog and playlists; YouTube supplies a matched recording, which can differ from the catalog entry. The queue then continues with the YouTube radio of the queue's first track, matched on YouTube.

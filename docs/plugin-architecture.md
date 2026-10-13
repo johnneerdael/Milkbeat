@@ -75,8 +75,9 @@ files but no editorial content).
 ### Additive API 6 transport
 
 API 6 supports optional `ServerAbrPlayback` alongside progressive, HLS and DASH descriptors. Prepared native requests enforce the accepted buffered expiry deadline against Android monotonic elapsed time, so wall-clock corrections do not expire a relative lifetime early. Explicit video retry clears accepted recovery and failure context before a fresh provider/account resolution. Cancelling an owned native load discards unfinished protocol segments while retaining completed progress; owned release also clears partial state and preserves existing deselection behavior. Any late abandoned headers are cleared before the next whole response. Fully consumed cross-track discarded media also permits continuation once no partial segment remains; truncated discarded media still fails. Encoded native configuration and attestation must decode as URL-safe Base64 before acceptance. The live window intersects known ends of active renditions and ignores released tracks. Native presentations require MP4 or WebM containers and a Media3-recognized audio/video codec for each declared rendition; unsupported formats are rejected before caching or source creation.
-The private YouTube Video plugin supplies the regular YouTube client context, format tuples,
-attestation and TV device-code account flow. The generic `media3-sabr` module performs adaptive
+The private YouTube Video plugin, since retired in favour of the YouTube plugin (code 563),
+supplied the regular YouTube client context, format tuples, attestation and TV device-code
+account flow. The generic `media3-sabr` module performs adaptive
 requests and container extraction in the existing Media3 player; plugins do not produce audio
 or video bytes. Protobuf definitions are generated in `media3-sabr-protocol`.
 
@@ -127,7 +128,8 @@ repeated load evaluation does not extend the delay, and source release cancels t
 `BrowserOpenRequest.userAgent` lets a provider couple its browser generator to its attestation
 HTTP profile. Existing requests retain the default browser user agent. Playback artwork is
 accepted-source metadata: prefetch or late prior-item callbacks cannot replace the current
-wallpaper or rewrite catalog identity. The new provider remains independent of YouTube Music.
+wallpaper or rewrite catalog identity. That provider was independent of the YouTube Music plugin;
+both are retired, and the single YouTube plugin replaces them.
 
 ## 2. Architecture at a glance
 
@@ -338,8 +340,13 @@ Rejected:
   calls wait behind it there. Once warm-up's garbage is collected, the context returns to the call
   memory limit, or to what its retained state needs plus 32 MB of headroom when that is more (the
   host logs a warning). This is where one-off work goes, such as preprocessing a new
-  YouTube player (13.5 s on the AM6). Until it finishes, the plugin answers with what does not need
-  it, for example stream clients that do not need the solver.
+  YouTube player (13.5 s on the AM6). When an API 8 warm-up runs out of its 20 seconds, the host runs
+  the warm-up again in a separate, isolated context with the 2-minute budget, so playback calls do not
+  wait for it. Code that run compiles with `mb.code.load` reaches the plugin's shared code cache, and the
+  playback context loads it on its next call. A cold YouTube player took about 25 s there on a TCL Smart
+  TV Pro (ARMv7), which never fitted 20 s; the following start's persistent warm-up loaded it in 2.6 s.
+  Until it finishes, the plugin answers with what does not need it, for example stream clients that
+  do not need the solver.
 - **Plugin thread:** each context runs on its own thread with a deep stack (16 MB in the spike).
 - **Concurrency:** at most 4 calls in flight per plugin. Host HTTP runs on the app's shared network
   pool (AGENTS.md rule 10).

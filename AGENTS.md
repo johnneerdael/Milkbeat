@@ -748,26 +748,27 @@ revision must pass the configured ktlint rules.
   fails or retries them, and announces each once per process. The TV pane opens Settings → About only when
   `AutoUpdater.isAvailable`. Catalog entries must not gain fields until builds with strict entry decoding are retired.
 - Publication updates keep `plugins/published.json`, the encrypted download catalog in
-  `app/src/main/assets/` and `app/src/androidTest/assets/published-plugins.json` aligned. Keep
-  the expected provider set in `plugins/scripts/verify-published-plugins.mjs` current. Render
+  `app/src/main/assets/` and `app/src/androidTest/assets/published-plugins.json` aligned. `PROVIDERS` in
+  `plugins/scripts/verify-published-plugins.mjs` lists exactly the published providers. Render
   downloader-code tables with `node .github/scripts/plugin-codes.mjs sync`; validate with its
   `check` command, `npm test` in `plugins/` and `node plugins/scripts/verify-published-plugins.mjs`
   from the root. Canonical signed provider packages stay outside this public Git repository.
   Stable descriptors reject prerelease versions. Keep `plugins/published-preview.json` aligned
   with `app/src/nightly/assets/plugin-preview-download-catalog.json`; preserve each distributed
   preview version's original archive hash/URL, including harmless signature-envelope rebuilds.
-  Stable and Preview publish YouTube Video 0.2.2 / versionCode 13, code 932, requiring API 8;
-  Preview no longer carries a prerelease YouTube Video. Its catalog keeps the retired, immutable
-  preview 6/code 304 and preview 4/code 744 entries. Every descriptor row states the package's
-  verified `apiMin` and `format`.
-  YouTube Video accepts valid empty TV Liked Music results without a WEB request since 0.2.1; Home
-  continues with the regular TV Music feed. Deezer 0.2.1 / versionCode 3 uses code 734 and requires
-  API 9 for its encrypted audio. Stable YouTube Music 0.3.1 / versionCode 16 uses code 728; Preview
-  keeps code 494 pinned to 0.2.9-preview.1 / versionCode 14, so stable docs must not cite 494.
-  These three releases target API 10 and declare no `rangeRequestBytes`. Stable and Preview publish
-  YouTube 0.1.3 / versionCode 4 under code 563; it requires API 11 (MicroG-RE-TV sign-in) and attaches
-  its largest playback artwork. Preserve
-  each original signed archive when retrying publication.
+  Every descriptor row states the package's verified `apiMin` and `format`.
+  Stable and Preview publish the same five providers: Beatport 0.1.3 / versionCode 4 (code 393),
+  Spotify 0.2.3 / versionCode 7 (code 981), SoundCloud 0.2.1 / versionCode 3 (code 089), Deezer
+  0.2.1 / versionCode 3 (code 734, API 9 for its encrypted audio) and YouTube 0.1.3 / versionCode 4
+  (code 563; API 11 for MicroG-RE-TV sign-in; attaches its largest playback artwork). Preserve each
+  original signed archive when retrying publication.
+  YouTube Music (`nl.neerdael.youtube-music`) and YouTube Video (`nl.neerdael.youtube-video`) are
+  retired; YouTube replaces both. A retired provider leaves both descriptors, the androidTest copy and
+  `PROVIDERS`, and `node tools/plugin-download-codes.mjs retire <plugin-id> [--catalog <file>]` removes
+  all its codes from the stable and the Preview catalog (728/416/494 and 932/304/744 here). Retired
+  codes are never reused; `add` does not track them, so check new codes against
+  `docs/plugin-download-codes.md`. Installed copies keep working without updates; release-note roles
+  (`PLUGIN_ROLES` in `.github/scripts/release_notes.py`) list only published providers.
   Preview (`.nightly`) update checks return no stable-publication candidates; automatic updates
   and Update all plugins must not replace its pinned packages. Stable hosts retain normal lookup.
   Never promote preview packages through stable metadata or automatic updates.
@@ -809,15 +810,24 @@ revision must pass the configured ktlint rules.
   Supply the SDK through `ANDROID_HOME` or an untracked `local.properties` containing `sdk.dir`.
   The app targets Android 36, supports API 26+, and compiles Java/Kotlin to JVM 17.
 - There is no selected metadata provider. `data/catalog/MusicSources` derives the rail's music tabs
-  (enabled metadata plugins with HOME that are signed in or expired, YouTube Music and YouTube Video
-  also signed out via `plugin/catalog/KnownProviders`, then Local when a folder exists; plugins of one
-  `KnownProviders` service share a tab held by the first listed, so YouTube Music hides YouTube
-  Video's catalog and YouTube Video takes the YouTube tab alone), asks each sign-in plugin's
+  (enabled metadata plugins with HOME that are signed in or expired, `plugin/catalog/KnownProviders`'
+  anonymous-Home providers also signed out, then Local when a folder exists; plugins of one
+  `KnownProviders` service share a tab held by the first listed: `nl.neerdael.youtube` is listed first,
+  so YouTube holds the YouTube tab, also signed out, and the retired YouTube Music/YouTube Video take it
+  only without YouTube), asks each sign-in plugin's
   account once, and stores the last tab used. The activity-scoped `TvMusicTabsViewModel` waits for
   the remembered tab instead of opening another. All music tabs share the `music` nav route; each
   source gets an assisted `MusicHomeFeedViewModel` keyed by `MusicSource.key` plus its own saveable
   state. Every catalog route, search chip and Library account chip passes its provider explicitly;
   never reintroduce a global "current provider".
+  Retired ids keep their `KnownProviders` entry with `replacedBy` → YouTube/563
+  (`replacementFor`). `ui/screens/music/ProviderNotice.kt` (`providerNotice`, `ProviderNoticeViewModel`)
+  and `ui/tv/screens/music/TvProviderNotice.kt` put one line above a music tab's Home: `Replaced`
+  (retired, **Add YouTube** offers code 563 through `PluginLinks` as `milkbeat://add-plugin?url=563`
+  unless YouTube is installed) or `SignedOut` (an `androidAccount` plugin not signed in: **Sign in**,
+  plus **Download MicroG-RE-TV** when `MicroGInstaller.isAvailable`). `TvPluginDetailItems` shows the
+  same retirement text and **Add YouTube** row, and a **Download MicroG-RE-TV** row while signed out.
+  Focused regressions: `--tests '*ProviderNoticeTest' --tests '*MusicSourcesTest'`.
   The rail's highlighted tab is derived from the back stack (`ownerDestination` in `ui/tv/navigation/TvTab.kt`),
   never from remembered shell state, so it survives the shell rebuild when now playing closes.
   `NavController.navigateToTab` (`TvTabNavigator.kt`) pops to the music start destination and to the
@@ -952,6 +962,11 @@ run that occupies a physical device, and the resulting diff is thousands of line
   never persist tokens. The TV flow is `TvAndroidAccountSignInScreen` + `AndroidAccountSignInViewModel`; launches of
   chooser/prompt/settings intents must not crash on `SecurityException`. GitHub builds install MicroG-RE-TV through
   the flavor-split `updater/MicroGInstaller` (package check before the installer session); foss builds only explain.
+  The sign-in route's `downloadMicroG` argument (`DOWNLOAD_MICROG_ARG`, `TvRoutes.pluginSignIn(…, downloadMicroG = true)`)
+  comes from the **Download MicroG-RE-TV** buttons: on GitHub builds `AndroidAccountSignInViewModel` sets
+  `AndroidAccountSignInState.OfferDownload` and installs the latest release (also over an installed copy, after the
+  install-permission setting when needed), then continues to the account chooser. Regressions:
+  `--tests '*AndroidAccountSignInViewModelTest'`.
   MicroG-RE-TV serves only `nl.neerdael.milkbeat`, so on-device token tests need the stable package.
   The chooser retains AccountManager's `app.revanced` filter and configured component, except for
   `com.google.android.gms/com.google.android.gms.common.account.NoTouchAccountPickerActivity`, used by
@@ -1034,7 +1049,11 @@ run that occupies a physical device, and the resulting diff is thousands of line
   warm-up call runs with the isolated warm-up's 256 MB (`WARM_UP_MEMORY_LIMIT`), then collects
   garbage and restores the call limit, or retained state plus 32 MB headroom (logged as a warning)
   when the prepared state itself exceeds it. Never extend the warm-up's time budget, since foreground
-  calls queue behind it on the playback owner. `PluginRuntimeWarmUpDeviceTest` covers this.
+  calls queue behind it on the playback owner. A persistent warm-up that times out runs again in an
+  isolated context (`WARM_UP_TIMEOUT_MS`, `WARM_UP_MEMORY_LIMIT`, own thread); what it compiles with
+  `mb.code.load` reaches the shared `CodeCache`, which the persistent context loads on its next call.
+  Without this a YouTube player too slow to prepare in 20 s (TCL ARMv7: about 25 s) is never cached and
+  signed-in TV streams fall back to anonymous clients. `PluginRuntimeWarmUpDeviceTest` covers both.
   QuickJS builds `MemoryUsage` from native code, so `app/proguard-rules.pro` keeps its constructor; device
   tests run unshrunk and cannot catch a stripped JNI target. After using another natively constructed
   library class, check it in a shrunk `:app:assembleGithubNightly` APK (`apkanalyzer dex packages`).

@@ -10,21 +10,15 @@ Install a new Preview build or use its documented code to test a newer preview p
 ## Set up
 
 1. Install the Preview APK from the linked GitHub prerelease.
-2. In **Milkbeat Preview**, install the preview YouTube Music plugin using downloader code **494**. This feature requires YouTube Music **0.2.9-preview.1** together with the preview app. Preview downloader codes use its bundled catalog, so code 494 installs this test version even while stable publishes another version.
+2. In **Milkbeat Preview**, install the YouTube plugin using downloader code **563**. Preview downloader codes use its bundled catalog. YouTube's Google-account sign-in works only in the stable app, so in Preview the plugin runs signed out.
 3. Install SoundCloud using **089** and sign in with its TV code if you want personalized Home and Library. YouTube sign-in is optional for matching and playback.
-4. Put YouTube Music first under Audio in **Settings > Plugins**. There is no metadata provider to select: SoundCloud and YouTube Music each get their own tab in the sidebar.
+4. Put YouTube first under Audio in **Settings > Plugins**. There is no metadata provider to select: SoundCloud and YouTube each get their own tab in the sidebar.
 
-## YouTube Video plugin
+<span id="youtube-video-plugin"></span>
 
-The Preview app no longer uses a prerelease **YouTube Video**. It installs the released **YouTube Video 0.2.2** with downloader code **932**, the same code as stable Milkbeat. Like YouTube Music it provides metadata, audio and video, and it browses YouTube's TV Music feeds.
+## Retired YouTube plugins
 
-Older codes **304** (preview 6) and **744** (preview 4) remain pinned to those retired prerelease packages; do not use them for new installs. If your Preview build does not recognize code **932**, update the Preview app first.
-
-1. In **Milkbeat Preview**, open **Settings > Plugins**, enter **932** and confirm the install.
-2. Optionally select YouTube Video and choose **Sign in with a TV code** for personalized Home and Library; it also works signed out.
-3. Under **Audio** and **Video**, choose it where you want it to supply playback.
-
-YouTube Video shares the **YouTube** tab in the sidebar with YouTube Music; the tab carries that name whichever plugin provides it. With both installed, the tab shows YouTube Music's catalog and YouTube Video's catalog stays hidden, also in Search and Library. To test YouTube Video's catalog, disable or remove YouTube Music; the same tab then shows YouTube Video.
+The preview YouTube Music plugin (code **494**) and YouTube Video (codes **932**, **304** and **744**) are retired and no longer in the Preview catalog; the YouTube plugin (code **563**) replaces both. An installed copy keeps working without updates, and its page and tab offer **Add YouTube**. See [Retired plugins](providers.md#retired-plugins).
 
 ## Check playback
 

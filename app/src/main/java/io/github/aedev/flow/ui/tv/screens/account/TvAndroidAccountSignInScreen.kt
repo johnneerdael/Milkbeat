@@ -136,6 +136,14 @@ internal fun TvAndroidAccountSignInPanel(
                 )
             }
 
+            AndroidAccountSignInState.OfferDownload -> {
+                TvMessageState(
+                    title = stringResource(R.string.tv_microg_download_title),
+                    message = stringResource(R.string.tv_microg_download_message),
+                    modifier = Modifier.weight(1f),
+                )
+            }
+
             AndroidAccountSignInState.Installing -> {
                 TvMessageState(title = stringResource(R.string.tv_microg_installing), modifier = Modifier.weight(1f))
             }
@@ -171,17 +179,16 @@ internal fun TvAndroidAccountSignInPanel(
         val installable =
             state == AndroidAccountSignInState.OfferInstall ||
                 state == AndroidAccountSignInState.OfferUpdate ||
+                state == AndroidAccountSignInState.OfferDownload ||
                 state == AndroidAccountSignInState.InstallFailed
         if (installable) {
             TvButton(
                 text =
                     stringResource(
-                        if (state ==
-                            AndroidAccountSignInState.OfferUpdate
-                        ) {
-                            R.string.tv_microg_update_action
-                        } else {
-                            R.string.tv_microg_install_action
+                        when (state) {
+                            AndroidAccountSignInState.OfferUpdate -> R.string.tv_microg_update_action
+                            AndroidAccountSignInState.OfferDownload -> R.string.tv_microg_download_action
+                            else -> R.string.tv_microg_install_action
                         },
                     ),
                 onClick = onInstall,

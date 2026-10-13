@@ -1,6 +1,7 @@
 package io.github.aedev.flow.ui.tv.navigation
 
 import android.net.Uri
+import io.github.aedev.flow.ui.screens.account.DOWNLOAD_MICROG_ARG
 import io.github.aedev.flow.ui.screens.account.METHOD_ARG
 import io.github.aedev.flow.ui.screens.account.PLUGIN_ARG
 import io.github.aedev.flow.ui.screens.music.CatalogPageViewModel
@@ -20,12 +21,14 @@ object TvRoutes {
         "catalog/{${CatalogPageViewModel.KIND_ARG}}/{${CatalogPageViewModel.ID_ARG}}" +
             "?provider={${CatalogPageViewModel.PROVIDER_ARG}}"
 
-    const val PLUGIN_SIGN_IN = "pluginSignIn/{$PLUGIN_ARG}/{$METHOD_ARG}"
+    const val PLUGIN_SIGN_IN = "pluginSignIn/{$PLUGIN_ARG}/{$METHOD_ARG}?$DOWNLOAD_MICROG_ARG={$DOWNLOAD_MICROG_ARG}"
 
+    /** With [downloadMicroG], the sign-in first downloads and installs the latest MicroG-RE-TV. */
     fun pluginSignIn(
         pluginId: String,
         methodId: String,
-    ) = "pluginSignIn/${Uri.encode(pluginId)}/${Uri.encode(methodId)}"
+        downloadMicroG: Boolean = false,
+    ) = "pluginSignIn/${Uri.encode(pluginId)}/${Uri.encode(methodId)}?$DOWNLOAD_MICROG_ARG=$downloadMicroG"
 
     /** [playlistId] is a playlist of the app's library, or the video plugin's id of one. */
     fun playlist(playlistId: String): String = "playlist/${Uri.encode(playlistId)}"

@@ -10,7 +10,7 @@ Settings has five categories on the left: **Plugins**, **Music folders**, **Play
 | --- | --- |
 | **Audio** | The order every track tries the audio providers, and which providers play only their own tracks. [Set audio priority](providers.md#set-audio-priority) |
 | **Video** | The plugin that supplies videos, or None |
-| **Installed** | Each plugin with its capabilities (metadata, audio, video) and version. Select one for its [details](providers.md#plugin-details): account, sign-in, play reporting, playlist indexing and Remove |
+| **Installed** | Each plugin with its capabilities (metadata, audio, video) and version. Select one for its [details](providers.md#plugin-details): account, sign-in (with **Download MicroG-RE-TV** for a Google-account plugin while signed out, in the GitHub build), play reporting, playlist indexing and Remove. A [retired plugin](providers.md#retired-plugins)'s details say so and offer **Add YouTube** until YouTube is installed |
 | **Update plugins automatically** | On by default: checks at start and every 6 hours and installs updates; updates asking for new permissions wait for review |
 | **Update all plugins** | Checks and installs updates now. An update that needs a newer Milkbeat waits; in the GitHub build its row opens [About](#about) to update the app. [Updates that need a newer Milkbeat](providers.md#updates-that-need-a-newer-milkbeat) |
 | **Add a plugin** | A three-digit code or plugin URL. [Install a plugin](providers.md#install-a-plugin) |
@@ -24,7 +24,7 @@ There is no Metadata option: each catalog you can use has its own [music tab](li
 
 <div class="mb-pair" markdown>
 ![Automatic plugin updates, Update all plugins and Add a plugin](images/settings-plugins-updates.png)
-![YouTube Music details with Index playlists and Report plays](images/plugin-details-youtube-music.png)
+![The retired YouTube Music plugin's details with Index playlists and Report plays](images/plugin-details-youtube-music.png)
 </div>
 
 ## Music folders

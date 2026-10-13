@@ -65,7 +65,7 @@ class PluginDownloadInstallTest {
                         }
                 }
             val expected =
-                mapOf("102" to "nl.neerdael.beatport", "772" to "nl.neerdael.spotify", "416" to "nl.neerdael.youtube-music") +
+                mapOf("102" to "nl.neerdael.beatport", "772" to "nl.neerdael.spotify") +
                     published.mapValues { (_, row) -> row.getValue("id").jsonPrimitive.content }
             expected.forEach { (code, id) ->
                 val source = codes.resolve(code)

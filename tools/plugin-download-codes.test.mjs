@@ -87,3 +87,34 @@ test('invalid URLs and assigning one URL to another plugin leave the catalog unt
     assert.deepEqual(readFileSync(file), before);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
+
+test('retiring a plugin removes all its codes and keeps every other assignment', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'milkbeat-codes-'));
+  const file = join(dir, 'catalog.json');
+  const kept = { code: '563', id: 'dev.example.kept', name: 'Kept', url: 'https://example.com/kept.mbplugin' };
+  try {
+    fixture([
+      { code: '416', id: 'dev.example.old', name: 'Old', url: 'https://example.com/old-1.mbplugin' },
+      kept,
+      { code: '728', id: 'dev.example.old', name: 'Old', url: 'https://example.com/old-2.mbplugin' },
+    ], file);
+    const run = spawnSync(process.execPath, [tool, 'retire', 'dev.example.old', '--catalog', file], { encoding: 'utf8' });
+    assert.equal(run.status, 0);
+    assert.match(run.stdout, /retired 416/);
+    assert.match(run.stdout, /retired 728/);
+    assert.deepEqual(decoded(file), [kept]);
+    const again = spawnSync(process.execPath, [tool, 'retire', 'dev.example.old', '--catalog', file], { encoding: 'utf8' });
+    assert.notEqual(again.status, 0);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('a retired code is never handed to a new plugin', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'milkbeat-codes-'));
+  const file = join(dir, 'catalog.json');
+  try {
+    fixture([], file);
+    for (let index = 0; index < 40; index++) assert.equal(invoke(file, `dev.example.p${index}`, `https://example.com/p${index}.mbplugin`).status, 0);
+    const codes = decoded(file).map(x => x.code);
+    for (const retired of ['304', '416', '494', '728', '744', '932']) assert.ok(!codes.includes(retired), retired);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});

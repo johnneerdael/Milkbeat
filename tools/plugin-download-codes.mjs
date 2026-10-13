@@ -6,6 +6,9 @@ import { fileURLToPath } from 'node:url';
 
 const aad = Buffer.from('milkbeat/plugin-download-catalog/1');
 const defaultCatalog = 'app/src/main/assets/plugin-download-catalog.json';
+// Codes of retired plugins (YouTube Music, YouTube Video). Released apps still resolve them from their bundled
+// catalogs, so they are never handed to another plugin.
+export const RETIRED_CODES = new Set(['304', '416', '494', '728', '744', '932']);
 
 function normalize(value) {
   if (!value || /\s/.test(value)) throw new Error('Invalid plugin URL');
@@ -68,7 +71,25 @@ function main() {
     for (const entry of readCatalog(file).entries) console.log(`${entry.code}  ${entry.name} (${entry.id})`);
     return;
   }
-  if (command !== 'add' || args.length !== 4) throw new Error('Usage: plugin-download-codes.mjs add <plugin-id> <name> <url> [--catalog <file>] | list');
+  // A plugin retired from publication loses every code; add them to RETIRED_CODES so they are never reused.
+  if (command === 'retire' && args.length === 2) {
+    const lock = `${file}.lock`;
+    const handle = openSync(lock, 'wx');
+    try {
+      const { key, entries } = readCatalog(file);
+      const retired = entries.filter(x => x.id === id);
+      if (!retired.length) throw new Error(`No codes are assigned to ${id}`);
+      write(file, key, entries.filter(x => x.id !== id));
+      for (const entry of retired) console.log(`retired ${entry.code}  ${entry.name} (${entry.id})`);
+    } finally {
+      closeSync(handle);
+      rmSync(lock);
+    }
+    return;
+  }
+  if (command !== 'add' || args.length !== 4) {
+    throw new Error('Usage: plugin-download-codes.mjs add <plugin-id> <name> <url> | retire <plugin-id> | list [--catalog <file>]');
+  }
   if (!/^[a-z][a-z0-9_]*(\.[a-z0-9_-]+)+$/.test(id) || !name.trim()) throw new Error('Invalid plugin ID or name');
   const url = normalize(input);
   mkdirSync(dirname(file), { recursive: true });
@@ -82,8 +103,8 @@ function main() {
       console.log(`${existing.code}  ${existing.name} (${existing.id})`);
       return;
     }
-    if (entries.length === 1000) throw new Error('All 1000 three-digit codes are assigned');
-    const occupied = new Set(entries.map(x => x.code));
+    if (entries.length + RETIRED_CODES.size >= 1000) throw new Error('All 1000 three-digit codes are assigned');
+    const occupied = new Set([...entries.map(x => x.code), ...RETIRED_CODES]);
     const start = createHash('sha256').update(url).digest().readUInt32BE(0) % 1000;
     let code;
     for (let offset = 0; offset < 1000; offset++) {

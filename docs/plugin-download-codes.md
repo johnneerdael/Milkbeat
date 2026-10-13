@@ -8,12 +8,9 @@ add-plugin deep link's `url` parameter. Full download URLs remain supported.
 | --- | --- |
 | 102 | Beatport |
 | 772 | Spotify |
-| 416 | YouTube Music |
 | 393 | Beatport, private publisher |
 | 981 | Spotify, private publisher |
-| 728 | YouTube Music, private publisher |
 | 089 | SoundCloud, private publisher |
-| 932 | YouTube Video, private publisher |
 | 734 | Deezer, private publisher |
 | 563 | YouTube, private publisher |
 <!-- /plugin-codes -->
@@ -31,7 +28,8 @@ node --test tools/plugin-download-codes.test.mjs
 The tool normalizes the URL and derives a candidate from SHA-256. If that slot
 is taken, it chooses the next unused slot. The committed catalog preserves
 existing assignments; adding the same URL for the same plugin is idempotent.
-Do not regenerate the catalog from scratch or delete assigned entries.
+Do not regenerate the catalog from scratch. Codes are never reassigned or reused;
+a retired provider's codes are removed only with the `retire` command below.
 
 The namespace contains **1,000 codes, 000–999**. Registration fails when it is
 full. An exclusive file lock prevents concurrent local commands from overwriting
@@ -46,9 +44,33 @@ bundled copy answers. A code resolves to its plugin's current release in
 `plugins/published.json`; when that release's `apiMin` or `format` is newer than
 the app supports, the app says Milkbeat needs updating instead of downloading it.
 Catalog entries keep exactly `code`, `id`, `name` and `url`: builds before the
-compatibility gate reject any other entry field. This tool only adds codes; the private publisher's
-copy also has `update <plugin-id> <name> <url> <code>`, which repoints an
+compatibility gate reject any other entry field. This tool adds and retires codes; the private
+publisher's copy also has `update <plugin-id> <name> <url> <code>`, which repoints an
 existing code when the same release moves.
+
+## Retire a plugin
+
+When a provider is withdrawn from publication, remove it from `plugins/published.json`,
+`plugins/published-preview.json` and `app/src/androidTest/assets/published-plugins.json`, and
+remove all of its codes from both bundled catalogs:
+
+```sh
+node tools/plugin-download-codes.mjs retire nl.neerdael.example
+node tools/plugin-download-codes.mjs retire nl.neerdael.example --catalog app/src/nightly/assets/plugin-preview-download-catalog.json
+```
+
+The command fails when the plugin has no codes. Drop the provider from `PROVIDERS` in
+`plugins/scripts/verify-published-plugins.mjs`, then run `node .github/scripts/plugin-codes.mjs sync`
+to regenerate the code tables.
+
+Retired codes must stay unassigned, because older app releases still resolve them from their
+bundled catalogs. `RETIRED_CODES` in `tools/plugin-download-codes.mjs` lists them, and `add` never
+hands them out; add a retired plugin's codes there when you retire it.
+
+| Retired codes | Plugin | Replaced by |
+| --- | --- | --- |
+| 728, 416, 494 | YouTube Music (`nl.neerdael.youtube-music`) | YouTube, 563 |
+| 932, 304, 744 | YouTube Video (`nl.neerdael.youtube-video`) | YouTube, 563 |
 
 ## Restore a missing archive
 

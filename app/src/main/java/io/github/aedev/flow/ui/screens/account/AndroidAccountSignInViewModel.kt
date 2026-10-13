@@ -48,6 +48,9 @@ sealed interface AndroidAccountSignInState {
     /** The installed MicroG-RE-TV is too old to sign Milkbeat in; the listener can update it from here. */
     data object OfferUpdate : AndroidAccountSignInState
 
+    /** The listener asked to download the latest MicroG-RE-TV, and is asked again after the install permission. */
+    data object OfferDownload : AndroidAccountSignInState
+
     /** The screen opens the setting that lets Milkbeat install apps with [intent], once. */
     data class InstallPermission(
         val intent: Intent,
@@ -105,6 +108,18 @@ class AndroidAccountSignInViewModel
 
         private val methodId: String? = savedStateHandle[METHOD_ARG]
 
+        // Opened from a "Download MicroG-RE-TV" button: install the latest release first, even over an installed one.
+        private val downloadMicroG: Boolean = savedStateHandle[DOWNLOAD_MICROG_ARG] ?: false
+
+        private val savedState = savedStateHandle
+
+        // Until the installer reports this download done, the MicroG already installed must not count as the update.
+        // The installer's report is lost with the process, so a recreated screen compares MicroG's install time with
+        // the one saved when the download started: changed, the update landed; unchanged, the listener is offered the
+        // download again rather than having it start by itself, which could loop.
+        private val downloadBaseline: Long? = savedStateHandle[DOWNLOAD_BASELINE_KEY]
+        private var downloadInstalled = false
+
         /** The method as the installed plugin declares it now; an update can change it while the screen is open. */
         val method: AndroidAccountMethod?
             get() =
@@ -146,18 +161,51 @@ class AndroidAccountSignInViewModel
                 }
             }
             // The installer's success can land after the screen resumed from its prompt.
-            viewModelScope.launch { installer.installed.drop(1).collect { onResumed() } }
+            viewModelScope.launch {
+                installer.installed.drop(1).collect {
+                    downloadInstalled = true
+                    onResumed()
+                }
+            }
         }
 
         fun start() {
             if (_state.value != AndroidAccountSignInState.Starting) return
+            // Judged here with the other MicroG package checks, never while the ViewModel is constructed.
+            if (downloadBaseline != null && !downloadInstalled) {
+                downloadInstalled = microG.installedAt()?.let { it != downloadBaseline } == true
+            }
             val method = method
             when {
-                method == null || method.identities.isEmpty() -> _state.value = AndroidAccountSignInState.Failed()
-                !microG.supported() -> _state.value = AndroidAccountSignInState.UnsupportedBuild
-                !microG.installed() -> _state.value = missing()
-                microG.outdated() -> _state.value = outdated()
-                else -> _state.value = AndroidAccountSignInState.ChooseAccount(microG.chooseAccountIntent())
+                method == null || method.identities.isEmpty() -> {
+                    _state.value = AndroidAccountSignInState.Failed()
+                }
+
+                !microG.supported() -> {
+                    _state.value = AndroidAccountSignInState.UnsupportedBuild
+                }
+
+                downloadMicroG && installer.isAvailable && !downloadInstalled -> {
+                    offered = AndroidAccountSignInState.OfferDownload
+                    if (downloadBaseline != null) {
+                        _state.value = AndroidAccountSignInState.OfferDownload
+                    } else {
+                        savedState[DOWNLOAD_BASELINE_KEY] = microG.installedAt() ?: NOT_INSTALLED
+                        install()
+                    }
+                }
+
+                !microG.installed() -> {
+                    _state.value = missing()
+                }
+
+                microG.outdated() -> {
+                    _state.value = outdated()
+                }
+
+                else -> {
+                    _state.value = AndroidAccountSignInState.ChooseAccount(microG.chooseAccountIntent())
+                }
             }
         }
 
@@ -204,11 +252,13 @@ class AndroidAccountSignInViewModel
             val waitingForMicroG =
                 _state.value == AndroidAccountSignInState.OfferInstall ||
                     _state.value == AndroidAccountSignInState.OfferUpdate ||
+                    _state.value == AndroidAccountSignInState.OfferDownload ||
                     _state.value == AndroidAccountSignInState.Installing ||
                     _state.value == AndroidAccountSignInState.InstallFailed ||
                     _state.value == AndroidAccountSignInState.MicroGMissing ||
                     _state.value == AndroidAccountSignInState.MicroGOutdated
-            if (waitingForMicroG && microG.installed() && !microG.outdated()) {
+            val downloading = downloadMicroG && installer.isAvailable && !downloadInstalled
+            if (waitingForMicroG && !downloading && microG.installed() && !microG.outdated()) {
                 _state.value = AndroidAccountSignInState.ChooseAccount(microG.chooseAccountIntent())
             }
         }
@@ -369,3 +419,6 @@ class AndroidAccountSignInViewModel
         private fun failureMessage(error: Exception): String? =
             (error as? PluginCallException)?.error?.let { (it.userMessage ?: it.message).takeIf(String::isNotBlank) }
     }
+
+private const val DOWNLOAD_BASELINE_KEY = "microgDownloadBaseline"
+private const val NOT_INSTALLED = -1L

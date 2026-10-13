@@ -51,7 +51,7 @@ A music player for Android TV. Play your own files, network shares and streaming
 
     ---
 
-    YouTube Music, Spotify, Beatport and SoundCloud plugins, audio priority and automatic plugin updates.
+    YouTube, Spotify, Beatport, SoundCloud and Deezer plugins, audio priority and automatic plugin updates.
 
     [:octicons-arrow-right-24: Providers](providers.md)
 
@@ -89,7 +89,7 @@ A music player for Android TV. Play your own files, network shares and streaming
 
     ---
 
-    Browse Spotify or Beatport and let YouTube Music, SoundCloud or Beatport supply the audio, tried in the order you choose. Recording identity is checked, so a cover or a short excerpt is rejected.
+    Browse Spotify or Beatport and let YouTube, SoundCloud or Beatport supply the audio, tried in the order you choose. Recording identity is checked, so a cover or a short excerpt is rejected.
 
     [:octicons-arrow-right-24: Audio priority](providers.md#set-audio-priority)
 
@@ -117,8 +117,8 @@ A music player for Android TV. Play your own files, network shares and streaming
 | --- | --- |
 | Files on the TV or a USB drive | Settings → Music folders → **Choose local folder** |
 | Files on a NAS or computer | Settings → Music folders → **Add SMB share**, **WebDAV server**, **SFTP server** or **NFS export** |
-| YouTube Music | Install the YouTube Music plugin (code **728**); its **YouTube** tab appears at once, sign-in optional |
-| Spotify catalog with YouTube audio | Install Spotify (**981**) and YouTube Music, sign in to Spotify, keep YouTube Music under Audio |
+| YouTube Music and YouTube | Install the YouTube plugin (code **563**); its **YouTube** tab appears at once, sign-in with MicroG-RE-TV optional |
+| Spotify catalog with YouTube audio | Install Spotify (**981**) and YouTube, sign in to Spotify, keep YouTube under Audio |
 | Beatport catalog and streaming | Install Beatport (**393**) and sign in; full streams need a Beatport streaming subscription |
 | SoundCloud | Install SoundCloud (**089**) and pair it with a TV code |
 
