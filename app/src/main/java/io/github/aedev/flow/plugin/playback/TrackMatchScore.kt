@@ -155,7 +155,8 @@ internal object TrackMatchScore {
                 return Evidence(titleSimilarity, CERTAIN, durationScore(sourceMs, candidateMs))
             }
         }
-        val credit = titleCredit.matchEntire(presentedTitle(candidate.title, normalizedArtist)) ?: return null
+        val presented = presentedTitle(candidate.title, normalizedArtist)
+        val credit = titleCredit.matchEntire(presented) ?: return null
         val performer = foldLatinAccents(normalizeText(credit.groupValues[1]))
         val title = normalize(credit.groupValues[2])
         val titleSimilarity = textSimilarity(recordingTitle(track), title)
@@ -166,11 +167,11 @@ internal object TrackMatchScore {
             return Evidence(titleSimilarity, CERTAIN, durationScore(sourceMs, candidateMs))
         }
         if (sourceMs < MIN_LIVE_SET_DURATION_MS || candidateMs < MIN_LIVE_SET_DURATION_MS) return null
-        if (!liveWord.containsMatchIn(normalize(track.title)) || !liveWord.containsMatchIn(normalize(candidate.title))) return null
+        if (!liveWord.containsMatchIn(normalize(track.title)) || !liveWord.containsMatchIn(normalize(presented))) return null
         val sourceCredit = titleCredit.matchEntire(track.title) ?: return null
         if (foldLatinAccents(normalizeText(sourceCredit.groupValues[1])) != performer) return null
         if (normalizedArtist != performer && performerSimilarity(track, candidate) < MIN_ARTIST_SIMILARITY) return null
-        if ((variantMarkers.findAll(normalize(track.title)) + variantMarkers.findAll(normalize(candidate.title)))
+        if ((variantMarkers.findAll(normalize(track.title)) + variantMarkers.findAll(normalize(presented)))
                 .any { it.value != "live" && it.value != "mix" }
         ) {
             return null

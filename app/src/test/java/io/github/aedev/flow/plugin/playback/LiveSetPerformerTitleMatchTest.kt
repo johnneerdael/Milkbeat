@@ -102,6 +102,15 @@ class LiveSetPerformerTitleMatchTest {
     }
 
     @Test
+    fun `a promoter's own name is not live set evidence`() {
+        val set = bodzin.copy(title = "Stephan Bodzin - Mayday Dortmund Live 2025")
+        val upload = promoterUpload.copy(title = "Live Nation presents Stephan Bodzin - Mayday Dortmund 2025")
+        assertThat(TrackMatchScore.best(set, listOf(upload))).isNull()
+        val marked = upload.copy(title = "Live Nation presents Stephan Bodzin - Mayday Dortmund Live 2025")
+        assertThat(TrackMatchScore.best(set, listOf(marked))?.candidate).isEqualTo(marked)
+    }
+
+    @Test
     fun `long recordings that do not name a live set keep the ten second length rule`() {
         for (name in listOf("The 2025 Suite", "Christmas at Home 2025")) {
             val piece = bodzin.copy(title = "Stephan Bodzin - $name", durationMs = 1_500_000L)
