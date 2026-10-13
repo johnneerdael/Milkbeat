@@ -204,10 +204,15 @@ internal class PluginRuntime(
     }
 
     suspend fun close() {
+        // Cancelling cannot interrupt a compile or cache write under way, so wait for it: the caller may delete this
+        // plugin version's code cache next, and the warm-up's context must be gone before the runtime counts as closed.
         synchronized(isolatedLock) {
             closing = true
             isolatedWarmUp
-        }?.cancel(CancellationException("Plugin runtime closed"))
+        }?.let { warming ->
+            warming.cancel(CancellationException("Plugin runtime closed"))
+            withContext(NonCancellable) { warming.join() }
+        }
         idleJob?.cancel()
         contexts.close()
         browser.closeAll()

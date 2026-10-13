@@ -14,7 +14,6 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withTimeout
 import nl.neerdael.milkbeat.catalog.EntityKind
 import nl.neerdael.milkbeat.catalog.EntityRef
 import nl.neerdael.milkbeat.catalog.PageRequest
@@ -28,6 +27,7 @@ import okhttp3.OkHttpClient
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
@@ -191,7 +191,7 @@ class PluginRuntimeWarmUpDeviceTest {
                 delay(27_000)
 
                 runtime.close()
-                withTimeout(60_000) { warming.join() }
+                assertTrue("close() returns only once the isolated warm-up has ended", warming.isCompleted)
 
                 val prepared =
                     MessageDigest.getInstance("SHA-256").digest("prepared".toByteArray()).joinToString("") { "%02x".format(it) }
