@@ -83,6 +83,20 @@ class LiveSetPerformerTitleMatchTest {
     }
 
     @Test
+    fun `a promoter credit introduces exactly the performer, not an imitation`() {
+        for (title in listOf(
+            "VSNZ pres. STEPHAN BODZIN Tribute - VSNZ Winter Festival 2025",
+            "VSNZ pres. STEPHAN BODZIN and Friends - VSNZ Winter Festival 2025",
+        )) {
+            for (length in listOf(6_468_000L, 7_085_000L)) {
+                assertThat(TrackMatchScore.best(bodzin, listOf(promoterUpload.copy(title = title, durationMs = length)))).isNull()
+            }
+        }
+        val presents = promoterUpload.copy(title = "VSNZ presents Stephan Bodzin - VSNZ Winter Festival 2025")
+        assertThat(TrackMatchScore.best(bodzin, listOf(presents))?.candidate).isEqualTo(presents)
+    }
+
+    @Test
     fun `long recordings that do not name a live set keep the ten second length rule`() {
         val suite = bodzin.copy(title = "Stephan Bodzin - The 2025 Suite", durationMs = 1_500_000L)
         val upload = promoterUpload.copy(title = "Stephan Bodzin - The 2025 Suite", durationMs = 1_620_000L)
