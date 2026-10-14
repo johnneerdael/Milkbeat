@@ -17,6 +17,17 @@ internal object DatedFestivalSet {
                 "((?:19|20)\\d{2})-(\\d{1,2})-(\\d{1,2}))(?!\\d)",
         )
     private val year = Regex("\\b(?:19|20)\\d{2}\\b")
+    private val publicationBefore =
+        Regex(
+            "\\b(?:upload(?:ed)?|publish(?:ed)?|publication|posted|release(?:d)?|premier(?:e|ed))" +
+                "\\s*(?:date\\s*)?(?:on\\s*)?[:=–—-]?\\s*$",
+            RegexOption.IGNORE_CASE,
+        )
+    private val publicationAfter =
+        Regex(
+            "^\\s*(?:[-–—:]\\s*)?(?:upload|publication|release|premiere)\\s+date\\b",
+            RegexOption.IGNORE_CASE,
+        )
 
     // Null leaves ordinary recordings to the existing matcher. A dated festival set needs its day,
     // rather than just a similar title: festivals host multiple performances by the same artist.
@@ -37,7 +48,12 @@ internal object DatedFestivalSet {
         if (sourceDates.size != 1 || recordingDates(candidate) != sourceDates) return false
         if (edition(sourceTitle) != edition(candidateTitle)) return false
         val recordingYear = sourceDates.single().year.toString()
-        if ((year.findAll(sourceTitle) + year.findAll(candidateTitle)).any { it.value != recordingYear }) return false
+        if ((year.findAll(recordingTitle(sourceTitle)) + year.findAll(recordingTitle(candidateTitle))).any {
+                it.value != recordingYear
+            }
+        ) {
+            return false
+        }
         if (!TrackMatchScore.liveSetVersionsCompatible(sourceTitle, candidateTitle)) return false
         val sourcePerformer = performer(source) ?: return false
         val targetPerformer = performer(candidate) ?: return false
@@ -57,6 +73,15 @@ internal object DatedFestivalSet {
         return TrackMatchScore.foldLatinAccents(TrackMatchScore.normalize(name)).takeIf { it.isNotBlank() }
     }
 
+    private fun publicationDate(
+        text: String,
+        match: MatchResult,
+    ): Boolean =
+        publicationBefore.containsMatchIn(text.substring(0, match.range.first)) ||
+            publicationAfter.containsMatchIn(text.substring(match.range.last + 1))
+
+    private fun recordingTitle(title: String): String = date.replace(title) { if (publicationDate(title, it)) " " else it.value }
+
     private fun recordingDates(track: TrackDescriptor): Set<LocalDate> {
         val description = track.description.orEmpty().lowercase(Locale.ROOT)
         val recordingLines =
@@ -68,6 +93,7 @@ internal object DatedFestivalSet {
                 date
                     .findAll(text)
                     .mapNotNull { match ->
+                        if (publicationDate(text, match)) return@mapNotNull null
                         val groups = match.groupValues
                         val parts =
                             if (groups[3].isNotEmpty()) {

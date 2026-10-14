@@ -129,4 +129,20 @@ class DatedFestivalSetMatchTest {
         val found = video.copy(title = video.title.replace("Massano", "Beyonce"), artists = listOf(ArtistCredit("Beyonce")))
         assertThat(TrackMatchScore.best(set, listOf(found))?.candidate).isEqualTo(found)
     }
+
+    @Test
+    fun `a labeled publication date is never recording-day evidence`() {
+        for (label in listOf("uploaded", "published", "publication date", "released", "release date", "premiered", "posted")) {
+            val candidate = video.copy(title = video.title + " ($label 25.07.2026)", description = null)
+            assertThat(TrackMatchScore.best(source, listOf(candidate))).isNull()
+        }
+        val published = video.copy(title = video.title + " (uploaded 26.07.2027)")
+        assertThat(TrackMatchScore.best(source, listOf(published))?.candidate).isEqualTo(published)
+        val confirmed = video.copy(title = video.title + " (recorded 25.07.2026, uploaded 26.07.2027)", description = null)
+        assertThat(TrackMatchScore.best(source, listOf(confirmed))?.candidate).isEqualTo(confirmed)
+        val conflict = confirmed.copy(title = confirmed.title.replace("recorded 25.07.2026", "recorded 18.07.2026"))
+        assertThat(TrackMatchScore.best(source, listOf(conflict))).isNull()
+        val mislabeled = video.copy(description = "Tomorrowland live set recorded in 2026, uploaded 25.07.2026.")
+        assertThat(TrackMatchScore.best(source, listOf(mislabeled))).isNull()
+    }
 }
