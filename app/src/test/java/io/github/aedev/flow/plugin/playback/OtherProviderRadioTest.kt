@@ -45,7 +45,7 @@ class OtherProviderRadioTest {
     private val spotifyNext = spotifyTrack.copy(ref = EntityRef(EntityKind.TRACK, "sp-2"), title = "Spotify next")
     private val host = mockk<PluginHost>()
     private val registry = mockk<PluginRegistry>()
-    private val audio = PluginAudio(host, registry, PluginTrackMatcher(host, MemoryTrackMatches()), PluginAccounts(host))
+    private val audio = PluginAudio(host, registry, PluginTrackMatcher(host, MemoryTrackMatches(), registry), PluginAccounts(host))
     private val radio = PluginRadio(host, registry, audio)
     private val youtube =
         plugin(

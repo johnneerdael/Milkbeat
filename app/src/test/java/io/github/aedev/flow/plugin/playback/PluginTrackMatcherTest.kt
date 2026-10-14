@@ -4,12 +4,17 @@ import com.google.common.truth.Truth.assertThat
 import io.github.aedev.flow.data.local.dao.TrackMatchDao
 import io.github.aedev.flow.data.local.entity.TrackMatchEntity
 import io.github.aedev.flow.plugin.PluginHost
+import io.github.aedev.flow.plugin.registry.InstalledPlugin
+import io.github.aedev.flow.plugin.registry.PluginRegistry
+import io.github.aedev.flow.plugin.registry.PluginRegistryState
 import io.github.aedev.flow.plugin.runtime.PluginCallException
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -17,11 +22,15 @@ import nl.neerdael.milkbeat.catalog.ArtistCredit
 import nl.neerdael.milkbeat.catalog.EntityKind
 import nl.neerdael.milkbeat.catalog.EntityRef
 import nl.neerdael.milkbeat.catalog.TrackDescriptor
+import nl.neerdael.milkbeat.plugin.ApiRange
 import nl.neerdael.milkbeat.plugin.AudioMatches
+import nl.neerdael.milkbeat.plugin.AudioRole
 import nl.neerdael.milkbeat.plugin.PluginError
 import nl.neerdael.milkbeat.plugin.PluginErrorCode
 import nl.neerdael.milkbeat.plugin.PluginJson
+import nl.neerdael.milkbeat.plugin.PluginManifest
 import nl.neerdael.milkbeat.plugin.PluginOperations
+import nl.neerdael.milkbeat.plugin.Roles
 import org.junit.Test
 import java.util.concurrent.TimeUnit
 
@@ -29,7 +38,9 @@ import java.util.concurrent.TimeUnit
 class PluginTrackMatcherTest {
     private val host = mockk<PluginHost>()
     private val dao = MemoryTrackMatches()
-    private val matcher = PluginTrackMatcher(host, dao)
+    private val plugins = MutableStateFlow(PluginRegistryState(listOf(youtubePlugin(versionCode = 5))))
+    private val registry = mockk<PluginRegistry> { every { state } returns plugins }
+    private val matcher = PluginTrackMatcher(host, dao, registry)
     private val original = matchTrack("spotify:song", "spotify")
     private val candidate = matchTrack("youtube-song", "youtube")
 
@@ -65,7 +76,7 @@ class PluginTrackMatcherTest {
         runTest {
             assertThat(matcher.matchForIndexing(original, "youtube")).isEqualTo(candidate)
             val restoredDao = MemoryTrackMatches().apply { row = dao.row!!.copy() }
-            val restarted = PluginTrackMatcher(host, restoredDao)
+            val restarted = PluginTrackMatcher(host, restoredDao, registry)
             assertThat(restarted.matchForIndexing(original, "youtube")).isEqualTo(candidate)
             coVerify(exactly = 1) { host.call("youtube", PluginOperations.matchAudio, any()) }
         }
@@ -94,6 +105,34 @@ class PluginTrackMatcherTest {
             dao.row = TrackMatchEntity(PluginTrackMatcher.fingerprint(original), "youtube", null, 0.0, System.currentTimeMillis())
             assertThat(matcher.match(original, "youtube")).isEqualTo(candidate)
             coVerify(exactly = 1) { host.call("youtube", PluginOperations.matchAudio, any()) }
+        }
+
+    @Test
+    fun `a miss from an older plugin version is searched again once the plugin updates`() =
+        runTest {
+            coEvery { host.call("youtube", PluginOperations.matchAudio, any()) } returns AudioMatches()
+            assertThat(matcher.match(original, "youtube")).isNull()
+            assertThat(matcher.match(original, "youtube")).isNull()
+            coVerify(exactly = 1) { host.call("youtube", PluginOperations.matchAudio, any()) }
+
+            plugins.value = PluginRegistryState(listOf(youtubePlugin(versionCode = 6)))
+            coEvery { host.call("youtube", PluginOperations.matchAudio, any()) } returns AudioMatches(listOf(candidate))
+            assertThat(matcher.match(original, "youtube")).isEqualTo(candidate)
+            coVerify(exactly = 2) { host.call("youtube", PluginOperations.matchAudio, any()) }
+        }
+
+    @Test
+    fun `a miss found while the plugin updates belongs to the version that started the search`() =
+        runTest {
+            coEvery { host.call("youtube", PluginOperations.matchAudio, any()) } answers {
+                plugins.value = PluginRegistryState(listOf(youtubePlugin(versionCode = 6)))
+                AudioMatches()
+            }
+            assertThat(matcher.match(original, "youtube")).isNull()
+
+            coEvery { host.call("youtube", PluginOperations.matchAudio, any()) } returns AudioMatches(listOf(candidate))
+            assertThat(matcher.match(original, "youtube")).isEqualTo(candidate)
+            coVerify(exactly = 2) { host.call("youtube", PluginOperations.matchAudio, any()) }
         }
 
     @Test
@@ -192,3 +231,21 @@ internal fun matchTrack(
     durationMs = 143_000,
     ids = mapOf(space to id),
 )
+
+private fun youtubePlugin(versionCode: Int) =
+    InstalledPlugin(
+        PluginManifest(
+            1,
+            ApiRange(1, 2),
+            "youtube",
+            "YouTube",
+            "1.0",
+            versionCode,
+            roles = Roles(audio = AudioRole(setOf("youtube"), match = true)),
+        ),
+        "signer",
+        "test://youtube",
+        0,
+        emptyList(),
+        emptyList(),
+    )

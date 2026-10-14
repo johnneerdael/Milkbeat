@@ -31,7 +31,7 @@ abstract class PluginAudioFixture {
     protected val host = mockk<PluginHost>()
     protected val registry = mockk<PluginRegistry>()
     private val matches = MemoryTrackMatches()
-    protected val matcher = PluginTrackMatcher(host, matches)
+    protected val matcher = PluginTrackMatcher(host, matches, registry)
     protected val accounts = PluginAccounts(host, CoroutineScope(StandardTestDispatcher()), { 0L })
     protected val audio = PluginAudio(host, registry, matcher, accounts)
     protected val radio = PluginRadio(host, registry, audio)
