@@ -19,13 +19,14 @@ internal object DatedFestivalSet {
     private val year =
         Regex(
             "\\b(?:tml|tomorrowland)(?:(?:\\s+|,\\s*)(?:winter|brasil|brazil|festival|belgium|boom|france|" +
-                "alpe d['’]?huez|s[ãa]o paulo))*\\s+((?:19|20)\\d{2})\\b",
+                "alpe d['’]?huez|s[ãa]o paulo|weekend \\s*(?:[12]|one|two)|we[12]|w[12]))*\\s+((?:19|20)\\d{2})\\b",
         )
     private val publication =
         Regex(
             "\\b(?:upload(?:ed)?|publish(?:ed)?|publication|posted|released|release date|premier(?:e|ed))\\b",
             RegexOption.IGNORE_CASE,
         )
+    private val recordingBefore = Regex("\\b(?:recorded|performed|recording date)\\s*[:=-]?\\s*(?:on\\s*)?$", RegexOption.IGNORE_CASE)
     private val publicationAfter =
         Regex(
             "^\\s*(?:[-–—:]\\s*)?(?:upload|publication|release|premiere)\\s+date\\b",
@@ -70,7 +71,12 @@ internal object DatedFestivalSet {
         track: TrackDescriptor,
         expected: String? = null,
     ): String? {
-        val title = expected?.let { TrackMatchScore.presentedTitle(track.title, it, credit) } ?: track.title
+        val known =
+            expected ?: track.artists
+                .firstOrNull()
+                ?.name
+                ?.let { TrackMatchScore.foldLatinAccents(TrackMatchScore.normalize(it)) }
+        val title = known?.let { TrackMatchScore.presentedTitle(track.title, it, credit) } ?: track.title
         val prefix = credit.matchEntire(title)?.groupValues?.get(1)
         val name =
             prefix ?: track.artists
@@ -99,7 +105,8 @@ internal object DatedFestivalSet {
                 .lastOrNull()
                 ?.range
                 ?.first ?: -1
-        return published > recorded || publicationAfter.containsMatchIn(text.substring(match.range.last + 1))
+        return published > recorded ||
+            (!recordingBefore.containsMatchIn(prefix) && publicationAfter.containsMatchIn(text.substring(match.range.last + 1)))
     }
 
     private fun recordingTitle(title: String): String = date.replace(title) { if (publicationDate(title, it)) " " else it.value }

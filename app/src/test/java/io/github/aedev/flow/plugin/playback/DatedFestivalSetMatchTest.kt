@@ -196,4 +196,29 @@ class DatedFestivalSetMatchTest {
             assertThat(TrackMatchScore.best(source, listOf(other))).isNull()
         }
     }
+
+    @Test
+    fun `a recording field remains evidence before a release date field`() {
+        val found = video.copy(description = "Tomorrowland set - Recorded: 25.07.2026 - Release date: 26.07.2026")
+        assertThat(TrackMatchScore.best(source, listOf(found))?.candidate).isEqualTo(found)
+    }
+
+    @Test
+    fun `source promoter credits are stripped only for the credited performer`() {
+        val set = source.copy(title = "VSNZ pres. " + source.title)
+        assertThat(TrackMatchScore.best(set, listOf(video))?.candidate).isEqualTo(video)
+        val other = set.copy(title = set.title.replace("Massano", "Cassian"))
+        assertThat(TrackMatchScore.best(other, listOf(video))).isNull()
+    }
+
+    @Test
+    fun `weekend qualified years must agree with the recording day`() {
+        for (label in listOf("Weekend 2", "Weekend Two", "WE2", "W2")) {
+            val correct = video.copy(title = video.title.replace("Tomorrowland 2026", "Tomorrowland $label 2026"))
+            assertThat(TrackMatchScore.best(source, listOf(correct))?.candidate).isEqualTo(correct)
+            assertThat(
+                TrackMatchScore.best(source, listOf(correct.copy(title = correct.title.replace("$label 2026", "$label 2025")))),
+            ).isNull()
+        }
+    }
 }
