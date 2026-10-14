@@ -128,7 +128,13 @@ internal object TrackMatchScore {
             sourceMs >= MIN_LIVE_SET_DURATION_MS && candidateMs >= MIN_LIVE_SET_DURATION_MS &&
                 lengthDelta <= sourceMs * LIVE_SET_LENGTH_TOLERANCE
         if (!sameLength && !setLength) return null
-        val sourceArtist = performerCredits(track).firstOrNull() ?: return null
+        val dated = DatedFestivalSet.decision(track, candidate)
+        if (dated == false) return null
+        val sourceArtist =
+            when {
+                dated == true -> DatedFestivalSet.performer(track)
+                else -> performerCredits(track).firstOrNull()
+            } ?: return null
         val normalizedArtist = foldLatinAccents(normalizeText(sourceArtist.replace(topicSuffix, "")))
         if (normalizedArtist in unavailableArtists) return null
         if (!imitationCompatible(
@@ -143,9 +149,7 @@ internal object TrackMatchScore {
         ) {
             return null
         }
-        DatedFestivalSet.decision(track, candidate)?.let { matched ->
-            return if (matched) Evidence(CERTAIN, CERTAIN, durationScore(sourceMs, candidateMs)) else null
-        }
+        if (dated == true) return Evidence(CERTAIN, CERTAIN, durationScore(sourceMs, candidateMs))
         val sourceTitle = foldLatinAccents(normalize(track.title))
         val candidateTitle = foldLatinAccents(normalize(withoutUploader(presentedTitle(candidate.title, normalizedArtist), candidate)))
         // Anyone can re-upload a set, so the source's credit may name only its uploader: the channel then
@@ -219,12 +223,13 @@ internal object TrackMatchScore {
     }
 
     // The title after a promoter's "pres." credit, only when the credit it introduces is exactly the performer.
-    private fun presentedTitle(
+    internal fun presentedTitle(
         title: String,
         normalizedArtist: String,
+        creditPattern: Regex = titleCredit,
     ): String {
         val presented = title.replaceFirst(presenterPrefix, "").takeIf { it != title } ?: return title
-        val credit = titleCredit.matchEntire(presented) ?: return title
+        val credit = creditPattern.matchEntire(presented) ?: return title
         return if (foldLatinAccents(normalizeText(credit.groupValues[1])) == normalizedArtist) presented else title
     }
 
@@ -324,7 +329,7 @@ internal object TrackMatchScore {
         return source.maxOf { artist -> target.maxOf { artistSimilarity(artist, it) } }
     }
 
-    private fun artistSimilarity(
+    internal fun artistSimilarity(
         artist: String,
         candidate: String,
     ): Double {

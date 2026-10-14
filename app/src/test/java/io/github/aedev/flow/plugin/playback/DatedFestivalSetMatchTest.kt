@@ -145,4 +145,45 @@ class DatedFestivalSetMatchTest {
         val mislabeled = video.copy(description = "Tomorrowland live set recorded in 2026, uploaded 25.07.2026.")
         assertThat(TrackMatchScore.best(source, listOf(mislabeled))).isNull()
     }
+
+    @Test
+    fun `performer and stage years are not festival years`() {
+        val set = source.copy(title = source.title.replace("Massano", "1991"), artists = listOf(ArtistCredit("1991")))
+        val found =
+            video.copy(
+                title = video.title.replace("Massano", "1991").replace("Freedom Stage", "Stage 1999"),
+                artists = listOf(ArtistCredit("1991")),
+            )
+        assertThat(TrackMatchScore.best(set, listOf(found))?.candidate).isEqualTo(found)
+        assertThat(
+            TrackMatchScore.best(set, listOf(found.copy(title = found.title.replace("Tomorrowland 2026", "Tomorrowland 2025")))),
+        ).isNull()
+    }
+
+    @Test
+    fun `upload wording can name a service before its date`() {
+        val set = source.copy(title = source.title.replace("25-07-2026", "18-07-2026"))
+        val found = video.copy(description = "Set recorded at Tomorrowland on 18.07.2026 and uploaded to YouTube on 25.07.2026.")
+        assertThat(TrackMatchScore.best(set, listOf(found))?.candidate).isEqualTo(found)
+        val uploadOnly = video.copy(description = "Live set recorded at Tomorrowland in 2026 and uploaded to SoundCloud on 25.07.2026.")
+        assertThat(TrackMatchScore.best(source, listOf(uploadOnly))).isNull()
+    }
+
+    @Test
+    fun `dated sets keep promoter title credits and complete artist normalization`() {
+        val promoter = video.copy(title = "VSNZ pres. " + video.title, artists = listOf(ArtistCredit("VSNZ")))
+        assertThat(TrackMatchScore.best(source, listOf(promoter))?.candidate).isEqualTo(promoter)
+    }
+
+    @Test
+    fun `dated festival artist equivalence keeps spacing normalization`() {
+        val set = source.copy(title = source.title.replace("Massano", "AC/DC"), artists = listOf(ArtistCredit("AC/DC")))
+        val found = video.copy(title = video.title.replace("Massano", "ACDC"), artists = listOf(ArtistCredit("ACDC")))
+        assertThat(TrackMatchScore.best(set, listOf(found))?.candidate).isEqualTo(found)
+    }
+
+    @Test
+    fun `an explicit dated performer title does not require uploader metadata`() {
+        assertThat(TrackMatchScore.best(source.copy(artists = emptyList()), listOf(video))?.candidate).isEqualTo(video)
+    }
 }
