@@ -249,4 +249,12 @@ class DatedFestivalSetMatchTest {
             assertThat(TrackMatchScore.best(source, listOf(found))).isNull()
         }
     }
+
+    @Test
+    fun `all recording contexts preserve their day before a later release field`() {
+        for (context in listOf("Live at", "Live from", "Set at", "Set from", "Recorded at", "Performed at")) {
+            val found = video.copy(description = "$context Tomorrowland 25.07.2026 - Release date: 26.07.2026")
+            assertThat(TrackMatchScore.best(source, listOf(found))?.candidate).isEqualTo(found)
+        }
+    }
 }

@@ -26,7 +26,6 @@ internal object DatedFestivalSet {
             "\\b(?:upload(?:ed)?|publish(?:ed)?|publication|posted|released|release date|premier(?:e|ed))\\b",
             RegexOption.IGNORE_CASE,
         )
-    private val recordingBefore = Regex("\\b(?:recorded|performed|recording date)\\s*[:=-]?\\s*(?:on\\s*)?$", RegexOption.IGNORE_CASE)
     private val publicationAfter =
         Regex(
             "^\\s*(?:[-–—:]\\s*)?(?:upload|publication|release|premiere)\\s+date\\b",
@@ -119,7 +118,7 @@ internal object DatedFestivalSet {
                 ?.range
                 ?.first ?: -1
         return published > recorded ||
-            (!recordingBefore.containsMatchIn(prefix) && publicationAfter.containsMatchIn(text.substring(match.range.last + 1)))
+            (recorded < 0 && publicationAfter.containsMatchIn(text.substring(match.range.last + 1)))
     }
 
     private fun recordingTitle(title: String): String = date.replace(title) { if (publicationDate(title, it)) " " else it.value }
