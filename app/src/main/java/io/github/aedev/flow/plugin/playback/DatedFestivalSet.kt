@@ -10,7 +10,7 @@ internal object DatedFestivalSet {
     private val editions = Regex("\\b(?:winter|brasil|brazil)\\b")
     private val liveSet = Regex("\\b(?:live|recorded|set|mix|festival)\\b")
     private val recording = Regex("\\b(?:recorded|performed|live (?:at|from)|set (?:at|from))\\b")
-    private val credit = Regex("^(.+?)(?:\\s*[|@•]\\s*|\\s*[-–—:]\\s+)(.+)$")
+    private val credit = Regex("^(.+?)\\s*[-–—|@•:]\\s+(.+)$")
     private val date =
         Regex(
             "(?<!\\d)(?:(\\d{1,2})[-./](\\d{1,2})[-./]((?:19|20)\\d{2})|" +
@@ -54,7 +54,7 @@ internal object DatedFestivalSet {
                 .firstOrNull()
                 ?.name
                 ?.takeIf { track.title.startsWith(it, ignoreCase = true) } ?: return null
-        return TrackMatchScore.normalize(name).takeIf { it.isNotBlank() }
+        return TrackMatchScore.foldLatinAccents(TrackMatchScore.normalize(name)).takeIf { it.isNotBlank() }
     }
 
     private fun recordingDates(track: TrackDescriptor): Set<LocalDate> {

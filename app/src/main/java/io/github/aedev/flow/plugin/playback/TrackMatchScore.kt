@@ -297,7 +297,7 @@ internal object TrackMatchScore {
         return normalized.ifEmpty { unicode.replace(spaces, " ").trim() }
     }
 
-    private fun foldLatinAccents(text: String): String =
+    internal fun foldLatinAccents(text: String): String =
         Normalizer.normalize(Normalizer.normalize(text, Normalizer.Form.NFD).replace(latinAccents, ""), Normalizer.Form.NFC)
 
     private fun textSimilarity(

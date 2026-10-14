@@ -107,4 +107,26 @@ class DatedFestivalSetMatchTest {
             assertThat(TrackMatchScore.best(source, listOf(video.copy(title = video.title + " " + variant)))).isNull()
         }
     }
+
+    @Test
+    fun `embedded performer punctuation never becomes a title separator`() {
+        for (symbol in listOf("@", "|", "•", ":")) {
+            val set = source.copy(title = source.title.replace("Massano", "DJ${symbol}A"), artists = listOf(ArtistCredit("DJ${symbol}A")))
+            val same = video.copy(title = video.title.replace("Massano", "DJ${symbol}A"), artists = listOf(ArtistCredit("DJ${symbol}A")))
+            val other =
+                same.copy(
+                    title = same.title.replace("DJ${symbol}A", "DJ${symbol}B"),
+                    artists = listOf(ArtistCredit("DJ${symbol}B")),
+                )
+            assertThat(TrackMatchScore.best(set, listOf(other))).isNull()
+            assertThat(TrackMatchScore.best(set, listOf(same))?.candidate).isEqualTo(same)
+        }
+    }
+
+    @Test
+    fun `Latin accents do not change the festival performer identity`() {
+        val set = source.copy(title = source.title.replace("Massano", "Beyoncé"), artists = listOf(ArtistCredit("Beyoncé")))
+        val found = video.copy(title = video.title.replace("Massano", "Beyonce"), artists = listOf(ArtistCredit("Beyonce")))
+        assertThat(TrackMatchScore.best(set, listOf(found))?.candidate).isEqualTo(found)
+    }
 }
