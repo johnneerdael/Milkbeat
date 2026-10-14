@@ -68,7 +68,17 @@ internal object DatedFestivalSet {
     }
 
     private fun edition(title: String): Set<String> =
-        editions.findAll(title).map { if (it.groupValues[1] == "brasil") "brazil" else it.groupValues[1] }.toSet()
+        editions
+            .findAll(TrackMatchScore.normalize(title))
+            .map {
+                if (it.groupValues[1] ==
+                    "brasil"
+                ) {
+                    "brazil"
+                } else {
+                    it.groupValues[1]
+                }
+            }.toSet()
 
     internal fun performer(
         track: TrackDescriptor,

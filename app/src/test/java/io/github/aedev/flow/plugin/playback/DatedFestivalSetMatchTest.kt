@@ -239,4 +239,14 @@ class DatedFestivalSetMatchTest {
         val other = video.copy(title = video.title.replace("Massano", "Nanana"), artists = listOf(ArtistCredit("Nanana")))
         assertThat(TrackMatchScore.best(set, listOf(other))).isNull()
     }
+
+    @Test
+    fun `punctuated edition names remain distinct from the standard festival`() {
+        val winter = source.copy(title = source.title.replace("TML 2026", "TML Winter 2026"))
+        for (separator in listOf("-", ",", "|", ":")) {
+            val found = video.copy(title = video.title.replace("Tomorrowland 2026", "Tomorrowland $separator Winter 2026"))
+            assertThat(TrackMatchScore.best(winter, listOf(found))?.candidate).isEqualTo(found)
+            assertThat(TrackMatchScore.best(source, listOf(found))).isNull()
+        }
+    }
 }
