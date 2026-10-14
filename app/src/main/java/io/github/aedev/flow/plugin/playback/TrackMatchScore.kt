@@ -329,7 +329,7 @@ internal object TrackMatchScore {
         return source.maxOf { artist -> target.maxOf { artistSimilarity(artist, it) } }
     }
 
-    internal fun artistSimilarity(
+    private fun artistSimilarity(
         artist: String,
         candidate: String,
     ): Double {

@@ -52,7 +52,10 @@ internal object DatedFestivalSet {
         if (sourceDates.size != 1 || recordingDates(candidate) != sourceDates) return false
         if (edition(sourceTitle) != edition(candidateTitle)) return false
         val recordingYear = sourceDates.single().year.toString()
-        if ((year.findAll(recordingTitle(sourceTitle)) + year.findAll(recordingTitle(candidateTitle))).any {
+        if ((
+                year.findAll(TrackMatchScore.normalize(recordingTitle(sourceTitle))) +
+                    year.findAll(TrackMatchScore.normalize(recordingTitle(candidateTitle)))
+            ).any {
                 it.groupValues[1] != recordingYear
             }
         ) {
@@ -61,7 +64,7 @@ internal object DatedFestivalSet {
         if (!TrackMatchScore.liveSetVersionsCompatible(sourceTitle, candidateTitle)) return false
         val sourcePerformer = performer(source) ?: return null
         val targetPerformer = performer(candidate, sourcePerformer) ?: return null
-        return TrackMatchScore.artistSimilarity(sourcePerformer, targetPerformer) == 1.0
+        return sourcePerformer.replace(" ", "") == targetPerformer.replace(" ", "")
     }
 
     private fun edition(title: String): Set<String> =

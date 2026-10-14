@@ -221,4 +221,22 @@ class DatedFestivalSetMatchTest {
             ).isNull()
         }
     }
+
+    @Test
+    fun `punctuation around event years does not hide a conflict`() {
+        for (separator in listOf("-", "–", "—", "|", ":", "/")) {
+            val correct = video.copy(title = video.title.replace("Tomorrowland 2026", "Tomorrowland $separator 2026"))
+            assertThat(TrackMatchScore.best(source, listOf(correct))?.candidate).isEqualTo(correct)
+            assertThat(
+                TrackMatchScore.best(source, listOf(correct.copy(title = correct.title.replace("$separator 2026", "$separator 2025")))),
+            ).isNull()
+        }
+    }
+
+    @Test
+    fun `repeated bigrams are not proof of performer identity`() {
+        val set = source.copy(title = source.title.replace("Massano", "Nana"), artists = listOf(ArtistCredit("Nana")))
+        val other = video.copy(title = video.title.replace("Massano", "Nanana"), artists = listOf(ArtistCredit("Nanana")))
+        assertThat(TrackMatchScore.best(set, listOf(other))).isNull()
+    }
 }
