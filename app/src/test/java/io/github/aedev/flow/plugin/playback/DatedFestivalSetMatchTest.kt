@@ -91,4 +91,20 @@ class DatedFestivalSetMatchTest {
                 ?.providerId,
         ).isEqualTo("eeNljOHahxY")
     }
+
+    @Test
+    fun `hyphenated performers retain their complete names`() {
+        val set = source.copy(title = source.title.replace("Massano", "DJ-A"), artists = listOf(ArtistCredit("DJ-A")))
+        val same = video.copy(title = video.title.replace("Massano", "DJ-A"), artists = listOf(ArtistCredit("DJ-A")))
+        val other = same.copy(title = same.title.replace("DJ-A", "DJ-B"), artists = listOf(ArtistCredit("DJ-B")))
+        assertThat(TrackMatchScore.best(set, listOf(other))).isNull()
+        assertThat(TrackMatchScore.best(set, listOf(same))?.candidate).isEqualTo(same)
+    }
+
+    @Test
+    fun `festival identity retains the ordinary recording variant checks`() {
+        for (variant in listOf("Acoustic", "Edit", "Dub", "VIP", "Instrumental", "Piano", "Demo", "Mono", "Sped up")) {
+            assertThat(TrackMatchScore.best(source, listOf(video.copy(title = video.title + " " + variant)))).isNull()
+        }
+    }
 }

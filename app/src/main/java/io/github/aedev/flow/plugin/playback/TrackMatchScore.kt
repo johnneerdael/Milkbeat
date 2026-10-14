@@ -390,6 +390,11 @@ internal object TrackMatchScore {
         return a.all { credit -> b.any { creditMatches(credit, it) } } && b.all { credit -> a.any { creditMatches(credit, it) } }
     }
 
+    internal fun liveSetVersionsCompatible(
+        title: String,
+        candidate: String,
+    ): Boolean = versionsCompatible(normalize(title).replace(liveSetWords, " "), normalize(candidate).replace(liveSetWords, " "))
+
     private fun versionsCompatible(
         title: String,
         candidate: String,
