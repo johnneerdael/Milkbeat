@@ -186,4 +186,14 @@ class DatedFestivalSetMatchTest {
     fun `an explicit dated performer title does not require uploader metadata`() {
         assertThat(TrackMatchScore.best(source.copy(artists = emptyList()), listOf(video))?.candidate).isEqualTo(video)
     }
+
+    @Test
+    fun `locale qualified event years must agree with the recording day`() {
+        for (locale in listOf("Belgium", "Boom Belgium", "Boom, Belgium", "Festival Belgium")) {
+            val correct = video.copy(title = video.title.replace("Tomorrowland 2026", "Tomorrowland $locale 2026"))
+            assertThat(TrackMatchScore.best(source, listOf(correct))?.candidate).isEqualTo(correct)
+            val other = correct.copy(title = correct.title.replace("$locale 2026", "$locale 2025"))
+            assertThat(TrackMatchScore.best(source, listOf(other))).isNull()
+        }
+    }
 }

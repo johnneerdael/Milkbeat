@@ -16,7 +16,11 @@ internal object DatedFestivalSet {
             "(?<!\\d)(?:(\\d{1,2})[-./](\\d{1,2})[-./]((?:19|20)\\d{2})|" +
                 "((?:19|20)\\d{2})-(\\d{1,2})-(\\d{1,2}))(?!\\d)",
         )
-    private val year = Regex("\\b(?:tml|tomorrowland)(?:\\s+(?:winter|brasil|brazil|festival))?\\s+((?:19|20)\\d{2})\\b")
+    private val year =
+        Regex(
+            "\\b(?:tml|tomorrowland)(?:(?:\\s+|,\\s*)(?:winter|brasil|brazil|festival|belgium|boom|france|" +
+                "alpe d['’]?huez|s[ãa]o paulo))*\\s+((?:19|20)\\d{2})\\b",
+        )
     private val publication =
         Regex(
             "\\b(?:upload(?:ed)?|publish(?:ed)?|publication|posted|released|release date|premier(?:e|ed))\\b",
