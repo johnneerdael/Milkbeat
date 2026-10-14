@@ -227,3 +227,7 @@ ecosystem are not required to validate phase 1.
 
 These gates define what robustness must mean in observable behavior. They are
 implementation requirements, not checks already passed by this design document.
+
+## Live-set recording descriptions
+
+`TrackDescriptor.description` is optional recording metadata. Providers may return a recording description with an audio-match candidate so the host can confirm a live festival set’s recording day. It defaults to null for existing providers and is retained in saved matches. Matching uses recording dates tied to the festival, not upload dates or unrelated dates in tracklists. Tomorrowland/TML is the supported festival alias; the performer, day and full-set duration remain required.

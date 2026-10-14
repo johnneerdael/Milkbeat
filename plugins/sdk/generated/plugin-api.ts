@@ -415,6 +415,7 @@ export interface TrackDescriptor {
   ids?: {
     [k: string]: string;
   };
+  description?: string | null;
 }
 export interface PageBlockHeader {
   type: 'header';

@@ -174,4 +174,21 @@ class LiveSetPerformerTitleMatchTest {
         assertThat(TrackMatchScore.best(song, listOf(video))).isNull()
         assertThat(TrackMatchScore.best(song, listOf(video.copy(durationMs = 605_000L)))?.candidate).isNotNull()
     }
+
+    @Test
+    fun `festival aliases match the same performer day and full set length`() {
+        val source =
+            original.copy(
+                title = "Massano- Live at TML 2026 (Boom, Belgium- 25-07-2026)",
+                artists = listOf(ArtistCredit("Victor Meneses")),
+                durationMs = 5_400_000L,
+            )
+        val video =
+            found.copy(
+                title = "Massano - Live at Tomorrowland 2026 (Full Set @ Freedom Stage) 25.07.2026",
+                artists = listOf(ArtistCredit("Massano")),
+                durationMs = 5_600_000L,
+            )
+        assertThat(TrackMatchScore.best(source, listOf(video))?.candidate).isEqualTo(video)
+    }
 }

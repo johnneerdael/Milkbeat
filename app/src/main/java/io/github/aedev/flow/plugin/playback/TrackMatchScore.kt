@@ -7,7 +7,7 @@ import java.util.Locale
 import kotlin.math.abs
 
 internal object TrackMatchScore {
-    const val POLICY_VERSION = 6
+    const val POLICY_VERSION = 7
     const val MIN_SCORE = 0.35
     private const val CERTAIN = 1.0
     private const val EARLY_EXIT = 0.95
@@ -81,6 +81,7 @@ internal object TrackMatchScore {
         candidates.firstOrNull { sharesIsrc(track, it) && !isMixed(it) }?.let { return Scored(it, CERTAIN) }
         var best: Scored? = candidates.firstOrNull { sharesIsrc(track, it) }?.let { Scored(it, CERTAIN) }
         for (candidate in candidates) {
+            if (candidate.hasVideo && DatedFestivalSet.decision(track, candidate) == false) continue
             val ordinary = evidence(track, candidate)
             val evidence =
                 if (ordinary.title >= MIN_TITLE_SIMILARITY && ordinary.artist >= MIN_ARTIST_SIMILARITY &&
@@ -141,6 +142,9 @@ internal object TrackMatchScore {
             )
         ) {
             return null
+        }
+        DatedFestivalSet.decision(track, candidate)?.let { matched ->
+            return if (matched) Evidence(CERTAIN, CERTAIN, durationScore(sourceMs, candidateMs)) else null
         }
         val sourceTitle = foldLatinAccents(normalize(track.title))
         val candidateTitle = foldLatinAccents(normalize(withoutUploader(presentedTitle(candidate.title, normalizedArtist), candidate)))

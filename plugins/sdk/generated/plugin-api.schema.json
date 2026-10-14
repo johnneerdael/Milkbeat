@@ -2161,6 +2161,12 @@
                     "additionalProperties": {
                         "type": "string"
                     }
+                },
+                "description": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
                 }
             },
             "title": "TrackDescriptor"
