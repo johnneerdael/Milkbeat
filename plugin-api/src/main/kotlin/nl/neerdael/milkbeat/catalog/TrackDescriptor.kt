@@ -24,6 +24,8 @@ data class TrackDescriptor(
     /** The track has a picture stream, as a music video does. */
     val hasVideo: Boolean = false,
     val ids: Map<String, String> = emptyMap(),
+    /** Recording details used to corroborate live-set identity; not the upload date. */
+    val description: String? = null,
 )
 
 /** Tracks to queue, in order, with the cursor that continues them and the collection they came from. */

@@ -7,7 +7,7 @@ import java.util.Locale
 import kotlin.math.abs
 
 internal object TrackMatchScore {
-    const val POLICY_VERSION = 6
+    const val POLICY_VERSION = 7
     const val MIN_SCORE = 0.35
     private const val CERTAIN = 1.0
     private const val EARLY_EXIT = 0.95
@@ -81,6 +81,7 @@ internal object TrackMatchScore {
         candidates.firstOrNull { sharesIsrc(track, it) && !isMixed(it) }?.let { return Scored(it, CERTAIN) }
         var best: Scored? = candidates.firstOrNull { sharesIsrc(track, it) }?.let { Scored(it, CERTAIN) }
         for (candidate in candidates) {
+            if (candidate.hasVideo && DatedFestivalSet.decision(track, candidate) == false) continue
             val ordinary = evidence(track, candidate)
             val evidence =
                 if (ordinary.title >= MIN_TITLE_SIMILARITY && ordinary.artist >= MIN_ARTIST_SIMILARITY &&
@@ -127,7 +128,13 @@ internal object TrackMatchScore {
             sourceMs >= MIN_LIVE_SET_DURATION_MS && candidateMs >= MIN_LIVE_SET_DURATION_MS &&
                 lengthDelta <= sourceMs * LIVE_SET_LENGTH_TOLERANCE
         if (!sameLength && !setLength) return null
-        val sourceArtist = performerCredits(track).firstOrNull() ?: return null
+        val dated = DatedFestivalSet.decision(track, candidate)
+        if (dated == false) return null
+        val sourceArtist =
+            when {
+                dated == true -> DatedFestivalSet.performer(track)
+                else -> performerCredits(track).firstOrNull()
+            } ?: return null
         val normalizedArtist = foldLatinAccents(normalizeText(sourceArtist.replace(topicSuffix, "")))
         if (normalizedArtist in unavailableArtists) return null
         if (!imitationCompatible(
@@ -142,6 +149,7 @@ internal object TrackMatchScore {
         ) {
             return null
         }
+        if (dated == true) return Evidence(CERTAIN, CERTAIN, durationScore(sourceMs, candidateMs))
         val sourceTitle = foldLatinAccents(normalize(track.title))
         val candidateTitle = foldLatinAccents(normalize(withoutUploader(presentedTitle(candidate.title, normalizedArtist), candidate)))
         // Anyone can re-upload a set, so the source's credit may name only its uploader: the channel then
@@ -215,12 +223,13 @@ internal object TrackMatchScore {
     }
 
     // The title after a promoter's "pres." credit, only when the credit it introduces is exactly the performer.
-    private fun presentedTitle(
+    internal fun presentedTitle(
         title: String,
         normalizedArtist: String,
+        creditPattern: Regex = titleCredit,
     ): String {
         val presented = title.replaceFirst(presenterPrefix, "").takeIf { it != title } ?: return title
-        val credit = titleCredit.matchEntire(presented) ?: return title
+        val credit = creditPattern.matchEntire(presented) ?: return title
         return if (foldLatinAccents(normalizeText(credit.groupValues[1])) == normalizedArtist) presented else title
     }
 
@@ -293,7 +302,7 @@ internal object TrackMatchScore {
         return normalized.ifEmpty { unicode.replace(spaces, " ").trim() }
     }
 
-    private fun foldLatinAccents(text: String): String =
+    internal fun foldLatinAccents(text: String): String =
         Normalizer.normalize(Normalizer.normalize(text, Normalizer.Form.NFD).replace(latinAccents, ""), Normalizer.Form.NFC)
 
     private fun textSimilarity(
@@ -385,6 +394,11 @@ internal object TrackMatchScore {
                 )
         return a.all { credit -> b.any { creditMatches(credit, it) } } && b.all { credit -> a.any { creditMatches(credit, it) } }
     }
+
+    internal fun liveSetVersionsCompatible(
+        title: String,
+        candidate: String,
+    ): Boolean = versionsCompatible(normalize(title).replace(liveSetWords, " "), normalize(candidate).replace(liveSetWords, " "))
 
     private fun versionsCompatible(
         title: String,

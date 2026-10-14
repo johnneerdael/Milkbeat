@@ -23,6 +23,7 @@ import nl.neerdael.milkbeat.catalog.EntityKind
 import nl.neerdael.milkbeat.catalog.EntityRef
 import nl.neerdael.milkbeat.catalog.TrackDescriptor
 import nl.neerdael.milkbeat.plugin.ApiRange
+import nl.neerdael.milkbeat.plugin.AudioMatchStrategy
 import nl.neerdael.milkbeat.plugin.AudioMatches
 import nl.neerdael.milkbeat.plugin.AudioRole
 import nl.neerdael.milkbeat.plugin.PluginError
@@ -133,6 +134,40 @@ class PluginTrackMatcherTest {
             coEvery { host.call("youtube", PluginOperations.matchAudio, any()) } returns AudioMatches(listOf(candidate))
             assertThat(matcher.match(original, "youtube")).isEqualTo(candidate)
             coVerify(exactly = 2) { host.call("youtube", PluginOperations.matchAudio, any()) }
+        }
+
+    @Test
+    fun `a dated festival match retains its description across a restart`() =
+        runTest {
+            val set =
+                original.copy(
+                    title = "Massano- Live at TML 2026 (Boom, Belgium - 25-07-2026)",
+                    artists = listOf(ArtistCredit("Massano")),
+                    durationMs = 3_560_783L,
+                )
+            val found =
+                candidate.copy(
+                    ref = EntityRef(EntityKind.MUSIC_VIDEO, "eeNljOHahxY"),
+                    title = "Massano - Live at Tomorrowland 2026 (Full Set @ Freedom Stage)",
+                    artists = listOf(ArtistCredit("Massano")),
+                    durationMs = 3_600_000L,
+                    hasVideo = true,
+                    ids = mapOf("yt" to "eeNljOHahxY"),
+                    description = "Set recorded live from Tomorrowland Weekend 2 - 25.07.2026.",
+                )
+            dao.row =
+                TrackMatchEntity(
+                    "miss:6:v5:VIDEOS:${PluginTrackMatcher.fingerprint(set)}",
+                    "youtube",
+                    null,
+                    0.0,
+                    System.currentTimeMillis(),
+                )
+            coEvery { host.call("youtube", PluginOperations.matchAudio, any()) } returns AudioMatches(listOf(found))
+            assertThat(matcher.match(set, "youtube", strategy = AudioMatchStrategy.VIDEOS)).isEqualTo(found)
+            val restarted = PluginTrackMatcher(host, dao, registry)
+            assertThat(restarted.match(set, "youtube", strategy = AudioMatchStrategy.VIDEOS)).isEqualTo(found)
+            coVerify(exactly = 1) { host.call("youtube", PluginOperations.matchAudio, any()) }
         }
 
     @Test

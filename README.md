@@ -52,7 +52,8 @@ and sign-in method, playback and radio, the visualizer, every Settings page and 
   a track from one of them, so YouTube above SoundCloud plays SoundCloud tracks from YouTube first.
   Providers left out of the order (Beatport by default) play only their own tracks. Spotify searches
   several providers at once but keeps your order. Recording identity is checked, so a
-  cover, another remix or a short excerpt is rejected.
+  cover, another remix or a short excerpt is rejected. Dated Tomorrowland sets also match by
+  performer, festival and recording day in the title or description, with `TML` treated as Tomorrowland.
 - **Every queue continues as a radio,** steered by YouTube Music's presets (Discover, Popular,
   Deep cuts, moods and decades) pinned above the queue. A queue from Spotify or another
   non-YouTube provider gets YouTube's radio for its first song, and local music seeds a radio
