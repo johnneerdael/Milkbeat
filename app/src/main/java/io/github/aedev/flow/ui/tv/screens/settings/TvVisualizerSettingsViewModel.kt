@@ -100,7 +100,8 @@ class TvVisualizerSettingsViewModel
         fun refreshExitRecords() {
             viewModelScope.launch {
                 val diagnostics = engine.exitDiagnostics
-                exitRecordsState.value = ExitRecords(diagnostics.recentExits(), diagnostics.trail())
+                val native = diagnostics.nativeCrashes()
+                exitRecordsState.value = ExitRecords(diagnostics.recentExits(), diagnostics.trail(), native.status, native.reports)
             }
         }
 

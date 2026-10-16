@@ -811,7 +811,13 @@ revision must pass the configured ktlint rules.
   `setProcessStateSummary`) from the settings flow's `onStart` on IO, so the trail is open before the
   engine first renders without loading the native library at app start or doing file I/O on main.
   Settings → Visualizations → Last exit formats Android's exit records with that trail
-  (`TvVisualizerExitReport.kt`); focused tests: `--tests '*VisualizerExit*'`.
+  (`TvVisualizerExitReport.kt`), including `NativeCrashReports.status()` and up to five saved native
+  reports from `NativeCrashReports.recent(context)`. `VisualizerExitDiagnostics.nativeCrashes` reads
+  these on IO; the UI preserves only the core-provided bounded display details, with long reports
+  split across focusable cards. Capture installs with `ProjectMCore.init`; no app-start eager init
+  or automatic upload is added. Keep `android.packaging.jniLibs.useLegacyPackaging = true` so
+  Android extracts the core's native dumper executable; preserve the core manifest's merged
+  `extractNativeLibs=true`. Focused tests: `--tests '*VisualizerExit*'`.
 - Use JDK 21, as CI does, with an Android SDK containing platform 37 (`compileSdk = 37`).
   Supply the SDK through `ANDROID_HOME` or an untracked `local.properties` containing `sdk.dir`.
   The app targets Android 36, supports API 26+, and compiles Java/Kotlin to JVM 17.

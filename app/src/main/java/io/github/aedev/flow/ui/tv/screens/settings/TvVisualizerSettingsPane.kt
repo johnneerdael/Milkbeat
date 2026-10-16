@@ -107,7 +107,10 @@ fun TvVisualizerSettingsPane(
                     skippedPresets = skippedPresets,
                     exitRecords = exitRecords,
                     exitReportFocus = exitReportFocus,
-                    onOpenExitReport = { exitReportOpen = true },
+                    onOpenExitReport = {
+                        viewModel.refreshExitRecords()
+                        exitReportOpen = true
+                    },
                     viewModel = viewModel,
                     rowFocus = rowFocus,
                     onOpen = {
@@ -290,7 +293,9 @@ private fun LazyListScope.engineSettingsItems(
             label = stringResource(R.string.visualizer_last_exit),
             value =
                 exitRecords?.let {
-                    VisualizerExitReportFormatter(resources).summary(it.exits, Build.VERSION.SDK_INT, System.currentTimeMillis())
+                    VisualizerExitReportFormatter(
+                        resources,
+                    ).summary(it.exits, Build.VERSION.SDK_INT, System.currentTimeMillis(), it.nativeCrashes)
                 },
             onClick = { if (exitRecords != null) onOpenExitReport() },
             modifier = Modifier.focusRequester(exitReportFocus),

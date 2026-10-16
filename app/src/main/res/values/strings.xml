@@ -368,10 +368,16 @@
     <string name="visualizer_last_exit_none">None recorded</string>
     <string name="visualizer_last_exit_needs_android_11">Needs Android 11</string>
     <string name="visualizer_last_exit_summary">%1$s · %2$s</string>
+    <string name="visualizer_last_native_crash_summary">Native crash · %1$s</string>
     <string name="visualizer_exit_report_title">Recent exits</string>
     <string name="visualizer_exit_report_device">%1$s %2$s, Android %3$s (API %4$d)</string>
     <string name="visualizer_exit_report_gpu">GPU: %1$s</string>
     <string name="visualizer_exit_report_gpu_unknown">not known until the visualizer has shown</string>
+    <string name="visualizer_exit_report_capture_status">Capture status: %1$s</string>
+    <string name="visualizer_exit_report_no_native_crashes">No saved native crash reports.</string>
+    <string name="visualizer_exit_report_native_crash">Saved native crash · %1$s</string>
+    <string name="visualizer_exit_report_native_continued">Native crash continued · %1$s</string>
+    <string name="visualizer_native_reports_unavailable">Native crash reports could not be read</string>
     <string name="visualizer_exit_report_switches">Switches: shader binary cache %1$s, background compile %2$s</string>
     <string name="visualizer_switch_on">on</string>
     <string name="visualizer_switch_off">off</string>

@@ -41,7 +41,7 @@ All visualizer settings are in [Settings → Visualizations](settings.md#visuali
 | Detail | Warp mesh from Minimal to Ultra | By device | [Frame rate and detail](https://johnneerdael.github.io/ProjectM-TV/picture-quality/#frame-rate-and-detail) |
 | Show diagnostics | A status line in the player controls | Off | [Diagnostics](https://johnneerdael.github.io/ProjectM-TV/settings/#diagnostics) |
 | Timing offset | Moves the visuals against the sound: −100, −50, −25, +0, +25, +50, +75, +100, +150 or +200 ms | +0 ms | |
-| Last exit | Why Milkbeat last ended, with the engine's last activity | — | [Exit report](settings.md#troubleshooting) |
+| Last exit | Android exit reasons, engine activity, native capture status and saved native crash backtraces | — | [Exit report](settings.md#troubleshooting) |
 
 **Resolution is always automatic in Milkbeat.** It follows the frame-rate target and live memory headroom, up to your screen's native size. Raising the frame rate or adding trail detail can make Auto choose a lower resolution. [How Auto resolution works](https://johnneerdael.github.io/ProjectM-TV/picture-quality/#resolution).
 

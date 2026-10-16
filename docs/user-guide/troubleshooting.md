@@ -100,7 +100,8 @@ If Milkbeat closes by itself while the visualizer shows, often when one preset c
 
 1. Open Milkbeat again and check **Settings → Visualizations → Last exit**. Select it for the [exit report](settings.md#troubleshooting): *crashed (native code)* or *killed by signal* points to the graphics driver or the engine, *killed for low memory* to memory.
 2. Try **Transition style** Lightweight, then Classic. If only Auto blends crash, the lower blend resolution is involved.
-3. Report the result with a photo of the exit report, the device model, the Milkbeat version and the transition style in use.
+3. Check the capture status and any **Saved native crash** cards below the Android records. A saved report can include the signal, module-relative backtrace and build IDs; these are also available before Android 11. Capture starts when the visualizer engine initializes.
+4. Report the result with photos of the exit report, including the native backtrace when present, the device model, the Milkbeat version and the transition style in use. Reports stay on the TV and are never uploaded automatically.
 
 The former **Background compile** and **Shader binary cache** switches did not resolve the reported Fire TV native crash and have been removed. Both features are enabled automatically, including after upgrading with a saved Off choice. That crash remains unresolved. Historical exit reports still preserve recorded switch states.
 
