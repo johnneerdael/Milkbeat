@@ -132,7 +132,7 @@ Check **Last exit** when the visualizer closes unexpectedly. Background compilat
 
 Saved native crash cards follow the Android records and show the captured signal, module-relative native backtrace and available build IDs. Long reports continue across cards for D-pad scrolling. Capture starts when the visualizer engine initializes; the status reports whether capture is ready, unavailable or has not started. An empty report list means no native report was saved, not that capture has been tested.
 
-The engine trail and up to five native crash reports stay in Milkbeat's private storage, excluded from backups, with no automatic upload. Raw register and stack memory are omitted from the displayed report. Take a photo of the report when you report a crash. Steps are in [Troubleshooting](troubleshooting.md#the-app-closes-at-preset-changes).
+The engine trail and up to five native crash reports stay in Milkbeat's private storage, excluded from backups, with no automatic upload. The private crash files can include raw registers and stack memory containing fragments of app data. Those memory sections are omitted from the displayed report. Take a photo of the report when you report a crash. Steps are in [Troubleshooting](troubleshooting.md#the-app-closes-at-preset-changes).
 
 Whether now playing shows the visualizer, the music video or the artwork is chosen in the player with its [view button](playback.md#visualizer-music-video-or-artwork), not here.
 

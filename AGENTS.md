@@ -814,7 +814,9 @@ revision must pass the configured ktlint rules.
   (`TvVisualizerExitReport.kt`), including `NativeCrashReports.status()` and up to five saved native
   reports from `NativeCrashReports.recent(context)`. `VisualizerExitDiagnostics.nativeCrashes` reads
   these on IO; the UI preserves only the core-provided bounded display details, with long reports
-  split across focusable cards. Capture installs with `ProjectMCore.init`; no app-start eager init
+  split across focusable cards. Raw private tombstones can contain register/stack memory and app
+  data; only the displayed details omit those sections. Keep `privacy.md` accurate about this
+  distinction. Capture installs with `ProjectMCore.init`; no app-start eager init
   or automatic upload is added. Keep `android.packaging.jniLibs.useLegacyPackaging = true` so
   Android extracts the core's native dumper executable; preserve the core manifest's merged
   `extractNativeLibs=true`. Focused tests: `--tests '*VisualizerExit*'`.

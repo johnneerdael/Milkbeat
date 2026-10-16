@@ -1,6 +1,6 @@
 # Privacy and Permissions
 
-Milkbeat has no account system of its own, no analytics or telemetry SDK, no crash reporting
+Milkbeat has no account system of its own, no analytics or telemetry SDK, no remote crash reporting
 service, and no advertising identifier. Nothing is uploaded to a server operated by the project.
 Watch history, subscriptions, playlists, downloads, and recommendation data are stored in a local
 Room database and in local DataStore preferences on the device. The local databases are exported
@@ -16,6 +16,19 @@ Signing in with a Google account is optional; see [Google account sign-in](#goog
 
 This document lists every permission that appears in the built APK, why it is declared, when it is
 requested, and whether the app still works without it.
+
+## Local visualizer crash diagnostics
+
+Initializing the visualizer engine enables the core's local native crash capture. It retains up
+to five native crash files in Milkbeat's private no-backup storage, with no automatic upload.
+These files can contain the app version, signal, thread, native backtrace, build IDs, registers
+and raw stack memory. Memory fragments can include audio fragments, account data or other app
+data present when the process crashed.
+
+**Settings → Visualizations → Last exit** displays capture status and a bounded version of saved
+native reports alongside Android exit records and the engine trail. The displayed native report
+omits raw register and stack memory. Take care when sharing a raw crash file; sharing a photo of
+the displayed report avoids those omitted memory sections.
 
 ## Summary
 
@@ -66,9 +79,10 @@ Users who never open Device Sync are never asked for it.
 Used by one feature: song recognition, reachable from the recognition screen and its home-screen
 widget. While the user holds the button, the app records a short microphone sample, computes an
 audio fingerprint on device, and sends only that fingerprint to Shazam's public endpoint
-(`amp.shazam.com`) to get the track title back. The raw recording is not written to disk and is not
-uploaded. Recording stops as soon as the query is made or the screen is left. There is no
-background or passive listening.
+(`amp.shazam.com`) to get the track title back. Song recognition does not deliberately save an
+audio recording or upload the sample; native crash files can still contain process-memory
+fragments, as described above. Recording stops as soon as the query is made or the screen is left.
+There is no background or passive listening.
 
 Requested at: `app/src/main/java/io/github/aedev/flow/ui/screens/recognition/RecognitionScreen.kt`
 
