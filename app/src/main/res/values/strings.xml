@@ -363,11 +363,7 @@
     <string name="visualizer_section_transitions">Transitions</string>
     <string name="visualizer_section_quality">Picture quality</string>
     <string name="visualizer_section_troubleshooting">Troubleshooting</string>
-    <string name="visualizer_troubleshooting_hint">For devices where the app closes when one preset changes into the next. Leave both switches on otherwise.</string>
-    <string name="visualizer_background_compile">Background compile</string>
-    <string name="visualizer_background_compile_subtitle">Compiles the next presets on a second thread so switches do not pause. Off compiles them at the switch, and the picture can hold for a second or two.</string>
-    <string name="visualizer_shader_binary_cache">Shader binary cache</string>
-    <string name="visualizer_shader_binary_cache_subtitle">Reuses compiled shader programs between the background and render threads. Off always compiles them from source.</string>
+    <string name="visualizer_troubleshooting_hint">Check the last exit and engine activity when the visualizer closes unexpectedly.</string>
     <string name="visualizer_last_exit">Last exit</string>
     <string name="visualizer_last_exit_none">None recorded</string>
     <string name="visualizer_last_exit_needs_android_11">Needs Android 11</string>
@@ -376,7 +372,6 @@
     <string name="visualizer_exit_report_device">%1$s %2$s, Android %3$s (API %4$d)</string>
     <string name="visualizer_exit_report_gpu">GPU: %1$s</string>
     <string name="visualizer_exit_report_gpu_unknown">not known until the visualizer has shown</string>
-    <string name="visualizer_exit_report_now">Now: background compile %1$s, shader binary cache %2$s</string>
     <string name="visualizer_exit_report_switches">Switches: shader binary cache %1$s, background compile %2$s</string>
     <string name="visualizer_switch_on">on</string>
     <string name="visualizer_switch_off">off</string>

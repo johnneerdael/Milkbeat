@@ -160,8 +160,6 @@ fun TvVisualizerSettingsPane(
                                 release = Build.VERSION.RELEASE,
                                 sdk = Build.VERSION.SDK_INT,
                                 gpu = viewModel.gpu,
-                                backgroundCompile = engineSettings.backgroundCompile,
-                                shaderBinaryCache = engineSettings.shaderBinaryCache,
                             ),
                             System.currentTimeMillis(),
                         )
@@ -285,16 +283,6 @@ private fun LazyListScope.engineSettingsItems(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-    }
-    toggleRow("background-compile", R.string.visualizer_background_compile, settings.backgroundCompile, {
-        stringResource(R.string.visualizer_background_compile_subtitle)
-    }) {
-        setBackgroundCompile(it)
-    }
-    toggleRow("shader-binary-cache", R.string.visualizer_shader_binary_cache, settings.shaderBinaryCache, {
-        stringResource(R.string.visualizer_shader_binary_cache_subtitle)
-    }) {
-        setShaderBinaryCache(it)
     }
     item(key = "visualizer-last-exit") {
         val resources = LocalContext.current.resources

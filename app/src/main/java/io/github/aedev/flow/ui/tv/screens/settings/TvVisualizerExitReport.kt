@@ -27,15 +27,13 @@ internal data class ExitRecords(
     val trail: String,
 )
 
-/** The device and the troubleshooting switches as they are now, for the report's header. */
+/** The device as it is now, for the report's header. */
 internal data class ExitReportDevice(
     val manufacturer: String,
     val model: String,
     val release: String,
     val sdk: Int,
     val gpu: String,
-    val backgroundCompile: Boolean,
-    val shaderBinaryCache: Boolean,
 )
 
 internal data class ExitReportEntry(
@@ -91,13 +89,6 @@ internal class VisualizerExitReportFormatter(
                         device.gpu.ifEmpty { resources.getString(R.string.visualizer_exit_report_gpu_unknown) },
                     ),
                 )
-                add(
-                    resources.getString(
-                        R.string.visualizer_exit_report_now,
-                        onOff(device.backgroundCompile),
-                        onOff(device.shaderBinaryCache),
-                    ),
-                )
                 when {
                     !supported -> add(resources.getString(R.string.visualizer_exit_report_needs_android_11))
                     records.exits.isEmpty() -> add(resources.getString(R.string.visualizer_exit_report_no_exits))
@@ -128,7 +119,7 @@ internal class VisualizerExitReportFormatter(
                                     ),
                                 )
                             }
-                            // The switches of the process that ended, which today's settings may differ from.
+                            // Preserve switch states recorded before the troubleshooting settings were retired.
                             newestSwitches(owned)?.let(::add)
                             owned.forEach { line ->
                                 add(

@@ -85,8 +85,10 @@ class VisualizerEngine
             if (last?.beatCuts != settings.beatCuts) ProjectMJNI.setBeatCuts(settings.beatCuts)
             if (last?.presetSeconds != settings.presetSeconds) ProjectMJNI.setPresetDuration(settings.presetSeconds)
             if (last?.blankDetection != settings.blankDetection) ProjectMJNI.setBlankDetection(settings.blankDetection)
-            if (last?.backgroundCompile != settings.backgroundCompile) ProjectMJNI.setBackgroundCompile(settings.backgroundCompile)
-            if (last?.shaderBinaryCache != settings.shaderBinaryCache) ProjectMJNI.setShaderBinaryCache(settings.shaderBinaryCache)
+            if (last == null) {
+                ProjectMJNI.setBackgroundCompile(true)
+                ProjectMJNI.setShaderBinaryCache(true)
+            }
             if (last?.transitionMode != settings.transitionMode) {
                 ProjectMJNI.setTransitionMode(settings.transitionMode, profile.lowerBlendResolutionByDefault())
             }

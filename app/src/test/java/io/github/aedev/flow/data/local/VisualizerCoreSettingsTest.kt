@@ -34,19 +34,16 @@ class VisualizerCoreSettingsTest {
     }
 
     @Test
-    fun `troubleshooting switches default on and keep a stored off`() {
-        assertThat(readVisualizerSettings(preferencesOf(), VisualizerSettings()).backgroundCompile).isTrue()
-        assertThat(readVisualizerSettings(preferencesOf(), VisualizerSettings()).shaderBinaryCache).isTrue()
-
+    fun `retired troubleshooting switches ignore stored off without changing other preferences`() {
         val settings =
             readVisualizerSettings(
                 preferencesOf(
                     booleanPreferencesKey("background_compile") to false,
                     booleanPreferencesKey("shader_binary_cache") to false,
+                    intPreferencesKey("frame_rate_cap") to 60,
                 ),
                 VisualizerSettings(),
             )
-        assertThat(settings.backgroundCompile).isFalse()
-        assertThat(settings.shaderBinaryCache).isFalse()
+        assertThat(settings).isEqualTo(VisualizerSettings(frameRateCap = 60))
     }
 }

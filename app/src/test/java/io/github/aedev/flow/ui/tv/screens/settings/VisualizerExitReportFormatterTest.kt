@@ -52,13 +52,12 @@ class VisualizerExitReportFormatterTest {
                 trail = trail,
             )
 
-        val report = formatter.report(records, device(backgroundCompile = true, shaderBinaryCache = true), NOW)
+        val report = formatter.report(records, device(), NOW)
 
         assertThat(report.header)
             .containsExactly(
                 "Amazon AFTKRT, Android 11 (API 30)",
                 "GPU: PowerVR Rogue GE9215",
-                "Now: background compile on, shader binary cache on",
             ).inOrder()
         val entry = report.entries.single()
         assertThat(entry.title).isEqualTo("60 s ago: crashed (native code), playing in the background")
@@ -107,9 +106,7 @@ class VisualizerExitReportFormatterTest {
     private fun device(
         sdk: Int = 30,
         gpu: String = "PowerVR Rogue GE9215",
-        backgroundCompile: Boolean = true,
-        shaderBinaryCache: Boolean = true,
-    ) = ExitReportDevice("Amazon", "AFTKRT", if (sdk >= 30) "11" else "9", sdk, gpu, backgroundCompile, shaderBinaryCache)
+    ) = ExitReportDevice("Amazon", "AFTKRT", if (sdk >= 30) "11" else "9", sdk, gpu)
 
     private companion object {
         const val NOW = 1_800_000_000_000L
