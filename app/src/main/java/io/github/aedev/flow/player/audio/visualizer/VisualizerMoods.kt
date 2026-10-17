@@ -3,6 +3,8 @@ package io.github.aedev.flow.player.audio.visualizer
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import nl.neerdael.projectm.core.PresetFacets
 import nl.neerdael.projectm.core.ProjectMCore
@@ -56,6 +58,8 @@ class VisualizerMoods
     constructor(
         @ApplicationContext private val context: Context,
     ) {
+        private val loadLock = Mutex()
+
         @Volatile
         private var loaded = false
 
@@ -68,13 +72,15 @@ class VisualizerMoods
             private set
 
         suspend fun load(): PresetFacets? =
-            withContext(Dispatchers.IO) {
-                if (!loaded) {
-                    facets = PresetFacets.load(context.assets)
-                    refreshSkipped()
-                    loaded = true
+            loadLock.withLock {
+                withContext(Dispatchers.IO) {
+                    if (!loaded) {
+                        facets = PresetFacets.load(context.assets)
+                        refreshSkipped()
+                        loaded = true
+                    }
+                    facets
                 }
-                facets
             }
 
         /** Rereads the engine's skip list; the panel calls it on open, so a mix never counts a preset that no longer plays. */
