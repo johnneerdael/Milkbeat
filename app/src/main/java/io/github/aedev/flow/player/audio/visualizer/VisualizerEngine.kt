@@ -106,6 +106,8 @@ class VisualizerEngine
             applied = settings
         }
 
+        fun categoryPresetCount(category: String): Int = if (started) ProjectMJNI.getCategoryPresetCount(category) else 0
+
         /** The music categories that hold presets; all of them until the engine has indexed its library. */
         fun musicCategories(): List<String> =
             if (started) VisualizerMusicCategory.available(ProjectMJNI::getCategoryPresetCount) else VisualizerMusicCategory.IDS

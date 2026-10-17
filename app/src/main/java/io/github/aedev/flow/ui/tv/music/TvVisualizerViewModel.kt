@@ -8,6 +8,7 @@ import io.github.aedev.flow.data.local.NowPlayingView
 import io.github.aedev.flow.data.local.VisualizerPreferences
 import io.github.aedev.flow.player.audio.visualizer.VisualizerAudioTap
 import io.github.aedev.flow.player.audio.visualizer.VisualizerEngine
+import io.github.aedev.flow.player.audio.visualizer.VisualizerMusicCategory
 import io.github.aedev.flow.player.audio.visualizer.VisualizerSettings
 import io.github.aedev.flow.player.audio.visualizer.toggledMoods
 import io.github.aedev.flow.player.diagnostics.PlaybackTrace
@@ -61,6 +62,9 @@ class TvVisualizerViewModel
             val facets = moodTable.value ?: return
             viewModelScope.launch { preferences.updateMoods { toggledMoods(facets, it, engine.moods.skipped, id) } }
         }
+
+        /** Presets in the collection that plays with no mood selected; 0 while the engine has not indexed its library. */
+        fun categoryPresetCount(category: String?): Int = engine.categoryPresetCount(category ?: VisualizerMusicCategory.ALL)
 
         fun clearMoods() {
             viewModelScope.launch { preferences.setMoods(emptySet()) }

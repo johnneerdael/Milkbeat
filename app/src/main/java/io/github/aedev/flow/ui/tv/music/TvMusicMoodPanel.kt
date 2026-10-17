@@ -65,7 +65,13 @@ fun BoxScope.TvMusicMoodPanel(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             item(key = "summary") {
-                MoodSummary(selection.poolSize(), table.presetCount(), selected.isEmpty(), exhausted, viewModel::clearMoods)
+                MoodSummary(
+                    selection.poolSize(),
+                    viewModel.categoryPresetCount(settings?.musicCategory),
+                    selected.isEmpty(),
+                    exhausted,
+                    viewModel::clearMoods,
+                )
             }
             items(table.groups(), key = { it.id }) { group ->
                 MoodGroup(group, selection, selected, viewModel::toggleMood)
@@ -77,18 +83,19 @@ fun BoxScope.TvMusicMoodPanel(
 @Composable
 private fun MoodSummary(
     pool: Int,
-    total: Int,
+    collection: Int,
     none: Boolean,
     exhausted: Boolean,
     onClear: () -> Unit,
 ) {
-    val count = if (none) total else pool
+    val count = if (none) collection else pool
     val format = NumberFormat.getIntegerInstance()
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
             text =
                 when {
                     exhausted -> stringResource(R.string.tv_music_moods_none_match)
+                    none && collection <= 0 -> stringResource(R.string.tv_music_moods_all)
                     else -> pluralStringResource(R.plurals.tv_music_moods_pool, count, format.format(count))
                 },
             style = MaterialTheme.typography.titleMedium,
@@ -114,7 +121,7 @@ private fun MoodGroup(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
-            text = group.label,
+            text = moodGroupLabel(group.id)?.let { stringResource(it) } ?: group.label,
             style = MaterialTheme.typography.titleSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -128,7 +135,12 @@ private fun MoodGroup(
                 val dimmed = selection.isDimmed(option.id)
                 val count = NumberFormat.getIntegerInstance().format(selection.countIfToggled(option.id))
                 TvFilterChip(
-                    label = stringResource(R.string.tv_music_mood_chip, option.label, count),
+                    label =
+                        stringResource(
+                            R.string.tv_music_mood_chip,
+                            moodOptionLabel(option.id)?.let { stringResource(it) } ?: option.label,
+                            count,
+                        ),
                     selected = chosen,
                     onClick = { onToggle(option.id) },
                     modifier =
