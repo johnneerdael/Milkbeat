@@ -152,7 +152,7 @@ distributed separately from Milkbeat releases, signature-checked and reviewed be
 | SoundCloud | Discover, Stream, Search, Artists, albums, playlists, Liked Songs, history | Available full tracks, matching and stations | — |
 | Deezer | Home, Flow, Search, artists, albums, playlists, library | Account streams and matching | — |
 
-**YouTube 0.1.5** (code **563**, plugin API 11) replaces the retired YouTube Music (728) and
+**YouTube 0.1.6** (code **563**, plugin API 11) replaces the retired YouTube Music (728) and
 YouTube Video (932) plugins; their codes no longer install anything. An installed copy keeps
 working without updates until you remove it.
 [Retired plugins](https://johnneerdael.github.io/Milkbeat/providers/#retired-plugins).
@@ -196,8 +196,9 @@ install apps yet, Android's permission setting opens first.
 ## Playback, queue and radio
 
 **OK** in the full player shows the controls: audio level, seek bar, shuffle, previous,
-play/pause, next, repeat, like, the view button and the queue.
+play/pause, next, repeat, like, the view button, the mood mix (visualizer only) and the queue.
 
+- **The mood mix** (visualizer view only) opens a panel beside the player: pick Energy, Brightness, Colour, Palette and other mood options to narrow the presets played, with live counts. It replaces the Settings preset mood collection while a selection is active.
 - **The view button** steps through the visualizer, the matched music video (up to the TV's physical
   resolution, capped at 2160p, in a hardware-decoded codec) and the artwork. Milkbeat remembers your choice; video only loads when
   you pick it.

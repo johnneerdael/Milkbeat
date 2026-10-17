@@ -49,7 +49,7 @@ import io.github.aedev.flow.ui.tv.theme.LocalTvDimens
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 
-private enum class TvMusicPanel { NONE, QUEUE }
+private enum class TvMusicPanel { NONE, QUEUE, MOODS }
 
 private const val CORNER_WIDTH_FRACTION = 0.6f
 private val PanelGap = 24.dp
@@ -117,6 +117,8 @@ fun TvMusicNowPlayingScreen(
         }
 
     var panel by rememberSaveable { mutableStateOf(TvMusicPanel.NONE) }
+    val moodsShown = visualizer?.moodsAvailable == true && shownView == NowPlayingView.VISUALIZER
+    LaunchedEffect(moodsShown) { if (!moodsShown && panel == TvMusicPanel.MOODS) panel = TvMusicPanel.NONE }
     val screenWidth = LocalConfiguration.current.screenWidthDp.dp
     val upcoming = remember(queue, queueIndex, automix, repeatMode) { upcomingTrack(queue, queueIndex, automix, repeatMode) }
     val handOver =
@@ -336,6 +338,8 @@ fun TvMusicNowPlayingScreen(
                         view = shownView,
                         nextView = nextView,
                         queueOpen = panel == TvMusicPanel.QUEUE,
+                        moodsAvailable = moodsShown,
+                        moodsOpen = panel == TvMusicPanel.MOODS,
                     ),
                 actions =
                     TvNowPlayingControlsActions(
@@ -357,6 +361,9 @@ fun TvMusicNowPlayingScreen(
                         onToggleQueue = {
                             panel = if (panel == TvMusicPanel.QUEUE) TvMusicPanel.NONE else TvMusicPanel.QUEUE
                         },
+                        onToggleMoods = {
+                            panel = if (panel == TvMusicPanel.MOODS) TvMusicPanel.NONE else TvMusicPanel.MOODS
+                        },
                     ),
                 positionProvider = { scrubUiState.takeIf { it.isScrubbing }?.targetMs ?: positionMs },
                 durationMs = durationMs,
@@ -373,6 +380,8 @@ fun TvMusicNowPlayingScreen(
                     .focusable(),
             )
         }
+
+        visualizer?.moodPanel?.invoke(this, panel == TvMusicPanel.MOODS && moodsShown) { panel = TvMusicPanel.NONE }
 
         TvMusicQueuePanel(
             visible = panel == TvMusicPanel.QUEUE,

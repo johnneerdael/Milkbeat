@@ -56,14 +56,14 @@
     {
       "id": "nl.neerdael.youtube",
       "name": "YouTube",
-      "version": "0.1.5",
-      "versionCode": 6,
+      "version": "0.1.6",
+      "versionCode": 7,
       "apiMin": 11,
       "format": 1,
-      "sha256": "99ed7af066dec964bac6c8f622f7585d2f38923507a14740e0405facd7f96a61",
-      "size": 125474,
+      "sha256": "7b1d365b5147ff2882ec27435d73b1629d630042305ad4f2df2bdd123476a9d5",
+      "size": 127005,
       "fingerprint": "39dca3d132c56262c0873ec96faf22cc8ed9ca30c7ed1f135049f8570b943adc",
-      "contentDigest": "575f9af61ed01e4b38aeae351e55a1691ba37c4d254792cb86f8d92d0b34cc34",
+      "contentDigest": "289336a7e393356fdcc7f214b6d10af9a8299512c02b035fb41cdb2467a0da1f",
       "code": "563"
     }
   ]

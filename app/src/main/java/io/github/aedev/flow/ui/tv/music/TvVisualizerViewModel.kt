@@ -8,14 +8,21 @@ import io.github.aedev.flow.data.local.NowPlayingView
 import io.github.aedev.flow.data.local.VisualizerPreferences
 import io.github.aedev.flow.player.audio.visualizer.VisualizerAudioTap
 import io.github.aedev.flow.player.audio.visualizer.VisualizerEngine
+import io.github.aedev.flow.player.audio.visualizer.VisualizerMusicCategory
 import io.github.aedev.flow.player.audio.visualizer.VisualizerSettings
+import io.github.aedev.flow.player.audio.visualizer.toggledMoods
 import io.github.aedev.flow.player.diagnostics.PlaybackTrace
 import io.github.aedev.flow.player.diagnostics.TraceEvent
 import io.github.aedev.flow.player.diagnostics.TraceField
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import nl.neerdael.projectm.core.PresetFacets
 import nl.neerdael.projectm.core.ProjectMJNI
 import javax.inject.Inject
 
@@ -37,6 +44,31 @@ class TvVisualizerViewModel
          */
         val settings: StateFlow<VisualizerSettings?> =
             engine.settings.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000, replayExpirationMillis = 0), null)
+
+        /** The bundled preset moods; null until read, while visualizations are off, and when this build's engine ships no mood table. */
+        @OptIn(ExperimentalCoroutinesApi::class)
+        val moodTable: StateFlow<PresetFacets?> =
+            engine.active
+                .flatMapLatest<Boolean, PresetFacets?> { active -> if (active) flow { emit(engine.moods.load()) } else flowOf(null) }
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+        /** Rereads the engine's skipped presets, which the mix leaves out, for the counts the panel shows. */
+        suspend fun refreshSkipped(): Set<String> {
+            engine.moods.refreshSkipped()
+            return engine.moods.skipped
+        }
+
+        fun toggleMood(id: String) {
+            val facets = moodTable.value ?: return
+            viewModelScope.launch { preferences.updateMoods { toggledMoods(facets, it, engine.moods.skipped, id) } }
+        }
+
+        /** Presets in the collection that plays with no mood selected; 0 while the engine has not indexed its library. */
+        fun categoryPresetCount(category: String?): Int = engine.categoryPresetCount(category ?: VisualizerMusicCategory.ALL)
+
+        fun clearMoods() {
+            viewModelScope.launch { preferences.setMoods(emptySet()) }
+        }
 
         val timingOffsetMs: StateFlow<Int> =
             preferences.timingOffsetMs.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)

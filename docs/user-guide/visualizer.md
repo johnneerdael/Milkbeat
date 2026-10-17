@@ -51,6 +51,14 @@ All visualizer settings are in [Settings → Visualizations](settings.md#visuali
 
 **All** shuffles the whole library. **Chill**, **Normal** and **Intense** are overlapping beta collections chosen from a measured activity score for each preset; they are predictions and will improve, and Chill is not a guarantee of no flashing. Skipped presets still stay out of every mood. [What the moods look like and how they are made](https://johnneerdael.github.io/ProjectM-TV/predictive-collections/).
 
+## Mood mix
+
+With the visualizer on screen, the mood button next to the queue button opens the mood mix beside the player. It is hidden for the music-video and artwork views, since only the visualizer uses presets.
+
+Pick options to narrow the presets the visualizer plays. Options in one group (Energy, Brightness, Colour, Palette and so on) widen the mix; groups together narrow it. Each chip shows how many presets the mix would hold if you toggled it, and an option that would leave none is dimmed and skipped by the D-pad. **Clear all** returns to your **Preset mood** collection. Moods are predicted from each preset's source, so a preset can carry no option in a group, and a mix with fewer than 20 presets repeats. Skipped presets stay out. If your selection ever matches nothing playable, the mix says so and your **Preset mood** collection plays instead; the selection is kept.
+
+A mix replaces the **Preset mood** collection while it is active. [How moods are predicted](https://johnneerdael.github.io/ProjectM-TV/predictive-collections/).
+
 ## Timing
 
 Raise **Timing offset** if the visuals come after the beat you hear, lower it if they come before. Audio paths differ per TV and receiver, so judge by watching and listening; on an Ugoos AM6, +75 ms is about right.

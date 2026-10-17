@@ -1,5 +1,6 @@
 package io.github.aedev.flow.ui.tv.music
 
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -68,14 +69,23 @@ class TvNowPlayingVisual(
     val background: @Composable () -> Unit,
     val onPresetStep: (forward: Boolean) -> Unit,
     val status: @Composable () -> Unit,
+    /** Whether the mood table is available; the controls bar shows the mood button only then. */
+    val moodsAvailable: Boolean = false,
+    val moodPanel: @Composable BoxScope.(visible: Boolean, onClose: () -> Unit) -> Unit = { _, _ -> },
 )
 
 @Composable
 internal fun rememberTvNowPlayingVisual(viewModel: TvVisualizerViewModel): TvNowPlayingVisual =
-    remember(viewModel) {
-        TvNowPlayingVisual(
-            background = { TvVisualizerBackground(viewModel) },
-            onPresetStep = viewModel::stepPreset,
-            status = { TvVisualizerStatus(viewModel) },
-        )
+    run {
+        val moodTable by viewModel.moodTable.collectAsStateWithLifecycle()
+        val moodsAvailable = moodTable != null
+        remember(viewModel, moodsAvailable) {
+            TvNowPlayingVisual(
+                background = { TvVisualizerBackground(viewModel) },
+                onPresetStep = viewModel::stepPreset,
+                status = { TvVisualizerStatus(viewModel) },
+                moodsAvailable = moodsAvailable,
+                moodPanel = { visible, onClose -> TvMusicMoodPanel(visible, viewModel, onClose) },
+            )
+        }
     }

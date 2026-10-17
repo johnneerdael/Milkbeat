@@ -760,10 +760,10 @@ revision must pass the configured ktlint rules.
   Every descriptor row states the package's verified `apiMin` and `format`.
   Stable and Preview publish the same five providers: Beatport 0.1.3 / versionCode 4 (code 393),
   Spotify 0.2.3 / versionCode 7 (code 981), SoundCloud 0.2.1 / versionCode 3 (code 089), Deezer
-  0.2.1 / versionCode 3 (code 734, API 9 for its encrypted audio) and YouTube 0.1.5 / versionCode 6
+  0.2.1 / versionCode 3 (code 734, API 9 for its encrypted audio) and YouTube 0.1.6 / versionCode 7
   (code 563; API 11 for MicroG-RE-TV sign-in; attaches its largest playback artwork; since 0.1.4 a
   refused TV stream suspends the TV player for 30 minutes and retries the other players; since 0.1.5 a
-  VIDEOS match that finds no videos for artist plus title searches the title alone once). Preserve each
+  VIDEOS match that finds no videos for artist plus title searches the title alone once; 0.1.6 searches dated Tomorrowland/TML sets by performer/festival/year and attaches bounded recording-description evidence). Preserve each
   original signed archive when retrying publication.
   YouTube Music (`nl.neerdael.youtube-music`) and YouTube Video (`nl.neerdael.youtube-video`) are
   retired; YouTube replaces both. A retired provider leaves both descriptors, the androidTest copy and

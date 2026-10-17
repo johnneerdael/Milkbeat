@@ -9,6 +9,7 @@ import kotlin.math.roundToInt
 data class VisualizerSettings(
     val autoChange: Boolean = true,
     val musicCategory: String = VisualizerMusicCategory.ALL,
+    val moods: Set<String> = emptySet(),
     val presetSeconds: Int = DEFAULT_PRESET_SECONDS,
     val beatCuts: Boolean = false,
     val blankDetection: Boolean = true,
