@@ -14,6 +14,7 @@ Selecting a track, **Play** or **Shuffle** opens the full player. The track's co
 | Shuffle, Previous, Play/pause, Next, Repeat | The usual queue controls |
 | Heart | Like the track; music likes appear under **Liked songs** in Library |
 | View button | Steps through the visualizer, the music video and the artwork |
+| Mood mix (visualizer only) | Opens the [mood mix](visualizer.md#mood-mix) beside the player; shown only while the visualizer is the view |
 | Queue | Opens the queue and radio presets beside the player |
 
 The controls hide on their own after a few seconds. With them hidden, **Left** and **Right** step through visualizer presets. **Back** hides the controls, then leaves the player; the [mini player](getting-started.md#find-your-way-around) keeps showing the track elsewhere in the app. Music keeps playing in the background unless you turn off **Background Play** in [Settings → Playback](settings.md#playback).

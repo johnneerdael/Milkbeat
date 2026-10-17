@@ -13,6 +13,7 @@ import androidx.compose.material.icons.outlined.Favorite
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.GraphicEq
 import androidx.compose.material.icons.outlined.Image
+import androidx.compose.material.icons.outlined.Mood
 import androidx.compose.material.icons.outlined.MusicVideo
 import androidx.compose.material.icons.outlined.Pause
 import androidx.compose.material.icons.outlined.PlayArrow
@@ -47,6 +48,10 @@ import io.github.aedev.flow.ui.tv.components.TvIconButtonColors
 // Fits beside the open queue panel: screen width minus the panel, the overscan edge and a gap.
 private val ControlsWidth = 480.dp
 private val ControlButtonSize = 48.dp
+
+// Nine 48 dp buttons (the Material minimum touch target) with 4 dp gaps need 464 dp plus the padding.
+private val MoodControlsWidth = 488.dp
+private val MoodButtonSpacing = 4.dp
 private val ControlsPadding = 12.dp
 
 // The controls bar stays see-through so the visual behind it is never lost, but solid enough to read
@@ -63,6 +68,9 @@ internal data class TvNowPlayingControlsState(
     val view: NowPlayingView,
     val nextView: NowPlayingView,
     val queueOpen: Boolean,
+    /** The mood button shows only while the visualizer is the view on screen. */
+    val moodsAvailable: Boolean = false,
+    val moodsOpen: Boolean = false,
 )
 
 internal class TvNowPlayingControlsActions(
@@ -76,6 +84,7 @@ internal class TvNowPlayingControlsActions(
     val onToggleLike: () -> Unit,
     val onNextView: () -> Unit,
     val onToggleQueue: () -> Unit,
+    val onToggleMoods: () -> Unit = {},
 )
 
 /**
@@ -95,7 +104,7 @@ internal fun TvNowPlayingControls(
 ) {
     var seekBarFocused by remember { mutableStateOf(false) }
     Surface(
-        modifier = modifier.width(ControlsWidth),
+        modifier = modifier.width(if (state.moodsAvailable) MoodControlsWidth else ControlsWidth),
         shape = MaterialTheme.shapes.large,
         color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = CONTROLS_BAR_ALPHA),
         tonalElevation = 3.dp,
@@ -128,7 +137,7 @@ internal fun TvNowPlayingControls(
                 )
             }
             Row(
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                horizontalArrangement = Arrangement.spacedBy(if (state.moodsAvailable) MoodButtonSpacing else 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 TvIconButton(
@@ -199,6 +208,16 @@ internal fun TvNowPlayingControls(
                     colors = buttonColors,
                     size = ControlButtonSize,
                 )
+                if (state.moodsAvailable) {
+                    TvIconButton(
+                        icon = Icons.Outlined.Mood,
+                        contentDescription = stringResource(R.string.tv_music_moods),
+                        onClick = actions.onToggleMoods,
+                        active = state.moodsOpen,
+                        colors = buttonColors,
+                        size = ControlButtonSize,
+                    )
+                }
                 TvIconButton(
                     icon = Icons.AutoMirrored.Outlined.QueueMusic,
                     contentDescription = stringResource(R.string.tv_player_queue),
