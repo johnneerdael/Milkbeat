@@ -49,7 +49,7 @@ Both ARM ABIs contain compressed `libprojectmtv.so`, `libxcrash.so` and
 `libxcrash_dumper.so`. Packaging configuration and the public consumer API are unchanged for
 the final candidate; the APK build was not repeated for the final AAR.
 
-## Remaining validation
+## Remaining validation at the original checkpoint
 
 No Milkbeat device journey or deliberate native fault was run during these consumer checks.
 There is no affected Fire TV verification or crash-fix claim here. ProjectM TV's separate
@@ -60,3 +60,43 @@ wait until the ProjectM TV release includes `NativeCrashReports`.
 Native crash files remain private and excluded from Android backups, with no automatic upload.
 Raw files can contain register/stack memory and fragments of app data. The Recent exits UI
 uses the core's bounded display details and omits those raw memory sections.
+
+
+## Published-core integration and device check — 2026-10-17
+
+After merging main `b2dc3f00`, the consumer passes42 focused visualizer JVM controls,
+ktlint and FOSS Kotlin compilation against the published core2.3.55. The earlier local
+AAR candidate identities above remain historical records; `NativeCrashReports` is now
+available in the published dependency.
+
+The owned Android14/API34 ARM64 emulator at1920×1080/320dpi ran the GitHub debug app and
+its instrumentation APK. The opt-in capture case initializes the real core recorder and
+sends SIGSEGV to its own process. Instrumentation ends with `Process crashed`, as intended;
+a62,508-byte private native file survives. The follow-up report case passes (`OK (1 test)`):
+it reads the real saved report, opens Last exit, focuses the native backtrace card, reaches
+Build IDs, and verifies that Back restores focus to the opener. Neither retired toggle is
+present. This is a component/device journey using the actual reader, formatter and settings
+pane, not a reproduction of the reporter's PowerVR driver fault. The header's unknown GPU
+is expected: this fixture initializes capture without rendering a preset.
+
+The opt-in cases are in `TvVisualizerCrashReportDeviceTest`; they skip unless their explicit
+arguments are supplied. Run each method separately with the Hilt instrumentation runner:
+`captureNativeCrashWhenExplicitlyRequested` with `projectmCrashCapture=true`, then
+`savedNativeBacktraceIsReadableAndBackReturnsRemoteFocus` with `projectmCrashReport=true`.
+Use only a disposable, task-owned device. The first run intentionally cannot pass as a normal
+JUnit run because it terminates the process. The second run asserts the persisted result.
+
+| Settings after restart | Focused native backtrace | Build IDs |
+|---|---|---|
+| ![Last exit in the settings fixture](device-2026-10-17/native-crash-settings.png) | ![Focused backtrace in the settings fixture](device-2026-10-17/native-crash-backtrace.png) | ![Build IDs in the settings fixture](device-2026-10-17/native-crash-build-ids.png) |
+
+These are the owned emulator's unedited component-test captures. They are not personal
+reporter photographs or physical-TV screenshots. The raw native file is not committed.
+
+
+The GitHub debug and instrumentation builds pass, as does the shrunk GitHub Nightly build.
+Both APK manifests declare `extractNativeLibs=true`; the ARM64 engine, recorder and dumper
+are compressed for extraction in both. The UI journey above ran on the debug app; the shrunk
+APK was inspected for packaging, not run through that journey. The [validation manifest](device-2026-10-17/validation.json)
+records APK/test/source hashes, screenshots, device and check results. Strict MkDocs and
+`git diff --check` pass. Final-head Codex review, CI, merge and publication remain separate.

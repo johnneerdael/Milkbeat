@@ -1,0 +1,126 @@
+{
+  "date": "2026-10-17",
+  "parent_checkpoint": "366bdc6b",
+  "published_core_version": "2.3.55",
+  "artifacts_and_sources": [
+    {
+      "path": "app/build/outputs/apk/github/debug/app-github-arm64-v8a-debug.apk",
+      "bytes": 92362746,
+      "sha256": "afb053d56dabfa59cee73a1995e24e7b0d08dfd1bb9d1ffb2ac51db3954d75f9",
+      "native_libraries": [
+        {
+          "path": "lib/arm64-v8a/libprojectmtv.so",
+          "bytes": 2403208,
+          "compressed_for_extraction": true
+        },
+        {
+          "path": "lib/arm64-v8a/libxcrash.so",
+          "bytes": 77720,
+          "compressed_for_extraction": true
+        },
+        {
+          "path": "lib/arm64-v8a/libxcrash_dumper.so",
+          "bytes": 111968,
+          "compressed_for_extraction": true
+        }
+      ]
+    },
+    {
+      "path": "app/build/outputs/apk/androidTest/github/debug/app-github-debug-androidTest.apk",
+      "bytes": 2823457,
+      "sha256": "bddd3cf63b87c42e30863ea407bc8f2de5f04468681996511931979acce454d1"
+    },
+    {
+      "path": "app/build/outputs/apk/github/nightly/app-github-arm64-v8a-nightly.apk",
+      "bytes": 55509583,
+      "sha256": "0860488e1558cca24dd87b11dec788b473a37986908f2cff213723bf3e6a2936",
+      "native_libraries": [
+        {
+          "path": "lib/arm64-v8a/libprojectmtv.so",
+          "bytes": 2403208,
+          "compressed_for_extraction": true
+        },
+        {
+          "path": "lib/arm64-v8a/libxcrash.so",
+          "bytes": 77720,
+          "compressed_for_extraction": true
+        },
+        {
+          "path": "lib/arm64-v8a/libxcrash_dumper.so",
+          "bytes": 111968,
+          "compressed_for_extraction": true
+        }
+      ]
+    },
+    {
+      "path": "app/src/androidTest/java/io/github/aedev/flow/ui/tv/music/TvVisualizerCrashReportDeviceTest.kt",
+      "sha256": "f2258829458a9fe4e889225c697cd23def636a255a46da6930f4ab603f564c20"
+    },
+    {
+      "path": "app/src/main/java/io/github/aedev/flow/ui/tv/screens/settings/TvVisualizerExitReport.kt",
+      "sha256": "7f636f328fc909e743a353f1d0199d590e28fa0cebc4a4048e1ca9bc213edcc6"
+    },
+    {
+      "path": "app/src/main/java/io/github/aedev/flow/player/audio/visualizer/VisualizerExitDiagnostics.kt",
+      "sha256": "5d1338b5bd5b9adca77c0a25963ad47e30da6ffbb5b93a19b6849fce92a22cff"
+    }
+  ],
+  "screenshots": [
+    {
+      "path": "docs/superpowers/evidence/firetv-native-crash-consumer/device-2026-10-17/native-crash-backtrace.png",
+      "bytes": 202948,
+      "sha256": "f553bcb77ed6c1289ed411eeb565c8873f1d715c5e5fa50cf7ab2507bb00249d"
+    },
+    {
+      "path": "docs/superpowers/evidence/firetv-native-crash-consumer/device-2026-10-17/native-crash-build-ids.png",
+      "bytes": 189050,
+      "sha256": "fa0c3459b732c00929e3d7a450b1849e5479f373797af3682a0a0ee88aa5614e"
+    },
+    {
+      "path": "docs/superpowers/evidence/firetv-native-crash-consumer/device-2026-10-17/native-crash-settings.png",
+      "bytes": 118318,
+      "sha256": "9f6c1c741eb0a1ee67e34bd16e6e9e3d560e358235cdc661370a55fff03bd2c7"
+    }
+  ],
+  "device": {
+    "android_api": 34,
+    "abi": "arm64-v8a",
+    "fingerprint": "Android/sdk_phone64_arm64/emu64a:14/UE1A.230829.036.A1/11228894:userdebug/test-keys",
+    "display": "1920x1080,320dpi",
+    "owned_disposable_emulator": true
+  },
+  "capture": {
+    "method": "Process.sendSignal(myPid(),11): intentional SIGSEGV, SI_USER",
+    "expected_instrumentation_result": "Process crashed",
+    "private_native_file_bytes": 62508,
+    "raw_file_committed": false
+  },
+  "report_ui": {
+    "passed": 1,
+    "seconds": 4.247,
+    "checks": [
+      "actual saved native report read",
+      "retired controls absent",
+      "backtrace card focus",
+      "Build IDs visible",
+      "Back restores Last exit row focus"
+    ],
+    "screen_scope": "actual settings component under instrumentation; not full launcher flow"
+  },
+  "checks": {
+    "visualizer_jvm_tests": 42,
+    "jvm_failures": 0,
+    "ktlint": "pass",
+    "foss_kotlin_compile": "pass",
+    "github_debug_and_instrumentation_build": "pass",
+    "github_nightly_r8_build": "pass",
+    "extractNativeLibs": "true in debug and shrunk nightly APKs",
+    "strict_mkdocs": "pass"
+  },
+  "limits": [
+    "Not a PowerVR crash reproduction",
+    "No affected Fire TV qualification",
+    "Shrunk APK packaging inspected; UI journey ran on debug APK",
+    "Raw reports can contain app memory; these screenshots use the bounded display details"
+  ]
+}

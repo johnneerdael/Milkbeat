@@ -820,6 +820,14 @@ revision must pass the configured ktlint rules.
   or automatic upload is added. Keep `android.packaging.jniLibs.useLegacyPackaging = true` so
   Android extracts the core's native dumper executable; preserve the core manifest's merged
   `extractNativeLibs=true`. Focused tests: `--tests '*VisualizerExit*'`.
+  Opt-in disposable-device check: build `:app:assembleGithubDebug :app:assembleGithubDebugAndroidTest`
+  against a published core containing `NativeCrashReports`, install both APKs, then run
+  `TvVisualizerCrashReportDeviceTest#captureNativeCrashWhenExplicitlyRequested` with instrumentation
+  argument `projectmCrashCapture=true`. It deliberately sends SIGSEGV to its own test app and is
+  expected to end with `Process crashed`; run only on a task-owned disposable device. Relaunch with
+  `#savedNativeBacktraceIsReadableAndBackReturnsRemoteFocus` and `projectmCrashReport=true` to verify
+  the saved native report, backtrace/build IDs, removed switches and Back focus. Verified2026-10-17
+  on the owned API34 ARM64 emulator against core2.3.55; not an affected-PowerVR reproduction.
 - Use JDK 21, as CI does, with an Android SDK containing platform 37 (`compileSdk = 37`).
   Supply the SDK through `ANDROID_HOME` or an untracked `local.properties` containing `sdk.dir`.
   The app targets Android 36, supports API 26+, and compiles Java/Kotlin to JVM 17.
