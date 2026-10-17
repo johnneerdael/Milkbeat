@@ -802,13 +802,32 @@ revision must pass the configured ktlint rules.
   allocation estimate across height callbacks; do not recompute both topologies at the new size. Visibility resumes still use
   `revalidateForResume`. Fixed-height/RAM-toggle preferences are retired. Standard
   trails is default; Medium/High activate above 1330p. Keep the audio tap and player owners intact.
-  Core 2.3.34's Fire TV troubleshooting switches (`setBackgroundCompile`, `setShaderBinaryCache`,
-  default on) are visualizer settings applied through `VisualizerEngine.apply`. `VisualizerExitDiagnostics`
+  The former Fire TV background-compile and shader-binary-cache preferences are retired and ignored,
+  including stored Off values. `VisualizerEngine.apply` explicitly enables both through the retained
+  `setBackgroundCompile(true)` and `setShaderBinaryCache(true)` core compatibility APIs on its first
+  configuration. The settings UI offers neither switch; exit reports preserve historical switch states
+  when recorded. `VisualizerExitDiagnostics`
   opens the engine trail (`setDiagnosticsFile`, no-backup storage, per-process session via
   `setProcessStateSummary`) from the settings flow's `onStart` on IO, so the trail is open before the
   engine first renders without loading the native library at app start or doing file I/O on main.
   Settings → Visualizations → Last exit formats Android's exit records with that trail
-  (`TvVisualizerExitReport.kt`); focused tests: `--tests '*VisualizerExit*'`.
+  (`TvVisualizerExitReport.kt`), including `NativeCrashReports.status()` and up to five saved native
+  reports from `NativeCrashReports.recent(context)`. `VisualizerExitDiagnostics.nativeCrashes` reads
+  these on IO; the UI preserves only the core-provided bounded display details, with long reports
+  split across focusable cards. Raw private tombstones can contain register/stack memory and app
+  data; only the displayed details omit those sections. Keep `privacy.md` accurate about this
+  distinction. Capture installs with `ProjectMCore.init`; no app-start eager init
+  or automatic upload is added. Keep `android.packaging.jniLibs.useLegacyPackaging = true` so
+  Android extracts the core's native dumper executable; preserve the core manifest's merged
+  `extractNativeLibs=true`. Focused tests: `--tests '*VisualizerExit*'`.
+  Opt-in disposable-device check: build `:app:assembleGithubDebug :app:assembleGithubDebugAndroidTest`
+  against a published core containing `NativeCrashReports`, install both APKs, then run
+  `TvVisualizerCrashReportDeviceTest#captureNativeCrashWhenExplicitlyRequested` with instrumentation
+  argument `projectmCrashCapture=true`. It deliberately sends SIGSEGV to its own test app and is
+  expected to end with `Process crashed`; run only on a task-owned disposable device. Relaunch with
+  `#savedNativeBacktraceIsReadableAndBackReturnsRemoteFocus` and `projectmCrashReport=true` to verify
+  the saved native report, backtrace/build IDs, removed switches and Back focus. Verified2026-10-17
+  on the owned API34 ARM64 emulator against core2.3.55; not an affected-PowerVR reproduction.
 - Use JDK 21, as CI does, with an Android SDK containing platform 37 (`compileSdk = 37`).
   Supply the SDK through `ANDROID_HOME` or an untracked `local.properties` containing `sdk.dir`.
   The app targets Android 36, supports API 26+, and compiles Java/Kotlin to JVM 17.

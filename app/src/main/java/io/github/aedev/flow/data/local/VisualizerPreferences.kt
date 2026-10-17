@@ -111,10 +111,6 @@ class VisualizerPreferences
 
         suspend fun setNativeTrails(level: Int) = set(VisualizerKeys.NATIVE_TRAILS, level.takeIf { it in 0..2 } ?: 0)
 
-        suspend fun setBackgroundCompile(enabled: Boolean) = set(VisualizerKeys.BACKGROUND_COMPILE, enabled)
-
-        suspend fun setShaderBinaryCache(enabled: Boolean) = set(VisualizerKeys.SHADER_BINARY_CACHE, enabled)
-
         private suspend fun <T> set(
             key: Preferences.Key<T>,
             value: T,
@@ -130,7 +126,7 @@ private fun readMoods(stored: String?): Set<String> =
         ?.toSet()
         .orEmpty()
 
-/** Retired fixed-height and RAM-toggle keys are deliberately ignored by the automatic core. */
+/** Retired fixed-height, RAM-toggle and troubleshooting keys are deliberately ignored. */
 internal fun readVisualizerSettings(
     prefs: Preferences,
     defaults: VisualizerSettings,
@@ -148,8 +144,6 @@ internal fun readVisualizerSettings(
         frameRateCap = prefs[VisualizerKeys.FRAME_RATE_CAP] ?: defaults.frameRateCap,
         meshLevel = prefs[VisualizerKeys.MESH_LEVEL] ?: defaults.meshLevel,
         nativeTrails = prefs[VisualizerKeys.NATIVE_TRAILS] ?: defaults.nativeTrails,
-        backgroundCompile = prefs[VisualizerKeys.BACKGROUND_COMPILE] ?: defaults.backgroundCompile,
-        shaderBinaryCache = prefs[VisualizerKeys.SHADER_BINARY_CACHE] ?: defaults.shaderBinaryCache,
     )
 
 private object VisualizerKeys {
@@ -165,8 +159,6 @@ private object VisualizerKeys {
     val FRAME_RATE_CAP = intPreferencesKey("frame_rate_cap")
     val MESH_LEVEL = intPreferencesKey("mesh_level")
     val NATIVE_TRAILS = intPreferencesKey("native_trails")
-    val BACKGROUND_COMPILE = booleanPreferencesKey("background_compile")
-    val SHADER_BINARY_CACHE = booleanPreferencesKey("shader_binary_cache")
     val TIMING_OFFSET_MS = intPreferencesKey("timing_offset_ms")
     val ENABLED = booleanPreferencesKey("enabled")
     val DIAGNOSTICS = booleanPreferencesKey("diagnostics")

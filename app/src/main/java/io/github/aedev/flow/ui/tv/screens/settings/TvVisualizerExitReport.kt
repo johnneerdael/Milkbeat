@@ -17,6 +17,7 @@ import io.github.aedev.flow.R
 import io.github.aedev.flow.player.audio.visualizer.AppExit
 import io.github.aedev.flow.player.audio.visualizer.EngineTrailLine
 import io.github.aedev.flow.player.audio.visualizer.ExitPresence
+import io.github.aedev.flow.player.audio.visualizer.VisualizerNativeCrash
 import io.github.aedev.flow.player.audio.visualizer.exitForTrailLine
 import io.github.aedev.flow.player.audio.visualizer.parseEngineTrail
 import io.github.aedev.flow.ui.tv.components.TvCard
@@ -25,17 +26,17 @@ import io.github.aedev.flow.ui.tv.components.TvCard
 internal data class ExitRecords(
     val exits: List<AppExit>,
     val trail: String,
+    val captureStatus: String = "",
+    val nativeCrashes: List<VisualizerNativeCrash> = emptyList(),
 )
 
-/** The device and the troubleshooting switches as they are now, for the report's header. */
+/** The device as it is now, for the report's header. */
 internal data class ExitReportDevice(
     val manufacturer: String,
     val model: String,
     val release: String,
     val sdk: Int,
     val gpu: String,
-    val backgroundCompile: Boolean,
-    val shaderBinaryCache: Boolean,
 )
 
 internal data class ExitReportEntry(
@@ -59,11 +60,15 @@ internal class VisualizerExitReportFormatter(
         exits: List<AppExit>,
         sdk: Int,
         nowMs: Long,
+        nativeCrashes: List<VisualizerNativeCrash> = emptyList(),
     ): String {
+        val exit = exits.firstOrNull { it.isProblem || it.presence == ExitPresence.ON_SCREEN }
+        val native = nativeCrashes.firstOrNull()
+        if (native != null && (sdk < Build.VERSION_CODES.R || exit == null || native.timestampMs >= exit.timestampMs)) {
+            return resources.getString(R.string.visualizer_last_native_crash_summary, age(nowMs, native.timestampMs))
+        }
         if (sdk < Build.VERSION_CODES.R) return resources.getString(R.string.visualizer_last_exit_needs_android_11)
-        val exit =
-            exits.firstOrNull { it.isProblem || it.presence == ExitPresence.ON_SCREEN }
-                ?: return resources.getString(R.string.visualizer_last_exit_none)
+        if (exit == null) return resources.getString(R.string.visualizer_last_exit_none)
         val reason = reasonLabel(exit.reason, exit.status, sdk).replaceFirstChar { it.uppercaseChar() }
         return resources.getString(R.string.visualizer_last_exit_summary, reason, age(nowMs, exit.timestampMs))
     }
@@ -91,13 +96,10 @@ internal class VisualizerExitReportFormatter(
                         device.gpu.ifEmpty { resources.getString(R.string.visualizer_exit_report_gpu_unknown) },
                     ),
                 )
-                add(
-                    resources.getString(
-                        R.string.visualizer_exit_report_now,
-                        onOff(device.backgroundCompile),
-                        onOff(device.shaderBinaryCache),
-                    ),
-                )
+                if (records.captureStatus.isNotEmpty()) {
+                    add(resources.getString(R.string.visualizer_exit_report_capture_status, records.captureStatus))
+                    if (records.nativeCrashes.isEmpty()) add(resources.getString(R.string.visualizer_exit_report_no_native_crashes))
+                }
                 when {
                     !supported -> add(resources.getString(R.string.visualizer_exit_report_needs_android_11))
                     records.exits.isEmpty() -> add(resources.getString(R.string.visualizer_exit_report_no_exits))
@@ -128,7 +130,7 @@ internal class VisualizerExitReportFormatter(
                                     ),
                                 )
                             }
-                            // The switches of the process that ended, which today's settings may differ from.
+                            // Preserve switch states recorded before the troubleshooting settings were retired.
                             newestSwitches(owned)?.let(::add)
                             owned.forEach { line ->
                                 add(
@@ -156,8 +158,33 @@ internal class VisualizerExitReportFormatter(
                     ),
                 )
             }
-        return ExitReport(header, entries + withoutRecords)
+        return ExitReport(header, entries + withoutRecords + nativeEntries(records.nativeCrashes, nowMs))
     }
+
+    private fun nativeEntries(
+        reports: List<VisualizerNativeCrash>,
+        nowMs: Long,
+    ): List<ExitReportEntry> =
+        reports.flatMap { report ->
+            report.details
+                .lineSequence()
+                .flatMap { it.chunked(NATIVE_CHARS_PER_LINE).ifEmpty { listOf("") } }
+                .chunked(NATIVE_LINES_PER_CARD)
+                .mapIndexed { index, lines ->
+                    ExitReportEntry(
+                        title =
+                            resources.getString(
+                                if (index == 0) {
+                                    R.string.visualizer_exit_report_native_crash
+                                } else {
+                                    R.string.visualizer_exit_report_native_continued
+                                },
+                                age(nowMs, report.timestampMs),
+                            ),
+                        details = if (index == 0) listOf(report.fileName) + lines else lines,
+                    )
+                }.toList()
+        }
 
     fun age(
         nowMs: Long,
@@ -287,6 +314,8 @@ internal class VisualizerExitReportFormatter(
     private companion object {
         const val KB_PER_MB = 1024
         const val MS_PER_SECOND = 1000L
+        const val NATIVE_LINES_PER_CARD = 4
+        const val NATIVE_CHARS_PER_LINE = 120
 
         val SIGNAL_NAMES = mapOf(4 to "SIGILL", 6 to "SIGABRT", 7 to "SIGBUS", 8 to "SIGFPE", 9 to "SIGKILL", 11 to "SIGSEGV")
     }

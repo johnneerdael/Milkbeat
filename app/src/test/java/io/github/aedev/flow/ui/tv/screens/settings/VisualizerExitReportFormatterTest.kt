@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Truth.assertThat
 import io.github.aedev.flow.player.audio.visualizer.AppExit
+import io.github.aedev.flow.player.audio.visualizer.VisualizerNativeCrash
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -52,13 +53,12 @@ class VisualizerExitReportFormatterTest {
                 trail = trail,
             )
 
-        val report = formatter.report(records, device(backgroundCompile = true, shaderBinaryCache = true), NOW)
+        val report = formatter.report(records, device(), NOW)
 
         assertThat(report.header)
             .containsExactly(
                 "Amazon AFTKRT, Android 11 (API 30)",
                 "GPU: PowerVR Rogue GE9215",
-                "Now: background compile on, shader binary cache on",
             ).inOrder()
         val entry = report.entries.single()
         assertThat(entry.title).isEqualTo("60 s ago: crashed (native code), playing in the background")
@@ -86,6 +86,58 @@ class VisualizerExitReportFormatterTest {
     }
 
     @Test
+    fun `saved native report shows supplied signal backtrace and build IDs beside Android records`() {
+        val native =
+            VisualizerNativeCrash(
+                "tombstone_saved.native.xcrash",
+                NOW - 60_000,
+                "Signal: SIGSEGV\nCode: SEGV_MAPERR\nFault address: 0x10\nNative backtrace:\n#00 pc 000abc /lib/libGLES.so\nBuild IDs: libGLES.so abcdef",
+            )
+        val records = ExitRecords(listOf(exit()), "", "Native crash capture ready", listOf(native))
+
+        val report = formatter.report(records, device(), NOW)
+
+        assertThat(report.header).contains("Capture status: Native crash capture ready")
+        assertThat(report.entries).hasSize(3)
+        assertThat(report.entries[1].title).isEqualTo("Saved native crash · 60 s ago")
+        assertThat(report.entries[1].details)
+            .containsExactly(
+                "tombstone_saved.native.xcrash",
+                "Signal: SIGSEGV",
+                "Code: SEGV_MAPERR",
+                "Fault address: 0x10",
+                "Native backtrace:",
+            ).inOrder()
+        assertThat(report.entries[2].title).isEqualTo("Native crash continued · 60 s ago")
+        assertThat(report.entries[2].details).containsExactly("#00 pc 000abc /lib/libGLES.so", "Build IDs: libGLES.so abcdef").inOrder()
+        assertThat(formatter.summary(emptyList(), 28, NOW, listOf(native))).isEqualTo("Native crash · 60 s ago")
+    }
+
+    @Test
+    fun `no native report states capture availability without inventing a crash`() {
+        val records = ExitRecords(emptyList(), "", "Native crash capture has not started")
+
+        val report = formatter.report(records, device(), NOW)
+
+        assertThat(report.header).contains("Capture status: Native crash capture has not started")
+        assertThat(report.header).contains("No saved native crash reports.")
+        assertThat(report.entries).isEmpty()
+    }
+
+    @Test
+    fun `long native details remain complete across bounded cards`() {
+        val details = "Abort message: " + "a".repeat(1_200)
+        val native = VisualizerNativeCrash("saved.native.xcrash", NOW, details)
+
+        val report = formatter.report(ExitRecords(emptyList(), "", nativeCrashes = listOf(native)), device(), NOW)
+        val shown = report.entries.flatMap { it.details }.drop(1)
+
+        assertThat(report.entries.size).isGreaterThan(1)
+        assertThat(shown.joinToString("")).isEqualTo(details)
+        assertThat(shown.all { it.length <= 120 }).isTrue()
+    }
+
+    @Test
     fun `ages round to the nearest unit`() {
         assertThat(formatter.age(NOW, NOW - 89_000)).isEqualTo("89 s ago")
         assertThat(formatter.age(NOW, NOW - 150 * 60_000L)).isEqualTo("3 h ago")
@@ -107,9 +159,7 @@ class VisualizerExitReportFormatterTest {
     private fun device(
         sdk: Int = 30,
         gpu: String = "PowerVR Rogue GE9215",
-        backgroundCompile: Boolean = true,
-        shaderBinaryCache: Boolean = true,
-    ) = ExitReportDevice("Amazon", "AFTKRT", if (sdk >= 30) "11" else "9", sdk, gpu, backgroundCompile, shaderBinaryCache)
+    ) = ExitReportDevice("Amazon", "AFTKRT", if (sdk >= 30) "11" else "9", sdk, gpu)
 
     private companion object {
         const val NOW = 1_800_000_000_000L

@@ -5,10 +5,12 @@ import android.content.Context
 import android.os.Build
 import android.util.Log
 import dagger.hilt.android.qualifiers.ApplicationContext
+import io.github.aedev.flow.R
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import nl.neerdael.projectm.core.NativeCrashReports
 import nl.neerdael.projectm.core.ProjectMJNI
 import java.io.File
 import java.security.SecureRandom
@@ -91,6 +93,17 @@ class VisualizerExitDiagnostics
             }
         }
 
+        suspend fun nativeCrashes(): VisualizerNativeCrashes =
+            withContext(Dispatchers.IO) {
+                runCatching {
+                    VisualizerNativeCrashes(
+                        status = NativeCrashReports.status(),
+                        reports = NativeCrashReports.recent(context).map { VisualizerNativeCrash(it.fileName, it.timestampMs, it.details) },
+                    )
+                }.onFailure { Log.w(TAG, "Native crash reports unavailable", it) }
+                    .getOrElse { VisualizerNativeCrashes(context.getString(R.string.visualizer_native_reports_unavailable), emptyList()) }
+            }
+
         private fun trailFile() = File(context.noBackupFilesDir, TRAIL_FILE)
 
         private fun read(file: File): String =
@@ -116,3 +129,14 @@ class VisualizerExitDiagnostics
             const val MAX_TRAIL_BYTES = 16 * 1024
         }
     }
+
+data class VisualizerNativeCrashes(
+    val status: String,
+    val reports: List<VisualizerNativeCrash>,
+)
+
+data class VisualizerNativeCrash(
+    val fileName: String,
+    val timestampMs: Long,
+    val details: String,
+)

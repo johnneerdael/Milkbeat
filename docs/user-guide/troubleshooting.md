@@ -100,11 +100,10 @@ If Milkbeat closes by itself while the visualizer shows, often when one preset c
 
 1. Open Milkbeat again and check **Settings → Visualizations → Last exit**. Select it for the [exit report](settings.md#troubleshooting): *crashed (native code)* or *killed by signal* points to the graphics driver or the engine, *killed for low memory* to memory.
 2. Try **Transition style** Lightweight, then Classic. If only Auto blends crash, the lower blend resolution is involved.
-3. Turn **Shader binary cache** off. If the crashes stop, the GPU driver cannot reuse program binaries between OpenGL contexts.
-4. If they continue, also turn **Background compile** off. Switches then pause the picture while each preset compiles, often for a second or two. If the crashes stop only now, the driver fails when two threads compile at once.
-5. Report the result with a photo of the exit report, the device model and which switches you changed. Turn the switches back on afterwards if they made no difference.
+3. Check the capture status and any **Saved native crash** cards below the Android records. A saved report can include the signal, module-relative backtrace and build IDs; these are also available before Android 11. Capture starts when the visualizer engine initializes.
+4. Report the result with photos of the exit report, including the native backtrace when present, the device model, the Milkbeat version and the transition style in use. Reports stay on the TV and are never uploaded automatically.
 
-These switches are the same as ProjectM TV's; its [troubleshooting](https://johnneerdael.github.io/ProjectM-TV/troubleshooting/#the-app-closes-at-preset-changes) describes them in depth. They exist to diagnose crashes first reported on a Fire TV Stick 4K Max (2nd gen, PowerVR GE9215 GPU). Leave them on otherwise.
+The former **Background compile** and **Shader binary cache** switches did not resolve the reported Fire TV native crash and have been removed. Both features are enabled automatically, including after upgrading with a saved Off choice. Success on the affected Fire TV has not yet been verified. Historical exit reports still preserve recorded switch states.
 
 ## A plugin did not update
 

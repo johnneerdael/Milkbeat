@@ -107,7 +107,10 @@ fun TvVisualizerSettingsPane(
                     skippedPresets = skippedPresets,
                     exitRecords = exitRecords,
                     exitReportFocus = exitReportFocus,
-                    onOpenExitReport = { exitReportOpen = true },
+                    onOpenExitReport = {
+                        viewModel.refreshExitRecords()
+                        exitReportOpen = true
+                    },
                     viewModel = viewModel,
                     rowFocus = rowFocus,
                     onOpen = {
@@ -160,8 +163,6 @@ fun TvVisualizerSettingsPane(
                                 release = Build.VERSION.RELEASE,
                                 sdk = Build.VERSION.SDK_INT,
                                 gpu = viewModel.gpu,
-                                backgroundCompile = engineSettings.backgroundCompile,
-                                shaderBinaryCache = engineSettings.shaderBinaryCache,
                             ),
                             System.currentTimeMillis(),
                         )
@@ -286,23 +287,15 @@ private fun LazyListScope.engineSettingsItems(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
-    toggleRow("background-compile", R.string.visualizer_background_compile, settings.backgroundCompile, {
-        stringResource(R.string.visualizer_background_compile_subtitle)
-    }) {
-        setBackgroundCompile(it)
-    }
-    toggleRow("shader-binary-cache", R.string.visualizer_shader_binary_cache, settings.shaderBinaryCache, {
-        stringResource(R.string.visualizer_shader_binary_cache_subtitle)
-    }) {
-        setShaderBinaryCache(it)
-    }
     item(key = "visualizer-last-exit") {
         val resources = LocalContext.current.resources
         TvNavRow(
             label = stringResource(R.string.visualizer_last_exit),
             value =
                 exitRecords?.let {
-                    VisualizerExitReportFormatter(resources).summary(it.exits, Build.VERSION.SDK_INT, System.currentTimeMillis())
+                    VisualizerExitReportFormatter(
+                        resources,
+                    ).summary(it.exits, Build.VERSION.SDK_INT, System.currentTimeMillis(), it.nativeCrashes)
                 },
             onClick = { if (exitRecords != null) onOpenExitReport() },
             modifier = Modifier.focusRequester(exitReportFocus),
