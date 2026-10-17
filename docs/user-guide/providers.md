@@ -26,7 +26,7 @@ Capabilities depend on the installed plugin version, the account and its subscri
 
 ## YouTube
 
-**YouTube 0.1.5** (downloader code **563**) is the one YouTube provider. It needs a Milkbeat build
+**YouTube 0.1.6** (downloader code **563**) is the one YouTube provider. It needs a Milkbeat build
 with plugin API 11; update the app before installing if your build is older. Its **YouTube** tab
 offers YouTube Music Home with mood chips, Search with YouTube Music's filters, artist, album and
 playlist pages, your library and radio. It plays YouTube audio and music videos, through YouTube's
@@ -156,7 +156,7 @@ Completed indexing matches are kept when you cancel. Index again after changing 
 
 ## Sign-in and account requirements
 
-- **YouTube:** sign-in is optional; Home works signed out. Signing in with the Google account in MicroG-RE-TV gives you your own Home, library and history. It works only in the stable app, not in Milkbeat Preview or debug builds. YouTube 0.1.5 needs a Milkbeat build with plugin API 11.
+- **YouTube:** sign-in is optional; Home works signed out. Signing in with the Google account in MicroG-RE-TV gives you your own Home, library and history. It works only in the stable app, not in Milkbeat Preview or debug builds. YouTube 0.1.6 needs a Milkbeat build with plugin API 11.
 - **Deezer:** sign in through the phone web viewer for your catalog, Flow and read-only library. Audio availability and quality depend on the account and recording. Deezer 0.2.1 needs a Milkbeat build with plugin API 9.
 - **Spotify:** a catalog with **no audio source**. Its value is your personalized feed, playlists, Liked Songs and library after signing in. Keep at least one audio provider enabled.
 - **Beatport:** sign in for the catalog and your library. Beatport's own full-length audio needs an active streaming subscription; otherwise SoundCloud or YouTube can match the recording. A free account does not guarantee a match.
@@ -201,7 +201,7 @@ Beatport starts with the switch off, and updating Milkbeat switches it off once 
 
 Spotify has no audio of its own, so Milkbeat searches up to four providers at once. A faster match from a lower provider is used only once every higher provider has failed; the remaining searches are cancelled as soon as the result is decided.
 
-YouTube matching searches recorded videos, including static Art Tracks and archived live sets, whichever now-playing view you use. It checks recording identity, so an unrelated performance, cover, different remix or short excerpt is rejected, and full versions are preferred over mixed excerpts. A live set of 20 minutes or more also matches a YouTube upload up to 15% longer or shorter, such as a promoter's upload with an intro, when the performer, event and year are the same. For dated Tomorrowland sets, `TML` and `Tomorrowland` mean the same festival: the performer, recording day and full-set duration must agree, even when one title names the city and the other names the stage. The recording day can be confirmed by the video description; the upload date is not used. Keep the YouTube plugin updated for this description lookup. The picture loads only when you choose [the video view](playback.md#visualizer-music-video-or-artwork).
+YouTube matching searches recorded videos, including static Art Tracks and archived live sets, whichever now-playing view you use. It checks recording identity, so an unrelated performance, cover, different remix or short excerpt is rejected, and full versions are preferred over mixed excerpts. A live set of 20 minutes or more also matches a YouTube upload up to 15% longer or shorter, such as a promoter's upload with an intro, when the performer, event and year are the same. For dated Tomorrowland sets, `TML` and `Tomorrowland` mean the same festival: the performer, recording day and full-set duration must agree, even when one title names the city and the other names the stage. The recording day can be confirmed by the video description; the upload date is not used. YouTube 0.1.6 and later supply this description lookup; use Milkbeat 1.0.4 or later for the dated-set matching rule. The picture loads only when you choose [the video view](playback.md#visualizer-music-video-or-artwork).
 
 ![Video: None or YouTube Music](images/settings-video-provider.png)
 
