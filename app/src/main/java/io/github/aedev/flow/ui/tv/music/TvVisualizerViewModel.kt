@@ -13,9 +13,12 @@ import io.github.aedev.flow.player.audio.visualizer.toggledMoods
 import io.github.aedev.flow.player.diagnostics.PlaybackTrace
 import io.github.aedev.flow.player.diagnostics.TraceEvent
 import io.github.aedev.flow.player.diagnostics.TraceField
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import nl.neerdael.projectm.core.PresetFacets
@@ -41,9 +44,12 @@ class TvVisualizerViewModel
         val settings: StateFlow<VisualizerSettings?> =
             engine.settings.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000, replayExpirationMillis = 0), null)
 
-        /** The bundled preset moods; null until read, and when this build's engine ships no mood table. */
+        /** The bundled preset moods; null until read, while visualizations are off, and when this build's engine ships no mood table. */
+        @OptIn(ExperimentalCoroutinesApi::class)
         val moodTable: StateFlow<PresetFacets?> =
-            flow { emit(engine.moods.load()) }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+            engine.active
+                .flatMapLatest<Boolean, PresetFacets?> { active -> if (active) flow { emit(engine.moods.load()) } else flowOf(null) }
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
         /** Rereads the engine's skipped presets, which the mix leaves out, for the counts the panel shows. */
         suspend fun refreshSkipped(): Set<String> {

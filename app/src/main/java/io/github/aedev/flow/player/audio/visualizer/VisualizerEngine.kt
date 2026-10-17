@@ -71,6 +71,9 @@ class VisualizerEngine
 
         private var applied: VisualizerSettings? = null
 
+        @Volatile
+        private var replanMoods = false
+
         fun start(settings: VisualizerSettings) {
             if (!started) {
                 started = true
@@ -120,7 +123,7 @@ class VisualizerEngine
                 }
             }
 
-        suspend fun resetSkippedPresets() =
+        suspend fun resetSkippedPresets() {
             withContext(Dispatchers.IO) {
                 if (started) {
                     ProjectMJNI.resetSkippedPresets()
@@ -129,6 +132,9 @@ class VisualizerEngine
                     File(skipList().path + BLANK_STRIKES_SUFFIX).delete()
                 }
             }
+            moods.refreshSkipped()
+            replanMoods = true
+        }
 
         private fun skipList(): File = ProjectMCore.skipListFile(context)
 
