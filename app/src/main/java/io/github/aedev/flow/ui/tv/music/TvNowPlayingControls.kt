@@ -49,9 +49,9 @@ import io.github.aedev.flow.ui.tv.components.TvIconButtonColors
 private val ControlsWidth = 480.dp
 private val ControlButtonSize = 48.dp
 
-// The mood button makes nine buttons, which only fit the bar a little tighter.
-private val CompactButtonSize = 44.dp
-private val CompactButtonSpacing = 6.dp
+// Nine 48 dp buttons (the Material minimum touch target) with 4 dp gaps need 464 dp plus the padding.
+private val MoodControlsWidth = 488.dp
+private val MoodButtonSpacing = 4.dp
 private val ControlsPadding = 12.dp
 
 // The controls bar stays see-through so the visual behind it is never lost, but solid enough to read
@@ -104,7 +104,7 @@ internal fun TvNowPlayingControls(
 ) {
     var seekBarFocused by remember { mutableStateOf(false) }
     Surface(
-        modifier = modifier.width(ControlsWidth),
+        modifier = modifier.width(if (state.moodsAvailable) MoodControlsWidth else ControlsWidth),
         shape = MaterialTheme.shapes.large,
         color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = CONTROLS_BAR_ALPHA),
         tonalElevation = 3.dp,
@@ -137,24 +137,23 @@ internal fun TvNowPlayingControls(
                 )
             }
             Row(
-                horizontalArrangement = Arrangement.spacedBy(if (state.moodsAvailable) CompactButtonSpacing else 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(if (state.moodsAvailable) MoodButtonSpacing else 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                val buttonSize = if (state.moodsAvailable) CompactButtonSize else ControlButtonSize
                 TvIconButton(
                     icon = Icons.Outlined.Shuffle,
                     contentDescription = stringResource(R.string.shuffle),
                     onClick = actions.onToggleShuffle,
                     active = state.shuffleEnabled,
                     colors = buttonColors,
-                    size = buttonSize,
+                    size = ControlButtonSize,
                 )
                 TvIconButton(
                     icon = Icons.Outlined.SkipPrevious,
                     contentDescription = stringResource(R.string.previous),
                     onClick = actions.onPrevious,
                     colors = buttonColors,
-                    size = buttonSize,
+                    size = ControlButtonSize,
                 )
                 TvIconButton(
                     icon = if (state.isPlaying) Icons.Outlined.Pause else Icons.Outlined.PlayArrow,
@@ -162,7 +161,7 @@ internal fun TvNowPlayingControls(
                     onClick = actions.onTogglePlayPause,
                     active = true,
                     colors = buttonColors,
-                    size = buttonSize,
+                    size = ControlButtonSize,
                     focusRequester = playPauseFocusRequester,
                 )
                 TvIconButton(
@@ -170,7 +169,7 @@ internal fun TvNowPlayingControls(
                     contentDescription = stringResource(R.string.next),
                     onClick = actions.onNext,
                     colors = buttonColors,
-                    size = buttonSize,
+                    size = ControlButtonSize,
                 )
                 TvIconButton(
                     icon = if (state.repeatMode == RepeatMode.ONE) Icons.Outlined.RepeatOne else Icons.Outlined.Repeat,
@@ -178,7 +177,7 @@ internal fun TvNowPlayingControls(
                     onClick = actions.onToggleRepeat,
                     active = state.repeatMode != RepeatMode.OFF,
                     colors = buttonColors,
-                    size = buttonSize,
+                    size = ControlButtonSize,
                 )
                 TvIconButton(
                     icon = if (state.isLiked) Icons.Outlined.Favorite else Icons.Outlined.FavoriteBorder,
@@ -186,7 +185,7 @@ internal fun TvNowPlayingControls(
                     onClick = actions.onToggleLike,
                     active = state.isLiked,
                     colors = buttonColors,
-                    size = buttonSize,
+                    size = ControlButtonSize,
                 )
                 // A choice between views rather than an on/off feature: it shows the view on screen,
                 // unfilled, and names the one it steps to.
@@ -207,7 +206,7 @@ internal fun TvNowPlayingControls(
                         ),
                     onClick = actions.onNextView,
                     colors = buttonColors,
-                    size = buttonSize,
+                    size = ControlButtonSize,
                 )
                 if (state.moodsAvailable) {
                     TvIconButton(
@@ -216,7 +215,7 @@ internal fun TvNowPlayingControls(
                         onClick = actions.onToggleMoods,
                         active = state.moodsOpen,
                         colors = buttonColors,
-                        size = buttonSize,
+                        size = ControlButtonSize,
                     )
                 }
                 TvIconButton(
@@ -225,7 +224,7 @@ internal fun TvNowPlayingControls(
                     onClick = actions.onToggleQueue,
                     active = state.queueOpen,
                     colors = buttonColors,
-                    size = buttonSize,
+                    size = ControlButtonSize,
                 )
             }
         }
