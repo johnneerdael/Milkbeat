@@ -55,7 +55,6 @@ fun BoxScope.TvMusicMoodPanel(
         visible = visible && facets != null,
         title = stringResource(R.string.tv_music_moods),
         onClose = onClose,
-        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = QUEUE_PANEL_ALPHA),
     ) {
         val table = facets ?: return@TvSidePanel
         val selected = settings?.moods.orEmpty()
@@ -129,7 +128,7 @@ private fun MoodGroup(
                 val dimmed = selection.isDimmed(option.id)
                 val count = NumberFormat.getIntegerInstance().format(selection.countIfToggled(option.id))
                 TvFilterChip(
-                    label = "${option.label} · $count",
+                    label = stringResource(R.string.tv_music_mood_chip, option.label, count),
                     selected = chosen,
                     onClick = { onToggle(option.id) },
                     modifier =

@@ -337,6 +337,7 @@
     </plurals>
     <string name="tv_music_moods_few">Few presets: some repetition</string>
     <string name="tv_music_moods_none_match">No presets match your mix; playing your usual collection</string>
+    <string name="tv_music_mood_chip">%1$s · %2$s</string>
     <string name="tv_music_moods_clear">Clear all</string>
     <string name="tv_player_play_now">Play now</string>
     <string name="tv_player_skip_segment">Skip %1$s</string>

@@ -53,8 +53,7 @@ class TvVisualizerViewModel
 
         fun toggleMood(id: String) {
             val facets = moodTable.value ?: return
-            val selected = settings.value?.moods ?: return
-            toggledMoods(facets, selected, engine.moods.skipped, id)?.let { viewModelScope.launch { preferences.setMoods(it) } }
+            viewModelScope.launch { preferences.updateMoods { toggledMoods(facets, it, engine.moods.skipped, id) } }
         }
 
         fun clearMoods() {
