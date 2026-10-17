@@ -38,7 +38,7 @@ import io.github.aedev.flow.ui.tv.focus.tvAcceleratedDpad
 import io.github.aedev.flow.ui.tv.theme.LocalTvDimens
 import kotlinx.coroutines.launch
 
-private const val QUEUE_PANEL_ALPHA = 0.5f
+internal const val QUEUE_PANEL_ALPHA = 0.5f
 
 // Rows sit a little more solid than the panel so they stay readable while the visual shows through.
 private const val QUEUE_ROW_ALPHA = 0.6f

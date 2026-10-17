@@ -196,8 +196,9 @@ install apps yet, Android's permission setting opens first.
 ## Playback, queue and radio
 
 **OK** in the full player shows the controls: audio level, seek bar, shuffle, previous,
-play/pause, next, repeat, like, the view button and the queue.
+play/pause, next, repeat, like, the view button, the mood mix (visualizer only) and the queue.
 
+- **The mood mix** (visualizer view only) opens a panel beside the player: pick Energy, Brightness, Colour, Palette and other mood options to narrow the presets played, with live counts. It replaces the Settings preset mood collection while a selection is active.
 - **The view button** steps through the visualizer, the matched music video (up to the TV's physical
   resolution, capped at 2160p, in a hardware-decoded codec) and the artwork. Milkbeat remembers your choice; video only loads when
   you pick it.

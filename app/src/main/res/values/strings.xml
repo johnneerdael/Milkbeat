@@ -330,6 +330,14 @@
     <string name="tv_music_retrying">Trying again…</string>
     <string name="tv_player_settings">Player settings</string>
     <string name="tv_player_queue">Queue</string>
+    <string name="tv_music_moods">Mood mix</string>
+    <plurals name="tv_music_moods_pool">
+        <item quantity="one">%1$s preset in your mix</item>
+        <item quantity="other">%1$s presets in your mix</item>
+    </plurals>
+    <string name="tv_music_moods_few">Few presets: some repetition</string>
+    <string name="tv_music_moods_none_match">No presets match your mix; playing your usual collection</string>
+    <string name="tv_music_moods_clear">Clear all</string>
     <string name="tv_player_play_now">Play now</string>
     <string name="tv_player_skip_segment">Skip %1$s</string>
     <string name="tv_player_chapters">Chapters</string>

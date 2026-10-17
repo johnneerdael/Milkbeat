@@ -13,6 +13,7 @@ import androidx.compose.material.icons.outlined.Favorite
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.GraphicEq
 import androidx.compose.material.icons.outlined.Image
+import androidx.compose.material.icons.outlined.Mood
 import androidx.compose.material.icons.outlined.MusicVideo
 import androidx.compose.material.icons.outlined.Pause
 import androidx.compose.material.icons.outlined.PlayArrow
@@ -63,6 +64,9 @@ internal data class TvNowPlayingControlsState(
     val view: NowPlayingView,
     val nextView: NowPlayingView,
     val queueOpen: Boolean,
+    /** The mood button shows only while the visualizer is the view on screen. */
+    val moodsAvailable: Boolean = false,
+    val moodsOpen: Boolean = false,
 )
 
 internal class TvNowPlayingControlsActions(
@@ -76,6 +80,7 @@ internal class TvNowPlayingControlsActions(
     val onToggleLike: () -> Unit,
     val onNextView: () -> Unit,
     val onToggleQueue: () -> Unit,
+    val onToggleMoods: () -> Unit = {},
 )
 
 /**
@@ -199,6 +204,16 @@ internal fun TvNowPlayingControls(
                     colors = buttonColors,
                     size = ControlButtonSize,
                 )
+                if (state.moodsAvailable) {
+                    TvIconButton(
+                        icon = Icons.Outlined.Mood,
+                        contentDescription = stringResource(R.string.tv_music_moods),
+                        onClick = actions.onToggleMoods,
+                        active = state.moodsOpen,
+                        colors = buttonColors,
+                        size = ControlButtonSize,
+                    )
+                }
                 TvIconButton(
                     icon = Icons.AutoMirrored.Outlined.QueueMusic,
                     contentDescription = stringResource(R.string.tv_player_queue),

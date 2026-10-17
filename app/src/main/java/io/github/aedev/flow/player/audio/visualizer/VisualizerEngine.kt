@@ -29,6 +29,7 @@ class VisualizerEngine
         @ApplicationContext private val context: Context,
         preferences: VisualizerPreferences,
         val exitDiagnostics: VisualizerExitDiagnostics,
+        val moods: VisualizerMoods,
     ) {
         @Volatile
         private var started = false
@@ -56,7 +57,12 @@ class VisualizerEngine
 
         /** The engine starts only once these are read, so its trail file is open before it first renders. */
         val settings: Flow<VisualizerSettings> by lazy {
-            preferences.settings(defaults).onStart { if (isSupported) exitDiagnostics.open() }
+            preferences.settings(defaults).onStart {
+                if (isSupported) {
+                    exitDiagnostics.open()
+                    moods.load()
+                }
+            }
         }
 
         /** The GPU as its driver names it, once a visualizer has rendered in this process; empty before. */
@@ -81,7 +87,11 @@ class VisualizerEngine
                 ProjectMJNI.setMeshSize(mesh[0], mesh[1])
             }
             if (last?.autoChange != settings.autoChange) ProjectMJNI.setAutoChange(settings.autoChange)
-            if (last?.musicCategory != settings.musicCategory) ProjectMJNI.setMusicCategory(settings.musicCategory)
+            if (last?.musicCategory != settings.musicCategory || last.moods != settings.moods) {
+                val plan = moods.plan(settings)
+                plan.pool?.let(ProjectMJNI::setPresetPool)
+                ProjectMJNI.setMusicCategory(plan.category)
+            }
             if (last?.beatCuts != settings.beatCuts) ProjectMJNI.setBeatCuts(settings.beatCuts)
             if (last?.presetSeconds != settings.presetSeconds) ProjectMJNI.setPresetDuration(settings.presetSeconds)
             if (last?.blankDetection != settings.blankDetection) ProjectMJNI.setBlankDetection(settings.blankDetection)

@@ -84,6 +84,8 @@ class VisualizerPreferences
 
         suspend fun setMusicCategory(category: String) = set(VisualizerKeys.MUSIC_CATEGORY, VisualizerMusicCategory.normalize(category))
 
+        suspend fun setMoods(moods: Set<String>) = set(VisualizerKeys.MOODS, moods.joinToString(","))
+
         suspend fun setPresetSeconds(seconds: Int) = set(VisualizerKeys.PRESET_SECONDS, seconds)
 
         suspend fun setBeatCuts(enabled: Boolean) = set(VisualizerKeys.BEAT_CUTS, enabled)
@@ -122,6 +124,7 @@ internal fun readVisualizerSettings(
     VisualizerSettings(
         autoChange = prefs[VisualizerKeys.AUTO_CHANGE] ?: defaults.autoChange,
         musicCategory = VisualizerMusicCategory.normalize(prefs[VisualizerKeys.MUSIC_CATEGORY] ?: defaults.musicCategory),
+        moods = prefs[VisualizerKeys.MOODS]?.split(',')?.filter { it.isNotEmpty() }?.toSet() ?: defaults.moods,
         presetSeconds = prefs[VisualizerKeys.PRESET_SECONDS] ?: defaults.presetSeconds,
         beatCuts = prefs[VisualizerKeys.BEAT_CUTS] ?: defaults.beatCuts,
         blankDetection = prefs[VisualizerKeys.BLANK_DETECTION] ?: defaults.blankDetection,
@@ -138,6 +141,7 @@ internal fun readVisualizerSettings(
 private object VisualizerKeys {
     val AUTO_CHANGE = booleanPreferencesKey("auto_change")
     val MUSIC_CATEGORY = stringPreferencesKey("music_category")
+    val MOODS = stringPreferencesKey("mood_facets")
     val PRESET_SECONDS = intPreferencesKey("preset_seconds")
     val BEAT_CUTS = booleanPreferencesKey("beat_cuts")
     val BLANK_DETECTION = booleanPreferencesKey("blank_detection")
