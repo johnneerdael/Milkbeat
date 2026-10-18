@@ -22,6 +22,8 @@ This page covers what the visualizer does inside Milkbeat. The **[ProjectM TV us
 
 The audio level above the seek bar reads **Listening**, **Very quiet** or **No sound**. If it stays on *No sound* while music plays, see [Troubleshooting](troubleshooting.md#visuals-are-slow-black-or-do-not-react).
 
+**PowerVR crash fix:** use Milkbeat 1.0.13 or later (ProjectM core 2.3.56+). The affected Fire TV Stick 4K Max 2nd generation is confirmed fixed. The same corrected copy path is automatic on all supported Imagination/PowerVR GPUs; [device coverage and upgrade guidance](https://johnneerdael.github.io/ProjectM-Android/troubleshooting/#powervr-framebuffer-crashes-fixed-in-2356) includes supported Fire TV models and Google TV Streamer, plus the broader ProjectM engine coverage on phones and tablets.
+
 ## Settings at a glance
 
 All visualizer settings are in [Settings → Visualizations](settings.md#visualizations). Changes apply the next time now playing shows the visualizer. Settings with several values open in a side panel that marks the default for your device.

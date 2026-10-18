@@ -98,12 +98,24 @@ The device needs OpenGL ES 3.0. For engine-level symptoms, see ProjectM TV's [tr
 
 If Milkbeat closes by itself while the visualizer shows, often when one preset changes into the next:
 
+**On PowerVR/Imagination devices, upgrade to Milkbeat 1.0.13 or later first: the reported framebuffer crash is fixed.** See [device coverage and upgrade details](#powervr-framebuffer-crashes-upgrade-to-1013-or-later).
+
 1. Open Milkbeat again and check **Settings → Visualizations → Last exit**. Select it for the [exit report](settings.md#troubleshooting): *crashed (native code)* or *killed by signal* points to the graphics driver or the engine, *killed for low memory* to memory.
-2. Try **Transition style** Lightweight, then Classic. If only Auto blends crash, the lower blend resolution is involved.
+2. If a crash continues on a current release, note the transition style and whether it happens during a change or while a preset plays. Include that information with the report.
 3. Check the capture status and any **Saved native crash** cards below the Android records. A saved report can include the signal, module-relative backtrace and build IDs; these are also available before Android 11. Capture starts when the visualizer engine initializes.
 4. Report the result with photos of the exit report, including the native backtrace when present, the device model, the Milkbeat version and the transition style in use. Reports stay on the TV and are never uploaded automatically.
 
-The former **Background compile** and **Shader binary cache** switches did not resolve the reported Fire TV native crash and have been removed. Both features are enabled automatically, including after upgrading with a saved Off choice. Success on the affected Fire TV has not yet been verified. Historical exit reports still preserve recorded switch states.
+The former **Background compile** and **Shader binary cache** switches did not resolve the reported Fire TV native crash and have been removed. Both features are enabled automatically, including after upgrading with a saved Off choice. The reporter has now confirmed that upgrading to **Milkbeat 1.0.13 or later**, which includes **ProjectM core 2.3.56 or later**, fixes the original Fire TV Stick 4K Max (2nd generation, `AFTKRT`, GE9215) framebuffer-blit crash. Historical exit reports still preserve recorded switch states.
+
+### PowerVR framebuffer crashes: upgrade to 1.0.13 or later
+
+**This crash is fixed in Milkbeat 1.0.13 / ProjectM core 2.3.56.** Upgrade before trying transition settings: the failure could happen during a preset change or while an unchanged preset kept playing, because Auto can resize its feedback buffers.
+
+The fix is automatic on **every supported Imagination/PowerVR GPU**, not just a list of device names. Milkbeat requires Android 8.0+ on TV; older Fire OS 5/6 models in ProjectM's broader engine list are not supported by Milkbeat. Identified devices include Fire TV Stick 4K Max (both generations), Fire TV Stick 4K (2nd generation), Fire TV Stick 4K Plus (2025), Stick 3rd generation, Stick Lite, Stick HD, Google TV Streamer 4K. These supported TV models use GE9215 or GE8300 GPUs and select the corrected framebuffer-copy path without another setting.
+
+See ProjectM's [device/GPU coverage and upgrade guide](https://johnneerdael.github.io/ProjectM-Android/troubleshooting/#powervr-framebuffer-crashes-fixed-in-2356) for exact generations, identifiers and sources. The original AFTKRT model has the confirmed field retest; the GPU-wide selection also covers the other identified PowerVR models. This does not mean unrelated shader, EGL or non-PowerVR failures are the same bug.
+
+If a crash continues after upgrading, open **Settings → Visualizations → Last exit** and share the displayed native backtrace, installed Milkbeat version and device model. Reports stay on the TV until you choose to share them.
 
 ## A plugin did not update
 
