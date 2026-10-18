@@ -792,6 +792,8 @@ revision must pass the configured ktlint rules.
   --tests '*TvMusicVideoJoin*' --tests '*InitialVideoJoinRenderer*'`.
   `TvMusicVideoHandoffDeviceTest` exercises real DASH media, native visuals, audio continuity,
   cancellation and failure; its generated fixtures live in `app/src/androidTest/assets/player/video-handoff/`.
+PowerVR field confirmation (2026-10-18): the reporter confirmed the original AFTKRT / Fire TV Stick 4K Max 2nd-generation GE9215 framebuffer-blit crash is fixed. Minimum releases: Milkbeat 1.0.13 and ProjectM core 2.3.56. Selection is GPU-wide for supported Imagination/PowerVR renderers, not a retail-model allowlist. The public [ProjectM device coverage](https://johnneerdael.github.io/ProjectM-Android/troubleshooting/#powervr-framebuffer-crashes-fixed-in-2356) identifies TV/phone/tablet examples; distinguish this confirmed retest from model/GPU matches and unrelated shader/EGL reports. This documentation update introduces no additional engine policy.
+
 - The visualizer consumes the canonical single Native ProjectM-TV core AAR. `TvVisualizerHost`
   owns a `QualityController` in Auto, acknowledges `BudgetStatsListener` context generations,
   revalidates live memory before resume, and publishes size/trails/transition as one reviewed
@@ -827,7 +829,7 @@ revision must pass the configured ktlint rules.
   expected to end with `Process crashed`; run only on a task-owned disposable device. Relaunch with
   `#savedNativeBacktraceIsReadableAndBackReturnsRemoteFocus` and `projectmCrashReport=true` to verify
   the saved native report, backtrace/build IDs, removed switches and Back focus. Verified2026-10-17
-  on the owned API34 ARM64 emulator against core2.3.55; not an affected-PowerVR reproduction.
+  on the owned API34 ARM64 emulator against core 2.3.55; not an affected-PowerVR reproduction.
 - Use JDK 21, as CI does, with an Android SDK containing platform 37 (`compileSdk = 37`).
   Supply the SDK through `ANDROID_HOME` or an untracked `local.properties` containing `sdk.dir`.
   The app targets Android 36, supports API 26+, and compiles Java/Kotlin to JVM 17.

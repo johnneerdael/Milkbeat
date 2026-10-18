@@ -224,7 +224,7 @@ target and live memory up to the panel's native size, including 4K. Settings →
 offers preset duration and beta moods (Chill, Normal, Intense), beat cuts, blank and slow preset
 skipping, transition length and style, Native trails, frame rate, detail, diagnostics and a
 timing offset. With the controls hidden, Left and Right change the preset.
-**Last exit** shows saved native crash backtraces and Android exit reasons on the TV; reports stay in private app storage and are never uploaded automatically.
+**Last exit** shows saved native crash backtraces and Android exit reasons on the TV; reports stay in private app storage and are never uploaded automatically. **PowerVR framebuffer crashes are fixed from Milkbeat 1.0.13 (ProjectM core 2.3.56)**, confirmed on the affected Fire TV Stick 4K Max 2nd generation. The fix automatically covers supported Imagination/PowerVR phones, tablets and TV boxes; see [device coverage and upgrade guidance](https://johnneerdael.github.io/ProjectM-Android/troubleshooting/#powervr-framebuffer-crashes-fixed-in-2356).
 [The visualizer in Milkbeat](https://johnneerdael.github.io/Milkbeat/visualizer/) gives the
 overview; [ProjectM TV's guide](https://johnneerdael.github.io/ProjectM-TV/) covers every option in depth.
 
