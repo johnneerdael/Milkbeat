@@ -1033,7 +1033,12 @@ run that occupies a physical device, and the resulting diff is thousands of line
   revocation or replacement takes effect immediately; a differently signed reinstall, a link
   replacement that changes the add-on ID, and plugin removal all withdraw the old origin. Never widen
   a connection origin to a host pattern, follow a redirect to one, or let an unapproved origin reach
-  `PluginHttp`. **AudioDrm extensions**: optional `serviceCertificate` (base64, 128–32 768 bytes),
+  `PluginHttp`. **Dolby capability**: `HostEnvironment.dolbyCodecs` reports the decoder MIME names the
+  device advertises (`DolbyCodecs.kt::dolbyCodecsFor`), with `eac3-joc` only for a real Joint Object
+  Coding decoder; providers must require `eac3-joc` before asking for an Atmos tier, because a plain
+  `audio/eac3` decoder (the UGOOS AM6's `OMX.amlogic.audio.decoder.eac3`) plays Dolby Digital Plus
+  without height channels and fails on an Atmos answer. **AudioDrm extensions**: optional
+  `serviceCertificate` (base64, 128–32 768 bytes),
   `multiSession` and a provider-declared `initialization` range whose two public track identifiers are
   applied to exactly that byte range (`PluginDrmInitialization`, format-checked) before Media3 reads
   it; `MusicMediaSourceFactory` routes a server-returned audio DASH manifest through

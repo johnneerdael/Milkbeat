@@ -188,7 +188,11 @@ internal class PluginHostApi(
         )
     }
 
-    /** The device's decodable Dolby codecs (A06), as the stream requests of API 12 plugins echo. */
+    /**
+     * The device's decodable Dolby codecs (A06), as the stream requests of API 12 plugins echo.
+     * `eac3-joc` is reported only for a real Atmos (Joint Object Coding) decoder, so a provider can
+     * ask for the Atmos tier when it is playable and stay on plain E-AC-3 when it is not.
+     */
     private fun outputDolbyCodecs(): List<String> {
         val types =
             MediaCodecList(MediaCodecList.REGULAR_CODECS)
@@ -196,10 +200,7 @@ internal class PluginHostApi(
                 .filterNot { it.isEncoder }
                 .flatMap { it.supportedTypes.asList() }
                 .toSet()
-        return buildList {
-            if ("audio/eac3" in types || "audio/eac3-joc" in types) add("eac3")
-            if ("audio/ac4" in types) add("ac4")
-        }
+        return dolbyCodecsFor(types)
     }
 
     private fun <Request, Response> handler(
