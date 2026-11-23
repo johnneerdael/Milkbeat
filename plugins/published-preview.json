@@ -54,6 +54,19 @@
       "code": "734"
     },
     {
+      "id": "nl.neerdael.eclipse",
+      "name": "Eclipse",
+      "version": "0.1.0",
+      "versionCode": 1,
+      "apiMin": 12,
+      "format": 1,
+      "sha256": "c201bed0ab0e414bb87c6814ca6e8e3320e0052cdee27ba80d79e63f6299ef87",
+      "size": 20475,
+      "fingerprint": "39dca3d132c56262c0873ec96faf22cc8ed9ca30c7ed1f135049f8570b943adc",
+      "contentDigest": "16d0fe53d63983237bb587b4dc354c436c99422fb4cb3c7e4311e118d49cc103",
+      "code": "141"
+    },
+    {
       "id": "nl.neerdael.youtube",
       "name": "YouTube",
       "version": "0.1.6",
