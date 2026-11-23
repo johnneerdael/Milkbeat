@@ -17,7 +17,7 @@ class CookieImportServerTest {
     fun `HTTPS cookie submission requires origin and code and is accepted once`() =
         runBlocking {
             val values = mutableListOf<String>()
-            val server = CookieImportServer("127.0.0.1", "setup") { values.add(it) }
+            val server = CookieImportServer("127.0.0.1", "setup", CookieImportMessages("refused", "invalid", "sent")) { values.add(it) }
             val port = server.start()
             var receivedCertificate: X509Certificate? = null
             val trust =
@@ -49,7 +49,7 @@ class CookieImportServerTest {
                 code: String,
                 cookie: String,
                 originHeader: String,
-            ): Int {
+            ): Pair<Int, String> {
                 val body =
                     FormBody
                         .Builder()
@@ -63,7 +63,7 @@ class CookieImportServerTest {
                         .header("Origin", originHeader)
                         .post(body)
                         .build()
-                return client.newCall(request).execute().use { it.code }
+                return client.newCall(request).execute().use { it.code to it.body.string() }
             }
             try {
                 client.newCall(Request.Builder().url(origin).build()).execute().use {
@@ -72,12 +72,12 @@ class CookieImportServerTest {
                 val digest = MessageDigest.getInstance("SHA-256").digest(receivedCertificate!!.encoded)
                 val actual = digest.joinToString(":") { "%02X".format(it) }
                 assertThat(server.fingerprint).isEqualTo(actual)
-                assertThat(post(server.pairingCode, "12345678901234567890", "https://evil.test")).isEqualTo(403)
-                assertThat(post(server.pairingCode, "12345678901234567890", "null")).isEqualTo(403)
-                assertThat(post("WRONG", "12345678901234567890", origin)).isEqualTo(400)
-                assertThat(post(server.pairingCode, "short", origin)).isEqualTo(400)
-                assertThat(post(server.pairingCode, "sp_dc=12345678901234567890", origin)).isEqualTo(200)
-                assertThat(post(server.pairingCode, "12345678901234567890", origin)).isEqualTo(400)
+                assertThat(post(server.pairingCode, "12345678901234567890", "https://evil.test")).isEqualTo(403 to "refused")
+                assertThat(post(server.pairingCode, "12345678901234567890", "null")).isEqualTo(403 to "refused")
+                assertThat(post("WRONG", "12345678901234567890", origin)).isEqualTo(400 to "invalid")
+                assertThat(post(server.pairingCode, "short", origin)).isEqualTo(400 to "invalid")
+                assertThat(post(server.pairingCode, "sp_dc=12345678901234567890", origin)).isEqualTo(200 to "sent")
+                assertThat(post(server.pairingCode, "12345678901234567890", origin)).isEqualTo(400 to "invalid")
                 assertThat(values).containsExactly("12345678901234567890")
             } finally {
                 server.stop()
