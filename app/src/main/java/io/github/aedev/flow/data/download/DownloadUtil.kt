@@ -38,6 +38,7 @@ import io.github.aedev.flow.plugin.playback.PluginAudio
 import io.github.aedev.flow.plugin.playback.PluginRangePolicy
 import io.github.aedev.flow.plugin.playback.QueuePreparationResult
 import io.github.aedev.flow.plugin.playback.ResolvedAudio
+import io.github.aedev.flow.plugin.playback.acquirePlaybackLease
 import io.github.aedev.flow.plugin.playback.adaptiveCacheKey
 import io.github.aedev.flow.plugin.playback.adaptiveDataSourceFactory
 import io.github.aedev.flow.plugin.playback.cacheIdentity

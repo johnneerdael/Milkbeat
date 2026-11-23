@@ -34,7 +34,7 @@ import javax.inject.Singleton
 
 private const val EXPIRY_MARGIN_MS = 60_000L
 private const val DEFAULT_LIFETIME_MS = 5 * 60 * 60_000L
-private const val ECLIPSE_PLUGIN_ID = "nl.neerdael.eclipse"
+internal const val ECLIPSE_PLUGIN_ID = "nl.neerdael.eclipse"
 
 /**
  * Resolves tracks through the audio providers in the order [audioProviderAttempts] gives. A track no
@@ -47,8 +47,8 @@ private const val ECLIPSE_PLUGIN_ID = "nl.neerdael.eclipse"
 class PluginAudio
     @Inject
     constructor(
-        private val host: PluginHost,
-        private val registry: PluginRegistry,
+        internal val host: PluginHost,
+        internal val registry: PluginRegistry,
         private val matcher: PluginTrackMatcher,
         private val accounts: PluginAccounts,
     ) {
@@ -82,21 +82,13 @@ class PluginAudio
                         .toSet()
                 }.distinctUntilChanged()
 
-        private fun streamContext(): Any = Triple(registry.state.value, accounts.playbackIdentitySnapshot(), accounts.playbackEpoch.value)
+        internal fun streamContext(): Any = Triple(registry.state.value, accounts.playbackIdentitySnapshot(), accounts.playbackEpoch.value)
 
-        private fun nativeContext(pluginId: String): Any =
+        internal fun nativeContext(pluginId: String): Any =
             registry.state.value.plugin(pluginId) to accounts.providerPlaybackContext(pluginId)
 
         private fun ownsNativeSource(audio: ResolvedAudio): Boolean =
             audio.nativeBinding != null && audio.nativeBinding == nativeContext(audio.pluginId)
-
-        internal fun needsQueueMatching(
-            track: TrackDescriptor,
-            preferredProviderId: String? = null,
-        ): Boolean =
-            audioProviderAttempts(registry.state.value, track, preferredProviderId = preferredProviderId)
-                .firstOrNull()
-                ?.let { it.direct == null } ?: false
 
         internal fun preparationVersion(): Any = streamContext() to cacheGeneration.get()
 
@@ -186,43 +178,26 @@ class PluginAudio
                 throw IOException("The accepted playback account or provider changed")
             }
             val state = registry.state.value
-            val providers =
-                audioProviderAttempts(state, track, withPicture = picture != null, preferredProviderId = preferredProviderId)
-                    .filterNot { provider ->
-                        val id = provider.plugin.id
-                        val canRematchEclipse = id == ECLIPSE_PLUGIN_ID && provider.direct == null
-                        !canRematchEclipse && mediaFailures.exhausted(key, id, nativeContext(id))
-                    }
-            val failedProvider = failedAcceptance?.let { audio -> providers.firstOrNull { it.plugin.id == audio.pluginId } }
-            // An Eclipse match identifies the actual add-on and recording. Exhaust that match
-            // before looking for another add-on, without changing the user's provider order.
-            val failedMatch =
-                failedProvider?.takeIf { it.plugin.id == ECLIPSE_PLUGIN_ID && it.direct == null }?.let { failedAcceptance?.track }
-            val excludedEclipseIds = eclipseMatchFailures.exhaustedProviders(key, nativeContext(ECLIPSE_PLUGIN_ID))
-            val pinned =
-                failedAcceptance
-                    ?.track
-                    ?.takeUnless { failedMatch != null && it.ref.providerId in excludedEclipseIds }
-                    ?.let { recording -> failedProvider?.let { AudioProviderAttempt(it.plugin, recording) } }
-                    ?: previous
-                        ?.takeIf {
-                            picture != null || !it.isValidAt(System.currentTimeMillis(), SystemClock.elapsedRealtime()) ||
-                                it.runtimeReceipt?.isCurrent() == false
-                        }?.let { audio ->
-                            providers
-                                .firstOrNull { provider ->
-                                    provider.plugin.id == audio.pluginId &&
-                                        (provider.plugin.id != ECLIPSE_PLUGIN_ID || audio.track.ref.providerId !in excludedEclipseIds)
-                                }?.let { AudioProviderAttempt(it.plugin, audio.track) }
-                        }
-            val recoveryFirst = pinned ?: failedProvider?.takeIf { failedMatch != null }
-            val attempts =
-                when {
-                    recoveryFirst == null -> providers
-                    picture != null && !protocolRecovery -> listOf(recoveryFirst)
-                    else -> listOf(recoveryFirst) + providers.filterNot { it.plugin.id == recoveryFirst.plugin.id }
-                }
-            val order = (if (picture != null) attempts else providers).map { "${it.plugin.id}:${it.plugin.manifest.versionCode}" }
+            val routing =
+                playbackAttemptRouting(
+                    key,
+                    state,
+                    track,
+                    picture,
+                    preferredProviderId,
+                    failedAcceptance,
+                    previous,
+                    protocolRecovery,
+                    mediaFailures,
+                    eclipseMatchFailures,
+                    ::nativeContext,
+                )
+            val providers = routing.providers
+            val attempts = routing.attempts
+            val recoveryFirst = routing.recoveryFirst
+            val failedMatch = routing.failedMatch
+            val excludedEclipseIds = routing.excludedEclipseIds
+            val order = routing.order
             resolved[key]
                 ?.takeIf {
                     it.coversResolution(
@@ -476,42 +451,7 @@ class PluginAudio
             )
         }
 
-        internal fun verifyBound(audio: ResolvedAudio) {
-            if (audio.runtimeReceipt?.isCurrent() == false) throw PluginPlaybackSessionLost()
-            if (audio.nativeBinding?.let { it != nativeContext(audio.pluginId) }
-                ?: (audio.preparationContext != null && audio.preparationContext != streamContext())
-            ) {
-                throw IOException("The accepted playback account or provider changed")
-            }
-        }
-
-        internal suspend fun acquirePlaybackLease(audio: ResolvedAudio): PluginPlaybackLease {
-            verifyBound(audio)
-            val held = host.playbackLease(audio.pluginId)
-            try {
-                audio.runtimeReceipt?.let(held::verify)
-                verifyBound(audio)
-                return held
-            } catch (error: Throwable) {
-                held.close()
-                throw error
-            }
-        }
-
         internal fun playbackGrants(pluginId: String): List<String> = registry.state.value.grantedHosts(pluginId)
-
-        /** How the first audio plugin that would play [track] delivers its streams. */
-        fun deliveryFor(
-            track: TrackDescriptor,
-            preferredProviderId: String? = null,
-        ): AudioDelivery =
-            audioProviderAttempts(registry.state.value, track, preferredProviderId = preferredProviderId)
-                .firstOrNull()
-                ?.plugin
-                ?.manifest
-                ?.roles
-                ?.audio
-                ?.delivery ?: AudioDelivery.PROGRESSIVE
 
         fun knownAliases(track: TrackDescriptor): Set<String> {
             val native = resolved[track.audioIdentity()]?.track ?: return emptySet()
