@@ -11,11 +11,9 @@ import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
-import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.exoplayer.analytics.AnalyticsListener
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.session.MediaLibraryService
 import androidx.media3.session.MediaNotification
@@ -41,10 +39,8 @@ import io.github.aedev.flow.player.audio.eq.EqualizerAudioProcessor
 import io.github.aedev.flow.player.audio.shouldHandleAudioFocus
 import io.github.aedev.flow.player.audio.shouldOffloadAudio
 import io.github.aedev.flow.player.audio.visualizer.VisualizerAudioTap
-import io.github.aedev.flow.player.audio.visualizer.VisualizerClockListener
 import io.github.aedev.flow.player.audio.visualizer.VisualizerEngine
 import io.github.aedev.flow.player.audio.visualizer.VisualizerTapProcessor
-import io.github.aedev.flow.player.audio.visualizer.followPlayerClock
 import io.github.aedev.flow.player.diagnostics.PlaybackOutputTrace
 import io.github.aedev.flow.player.factory.LoadControlFactory
 import io.github.aedev.flow.player.musicAudioQualityState
@@ -98,6 +94,8 @@ class Media3MusicService : MediaLibraryService() {
     internal val outputRecoveryActive: Boolean get() = ::outputRecovery.isInitialized && outputRecovery.isRecovering
     internal val outputFailureHeld: Boolean get() = ::outputRecovery.isInitialized && outputRecovery.hasOutputFailure
     internal val playerInitialized: Boolean get() = ::player.isInitialized
+    internal val outputRecoveryReady: Boolean get() = ::outputRecovery.isInitialized
+    internal val pluginAudioReady: Boolean get() = ::pluginAudio.isInitialized
     internal val sessionInitialized: Boolean get() = ::mediaLibrarySession.isInitialized
     private val musicSession by lazy { MusicServiceSession(this) }
 
@@ -389,19 +387,6 @@ class Media3MusicService : MediaLibraryService() {
         io.github.aedev.flow.player.musicVideoJoinGate
             .bind(player)
         player.addAnalyticsListener(PlaybackOutputTrace(audioOutputProbe))
-        audioStartGate =
-            io.github.aedev.flow.player.audio
-                .MusicAudioStartGate(
-                    player,
-                    lifecycleScope,
-                    ::failOverSilentStart,
-                    onHoldChanged = {
-                        if (::outputRecovery.isInitialized) outputRecovery.reportedPlayer.refreshAudioHold()
-                    },
-                ).also {
-                    player.addAnalyticsListener(it)
-                    player.addListener(it)
-                }
         observeAudioQuality()
         player.trackSelectionParameters =
             player.trackSelectionParameters
@@ -416,17 +401,7 @@ class Media3MusicService : MediaLibraryService() {
 
         player.setOffloadEnabled(shouldOffloadAudio(isTv, equalizerRepository.needsProcessing.value))
         initializeOutputRecovery()
-        accountHistoryListener =
-            MusicAccountHistoryListener(
-                sessionPlayer,
-                lifecycleScope,
-                ::resolveLearnTrack,
-                accountPlayHistory::reportProgress,
-                lifecycleReporter = ::reportsListenLifecycle,
-                confirmedAudio = { mediaId -> audioStartGate?.confirmed(mediaId) == true },
-            )
-        sessionPlayer.addListener(VisualizerClockListener(visualizerTap))
-        lifecycleScope.launch { followPlayerClock(visualizerTap, sessionPlayer) }
+        installPlaybackMonitoring()
         // Stream URLs belong to the identity that requested them; a sign-in or sign-out starts fresh.
         lifecycleScope.launch { pluginAccounts.accounts.drop(1).collect { downloadUtil.clearUrlCache() } }
 
@@ -534,19 +509,6 @@ class Media3MusicService : MediaLibraryService() {
                 }
             },
         )
-
-        // The item that failed is not always the current one: a next-item preload can fail while
-        // the previous track still plays. Only EventTime names the window that actually broke.
-        player.addAnalyticsListener(
-            object : AnalyticsListener {
-                override fun onPlayerError(
-                    eventTime: AnalyticsListener.EventTime,
-                    error: PlaybackException,
-                ) {
-                    handlePlayerError(error, eventTime.windowIndex)
-                }
-            },
-        )
     }
 
     // ── Listen-session accounting (feeds MusicBrainEngine) ──
@@ -555,12 +517,6 @@ class Media3MusicService : MediaLibraryService() {
     // device with a former seekTo(0)-on-transition). Wall-clock time while isPlaying is
     // pause-free and seek-immune; a repeat loop finalizes and restarts a session,
     // so relistens still count once each.
-
-    /** Whether this item's provider takes API 12 listen-lifecycle reports instead of cadence samples. */
-    internal fun reportsListenLifecycle(mediaId: String): Boolean {
-        if (!::pluginAudio.isInitialized) return false
-        return pluginAudio.current(mediaId)?.let(pluginAudio::reportsListenLifecycle) == true
-    }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaLibrarySession? = mediaLibrarySession
 
