@@ -64,6 +64,20 @@ says the old plugin can be removed:
 Private YouTube copies of Spotify playlists that YouTube Music prepared stay in your YouTube
 library and show in Milkbeat's Library like your other playlists.
 
+## Spotify sign-in on older TV WebViews
+
+If the TV cannot isolate its web sign-in, Milkbeat automatically offers a secure setup page instead.
+On a computer on the same network, open the HTTPS address shown on the TV. The certificate is
+created for this setup session, so the browser will display a security warning. Before proceeding,
+inspect the certificate and compare its SHA-256 fingerprint with the value shown on the TV. If the
+fingerprints differ, do not enter your cookie.
+
+Sign in at [Spotify Web Player](https://open.spotify.com/), open the browser developer tools and
+find **Application** or **Storage → Cookies → https://open.spotify.com**. Copy the value of
+**sp_dc**, then paste it and the TV pairing code into the setup page. Milkbeat checks the session
+with Spotify and shows the result on the TV. The page closes on completion, cancellation or after
+ten minutes. Treat the cookie like a password; anyone possessing it can access your Spotify session.
+
 ## Deezer
 
 **Deezer 0.2.1** provides Home with Flow, mixes and channels, Search, artist, album and playlist
@@ -114,8 +128,9 @@ specific to the approved add-on. The first-party Eclipse API alone receives your
 ### Quality and playback
 
 Eclipse uses your quality setting and classifies what the add-on actually returns. For Cloud, Auto
-and High can request Atmos when the TV reports a compatible Dolby output, then try Hi-Res and CD
-lossless if Atmos is refused. Clear and licensed Widevine HLS and DASH play through Milkbeat's
+and High can request Atmos when the TV reports an Atmos decoder of its own (E-AC-3 with Joint Object
+Coding), then try Hi-Res and CD lossless if Atmos is refused. A TV whose Dolby decoder handles plain
+Dolby Digital Plus does not take the Atmos tier. Clear and licensed Widevine HLS and DASH play through Milkbeat's
 player. A receiver or soundbar shows Atmos when the TV passes the stream through. The now-playing
 line reports the source encoding separately from the actual output.
 

@@ -132,9 +132,11 @@ data class HostEnvironment(
     val osVersion: String? = null,
     val deviceModel: String? = null,
     /**
-     * Dolby codecs this device can decode and pass to the active output, as MIME-independent names
-     * (`eac3`, `ac4`; plugin API 12). Empty when none are supported. Providers echo these in their
-     * stream requests instead of assuming device capability.
+     * Dolby codecs this device can decode and pass to the active output, as codec names (`eac3`,
+     * `eac3-joc` for Atmos over E-AC-3, `ac4`; plugin API 12). Empty when none are supported.
+     * Providers echo these in their stream requests instead of assuming device capability, and must
+     * require `eac3-joc` before asking for an Atmos tier: a plain `eac3` decoder plays Dolby Digital
+     * Plus without the height channels.
      */
     val dolbyCodecs: List<String> = emptyList(),
 )

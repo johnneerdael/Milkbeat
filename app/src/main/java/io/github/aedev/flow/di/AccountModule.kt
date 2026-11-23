@@ -8,6 +8,7 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import io.github.aedev.flow.R
+import io.github.aedev.flow.data.account.signin.CookieImportServer
 import io.github.aedev.flow.data.account.signin.PhoneChannel
 import io.github.aedev.flow.data.account.signin.PhoneFrame
 import io.github.aedev.flow.data.account.signin.PhoneInput
@@ -16,6 +17,7 @@ import io.github.aedev.flow.data.account.signin.PhoneStatus
 import io.github.aedev.flow.plugin.host.AndroidMicroGAccountGateway
 import io.github.aedev.flow.plugin.host.MicroGAccountGateway
 import io.github.aedev.flow.sync.transport.LanAddress
+import io.github.aedev.flow.ui.screens.account.CookieServerHandle
 import io.github.aedev.flow.ui.screens.account.LanAddressProvider
 import io.github.aedev.flow.ui.screens.account.PhoneServerHandle
 import io.github.aedev.flow.ui.screens.account.PhoneServerLauncher
@@ -36,6 +38,32 @@ object AccountModule {
         @ApplicationContext context: Context,
     ): PhoneServerLauncher =
         object : PhoneServerLauncher {
+            override suspend fun launchCookie(
+                host: String,
+                onCookie: (String) -> Unit,
+            ): CookieServerHandle {
+                val page =
+                    context.assets
+                        .open("account-signin/cookie.html")
+                        .bufferedReader()
+                        .use { it.readText() }
+                val server = CookieImportServer(host, page, onCookie)
+                val boundPort =
+                    try {
+                        withContext(Dispatchers.IO) { server.start() }
+                    } catch (error: Exception) {
+                        server.stop()
+                        throw error
+                    }
+                return object : CookieServerHandle {
+                    override val port = boundPort
+                    override val pairingCode = server.pairingCode
+                    override val fingerprint = server.fingerprint
+
+                    override fun stop() = server.stop()
+                }
+            }
+
             override suspend fun launch(
                 channel: PhoneChannel,
                 host: String,

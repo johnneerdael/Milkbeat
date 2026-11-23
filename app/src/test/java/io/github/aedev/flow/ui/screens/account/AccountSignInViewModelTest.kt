@@ -77,12 +77,30 @@ class AccountSignInViewModelTest {
     private val registry = mockk<PluginRegistry> { every { state } returns installed }
     private val accounts =
         mockk<PluginAccounts> { coEvery { complete(any(), any()) } returns ProviderAccount.SignedIn(key = "k", name = "Test User") }
+    private var onCookie: ((String) -> Unit)? = null
     private var launches = 0
     private var stops = 0
     private var lastStatus: () -> PhoneStatus = { PhoneStatus("") }
     private var lastFrame: suspend () -> PhoneFrame? = { null }
     private val launcher =
         object : PhoneServerLauncher {
+            override suspend fun launchCookie(
+                host: String,
+                onCookie: (String) -> Unit,
+            ): CookieServerHandle {
+                launches++
+                this@AccountSignInViewModelTest.onCookie = onCookie
+                return object : CookieServerHandle {
+                    override val port = 4321
+                    override val pairingCode = "ABC123"
+                    override val fingerprint = "SHA256"
+
+                    override fun stop() {
+                        stops++
+                    }
+                }
+            }
+
             override suspend fun launch(
                 channel: PhoneChannel,
                 host: String,
@@ -136,6 +154,30 @@ class AccountSignInViewModelTest {
             advanceUntilIdle()
             assertThat(vm.state.value).isEqualTo(AccountSignInState.Unsupported)
             assertThat(launches).isEqualTo(0)
+        }
+
+    @Test
+    fun `Spotify without profiles offers cookie setup and submits to plugin`() =
+        runTest(dispatcher) {
+            val spotifyMethod = method.copy(id = "spotify", cookieUrl = "https://open.spotify.com/", requiredCookies = listOf("sp_dc"))
+            val spotify = plugin.copy(manifest = plugin.manifest.copy(id = "nl.neerdael.spotify", signIn = listOf(spotifyMethod)))
+            installed.value = PluginRegistryState(plugins = listOf(spotify))
+            val vm =
+                AccountSignInViewModel(
+                    SavedStateHandle(mapOf(PLUGIN_ARG to spotify.id, METHOD_ARG to "spotify")),
+                    registry,
+                    accounts,
+                    { "192.168.50.101" },
+                    launcher,
+                )
+            vm.start(loginSupported = false)
+            runCurrent()
+            assertThat(vm.state.value).isEqualTo(AccountSignInState.CookieReady("https://192.168.50.101:4321/", "ABC123", "SHA256"))
+            onCookie?.invoke("valid-cookie")
+            advanceUntilIdle()
+            coVerify { accounts.complete(spotify.id, WebLoginResult("spotify", "sp_dc=valid-cookie")) }
+            assertThat(vm.state.value).isEqualTo(AccountSignInState.SignedIn("Test User"))
+            assertThat(stops).isEqualTo(1)
         }
 
     @Test
