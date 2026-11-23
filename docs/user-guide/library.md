@@ -67,7 +67,7 @@ Each provider brings its own filter chips and suggestions, and a chip only ever 
 
 YouTube offers YouTube Music's Songs, Videos, Albums, Artists, Featured and Community playlists; Beatport offers Tracks, Releases, Artists, Labels, Charts and Playlists. **Local library** searches song titles, artists, albums and artist names in your folders; while you type it suggests only matching recent searches, with no provider suggestions. Opening a result uses the page for its type, on the provider of its chip.
 
-To return to the player, close the on-screen keyboard, then press **Down** through Search to the bottom Now Playing strip. Press **OK** on the track.
+Search results stay above the on-screen keyboard while you type. Submit from the keyboard (or press **Back** to close it) and focus returns to the page; press **Down** through the results to the bottom Now Playing strip, then **OK** on the track to reopen the player.
 
 ## Library
 
