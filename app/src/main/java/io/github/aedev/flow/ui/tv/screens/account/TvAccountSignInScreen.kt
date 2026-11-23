@@ -99,7 +99,12 @@ fun TvAccountSignInScreen(
         }
     }
 
-    TvScreenScaffold(title = stringResource(if (state is AccountSignInState.CookieReady) R.string.tv_spotify_cookie_title else R.string.tv_account_sign_in_title)) {
+    TvScreenScaffold(
+        title =
+            stringResource(
+                if (state is AccountSignInState.CookieReady) R.string.tv_spotify_cookie_title else R.string.tv_account_sign_in_title,
+            ),
+    ) {
         Row(
             modifier = Modifier.fillMaxSize().padding(horizontal = LocalTvDimens.current.overscanHorizontal),
             horizontalArrangement = Arrangement.spacedBy(32.dp),

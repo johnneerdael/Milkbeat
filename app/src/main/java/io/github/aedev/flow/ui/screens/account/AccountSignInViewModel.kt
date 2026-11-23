@@ -56,7 +56,10 @@ interface CookieServerHandle : PhoneServerHandle {
 }
 
 interface PhoneServerLauncher {
-    suspend fun launchCookie(host: String, onCookie: (String) -> Unit): CookieServerHandle = throw IOException("Cookie sign-in unavailable")
+    suspend fun launchCookie(
+        host: String,
+        onCookie: (String) -> Unit,
+    ): CookieServerHandle = throw IOException("Cookie sign-in unavailable")
 
     suspend fun launch(
         channel: PhoneChannel,
@@ -145,6 +148,8 @@ class AccountSignInViewModel
         private var channel: PhoneChannel? = null
         private var server: PhoneServerHandle? = null
         private var timeoutJob: Job? = null
+        private var startupJob: Job? = null
+        private var completionJob: Job? = null
 
         @Volatile private var step = ""
 
@@ -163,7 +168,7 @@ class AccountSignInViewModel
         }
 
         fun start(loginSupported: Boolean) {
-            if (_state.value != AccountSignInState.Starting || channel != null) return
+            if (_state.value != AccountSignInState.Starting || channel != null || startupJob?.isActive == true) return
             val current = method
             if (current == null || (!loginSupported && !supportsCookieFallback(current))) {
                 _state.value = AccountSignInState.Unsupported
@@ -179,32 +184,36 @@ class AccountSignInViewModel
                     _state.value = AccountSignInState.NoNetwork
                     return
                 }
-                viewModelScope.launch {
-                    val handle = try {
-                        launcher.launchCookie(host) { cookie ->
-                            if (_state.value is AccountSignInState.CookieReady && !completing && method == current) {
-                                onCaptured(WebLoginResult(method = current.id, cookies = "sp_dc=$cookie"))
+                startupJob =
+                    viewModelScope.launch {
+                        val handle =
+                            try {
+                                launcher.launchCookie(host) { cookie ->
+                                    if (_state.value is AccountSignInState.CookieReady && !completing && method == current) {
+                                        onCaptured(WebLoginResult(method = current.id, cookies = "sp_dc=$cookie"))
+                                    }
+                                }
+                            } catch (e: CancellationException) {
+                                throw e
+                            } catch (e: Exception) {
+                                Log.w(TAG, "Cookie sign-in server could not start", e)
+                                _state.value = AccountSignInState.SecureSetupFailed
+                                return@launch
                             }
+                        if (_state.value != AccountSignInState.Starting || method != current) {
+                            handle.stop()
+                            return@launch
                         }
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (e: Exception) {
-                        Log.w(TAG, "Cookie sign-in server could not start", e)
-                        _state.value = AccountSignInState.SecureSetupFailed
-                        return@launch
+                        server = handle
+                        val url = "https://$host:${handle.port}/"
+                        _state.value = AccountSignInState.CookieReady(url, handle.pairingCode, handle.fingerprint)
+                        timeoutJob =
+                            launch {
+                                delay(SIGN_IN_TIMEOUT_MS)
+                                _state.value = AccountSignInState.TimedOut
+                                stopServer()
+                            }
                     }
-                    if (_state.value != AccountSignInState.Starting || method != current) {
-                        handle.stop()
-                        return@launch
-                    }
-                    server = handle
-                    _state.value = AccountSignInState.CookieReady("https://$host:${handle.port}/", handle.pairingCode, handle.fingerprint)
-                    timeoutJob = launch {
-                        delay(SIGN_IN_TIMEOUT_MS)
-                        _state.value = AccountSignInState.TimedOut
-                        stopServer()
-                    }
-                }
                 return
             }
             val phoneChannel = PhoneChannel.create().also { channel = it }
@@ -248,23 +257,27 @@ class AccountSignInViewModel
         }
 
         fun onCaptured(result: WebLoginResult) {
-            viewModelScope.launch {
-                completing = true
-                timeoutJob?.cancel()
-                val next =
-                    try {
-                        AccountSignInState.SignedIn((accounts.complete(pluginId, result) as? ProviderAccount.SignedIn)?.name)
-                    } catch (e: PluginCallException) {
-                        AccountSignInState.Failed(e.error.userMessage ?: e.error.message)
-                    }
-                done = next is AccountSignInState.SignedIn
-                delay(STATUS_GRACE_MS)
-                stopServer()
-                _state.value = next
-            }
+            if (completing) return
+            completing = true
+            completionJob =
+                viewModelScope.launch {
+                    timeoutJob?.cancel()
+                    val next =
+                        try {
+                            AccountSignInState.SignedIn((accounts.complete(pluginId, result) as? ProviderAccount.SignedIn)?.name)
+                        } catch (e: PluginCallException) {
+                            AccountSignInState.Failed(e.error.userMessage ?: e.error.message)
+                        }
+                    done = next is AccountSignInState.SignedIn
+                    delay(STATUS_GRACE_MS)
+                    stopServer()
+                    _state.value = next
+                }
         }
 
         fun retry() {
+            completionJob?.cancel()
+            completionJob = null
             stopServer()
             done = false
             completing = false
@@ -290,6 +303,8 @@ class AccountSignInViewModel
         }
 
         private fun stopServer() {
+            startupJob?.cancel()
+            startupJob = null
             timeoutJob?.cancel()
             timeoutJob = null
             server?.stop()

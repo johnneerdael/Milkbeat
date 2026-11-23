@@ -33,18 +33,23 @@ internal class CookieImportTls(
             val subject = X500Principal("CN=Milkbeat sign-in")
             val certificate =
                 JcaX509v3CertificateBuilder(
-                    subject, BigInteger(159, SecureRandom()).setBit(158), Date.from(now.minus(5, ChronoUnit.MINUTES)),
-                    Date.from(now.plus(1, ChronoUnit.DAYS)), subject, key.public,
+                    subject,
+                    BigInteger(159, SecureRandom()).setBit(158),
+                    Date.from(now.minus(5, ChronoUnit.MINUTES)),
+                    Date.from(now.plus(1, ChronoUnit.DAYS)),
+                    subject,
+                    key.public,
                 ).apply {
                     addExtension(Extension.basicConstraints, true, BasicConstraints(false))
                     addExtension(Extension.subjectAlternativeName, false, GeneralNames(GeneralName(GeneralName.iPAddress, host)))
                 }.build(JcaContentSignerBuilder("SHA256withECDSA").build(key.private))
             val leaf = CertificateFactory.getInstance("X.509").generateCertificate(certificate.encoded.inputStream())
             val password = ByteArray(24).also(SecureRandom()::nextBytes).joinToString("") { "%02x".format(it) }.toCharArray()
-            val store = KeyStore.getInstance("PKCS12").apply {
-                load(null, null)
-                setKeyEntry(ALIAS, key.private, password, arrayOf(leaf))
-            }
+            val store =
+                KeyStore.getInstance("PKCS12").apply {
+                    load(null, null)
+                    setKeyEntry(ALIAS, key.private, password, arrayOf(leaf))
+                }
             val fingerprint = MessageDigest.getInstance("SHA-256").digest(leaf.encoded).joinToString(":") { "%02X".format(it) }
             return CookieImportTls(store, password, fingerprint)
         }

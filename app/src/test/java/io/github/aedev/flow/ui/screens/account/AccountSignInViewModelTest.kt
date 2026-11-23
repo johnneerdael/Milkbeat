@@ -84,14 +84,20 @@ class AccountSignInViewModelTest {
     private var lastFrame: suspend () -> PhoneFrame? = { null }
     private val launcher =
         object : PhoneServerLauncher {
-            override suspend fun launchCookie(host: String, onCookie: (String) -> Unit): CookieServerHandle {
+            override suspend fun launchCookie(
+                host: String,
+                onCookie: (String) -> Unit,
+            ): CookieServerHandle {
                 launches++
                 this@AccountSignInViewModelTest.onCookie = onCookie
                 return object : CookieServerHandle {
                     override val port = 4321
                     override val pairingCode = "ABC123"
                     override val fingerprint = "SHA256"
-                    override fun stop() { stops++ }
+
+                    override fun stop() {
+                        stops++
+                    }
                 }
             }
 
@@ -156,9 +162,14 @@ class AccountSignInViewModelTest {
             val spotifyMethod = method.copy(id = "spotify", cookieUrl = "https://open.spotify.com/", requiredCookies = listOf("sp_dc"))
             val spotify = plugin.copy(manifest = plugin.manifest.copy(id = "nl.neerdael.spotify", signIn = listOf(spotifyMethod)))
             installed.value = PluginRegistryState(plugins = listOf(spotify))
-            val vm = AccountSignInViewModel(
-                SavedStateHandle(mapOf(PLUGIN_ARG to spotify.id, METHOD_ARG to "spotify")), registry, accounts, { "192.168.50.101" }, launcher,
-            )
+            val vm =
+                AccountSignInViewModel(
+                    SavedStateHandle(mapOf(PLUGIN_ARG to spotify.id, METHOD_ARG to "spotify")),
+                    registry,
+                    accounts,
+                    { "192.168.50.101" },
+                    launcher,
+                )
             vm.start(loginSupported = false)
             runCurrent()
             assertThat(vm.state.value).isEqualTo(AccountSignInState.CookieReady("https://192.168.50.101:4321/", "ABC123", "SHA256"))

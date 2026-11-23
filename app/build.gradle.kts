@@ -168,6 +168,8 @@ android {
             useLegacyPackaging = true
         }
         resources {
+            // Netty ships one properties file per module; keep all module version entries.
+            merges += "/META-INF/io.netty.versions.properties"
             excludes +=
                 listOf(
                     "/META-INF/{AL2.0,LGPL2.1}",

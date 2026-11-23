@@ -38,42 +38,58 @@ internal class CookieImportServer(
     suspend fun start(): Int {
         val tls = CookieImportTls.create(host)
         fingerprint = tls.fingerprint
-        val engine = embeddedServer(Netty, configure = {
-            sslConnector(tls.store, CookieImportTls.ALIAS, { tls.password }, { tls.password }) {
-                this.host = this@CookieImportServer.host
-                port = 0
-            }
-        }) {
-            routing {
-                get("/") {
-                    call.secureHeaders()
-                    call.respondText(page, ContentType.Text.Html)
+        val engine =
+            embeddedServer(Netty, configure = {
+                // Android 9's platform TLS lacks Netty's JDK ALPN support; setup only needs HTTP/1.1.
+                enableHttp2 = false
+                sslConnector(tls.store, CookieImportTls.ALIAS, { tls.password }, { tls.password }) {
+                    this.host = this@CookieImportServer.host
+                    port = 0
                 }
-                post("/submit") {
-                    call.secureHeaders()
-                    val expected = "https://$host:$port"
-                    val length = call.request.headers[HttpHeaders.ContentLength]?.toLongOrNull()
-                    if (call.request.headers[HttpHeaders.Origin] != expected || length == null || length !in 1..8192 || attempts.incrementAndGet() > 10) {
-                        call.respondText("Request refused.", status = HttpStatusCode.Forbidden)
-                        return@post
+            }) {
+                routing {
+                    get("/") {
+                        call.secureHeaders()
+                        call.respondText(page, ContentType.Text.Html)
                     }
-                    val form = call.receiveParameters()
-                    val code = form["code"].orEmpty().trim().uppercase()
-                    val value = form["cookie"].orEmpty().trim().removePrefix("sp_dc=").substringBefore(';').trim().trim('"')
-                    if (!MessageDigest.isEqual(code.toByteArray(), pairingCode.toByteArray()) ||
-                        value.length !in 20..4096 || value.any { it <= ' ' || it == ';' || it == ',' } || !used.compareAndSet(false, true)
-                    ) {
-                        call.respondText("Check the pairing code and cookie, then try again.", status = HttpStatusCode.BadRequest)
-                        return@post
+                    post("/submit") {
+                        call.secureHeaders()
+                        val expected = "https://$host:$port"
+                        val length = call.request.headers[HttpHeaders.ContentLength]?.toLongOrNull()
+                        if (call.request.headers[HttpHeaders.Origin] != expected || length == null ||
+                            length !in 1..8192 || attempts.incrementAndGet() > 10
+                        ) {
+                            call.respondText("Request refused.", status = HttpStatusCode.Forbidden)
+                            return@post
+                        }
+                        val form = call.receiveParameters()
+                        val code = form["code"].orEmpty().trim().uppercase()
+                        val value =
+                            form["cookie"]
+                                .orEmpty()
+                                .trim()
+                                .removePrefix("sp_dc=")
+                                .substringBefore(';')
+                                .trim()
+                                .trim('"')
+                        val invalidCookie = value.length !in 20..4096 || value.any { it <= ' ' || it == ';' || it == ',' }
+                        val wrongCode = !MessageDigest.isEqual(code.toByteArray(), pairingCode.toByteArray())
+                        if (wrongCode || invalidCookie || !used.compareAndSet(false, true)) {
+                            call.respondText("Check the pairing code and cookie, then try again.", status = HttpStatusCode.BadRequest)
+                            return@post
+                        }
+                        submit(value)
+                        call.respondText("Sent to Milkbeat. Check the TV for the result.")
                     }
-                    submit(value)
-                    call.respondText("Sent to Milkbeat. Check the TV for the result.")
                 }
             }
-        }
         try {
             engine.start(wait = false)
-            port = engine.engine.resolvedConnectors().first().port
+            port =
+                engine.engine
+                    .resolvedConnectors()
+                    .first()
+                    .port
             server = engine
             return port
         } catch (error: Exception) {
@@ -90,8 +106,11 @@ internal class CookieImportServer(
 
     private fun ApplicationCall.secureHeaders() {
         response.header(HttpHeaders.CacheControl, "no-store")
-        response.header("Referrer-Policy", "no-referrer")
+        response.header("Referrer-Policy", "same-origin")
         response.header("X-Content-Type-Options", "nosniff")
-        response.header("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'")
+        response.header(
+            "Content-Security-Policy",
+            "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'",
+        )
     }
 }

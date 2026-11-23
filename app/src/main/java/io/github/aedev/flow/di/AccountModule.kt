@@ -38,19 +38,28 @@ object AccountModule {
         @ApplicationContext context: Context,
     ): PhoneServerLauncher =
         object : PhoneServerLauncher {
-            override suspend fun launchCookie(host: String, onCookie: (String) -> Unit): CookieServerHandle {
-                val page = context.assets.open("account-signin/cookie.html").bufferedReader().use { it.readText() }
+            override suspend fun launchCookie(
+                host: String,
+                onCookie: (String) -> Unit,
+            ): CookieServerHandle {
+                val page =
+                    context.assets
+                        .open("account-signin/cookie.html")
+                        .bufferedReader()
+                        .use { it.readText() }
                 val server = CookieImportServer(host, page, onCookie)
-                val boundPort = try {
-                    withContext(Dispatchers.IO) { server.start() }
-                } catch (error: Exception) {
-                    server.stop()
-                    throw error
-                }
+                val boundPort =
+                    try {
+                        withContext(Dispatchers.IO) { server.start() }
+                    } catch (error: Exception) {
+                        server.stop()
+                        throw error
+                    }
                 return object : CookieServerHandle {
                     override val port = boundPort
                     override val pairingCode = server.pairingCode
                     override val fingerprint = server.fingerprint
+
                     override fun stop() = server.stop()
                 }
             }
