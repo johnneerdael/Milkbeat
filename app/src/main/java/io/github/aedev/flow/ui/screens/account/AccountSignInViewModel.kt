@@ -14,6 +14,7 @@ import io.github.aedev.flow.plugin.catalog.PluginAccounts
 import io.github.aedev.flow.plugin.registry.PluginRegistry
 import io.github.aedev.flow.plugin.registry.PluginRegistryState
 import io.github.aedev.flow.plugin.runtime.PluginCallException
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
@@ -31,6 +32,7 @@ import nl.neerdael.milkbeat.plugin.SignInMethod
 import nl.neerdael.milkbeat.plugin.WebLoginMethod
 import nl.neerdael.milkbeat.plugin.WebLoginResult
 import java.io.IOException
+import java.net.InetAddress
 import javax.inject.Inject
 
 /** Navigation arguments of the sign-in route. */
@@ -48,7 +50,17 @@ interface PhoneServerHandle {
     fun stop()
 }
 
+interface CookieServerHandle : PhoneServerHandle {
+    val pairingCode: String
+    val fingerprint: String
+}
+
 interface PhoneServerLauncher {
+    suspend fun launchCookie(
+        host: String,
+        onCookie: (String) -> Unit,
+    ): CookieServerHandle = throw IOException("Cookie sign-in unavailable")
+
     suspend fun launch(
         channel: PhoneChannel,
         host: String,
@@ -65,7 +77,15 @@ sealed interface AccountSignInState {
         val phoneUrl: String,
     ) : AccountSignInState
 
+    data class CookieReady(
+        val url: String,
+        val pairingCode: String,
+        val fingerprint: String,
+    ) : AccountSignInState
+
     data object NoNetwork : AccountSignInState
+
+    data object SecureSetupFailed : AccountSignInState
 
     data object Unsupported : AccountSignInState
 
@@ -128,6 +148,8 @@ class AccountSignInViewModel
         private var channel: PhoneChannel? = null
         private var server: PhoneServerHandle? = null
         private var timeoutJob: Job? = null
+        private var startupJob: Job? = null
+        private var completionJob: Job? = null
 
         @Volatile private var step = ""
 
@@ -146,14 +168,52 @@ class AccountSignInViewModel
         }
 
         fun start(loginSupported: Boolean) {
-            if (_state.value != AccountSignInState.Starting || channel != null) return
-            if (!loginSupported || method == null) {
+            if (_state.value != AccountSignInState.Starting || channel != null || startupJob?.isActive == true) return
+            val current = method
+            if (current == null || (!loginSupported && !supportsCookieFallback(current))) {
                 _state.value = AccountSignInState.Unsupported
                 return
             }
             val host = lan.resolve()
             if (host == null) {
                 _state.value = AccountSignInState.NoNetwork
+                return
+            }
+            if (!loginSupported) {
+                if (runCatching { !InetAddress.getByName(host).isSiteLocalAddress }.getOrDefault(true)) {
+                    _state.value = AccountSignInState.NoNetwork
+                    return
+                }
+                startupJob =
+                    viewModelScope.launch {
+                        val handle =
+                            try {
+                                launcher.launchCookie(host) { cookie ->
+                                    if (_state.value is AccountSignInState.CookieReady && !completing && method == current) {
+                                        onCaptured(WebLoginResult(method = current.id, cookies = "sp_dc=$cookie"))
+                                    }
+                                }
+                            } catch (e: CancellationException) {
+                                throw e
+                            } catch (e: Exception) {
+                                Log.w(TAG, "Cookie sign-in server could not start", e)
+                                _state.value = AccountSignInState.SecureSetupFailed
+                                return@launch
+                            }
+                        if (_state.value != AccountSignInState.Starting || method != current) {
+                            handle.stop()
+                            return@launch
+                        }
+                        server = handle
+                        val url = "https://$host:${handle.port}/"
+                        _state.value = AccountSignInState.CookieReady(url, handle.pairingCode, handle.fingerprint)
+                        timeoutJob =
+                            launch {
+                                delay(SIGN_IN_TIMEOUT_MS)
+                                _state.value = AccountSignInState.TimedOut
+                                stopServer()
+                            }
+                    }
                 return
             }
             val phoneChannel = PhoneChannel.create().also { channel = it }
@@ -197,23 +257,27 @@ class AccountSignInViewModel
         }
 
         fun onCaptured(result: WebLoginResult) {
-            viewModelScope.launch {
-                completing = true
-                timeoutJob?.cancel()
-                val next =
-                    try {
-                        AccountSignInState.SignedIn((accounts.complete(pluginId, result) as? ProviderAccount.SignedIn)?.name)
-                    } catch (e: PluginCallException) {
-                        AccountSignInState.Failed(e.error.userMessage ?: e.error.message)
-                    }
-                done = next is AccountSignInState.SignedIn
-                delay(STATUS_GRACE_MS)
-                stopServer()
-                _state.value = next
-            }
+            if (completing) return
+            completing = true
+            completionJob =
+                viewModelScope.launch {
+                    timeoutJob?.cancel()
+                    val next =
+                        try {
+                            AccountSignInState.SignedIn((accounts.complete(pluginId, result) as? ProviderAccount.SignedIn)?.name)
+                        } catch (e: PluginCallException) {
+                            AccountSignInState.Failed(e.error.userMessage ?: e.error.message)
+                        }
+                    done = next is AccountSignInState.SignedIn
+                    delay(STATUS_GRACE_MS)
+                    stopServer()
+                    _state.value = next
+                }
         }
 
         fun retry() {
+            completionJob?.cancel()
+            completionJob = null
             stopServer()
             done = false
             completing = false
@@ -239,6 +303,8 @@ class AccountSignInViewModel
         }
 
         private fun stopServer() {
+            startupJob?.cancel()
+            startupJob = null
             timeoutJob?.cancel()
             timeoutJob = null
             server?.stop()
@@ -246,6 +312,11 @@ class AccountSignInViewModel
             channel?.destroy()
             channel = null
         }
+
+        private fun supportsCookieFallback(method: WebLoginMethod): Boolean =
+            pluginId == "nl.neerdael.spotify" && method.id == "spotify" &&
+                method.cookieUrl == "https://open.spotify.com/" && method.requiredCookies == listOf("sp_dc") &&
+                method.extractScript == null && method.refreshUrl == null
 
         companion object {
             private const val TAG = "AccountSignIn"

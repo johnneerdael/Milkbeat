@@ -160,7 +160,7 @@ working without updates until you remove it.
 
 - **YouTube:** Home works signed out; signing in with the Google account in MicroG-RE-TV (below)
   personalizes Home, library and history.
-- **Spotify:** sign in for your feed, playlists and library; playback comes from your audio providers.
+- **Spotify:** sign in for your feed, playlists and library; playback comes from your audio providers. TVs without isolated WebView profiles offer a [computer browser sign-in fallback](https://johnneerdael.github.io/Milkbeat/providers/#spotify-sign-in-on-older-tv-webviews).
 - **Beatport:** sign in for the catalog and library; Beatport's own full-length audio needs a
   streaming subscription, otherwise another provider can match the recording.
 - **SoundCloud:** pair with a TV code from any phone. Full-track availability depends on the
