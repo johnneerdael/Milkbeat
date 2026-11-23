@@ -344,6 +344,8 @@
     <string name="tv_search_no_music_plugin">No metadata plugin is chosen</string>
     <string name="tv_search_no_video_plugin">No video plugin is chosen</string>
     <string name="tv_search_no_plugin_message">Choose one in Settings, Plugins to search here.</string>
+    <string name="tv_search_no_search_source">No plugin can search right now</string>
+    <string name="tv_search_no_search_source_message">The music plugins on this TV have no search at the moment. Add or sign in to one in Settings, Plugins.</string>
     <string name="tv_library_history">History</string>
     <string name="tv_library_playlists">Playlists</string>
     <string name="library_liked_songs">Liked songs</string>

@@ -77,8 +77,10 @@ fun TvSearchScreen(
     val dimens = LocalTvDimens.current
     val state by viewModel.state.collectAsStateWithLifecycle()
     val recentSearches by viewModel.recentSearches.collectAsStateWithLifecycle()
+    val unsupported by viewModel.unsupported.collectAsStateWithLifecycle()
     val searchable = musicTabs.tabs.filter { it.source == MusicSource.Local || MetadataSurface.SEARCH in it.surfaces }
-    val chips = searchable.map { it.source }
+    // A plugin that answered UNSUPPORTED has no search to give (Eclipse without Pulsar or Gravity).
+    val chips = searchable.map { it.source }.filter { it.key !in unsupported }
     val startSource = musicTabs.selected?.takeIf { it in chips } ?: chips.firstOrNull()
     // Keep the picked provider when the shell temporarily gives way to the player.
     var pickedKey by rememberSaveable { mutableStateOf<String?>(null) }
@@ -87,14 +89,26 @@ fun TvSearchScreen(
     LaunchedEffect(chipIdentities) { viewModel.retainSources(chipIdentities) }
     LaunchedEffect(source) { source?.let(viewModel::showSource) }
     if (source == null) {
-        if (musicTabs.ready) {
-            TvMessageState(
-                title = stringResource(R.string.tv_search_no_music_plugin),
-                message = stringResource(R.string.tv_search_no_plugin_message),
-                modifier = modifier,
-            )
-        } else {
-            TvLoadingState(modifier = modifier)
+        when {
+            !musicTabs.ready -> {
+                TvLoadingState(modifier = modifier)
+            }
+
+            searchable.isEmpty() -> {
+                TvMessageState(
+                    title = stringResource(R.string.tv_search_no_music_plugin),
+                    message = stringResource(R.string.tv_search_no_plugin_message),
+                    modifier = modifier,
+                )
+            }
+
+            else -> {
+                TvMessageState(
+                    title = stringResource(R.string.tv_search_no_search_source),
+                    message = stringResource(R.string.tv_search_no_search_source_message),
+                    modifier = modifier,
+                )
+            }
         }
         return
     }

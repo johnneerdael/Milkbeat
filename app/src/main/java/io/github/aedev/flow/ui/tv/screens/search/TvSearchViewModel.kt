@@ -14,6 +14,7 @@ import io.github.aedev.flow.data.music.model.MusicTrack
 import io.github.aedev.flow.data.stats.VideoStatsRecorder
 import io.github.aedev.flow.plugin.catalog.PluginMetadataProvider
 import io.github.aedev.flow.plugin.catalog.listenerMessage
+import io.github.aedev.flow.plugin.runtime.PluginCallException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
@@ -28,6 +29,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import nl.neerdael.milkbeat.catalog.MetadataItem
 import nl.neerdael.milkbeat.catalog.SearchRequest
+import nl.neerdael.milkbeat.plugin.PluginErrorCode
 import javax.inject.Inject
 
 /**
@@ -71,6 +73,14 @@ class TvSearchViewModel internal constructor(
 
     private val _state = MutableStateFlow(TvSearchUiState(query = savedStateHandle[QUERY_KEY] ?: ""))
     val state: StateFlow<TvSearchUiState> = _state.asStateFlow()
+
+    /**
+     * Sources whose plugin answered `UNSUPPORTED` to a search: it has nothing to search right now
+     * (Eclipse without Pulsar or Gravity), so the chip list drops it instead of offering a search
+     * that can only fail.
+     */
+    private val _unsupported = MutableStateFlow<Set<String>>(emptySet())
+    val unsupported: StateFlow<Set<String>> = _unsupported.asStateFlow()
 
     /** The saved searches, most recent first; empty while search history is switched off. */
     val recentSearches: StateFlow<List<SearchHistoryItem>> =
@@ -137,6 +147,9 @@ class TvSearchViewModel internal constructor(
             if (shown.key !in sources) source = null
             restartSuggestions()
         }
+        // Connecting Eclipse's Pulsar or Gravity, or signing in, changes the identity, so a provider
+        // that answered UNSUPPORTED before gets its chip back with the new account or install.
+        _unsupported.update { blocked -> blocked - changed - blocked.filter { it !in sources }.toSet() }
         // A search still in its typing pause has a job but no results yet.
         val gone = (_state.value.results.keys + searchJobs.keys + moreJobs.keys).filter { it !in sources || it in changed }
         if (gone.isEmpty()) return
@@ -263,9 +276,15 @@ class TvSearchViewModel internal constructor(
                 _state.update { state ->
                     state.withResults(target) { current ->
                         page.fold(
-                            onSuccess = current::withFirstPage,
+                            onSuccess = { first ->
+                                if (target.key in _unsupported.value) _unsupported.update { it - target.key }
+                                current.withFirstPage(first)
+                            },
                             onFailure = { error ->
                                 if (!error.isNoPlugin) Log.w(TAG, "$target search failed", error)
+                                if (error is PluginCallException && error.error.code == PluginErrorCode.UNSUPPORTED) {
+                                    _unsupported.update { it + target.key }
+                                }
                                 current.failed(error.listenerMessage, noPlugin = error.isNoPlugin)
                             },
                         )
