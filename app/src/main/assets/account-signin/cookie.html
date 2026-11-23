@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><title>Connect Spotify to Milkbeat</title>
+<style>
+:root{color-scheme:light dark}body{font:16px/1.5 system-ui,sans-serif;margin:0;padding:24px}main{max-width:44rem;margin:auto}label{display:block;font-weight:600;margin-top:1.5rem}input{box-sizing:border-box;width:100%;padding:.8rem;font:inherit}button{margin-top:1.5rem;padding:.8rem 1.4rem;font:inherit}li{margin:.6rem 0}.note{border-left:3px solid;padding-left:1rem}
+</style></head><body><main>
+<h1>Connect Spotify to Milkbeat</h1>
+<p class="note">Your Spotify cookie gives access to your account. Before entering it, check that this page’s certificate SHA-256 fingerprint matches your TV. Only use this page on a network you trust.</p>
+<ol><li>Open <a href="https://open.spotify.com/" target="_blank" rel="noopener noreferrer">Spotify Web Player</a> in another browser tab and sign in.</li><li>Open your browser’s developer tools, then Application (or Storage) → Cookies → https://open.spotify.com.</li><li>Find <strong>sp_dc</strong> and copy its value. Return to this page and paste it below.</li></ol>
+<form method="post" action="/submit" autocomplete="off">
+<label for="code">Pairing code shown on the TV</label><input id="code" name="code" required autocomplete="off" spellcheck="false">
+<label for="cookie">Spotify sp_dc cookie</label><input id="cookie" name="cookie" type="password" required autocomplete="off" spellcheck="false">
+<button type="submit">Connect Spotify</button></form>
+</main></body></html>

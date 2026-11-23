@@ -683,6 +683,12 @@
     <string name="tv_account_sign_in_instructions">Scan this code with a phone on the same network. The phone shows the live sign-in page: tap and swipe it, type with the phone keyboard, and complete any verification challenge.</string>
     <string name="tv_account_sign_in_qr_description">QR code for signing in from your phone</string>
     <string name="tv_account_sign_in_no_network">This TV has no local network address. Connect it to Wi-Fi or Ethernet and try again.</string>
+    <string name="tv_spotify_cookie_server_failed">Could not start the secure sign-in page. Try again.</string>
+    <string name="tv_spotify_cookie_title">Sign in to Spotify from a computer</string>
+    <string name="tv_spotify_cookie_help">On your computer, open the address shown here. Before proceeding past the browser’s security warning, compare the certificate SHA-256 fingerprint with the value below. Sign in at open.spotify.com, copy the sp_dc cookie from browser developer tools, and paste it into the setup page.</string>
+    <string name="tv_spotify_cookie_fingerprint">Certificate SHA-256 fingerprint</string>
+    <string name="tv_spotify_cookie_open">On a computer on the same network, open this address:</string>
+    <string name="tv_spotify_cookie_pairing">Pairing code: %1$s</string>
     <string name="tv_account_sign_in_unsupported">This TV\'s WebView cannot keep the sign-in separate from playback, so phone sign-in is unavailable.</string>
     <string name="tv_account_sign_in_timed_out">The sign-in page timed out.</string>
     <string name="tv_account_history">YouTube history</string>

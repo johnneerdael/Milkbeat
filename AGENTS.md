@@ -899,6 +899,15 @@ PowerVR field confirmation (2026-10-18): the reporter confirmed the original AFT
 2. If the build fails, fix the reported errors and rebuild before proceeding.
 3. For UI changes, actually run the app (emulator or device) and exercise the golden path plus edge cases — passing a build does not mean the feature works correctly.
 
+## Spotify browser fallback
+
+On TVs whose WebView lacks MULTI_PROFILE, the Spotify web-cookie-only contract uses a temporary
+HTTPS setup listener. The computer verifies the SHA-256 certificate fingerprint shown on the TV,
+then submits the session pairing code and sp_dc cookie. Keep the listener limited to the selected
+LAN address and its sign-in lifecycle, never log cookie values, and do not apply this fallback to
+plugins that need WebView extraction or refresh. The Ktor Netty engine is used because CIO 3.5.2
+rejects HTTPS connectors; preserve the existing phone-viewer behavior when changing it.
+
 ## Documentation and publishing
 
 - The root `README.md` and the user guide in `docs/user-guide/` are the user-facing documentation.

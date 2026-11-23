@@ -99,7 +99,7 @@ fun TvAccountSignInScreen(
         }
     }
 
-    TvScreenScaffold(title = stringResource(R.string.tv_account_sign_in_title)) {
+    TvScreenScaffold(title = stringResource(if (state is AccountSignInState.CookieReady) R.string.tv_spotify_cookie_title else R.string.tv_account_sign_in_title)) {
         Row(
             modifier = Modifier.fillMaxSize().padding(horizontal = LocalTvDimens.current.overscanHorizontal),
             horizontalArrangement = Arrangement.spacedBy(32.dp),
@@ -112,6 +112,13 @@ fun TvAccountSignInScreen(
                 if (controller != null) {
                     val dimensions = LocalTvDimens.current
                     FlowWebViewStream(controller.stream, DpSize(dimensions.signInViewportWidth, dimensions.signInViewportHeight))
+                } else if (state is AccountSignInState.CookieReady) {
+                    Column(modifier = Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                        Text(stringResource(R.string.tv_spotify_cookie_title), style = MaterialTheme.typography.headlineSmall)
+                        Text(stringResource(R.string.tv_spotify_cookie_help), style = MaterialTheme.typography.bodyLarge)
+                        Text(stringResource(R.string.tv_spotify_cookie_fingerprint), style = MaterialTheme.typography.titleMedium)
+                        Text((state as AccountSignInState.CookieReady).fingerprint, style = MaterialTheme.typography.bodyMedium)
+                    }
                 }
             }
             TvAccountSignInPanel(
@@ -161,8 +168,25 @@ private fun TvAccountSignInPanel(
                 TvButton(text = stringResource(R.string.cancel), onClick = onCancel, modifier = Modifier.tvInitialFocus(state.phoneUrl))
             }
 
+            is AccountSignInState.CookieReady -> {
+                Text(stringResource(R.string.tv_spotify_cookie_open), style = MaterialTheme.typography.bodyMedium)
+                QrCodeImage(
+                    text = state.url,
+                    contentDescription = stringResource(R.string.tv_account_sign_in_qr_description),
+                    modifier = Modifier.padding(12.dp).size(180.dp),
+                )
+                Text(state.url, style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.tv_spotify_cookie_pairing, state.pairingCode), style = MaterialTheme.typography.titleMedium)
+                TvButton(text = stringResource(R.string.cancel), onClick = onCancel, modifier = Modifier.tvInitialFocus(state.url))
+            }
+
             AccountSignInState.NoNetwork -> {
                 TvMessageState(title = stringResource(R.string.tv_account_sign_in_no_network))
+                TvButton(text = stringResource(R.string.retry), onClick = onRetry, modifier = Modifier.tvInitialFocus(state))
+            }
+
+            AccountSignInState.SecureSetupFailed -> {
+                TvMessageState(title = stringResource(R.string.tv_spotify_cookie_server_failed))
                 TvButton(text = stringResource(R.string.retry), onClick = onRetry, modifier = Modifier.tvInitialFocus(state))
             }
 

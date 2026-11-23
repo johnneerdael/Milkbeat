@@ -232,6 +232,7 @@ dependencies {
     implementation(libs.smbj)
     implementation(libs.sshj)
     implementation(libs.bouncycastle.bcprov)
+    implementation(libs.bouncycastle.pkix)
     // Berkeley DB backs only nfs4j's server-side state store; the client never loads it.
     implementation(libs.nfs4j.core) { exclude(group = "com.sleepycat") }
     constraints {
@@ -282,7 +283,7 @@ dependencies {
     implementation(libs.ktor.server.core) {
         exclude(group = "org.fusesource.jansi", module = "jansi")
     }
-    implementation(libs.ktor.server.cio)
+    implementation(libs.ktor.server.netty)
     implementation(libs.ktor.server.websockets)
     implementation(libs.zxing.core)
     implementation(libs.androidx.webkit)

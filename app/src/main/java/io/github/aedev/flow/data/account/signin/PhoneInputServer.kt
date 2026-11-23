@@ -4,7 +4,7 @@ import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
-import io.ktor.server.cio.CIO
+import io.ktor.server.netty.Netty
 import io.ktor.server.engine.EmbeddedServer
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.plugins.origin
@@ -34,7 +34,7 @@ class PhoneInputServer(
 
     suspend fun start(host: String): Int {
         val engine =
-            embeddedServer(CIO, host = host, port = 0) {
+            embeddedServer(Netty, host = host, port = 0) {
                 routing {
                     get("/") { call.respondAsset(INDEX, ContentType.Text.Html) }
                     get("/app.js") { call.respondAsset(APP_JS, ContentType.Application.JavaScript) }
