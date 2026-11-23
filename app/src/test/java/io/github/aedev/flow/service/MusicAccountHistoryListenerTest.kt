@@ -304,6 +304,33 @@ class MusicAccountHistoryListenerTest {
             assertEquals("natural", first.second.endReason)
             assertEquals(1_500L, first.second.playingMs)
             assertEquals(1_500L, first.second.positionMs)
+            assertFalse(first.second.manual)
+            fixture.listener.close()
+        }
+
+    @Test
+    fun `an explicitly installed queue starts a manual listen`() =
+        runTest {
+            val fixture = fixture(lifecycle = true)
+            pump()
+            advanceTimeBy(2_000)
+            fixture.player.positionMs = 2_000
+            pump()
+
+            // Selecting a track or pressing Play installs a queue, which Media3 reports as a
+            // playlist change rather than a seek.
+            fixture.player.installQueue("third")
+            pump()
+            advanceTimeBy(6_000)
+            fixture.player.positionMs = 6_000
+            pump()
+
+            val replaced = fixture.reports.single { !it.second.progress && it.first.videoId == "first" }
+            assertEquals("replaced", replaced.second.endReason)
+            assertFalse(replaced.second.manual)
+            val installed = fixture.reports.filter { it.first.videoId == "third" }
+            assertTrue(installed.isNotEmpty())
+            assertTrue(installed.all { it.second.manual })
             fixture.listener.close()
         }
 
@@ -423,7 +450,7 @@ class MusicAccountHistoryListenerTest {
     // Snapshot positions belong to their state. A PositionSupplier reading a mutable property
     // would also change the outgoing state's position when the next item resets it to zero.
     private class HistoryTestPlayer(
-        durationMs: Long,
+        private val durationMs: Long,
         private val nowMs: () -> Long,
     ) : SimpleBasePlayer(Looper.getMainLooper()) {
         private var value =
@@ -434,20 +461,8 @@ class MusicAccountHistoryListenerTest {
                         .Builder()
                         .addAllCommands()
                         .build(),
-                ).setPlaylist(
-                    listOf("first", "second").map { id ->
-                        MediaItemData
-                            .Builder(id)
-                            .setMediaItem(
-                                MediaItem
-                                    .Builder()
-                                    .setMediaId(id)
-                                    .setUri("file:///$id.wav")
-                                    .build(),
-                            ).setDurationUs(durationMs * 1_000)
-                            .build()
-                    },
-                ).setCurrentMediaItemIndex(0)
+                ).setPlaylist(listOf("first", "second").map(::mediaItemData))
+                .setCurrentMediaItemIndex(0)
                 .setPlaybackState(Player.STATE_READY)
                 .setPlayWhenReady(true, Player.PLAY_WHEN_READY_CHANGE_REASON_USER_REQUEST)
                 .setContentPositionMs(position(0, true))
@@ -461,6 +476,29 @@ class MusicAccountHistoryListenerTest {
             }
 
         override fun getState(): State = value
+
+        fun installQueue(vararg ids: String) {
+            value =
+                value
+                    .buildUpon()
+                    .setPlaylist(ids.map(::mediaItemData))
+                    .setCurrentMediaItemIndex(0)
+                    .setContentPositionMs(position(0, isPlaying))
+                    .build()
+            invalidateState()
+        }
+
+        private fun mediaItemData(id: String) =
+            MediaItemData
+                .Builder(id)
+                .setMediaItem(
+                    MediaItem
+                        .Builder()
+                        .setMediaId(id)
+                        .setUri("file:///$id.wav")
+                        .build(),
+                ).setDurationUs(durationMs * 1_000)
+                .build()
 
         fun transition(
             index: Int,

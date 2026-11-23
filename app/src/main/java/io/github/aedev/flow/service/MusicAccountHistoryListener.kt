@@ -141,7 +141,14 @@ internal class MusicAccountHistoryListener(
                         "replaced"
                     },
             )
-            startCurrent(manual = reason == Player.MEDIA_ITEM_TRANSITION_REASON_SEEK)
+            // Picking a track or starting a collection installs a queue as a playlist change; only
+            // automatic advancement (AUTO/REPEAT) is not a listener action, and a recovery
+            // replacement keeps its listen above.
+            startCurrent(
+                manual =
+                    reason == Player.MEDIA_ITEM_TRANSITION_REASON_SEEK ||
+                        reason == Player.MEDIA_ITEM_TRANSITION_REASON_PLAYLIST_CHANGED,
+            )
             return
         }
 
