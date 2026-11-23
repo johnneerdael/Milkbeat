@@ -1,6 +1,6 @@
 # Music tabs, Search and Library
 
-Milkbeat has no "metadata provider" setting any more. Instead, every music catalog you can use appears in the sidebar as its own tab, and Search and Library offer one chip per provider. Whatever you open from a tab, chip or page stays on the provider it came from.
+Milkbeat has no "metadata provider" setting any more. Instead, every music catalog you can use appears in the sidebar as its own tab, and Search and Library offer one chip per provider; a provider that has no search at the moment — Eclipse without Pulsar or Gravity connected — is left out of Search rather than shown and failing. Whatever you open from a tab, chip or page stays on the provider it came from.
 
 ## A tab per music service
 
