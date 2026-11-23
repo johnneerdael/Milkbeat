@@ -909,8 +909,9 @@ plugins that need WebView extraction or refresh. Browser text and responses come
 resources; escape translated values before inserting them into the HTML template. The Ktor Netty engine is used because CIO 3.5.2
 rejects HTTPS connectors; preserve the existing phone-viewer behavior when changing it. Netty's
 optional desktop integrations require the narrowly scoped R8 rules in `app/proguard-rules.pro`;
-keep Netty's isolated VarHandle bytecode out of classes loaded on pre-33 Android and validate the
-HTTPS listener in a shrunk Android build when changing the server or these rules.
+keep Netty's isolated VarHandle bytecode out of classes loaded on pre-33 Android, preserve the
+reflectively constructed NIO server channel, and validate the HTTPS listener in a shrunk Android
+build when changing the server or these rules.
 
 ## Documentation and publishing
 

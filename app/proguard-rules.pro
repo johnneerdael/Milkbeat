@@ -71,6 +71,8 @@
 # Netty isolates signature-polymorphic VarHandle calls for pre-33 Android. R8 must not inline or
 # merge them into classes loaded at startup: older ART rejects their bytecode during verification.
 -keep class io.netty.buffer.VarHandleByteBufferAccess { *; }
+# Ktor gives Netty this channel class for reflective construction of the server socket.
+-keep class io.netty.channel.socket.nio.NioServerSocketChannel { public <init>(); }
 
 ## Optional classes other libraries reference
 -dontwarn org.conscrypt.**
