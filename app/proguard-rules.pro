@@ -58,6 +58,17 @@
 -dontwarn io.ktor.**
 -keep class io.ktor.** { *; }
 
+## Netty's optional desktop integrations are not used by the local Android setup server.
+## TLS uses the JDK/Android provider without client certificates; there is no tcnative/OpenSSL,
+## JFR, LDAP hostname enhancement, Log4j adapter or BlockHound integration on Android.
+-dontwarn io.netty.internal.tcnative.**
+-dontwarn javax.naming.ldap.LdapName
+-dontwarn javax.naming.ldap.Rdn
+-dontwarn jdk.jfr.**
+-dontwarn org.apache.log4j.**
+-dontwarn org.apache.logging.log4j.**
+-dontwarn reactor.blockhound.integration.BlockHoundIntegration
+
 ## Optional classes other libraries reference
 -dontwarn org.conscrypt.**
 -dontwarn com.google.re2j.**
