@@ -130,7 +130,15 @@ class MusicMediaSourceFactoryTest {
 
     @Test
     fun `a server-returned audio DASH manifest plays through a DASH source`() {
-        assertThat(factory.resolvedSource(item, audio("application/dash+xml"), checkedBound())).isInstanceOf(DashMediaSource::class.java)
+        val source = factory.resolvedSource(item, audio("application/dash+xml"), checkedBound())
+        assertThat(source).isInstanceOf(DashMediaSource::class.java)
+        // The manifest request uses the accepted stream URL, not the queue's music:// URI.
+        assertThat(
+            source.mediaItem.localConfiguration!!
+                .uri
+                .toString(),
+        ).isEqualTo("https://fixture/audio")
+        assertThat(source.mediaItem.mediaId).isEqualTo(item.mediaId)
         assertThat(
             factory.resolvedSource(item, audio("application/dash+xml; charset=utf-8"), checkedBound()),
         ).isInstanceOf(DashMediaSource::class.java)

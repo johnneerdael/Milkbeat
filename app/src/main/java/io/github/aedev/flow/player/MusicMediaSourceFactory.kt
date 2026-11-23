@@ -176,9 +176,21 @@ class MusicMediaSourceFactory(
                     ?.substringBefore(';')
                     ?.lowercase()
             ) {
-                in setOf("application/x-mpegurl", "application/vnd.apple.mpegurl") -> hls.createMediaSource(soundItem)
-                "application/dash+xml" -> requireNotNull(dash).createMediaSource(soundItem)
-                else -> progressive.createMediaSource(soundItem)
+                in setOf("application/x-mpegurl", "application/vnd.apple.mpegurl") -> {
+                    hls.createMediaSource(soundItem)
+                }
+
+                "application/dash+xml" -> {
+                    requireNotNull(dash).createMediaSource(
+                        // The manifest is fetched from the accepted stream URL; the queue's identity
+                        // and metadata stay on the item.
+                        soundItem.buildUpon().setUri(requireNotNull(audio).stream.url).build(),
+                    )
+                }
+
+                else -> {
+                    progressive.createMediaSource(soundItem)
+                }
             }
         // Separate progressive picture URLs cannot be prepared without fetching hidden bytes.
         // Audio remains available; picture needs a metadata-prepared DASH/HLS/SABR presentation.
