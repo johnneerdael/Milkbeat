@@ -316,7 +316,11 @@ class TvPluginsViewModel
                                     ),
                             )
                         } catch (e: Exception) {
-                            connectionsState.value.copy(busy = false, failure = e.message ?: context.getString(R.string.tv_plugins_connections_review_failed))
+                            connectionsState.value.copy(
+                                busy = false,
+                                failure =
+                                    e.message ?: context.getString(R.string.tv_plugins_connections_review_failed),
+                            )
                         }
                     connectionsState.value = next
                 }
@@ -388,7 +392,13 @@ class TvPluginsViewModel
                     val result =
                         runCatching { pluginConnections.test(pluginId, id) }
                             .getOrElse { error ->
-                                updateConnections { it.copy(busy = false, failure = error.message ?: context.getString(R.string.tv_plugins_connections_test_failed)) }
+                                updateConnections {
+                                    it.copy(
+                                        busy = false,
+                                        failure =
+                                            error.message ?: context.getString(R.string.tv_plugins_connections_test_failed),
+                                    )
+                                }
                                 return@launch
                             }
                     updateConnections { it.copy(busy = false, testResult = id to result.state) }
