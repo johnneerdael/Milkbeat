@@ -77,10 +77,10 @@ resumes during a song.
 
 ## Eclipse
 
-**Eclipse 0.1.0** is a streaming-only audio provider. It keeps Milkbeat's own catalog, queue and
-metadata, and returns lossless or Atmos audio from the Eclipse add-ons you connect. Install it on a
-Milkbeat build supporting plugin API 12, then sign in with the TV code shown at
-`eclipsemusic.app/tv`.
+**Eclipse 0.2.0** returns lossless or Atmos audio from the Eclipse add-ons you connect, and adds
+an Eclipse music tab with your Cloud playlists, Liked Songs and a search across the approved
+add-ons. Install it on a Milkbeat build supporting plugin API 12, then sign in with the TV code
+shown at `eclipsemusic.app/tv`.
 
 Eclipse needs a subscription or account entitlement of its own; Milkbeat's other providers are
 unaffected and remain available as fallbacks in [Audio](#set-audio-priority).
@@ -104,6 +104,14 @@ the manifest, your account's authorization for that add-on, or the track lookup.
 
 Only approved destinations receive content requests. Account access sends a short-lived token
 specific to the approved add-on. The first-party Eclipse API alone receives your account session.
+
+### Browse and search
+
+The Eclipse tab lists your Cloud playlists and Liked Songs from your Eclipse account. Milkbeat
+shows those tracks with their own metadata and matches each one to the Eclipse recording that
+plays it, so a playlist queues like any other. Search runs against every approved add-on that
+advertises lookup — Cloud, Pulsar, Gravity and any community link — and returns playable Eclipse
+recordings.
 
 ### Quality and playback
 
