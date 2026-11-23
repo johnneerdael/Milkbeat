@@ -77,11 +77,13 @@ resumes during a song.
 
 ## Eclipse
 
-**Eclipse 0.3.0** returns lossless or Atmos audio from the Eclipse add-ons you connect and adds an
+**Eclipse 0.4.0** returns lossless or Atmos audio from the Eclipse add-ons you connect and adds an
 Eclipse music tab. Its **For you** shelves follow the Eclipse account's composed feed — new
-releases, Daily Mixes with their tracks, top and trending tracks — alongside your Cloud playlists,
-Liked Songs and Discover. Install it on a Milkbeat build supporting plugin API 12, then sign in with
-the TV code shown at `eclipsemusic.app/tv`.
+releases, Daily Mixes with their tracks, album shelves that open the add-on's own album, top and
+trending tracks — alongside your Cloud playlists, Liked Songs and Discover. A composed or library
+track is matched to an Eclipse recording before it plays; when no approved add-on holds that
+recording, another provider in your audio order plays it instead. Install it on a Milkbeat build
+supporting plugin API 12, then sign in with the TV code shown at `eclipsemusic.app/tv`.
 
 Eclipse needs a subscription or account entitlement of its own; Milkbeat's other providers are
 unaffected and remain available as fallbacks in [Audio](#set-audio-priority).
