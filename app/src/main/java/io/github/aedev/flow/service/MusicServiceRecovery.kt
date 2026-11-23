@@ -16,9 +16,9 @@ import kotlinx.coroutines.launch
 import java.util.Locale
 import kotlin.math.min
 
-private const val TAG = "Media3MusicService"
-private const val MAX_RETRY_PER_SONG = 5
-private const val BASE_RETRY_DELAY_MS = 3000L
+internal const val TAG = "Media3MusicService"
+internal const val MAX_RETRY_PER_SONG = 5
+internal const val BASE_RETRY_DELAY_MS = 3000L
 private const val MAX_RETRY_DELAY_MS = 30000L
 private const val FAILED_SONGS_CACHE_SIZE = 50
 private const val MUSIC_URI_SCHEME = "music"
@@ -251,37 +251,6 @@ internal fun Media3MusicService.fallBackToSong(failed: MusicPlaybackRecoveryPlan
     return true
 }
 
-/**
- * A media open that reached Ready without ever producing audio output — no selected audio track, or
- * a selected track that never advanced — is rejected before playback counts as started. The same
- * queue occurrence is retried at the same position with fresh media: the accepted provider resolves
- * a fresh URL first, and the normal configured order takes over if it cannot.
- */
-internal fun Media3MusicService.failOverSilentStart(
-    mediaId: String,
-    positionMs: Long,
-) {
-    val index = player.currentMediaItemIndex
-    if (player.currentMediaItem?.mediaId != mediaId || index !in 0 until player.mediaItemCount) return
-    val failed = MusicPlaybackRecoveryPlanner.FailedItem(index, mediaId, positionMs)
-    val retryCount = retryCountMap.getOrDefault(mediaId, 0)
-    if (retryCount >= MAX_RETRY_PER_SONG || mediaId in recentlyFailedSongs) {
-        handleFinalFailure(failed)
-        return
-    }
-    Log.w(TAG, "Rejecting a silent start for $mediaId at ${positionMs}ms; recovering with fresh media")
-    lastPlaybackErrorAtMap[mediaId] = System.currentTimeMillis()
-    retryCountMap[mediaId] = retryCount + 1
-    retryJobCancel()
-    pluginAudio.current(mediaId)?.let { pluginAudio.failed(mediaId, it.stream.url, null) }
-    downloadUtil.invalidateUrlCache(mediaId)
-    if (refreshStreamMediaItemAt(index, mediaId, positionMs, preservePicture = true)) {
-        player.prepare()
-    } else {
-        handleFinalFailure(failed)
-    }
-}
-
 internal fun Media3MusicService.playerMediaIds(): List<String> = List(player.mediaItemCount) { player.getMediaItemAt(it).mediaId }
 
 /**
@@ -369,34 +338,9 @@ internal fun Media3MusicService.isFileNotFoundError(error: PlaybackException): B
     error.errorCode == PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND ||
         (error.cause as? PlaybackException)?.errorCode == PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND
 
-internal fun Media3MusicService.isAudioRendererError(error: PlaybackException): Boolean =
-    error.errorCode == PlaybackException.ERROR_CODE_AUDIO_TRACK_WRITE_FAILED ||
-        error.errorCode == PlaybackException.ERROR_CODE_AUDIO_TRACK_INIT_FAILED
-
 internal fun Media3MusicService.isNetworkError(error: PlaybackException): Boolean =
     error.errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED ||
         error.errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT
-
-internal fun Media3MusicService.handleAudioRendererError(
-    failed: MusicPlaybackRecoveryPlanner.FailedItem,
-    currentRetry: Int,
-) {
-    retryCountMap[failed.mediaId] = currentRetry + 1
-    retryJobCancel()
-    pendingRetryJob =
-        lifecycleScope.launch {
-            try {
-                // Release the broken renderer without using pause as a recovery flag.
-                accountHistoryListener?.sourceWillReopen(failed.mediaId)
-                player.stop()
-                delay(BASE_RETRY_DELAY_MS * 3)
-                restartFailedItem(failed)
-            } catch (e: Exception) {
-                Log.e(TAG, "AudioTrack recovery failed", e)
-                handleFinalFailure(failed)
-            }
-        }
-}
 
 internal fun Media3MusicService.handleRangeNotSatisfiableError(
     failed: MusicPlaybackRecoveryPlanner.FailedItem,
