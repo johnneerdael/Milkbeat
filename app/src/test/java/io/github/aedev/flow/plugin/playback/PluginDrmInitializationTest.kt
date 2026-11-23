@@ -1,9 +1,12 @@
 package io.github.aedev.flow.plugin.playback
 
 import android.app.Application
+import android.net.Uri
 import androidx.media3.common.C
 import androidx.media3.datasource.ByteArrayDataSource
+import androidx.media3.datasource.DataSourceUtil
 import androidx.media3.datasource.DataSpec
+import androidx.media3.datasource.ResolvingDataSource
 import com.google.common.truth.Truth.assertThat
 import nl.neerdael.milkbeat.plugin.AudioDrm
 import nl.neerdael.milkbeat.plugin.AudioDrmScheme
@@ -89,6 +92,44 @@ class PluginDrmInitializationTest {
         assertRequest(0, C.LENGTH_UNSET, prefix + mapped + index)
         assertRequest(0, prefix.size + original.size - 1, prefix + original.copyOf(original.size - 1))
         assertRequest(prefix.size + original.size, index.size, index)
+    }
+
+    @Test
+    fun `progressive queue requests map initialization after resolving the media URI`() {
+        val shared = ByteArray(16) { 9 }
+        val original = initialization(shared, shared)
+        val ids = listOf(ByteArray(16) { 1 }, ByteArray(16) { 2 })
+        val prefix = box("ftyp", ByteArray(9))
+        val resource = prefix + original
+        val uri = Uri.parse("https://cdn.example/audio.mp4")
+        val declared =
+            DrmInitialization("apple-cbcs-eac3-v1", uri.toString(), prefix.size.toLong(), original.size, emptyList())
+        val bytes = pluginDrmInitDataSourceFactory({ ByteArrayDataSource(resource) }, declared, ids)
+        val request =
+            DataSpec
+                .Builder()
+                .setUri("music://queued")
+                .setKey("queued")
+                .setPosition(prefix.size.toLong())
+                .build()
+
+        for ((resolvedUri, expected) in listOf(
+            uri to initialization(ids[0], ids[1]),
+            Uri.parse("https://cdn.example/other.mp4") to original,
+        )) {
+            val source =
+                ResolvingDataSource
+                    .Factory(bytes) { spec ->
+                        assertThat(spec.key).isEqualTo("queued")
+                        spec.withUri(resolvedUri)
+                    }.createDataSource()
+            try {
+                assertThat(source.open(request)).isEqualTo(original.size.toLong())
+                assertThat(DataSourceUtil.readToEnd(source)).isEqualTo(expected)
+            } finally {
+                source.close()
+            }
+        }
     }
 
     @Test

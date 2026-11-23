@@ -64,7 +64,7 @@ internal fun validatedServiceCertificate(drm: AudioDrm): ByteArray? {
 internal fun pluginDrmInitDataSourceFactory(
     upstream: DataSource.Factory,
     initialization: DrmInitialization,
-    keyIds: List<ByteArray>,
+    keyIds: List<ByteArray> = initializationKeyIds(initialization),
 ): DataSource.Factory =
     DataSource.Factory {
         MappedInitialization(

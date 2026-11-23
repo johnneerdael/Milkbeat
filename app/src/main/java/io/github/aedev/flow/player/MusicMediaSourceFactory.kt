@@ -17,7 +17,6 @@ import io.github.aedev.flow.player.resolver.AudioOnlyHlsPlaylistParserFactory
 import io.github.aedev.flow.player.resolver.MediaSourceBuilder
 import io.github.aedev.flow.player.resolver.ResolvingMusicMediaSource
 import io.github.aedev.flow.plugin.playback.ResolvedAudio
-import io.github.aedev.flow.plugin.playback.initializationKeyIds
 import io.github.aedev.flow.plugin.playback.pluginDrmInitDataSourceFactory
 import io.github.aedev.flow.plugin.playback.pluginDrmProvider
 import io.github.aedev.flow.plugin.playback.validatedServiceCertificate
@@ -127,12 +126,8 @@ class MusicMediaSourceFactory(
             return MediaSourceBuilder.buildDashSource(transport, manifest, Uri.parse(audio.stream.url), soundItem)
         }
 
-        fun checkedTransport(factory: DataSource.Factory): DataSource.Factory =
-            audio?.stream?.drm?.initialization?.let { initialization ->
-                pluginDrmInitDataSourceFactory(factory, initialization, initializationKeyIds(initialization))
-            } ?: factory
-        val progressive = ProgressiveMediaSource.Factory(checkedTransport(sourceFactory))
-        val hls = HlsMediaSource.Factory(checkedTransport(sourceFactory))
+        val progressive = ProgressiveMediaSource.Factory(sourceFactory)
+        val hls = HlsMediaSource.Factory(sourceFactory)
         val dashMime =
             audio
                 ?.stream
@@ -141,11 +136,9 @@ class MusicMediaSourceFactory(
                 ?.equals("application/dash+xml", ignoreCase = true) == true
         val dash =
             if (dashMime) {
-                DashMediaSource.Factory(
-                    checkedTransport(
-                        requireNotNull(adaptive) { "Plugin DASH requires the permission-checked adaptive transport" },
-                    ),
-                )
+                val transport = requireNotNull(adaptive) { "Plugin DASH requires the permission-checked adaptive transport" }
+                val initialization = audio?.stream?.drm?.initialization
+                DashMediaSource.Factory(initialization?.let { pluginDrmInitDataSourceFactory(transport, it) } ?: transport)
             } else {
                 null
             }

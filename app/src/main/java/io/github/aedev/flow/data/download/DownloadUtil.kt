@@ -43,6 +43,7 @@ import io.github.aedev.flow.plugin.playback.adaptiveCacheKey
 import io.github.aedev.flow.plugin.playback.adaptiveDataSourceFactory
 import io.github.aedev.flow.plugin.playback.cacheIdentity
 import io.github.aedev.flow.plugin.playback.drmDataSourceFactory
+import io.github.aedev.flow.plugin.playback.pluginDrmInitDataSourceFactory
 import io.github.aedev.flow.plugin.playback.pluginRangedDataSourceFactory
 import io.github.aedev.flow.plugin.playback.pluginRequestLength
 import io.github.aedev.flow.plugin.playback.pluginStripeCipherDataSourceFactory
@@ -229,7 +230,14 @@ class DownloadUtil
                         binding?.current() ?: resolveForPlayback(uri, picture)
                     }
                 val playbackCache = if (binding == null) cachedDataSourceFactory else playerCacheFactory
-                return ResolvingDataSource.Factory(playbackCache) { dataSpec ->
+                val initialization =
+                    binding
+                        ?.initial
+                        ?.stream
+                        ?.drm
+                        ?.initialization
+                val media = initialization?.let { pluginDrmInitDataSourceFactory(playbackCache, it) } ?: playbackCache
+                return ResolvingDataSource.Factory(media) { dataSpec ->
                     if (dataSpec.uri.scheme in setOf("file", "content", "android.resource")) {
                         return@Factory dataSpec
                     }
@@ -272,6 +280,12 @@ class DownloadUtil
                     try {
                         if (playerCache.isCached(mediaId, dataSpec.position, CACHE_PROBE_LENGTH)) {
                             Log.d(TAG, "[Player] Serving from playerCache: $mediaId")
+                            // The cache key stays the queue ID. The initialization adapter still
+                            // needs the media URI to recognize matching bytes on an offline hit.
+                            if (initialization != null) {
+                                val url = removeRangeParameter(requireNotNull(binding).initial.stream.url)
+                                return@Factory dataSpec.withUri(url.toUri())
+                            }
                             return@Factory dataSpec
                         }
                     } catch (e: Exception) {

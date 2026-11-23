@@ -32,6 +32,8 @@ and later key renewals use current URLs and headers without retargeting provisio
 Remote DASH manifests and their initialization and media segments receive the bound stream's media
 headers. When Media3 combines adjacent DASH initialization and index ranges, the licensed identifier
 mapping buffers and rewrites only the declared initialization bytes.
+Progressive playback applies the mapping after resolving the queue URI, including when the cache
+serves the original bytes.
 Providers requiring DRM declare `api.min: 4`. HLS/DRM offline downloads are unsupported. The v1
 non-goals below describe the original proposal, not this implemented extension.
 
