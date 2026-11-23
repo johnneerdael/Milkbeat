@@ -991,4 +991,7 @@
     <string name="audio_codec_dts_hd" translatable="false">DTS-HD</string>
     <string name="audio_codec_mpegh" translatable="false">MPEG-H</string>
     <string name="audio_codec_iamf" translatable="false">IAMF</string>
+    <string name="visualizer_brightness_limiter">Brightness limiter</string>
+    <string name="visualizer_brightness_off">Off</string>
+    <string name="visualizer_brightness_percent">%1$d%%</string>
 </resources>

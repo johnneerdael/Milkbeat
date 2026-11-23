@@ -265,6 +265,7 @@ private fun LazyListScope.engineSettingsItems(
     pickerRow(VisualizerPicker.NATIVE_TRAILS, R.string.visualizer_native_trails_subtitle)
     pickerRow(VisualizerPicker.FRAME_RATE, R.string.visualizer_frame_rate_subtitle)
     pickerRow(VisualizerPicker.DETAIL, R.string.visualizer_detail_subtitle)
+    pickerRow(VisualizerPicker.BRIGHTNESS)
     toggleRow("diagnostics", R.string.visualizer_diagnostics, diagnostics, { stringResource(R.string.visualizer_diagnostics_subtitle) }) {
         setDiagnostics(it)
     }

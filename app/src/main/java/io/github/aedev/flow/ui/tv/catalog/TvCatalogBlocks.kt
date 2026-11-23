@@ -25,6 +25,7 @@ import io.github.aedev.flow.R
 import io.github.aedev.flow.data.localmedia.LocalMediaIds
 import io.github.aedev.flow.data.music.model.MusicTrack
 import io.github.aedev.flow.ui.tv.components.TvButton
+import io.github.aedev.flow.ui.tv.focus.tvEndFocus
 import io.github.aedev.flow.ui.tv.focus.tvInitialFocus
 import nl.neerdael.milkbeat.catalog.CollectionBlock
 import nl.neerdael.milkbeat.catalog.CollectionLayout
@@ -84,6 +85,7 @@ internal fun LazyListScope.catalogBlocks(
     tables: TvCatalogTableLayout? = null,
     gridBlockId: String? = null,
     pageHeader: EntityHeader? = blocks.firstNotNullOfOrNull { it as? EntityHeader },
+    endFocus: FocusRequester? = null,
 ) {
     val firstTable = blocks.firstOrNull { it.isTrackTable }
     val firstShelf = blocks.firstOrNull { it is CollectionBlock && !it.isTrackTable }
@@ -97,7 +99,7 @@ internal fun LazyListScope.catalogBlocks(
 
             is CollectionBlock -> {
                 if (block.id == gridBlockId) {
-                    catalogGrid(block, actions, horizontalPadding)
+                    catalogGrid(block, actions, horizontalPadding, endFocus, index == blocks.lastIndex)
                 } else if (block.layout == CollectionLayout.TRACK_TABLE) {
                     val queueId = (pageHeader?.tracks ?: block.showAll)?.providerId
                     val source = block.header?.title ?: pageHeader?.title.orEmpty()
@@ -113,6 +115,8 @@ internal fun LazyListScope.catalogBlocks(
                         playingTrackFocus = tables?.playingTrackFocus,
                         paneFocus = tables?.paneFocus,
                         playingTrackPosition = tables?.playingTrackPosition?.minus(trackOffset),
+                        endFocus = endFocus,
+                        isLastBlock = index == blocks.lastIndex,
                     )
                     trackOffset += block.items.size
                 } else {
@@ -124,7 +128,9 @@ internal fun LazyListScope.catalogBlocks(
                         } else {
                             blockModifier
                         }
-                    item(key = block.id) { TvCatalogShelfBlock(block, actions, shelfModifier) }
+                    item(
+                        key = block.id,
+                    ) { TvCatalogShelfBlock(block, actions, shelfModifier.tvEndFocus(index == blocks.lastIndex, endFocus)) }
                 }
             }
         }

@@ -13,6 +13,8 @@ This page covers what the visualizer does inside Milkbeat. The **[ProjectM TV us
 - **It uses the same engine as the standalone app.** Each Milkbeat release names the ProjectM TV core it ships in its [release notes](https://github.com/johnneerdael/Milkbeat/releases). Milkbeat uses ProjectM TV's defaults for your device until you change something.
 - **Track details are Milkbeat's own.** The cover, artists and title in the upper left come from Milkbeat's player, so ProjectM TV's *Track display* and notification-access settings do not apply. Custom preset packs and ProjectM TV's own auto-update are not part of Milkbeat either.
 
+While the visualizer is visible and music plays, Milkbeat keeps Android TV Ambient Mode from interrupting it. Normal screensaver behavior resumes when you pause or leave the visualizer.
+
 ## Control it with the remote
 
 | Key | With the player controls hidden |
@@ -40,6 +42,7 @@ All visualizer settings are in [Settings → Visualizations](settings.md#visuali
 | Transition style | Auto, Lightweight or Classic blends | Auto | [Transitions](https://johnneerdael.github.io/ProjectM-TV/picture-quality/#transitions) |
 | Native trails | Standard, Medium or High feedback detail above 1330p | Standard | [Native trails](https://johnneerdael.github.io/ProjectM-TV/picture-quality/#native-trails) |
 | Frame rate | The display rate divided by 1, 2 or 4, at least 24 fps | 30 fps | [Frame rate and detail](https://johnneerdael.github.io/ProjectM-TV/picture-quality/#frame-rate-and-detail) |
+| Brightness limiter | Dim the visualizer to 75%, 50% or 25% | Off | |
 | Detail | Warp mesh from Minimal to Ultra | By device | [Frame rate and detail](https://johnneerdael.github.io/ProjectM-TV/picture-quality/#frame-rate-and-detail) |
 | Show diagnostics | A status line in the player controls | Off | [Diagnostics](https://johnneerdael.github.io/ProjectM-TV/settings/#diagnostics) |
 | Timing offset | Moves the visuals against the sound: −100, −50, −25, +0, +25, +50, +75, +100, +150 or +200 ms | +0 ms | |

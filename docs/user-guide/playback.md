@@ -19,6 +19,8 @@ Selecting a track, **Play** or **Shuffle** opens the full player. The track's co
 
 The controls hide on their own after a few seconds. With them hidden, **Left** and **Right** step through visualizer presets. **Back** hides the controls, then leaves the player; the [mini player](getting-started.md#find-your-way-around) keeps showing the track elsewhere in the app. Music keeps playing in the background unless you turn off **Background Play** in [Settings → Playback](settings.md#playback).
 
+From Search, close the on-screen keyboard, then press **Down** through the results to the bottom Now Playing strip. Press **OK** on the track to reopen the player.
+
 ## Audio quality
 
 Turn on **Show audio quality** in [Settings → Playback](settings.md#playback) to see what is playing at the top of the controls, in every view.

@@ -94,10 +94,13 @@ The ProjectM TV engine's settings, applied to Milkbeat's own visualizer. Changes
 | **Transition style** | **Auto** blends at a lower, adaptive resolution; **Lightweight** cuts and fades the old preset out on top; **Classic** is a full-resolution blend and costs the most | Auto |
 | **Native trails** | **Standard** keeps authored feedback; **Medium** and **High** add trail detail above 1330p at extra GPU cost | Standard |
 | **Frame rate** | The display rate divided by 1, 2 or 4, at least 24 fps. A lower rate leaves room for a sharper picture | 30 fps |
+| **Brightness limiter** | Dim the visualizer to 75%, 50% or 25%, while leaving controls and video unchanged | Off |
 | **Detail** | Warp mesh from Minimal to Ultra: finer warps and zooms for more processor time | By device (Medium here) |
 | **Show diagnostics** | Frame rate, render size, transition, audio level and preset in the playback controls | Off |
 
 Resolution is always automatic: it follows the frame-rate target and live memory headroom up to the screen's native size, including 4K. Previously saved fixed resolutions and memory toggles no longer apply.
+
+The brightness limiter affects the visualizer picture. Its percentage is relative to the original image and does not change your TV's brightness setting. The **Brightness** options in Mood mix choose presets, while the limiter dims their output.
 
 <div class="mb-pair" markdown>
 ![Transition length picker](images/picker-transition-length.png)

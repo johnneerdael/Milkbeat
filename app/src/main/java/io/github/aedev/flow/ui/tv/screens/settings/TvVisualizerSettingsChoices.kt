@@ -2,7 +2,9 @@ package io.github.aedev.flow.ui.tv.screens.settings
 
 import androidx.annotation.StringRes
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.res.stringResource
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.aedev.flow.R
 import io.github.aedev.flow.player.audio.visualizer.VisualizerMusicCategory
 import io.github.aedev.flow.player.audio.visualizer.VisualizerSettings
@@ -21,6 +23,7 @@ internal enum class VisualizerPicker {
     NATIVE_TRAILS,
     FRAME_RATE,
     DETAIL,
+    BRIGHTNESS,
     TIMING,
 }
 
@@ -46,6 +49,7 @@ internal fun visualizerChoices(
     viewModel: TvVisualizerSettingsViewModel,
 ): VisualizerChoices {
     val defaults = viewModel.defaults
+    val brightness by viewModel.brightness.collectAsStateWithLifecycle()
     return when (picker) {
         VisualizerPicker.PRESET_DURATION -> {
             choices(
@@ -133,6 +137,25 @@ internal fun visualizerChoices(
                 default = defaults.meshLevel,
                 label = { stringResource(DETAIL_LABELS[it]) },
                 onSelect = { viewModel.update { setMeshLevel(it) } },
+            )
+        }
+
+        VisualizerPicker.BRIGHTNESS -> {
+            choices(
+                title = stringResource(R.string.visualizer_brightness_limiter),
+                values = listOf(100, 75, 50, 25),
+                current = brightness,
+                default = 100,
+                label = {
+                    if (it ==
+                        100
+                    ) {
+                        stringResource(R.string.visualizer_brightness_off)
+                    } else {
+                        stringResource(R.string.visualizer_brightness_percent, it)
+                    }
+                },
+                onSelect = { viewModel.update { setBrightness(it) } },
             )
         }
 

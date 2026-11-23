@@ -3,6 +3,7 @@ package io.github.aedev.flow.ui.tv.navigation
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
 import androidx.media3.common.util.UnstableApi
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -41,6 +42,8 @@ fun TvNavHost(
     musicTabs: TvMusicTabsState,
     modifier: Modifier = Modifier,
     pluginLinkPending: Boolean = false,
+    searchStripFocus: FocusRequester? = null,
+    searchContentFocus: FocusRequester? = null,
 ) {
     NavHost(
         navController = navController,
@@ -97,6 +100,8 @@ fun TvNavHost(
         composable(TvDestination.SEARCH.route) {
             TvSearchScreen(
                 musicTabs = musicTabs,
+                stripFocus = searchStripFocus,
+                contentFocus = searchContentFocus,
                 onPlayMix = onPlayMix,
                 onOpenCatalog = { entity, provider -> navController.navigate(TvRoutes.catalog(entity, provider)) },
                 modifier = Modifier.fillMaxSize(),
