@@ -168,12 +168,14 @@ working without updates until you remove it.
 - **Deezer:** sign in for Home, Flow and your library. Stream availability and FLAC/MP3 quality
   depend on the account and recording. Deezer 0.2.1 needs plugin API 9; update Milkbeat first. With
   plugin API 10 it fetches each track in one request, so songs no longer pause mid-play.
-- **Eclipse:** a streaming-only audio provider for your Eclipse add-ons. Sign in with the TV code at
-  `eclipsemusic.app/tv`; Cloud is added from your account, and other add-ons are added under
-  **Add-on links** from their own install links, each reviewed and approved on the TV before
-  Milkbeat sends it anything. Atmos is requested only when the TV's output supports Dolby, and
-  **Report Eclipse listening** (off by default) sends one history event per finished listen.
-  Eclipse 0.1.0 needs plugin API 12; update Milkbeat first.
+- **Eclipse:** lossless and Atmos audio from your Eclipse add-ons, plus an Eclipse music tab with
+  the composed **For you** shelves (new releases, Daily Mixes with their tracks, top and trending
+  tracks), your Cloud playlists, Liked Songs, a Discover feed and a search across the approved
+  add-ons. Sign in with the TV code at `eclipsemusic.app/tv`; Cloud is added from your account, and
+  other add-ons are added under **Add-on links** from their own install links, each reviewed and
+  approved on the TV before Milkbeat sends it anything. Atmos is requested only when the TV's output
+  supports Dolby, and **Report Eclipse listening** (off by default) sends one history event per
+  finished listen. Eclipse 0.3.0 needs plugin API 12; update Milkbeat first.
 
 Under **Audio**, put providers in priority order and choose which ones play other services'
 tracks; under **Video**, choose the video plugin. Every track follows the order, including tracks
