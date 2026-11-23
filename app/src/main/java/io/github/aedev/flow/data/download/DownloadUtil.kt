@@ -22,7 +22,6 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.aedev.flow.data.local.PlayerPreferences
 import io.github.aedev.flow.di.DownloadCache
 import io.github.aedev.flow.di.PlayerCache
-import io.github.aedev.flow.network.AppProxyManager
 import io.github.aedev.flow.player.MusicVideoItems
 import io.github.aedev.flow.player.datasource.BoundPluginMusicDataSourceFactory
 import io.github.aedev.flow.player.datasource.MusicFolderDataSourceFactory
@@ -32,6 +31,7 @@ import io.github.aedev.flow.player.datasource.bindCachedMusicRendition
 import io.github.aedev.flow.player.datasource.clearCachedMusicResources
 import io.github.aedev.flow.player.datasource.hasCompleteMusicDownload
 import io.github.aedev.flow.player.stream.VideoCodecUtils
+import io.github.aedev.flow.plugin.host.publicPluginDestination
 import io.github.aedev.flow.plugin.playback.BoundPluginAudio
 import io.github.aedev.flow.plugin.playback.PictureLimits
 import io.github.aedev.flow.plugin.playback.PluginAudio
@@ -106,13 +106,10 @@ class DownloadUtil
         val downloads = MutableStateFlow<Map<String, Download>>(emptyMap())
 
         private val okHttpClient: OkHttpClient by lazy {
-            AppProxyManager
-                .applyTo(OkHttpClient.Builder())
-                // Plugin media and downloads never follow a hostname into the local network.
-                .dns(
-                    io.github.aedev.flow.plugin.host
-                        .publicDns(),
-                ).connectTimeout(30, TimeUnit.SECONDS)
+            OkHttpClient
+                .Builder()
+                .publicPluginDestination()
+                .connectTimeout(30, TimeUnit.SECONDS)
                 .readTimeout(60, TimeUnit.SECONDS)
                 .build()
         }

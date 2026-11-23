@@ -46,6 +46,36 @@ class PluginAudioRoutingTest : PluginAudioFixture() {
         }
 
     @Test
+    fun `a Spotify track retries the same Eclipse recording then switches to another Eclipse match`() =
+        runTest {
+            val eclipseId = "nl.neerdael.eclipse"
+            val eclipse =
+                plugin.copy(
+                    manifest = plugin.manifest.copy(id = eclipseId, roles = Roles(audio = AudioRole(setOf("eclipse"), match = true))),
+                )
+            every { registry.state } returns
+                MutableStateFlow(PluginRegistryState(listOf(eclipse), ProviderSelection(audio = listOf(eclipseId))))
+            val primary = matchTrack("cloud-recording", "eclipse")
+            val secondary = matchTrack("pulsar-recording", "eclipse")
+            coEvery { host.call(eclipseId, PluginOperations.matchAudio, any()) } returns AudioMatches(listOf(primary, secondary))
+            coEvery { host.call(eclipseId, PluginOperations.resolveAudio, match { it.track.ref == primary.ref }) } returns stream
+            coEvery { host.call(eclipseId, PluginOperations.resolveAudio, match { it.track.ref == secondary.ref }) } returns stream
+
+            assertThat(audio.resolve(original, null).track).isEqualTo(primary)
+            audio.failed(original.ref.providerId, stream.url, 401)
+            assertThat(audio.resolve(original, null).track).isEqualTo(primary)
+            coVerify(exactly = 1) {
+                host.call(eclipseId, PluginOperations.resolveAudio, match { it.track.ref == primary.ref && it.failure?.status == 401 })
+            }
+            coVerify(exactly = 1) { host.call(eclipseId, PluginOperations.matchAudio, any()) }
+
+            audio.failed(original.ref.providerId, stream.url, 401)
+            assertThat(audio.resolve(original, null).track).isEqualTo(secondary)
+            coVerify(exactly = 2) { host.call(eclipseId, PluginOperations.resolveAudio, match { it.track.ref == primary.ref }) }
+            coVerify(exactly = 2) { host.call(eclipseId, PluginOperations.matchAudio, any()) }
+        }
+
+    @Test
     fun `full cache clearing removes the accepted recording binding`() =
         runTest {
             coEvery { host.call("youtube", PluginOperations.matchAudio, any()) } returns AudioMatches(listOf(candidate))

@@ -3,8 +3,8 @@ package io.github.aedev.flow.plugin.playback
 import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.ResolvingDataSource
 import androidx.media3.datasource.okhttp.OkHttpDataSource
-import io.github.aedev.flow.plugin.host.hostAllowed
-import io.github.aedev.flow.plugin.host.publicDns
+import io.github.aedev.flow.plugin.host.httpsDestinationAllowed
+import io.github.aedev.flow.plugin.host.publicPluginDestination
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import okhttp3.CookieJar
@@ -22,7 +22,7 @@ internal fun checkedPluginDrmUrl(
     if (!url.isHttps || url.username.isNotEmpty() || url.password.isNotEmpty() || url.fragment != null) {
         throw IOException("Plugin DRM requires an HTTPS destination without user information or fragment")
     }
-    if (!hostAllowed(url.host, allowedHosts)) throw IOException("Plugin DRM destination is not granted")
+    if (!httpsDestinationAllowed(url, allowedHosts)) throw IOException("Plugin DRM destination is not granted")
     return url
 }
 
@@ -40,7 +40,7 @@ internal fun pluginDrmDataSourceFactory(
     val client =
         base
             .newBuilder()
-            .dns(publicDns())
+            .publicPluginDestination()
             .cookieJar(CookieJar.NO_COOKIES)
             .followRedirects(false)
             .followSslRedirects(false)

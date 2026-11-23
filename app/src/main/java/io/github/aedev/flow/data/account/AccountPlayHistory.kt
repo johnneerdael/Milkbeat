@@ -145,11 +145,10 @@ class AccountPlayHistory
             playingMs: Long = 0L,
             manual: Boolean = false,
         ) {
-            // A lifecycle report carries its own qualification: the plugin decides from real
-            // position-delta listening time, not the host's cumulative elapsed threshold.
-            if (endReason == null && !countsAsPlay(playedMs, durationMs)) return
             // Pinned now: an account or quality change before the send or a retry must not redirect it.
             val played = pluginAudio.acceptedListen(MusicVideoItems.descriptor(track)) ?: return
+            // Lifecycle reporters need early, audible checkpoints for interrupted-listen recovery.
+            if (!countsAsPlay(playedMs, durationMs) && !pluginAudio.reportsListenLifecycle(played)) return
             PlaybackTrace.event(
                 TraceEvent.HISTORY_QUEUED,
                 TraceField.PLAYED_MS to playedMs,

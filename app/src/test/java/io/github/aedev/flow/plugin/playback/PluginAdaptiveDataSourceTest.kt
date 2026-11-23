@@ -12,6 +12,7 @@ import nl.neerdael.milkbeat.plugin.AudioStream
 import nl.neerdael.milkbeat.plugin.ByteRange
 import nl.neerdael.milkbeat.plugin.FormatType
 import nl.neerdael.milkbeat.plugin.MediaFormat
+import okhttp3.Dns
 import okhttp3.OkHttpClient
 import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.Test
@@ -133,7 +134,7 @@ class PluginAdaptiveDataSourceTest {
             val initial = resolved(server.url("/audio").toString(), server.url("/video").toString())
             val binding = BoundPluginAudio(initial, { error("No refresh") })
             val client = OkHttpClient.Builder().sslSocketFactory(tls.first.socketFactory, tls.second).build()
-            val factory = pluginAdaptiveDataSourceFactory(client, binding, null, {}, { listOf("localhost") })
+            val factory = pluginAdaptiveDataSourceFactory(client, binding, null, {}, { listOf("localhost") }, Dns.SYSTEM)
             val source = factory.createDataSource()
             source.open(
                 DataSpec

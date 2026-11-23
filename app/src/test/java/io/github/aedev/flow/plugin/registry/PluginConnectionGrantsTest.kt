@@ -7,9 +7,10 @@ import kotlinx.coroutines.test.runTest
 import nl.neerdael.milkbeat.plugin.ApiRange
 import nl.neerdael.milkbeat.plugin.AudioRole
 import nl.neerdael.milkbeat.plugin.Permissions
+import nl.neerdael.milkbeat.plugin.PluginConnectionRow
+import nl.neerdael.milkbeat.plugin.PluginJson
 import nl.neerdael.milkbeat.plugin.PluginManifest
 import nl.neerdael.milkbeat.plugin.Roles
-import org.junit.Assert.assertThrows
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -55,10 +56,10 @@ class PluginConnectionGrantsTest {
             val registry = registry()
             val installed = registry.installForTest(plugin())
             assertThat(registry.state.value.grantedHosts(installed.id)).containsExactly("api.eclipsemusic.app")
-            registry.approveConnection(installed, "music.example.org", "org.example.music")
+            registry.approveConnection(installed, "c1", "music.example.org:443", "org.example.music")
             assertThat(registry.state.value.grantedHosts(installed.id))
-                .containsExactly("api.eclipsemusic.app", "music.example.org")
-            registry.revokeConnection(installed.id, "music.example.org")
+                .containsExactly("api.eclipsemusic.app", "music.example.org:443")
+            registry.revokeConnection(installed, PluginConnectionRow("c1", "Music", "music.example.org"))
             assertThat(registry.state.value.grantedHosts(installed.id)).containsExactly("api.eclipsemusic.app")
         }
 
@@ -67,7 +68,7 @@ class PluginConnectionGrantsTest {
         runTest {
             val registry = registry()
             val installed = registry.installForTest(plugin())
-            registry.approveConnection(installed, "music.example.org", "org.example.music")
+            registry.approveConnection(installed, "c1", "music.example.org:443", "org.example.music")
             val resigned = installed.copy(signerFingerprint = "bb")
             assertThat(registry.state.value.connectionOrigins(resigned.id, resigned.signerFingerprint)).isEmpty()
             val other = registry.installForTest(plugin(id = "other.plugin"))
@@ -75,14 +76,56 @@ class PluginConnectionGrantsTest {
         }
 
     @Test
-    fun `reapproving an add-on id moves its origin instead of accumulating`() =
+    fun `replacement withdraws the old row even if both the origin and audience change`() =
         runTest {
             val registry = registry()
             val installed = registry.installForTest(plugin())
-            registry.approveConnection(installed, "old.example.org", "org.example.music")
-            registry.approveConnection(installed, "new.example.org", "org.example.music")
+            val row = PluginConnectionRow("c1", "Music", "old.example.org", "org.example.music")
+            registry.approveConnection(installed, row.id, "old.example.org:443", "org.example.music")
+            registry.approveConnection(installed, "c2", "new.example.org:8443", "org.example.new", row)
             val origins = registry.state.value.connectionOrigins(installed.id, installed.signerFingerprint)
-            assertThat(origins).containsExactly("new.example.org")
+            assertThat(origins).containsExactly("new.example.org:8443")
+        }
+
+    @Test
+    fun `removing one row leaves another row's grant for their shared origin`() =
+        runTest {
+            val registry = registry()
+            val installed = registry.installForTest(plugin())
+            registry.approveConnection(installed, "c1", "music.example.org:443", "org.example.music")
+            registry.approveConnection(installed, "c2", "music.example.org:443", "org.example.music")
+            registry.revokeConnection(installed, PluginConnectionRow("c1", "First link", "music.example.org"))
+            assertThat(
+                registry.state.value.connections
+                    .map { it.connectionId },
+            ).containsExactly("c2")
+            assertThat(registry.state.value.connectionOrigins(installed.id, installed.signerFingerprint))
+                .containsExactly("music.example.org:443")
+        }
+
+    @Test
+    fun `legacy grants still allow HTTPS and are removed when the old row is replaced`() =
+        runTest {
+            val installed = registry().installForTest(plugin())
+            val oldGrant = PluginConnectionGrant(installed.id, installed.signerFingerprint, "music.example.org", "org.example.music", 1)
+            File(context.filesDir, "plugins/registry.json").writeText(
+                PluginJson.encodeToString(
+                    PluginRegistryState.serializer(),
+                    PluginRegistryState(listOf(installed), connections = listOf(oldGrant)),
+                ),
+            )
+            val reopened = PluginRegistry(context)
+            assertThat(reopened.state.value.connectionOrigins(installed.id, installed.signerFingerprint))
+                .containsExactly("music.example.org:443")
+            reopened.approveConnection(
+                installed,
+                "c2",
+                "new.example.org:443",
+                "org.example.new",
+                PluginConnectionRow("c1", "Music", "music.example.org", "org.example.music"),
+            )
+            assertThat(reopened.state.value.connectionOrigins(installed.id, installed.signerFingerprint))
+                .containsExactly("new.example.org:443")
         }
 
     @Test
@@ -90,7 +133,7 @@ class PluginConnectionGrantsTest {
         runTest {
             val registry = registry()
             val installed = registry.installForTest(plugin())
-            registry.approveConnection(installed, "music.example.org", "org.example.music")
+            registry.approveConnection(installed, "c1", "music.example.org:443", "org.example.music")
             registry.remove(installed.id)
             assertThat(registry.state.value.connections).isEmpty()
         }

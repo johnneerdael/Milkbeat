@@ -14,6 +14,8 @@ import nl.neerdael.milkbeat.plugin.HttpResponse
 import nl.neerdael.milkbeat.plugin.PluginJson
 import okhttp3.Call
 import okhttp3.Callback
+import okhttp3.Dns
+import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.Interceptor
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
@@ -22,6 +24,9 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 import java.io.IOException
+import java.net.InetAddress
+import java.net.Proxy
+import java.net.UnknownHostException
 import java.util.Base64
 import java.util.concurrent.TimeUnit
 import kotlin.coroutines.resume
@@ -32,6 +37,8 @@ private const val MAX_TIMEOUT_MS = 60_000L
 private const val MAX_RESPONSE_BYTES = 16L * 1024 * 1024
 private const val MAX_MANIFEST_BYTES = 2L * 1024 * 1024
 private val BODYLESS_METHODS = setOf("GET", "HEAD")
+
+private object ReviewedManifestRequest
 
 class PluginHttpException(
     message: String,
@@ -47,12 +54,13 @@ internal class PluginHttp(
     base: OkHttpClient,
     private val allowedHosts: () -> List<String>,
     /** Public-destination policy; a test may pass the system resolver for its local server. */
-    dns: okhttp3.Dns = publicDns(),
+    dns: Dns = publicDns(),
+    private val reviewedManifest: () -> HttpUrl? = { null },
 ) {
     private val client =
         base
             .newBuilder()
-            .dns(dns)
+            .publicPluginDestination(dns)
             .cookieJar(okhttp3.CookieJar.NO_COOKIES)
             .addNetworkInterceptor(Interceptor { chain -> chain.proceed(checked(chain.request())) })
             .build()
@@ -60,7 +68,13 @@ internal class PluginHttp(
     suspend fun fetch(request: HttpRequest): HttpResponse =
         withContext(Dispatchers.IO) {
             val method = request.method.uppercase()
-            val url = checked(Request.Builder().url(request.url).build()).url
+            val url = request.url.toHttpUrlOrNull() ?: throw PluginHttpException("Invalid plugin destination")
+            val confirming = !httpsDestinationAllowed(url, allowedHosts()) && url == reviewedManifest()
+            if (confirming &&
+                (method != "GET" || request.body != null || request.headers.keys.any { !it.equals("accept", ignoreCase = true) })
+            ) {
+                throw PluginHttpException("Manifest confirmation requires a credential-free GET")
+            }
             val body =
                 request.body
                     ?.takeUnless { method in BODYLESS_METHODS }
@@ -81,17 +95,21 @@ internal class PluginHttp(
             val call =
                 client
                     .newBuilder()
-                    .followRedirects(request.followRedirects)
-                    .followSslRedirects(request.followRedirects)
+                    .apply { if (confirming) cache(null) }
+                    .followRedirects(request.followRedirects && !confirming)
+                    .followSslRedirects(request.followRedirects && !confirming)
                     .callTimeout((request.timeoutMs ?: DEFAULT_TIMEOUT_MS).coerceAtMost(MAX_TIMEOUT_MS), TimeUnit.MILLISECONDS)
                     .build()
                     .newCall(
-                        Request
-                            .Builder()
-                            .url(url)
-                            .apply { request.headers.forEach { (name, value) -> header(name, value) } }
-                            .method(method, body ?: if (method in BODYLESS_METHODS) null else ByteArray(0).toRequestBody())
-                            .build(),
+                        checked(
+                            Request
+                                .Builder()
+                                .url(url)
+                                .apply { request.headers.forEach { (name, value) -> header(name, value) } }
+                                .apply { if (confirming) tag(ReviewedManifestRequest::class.java, ReviewedManifestRequest) }
+                                .method(method, body ?: if (method in BODYLESS_METHODS) null else ByteArray(0).toRequestBody())
+                                .build(),
+                        ),
                     )
             val trace = PlaybackTrace.start(TraceEvent.HTTP_STARTED, pluginHttpTraceCategory(url))
             var status = 0L
@@ -135,8 +153,13 @@ internal class PluginHttp(
 
     private fun checked(request: Request): Request {
         val url = request.url
-        if (!url.isHttps) throw PluginHttpException("Plugins may only use HTTPS: ${url.host}")
-        if (!hostAllowed(url.host, allowedHosts())) throw PluginHttpException("${url.host} is not in the plugin's permissions")
+        if (!url.isHttps || url.username.isNotEmpty() || url.password.isNotEmpty() || url.fragment != null) {
+            throw PluginHttpException("Plugins require an HTTPS destination without user information or fragment")
+        }
+        val confirming = request.tag(ReviewedManifestRequest::class.java) != null && url == reviewedManifest()
+        if (!confirming && !httpsDestinationAllowed(url, allowedHosts())) {
+            throw PluginHttpException("${url.host} is not in the plugin's permissions")
+        }
         return request
     }
 }
@@ -187,7 +210,9 @@ internal suspend fun inspectConnectionManifest(
         val body =
             base
                 .newBuilder()
-                .dns(publicDns())
+                .publicPluginDestination()
+                .cookieJar(okhttp3.CookieJar.NO_COOKIES)
+                .cache(null)
                 .followRedirects(false)
                 .followSslRedirects(false)
                 .callTimeout(30, TimeUnit.SECONDS)
@@ -201,9 +226,9 @@ internal suspend fun inspectConnectionManifest(
                 ).readResponse { response ->
                     if (response.code !in 200..299) throw PluginHttpException("The add-on answered HTTP ${response.code}")
                     if (response.body.contentLength() > MAX_MANIFEST_BYTES) throw PluginHttpException("The add-on manifest is too large")
-                    response.body.string().also {
-                        if (it.toByteArray().size > MAX_MANIFEST_BYTES) throw PluginHttpException("The add-on manifest is too large")
-                    }
+                    val source = response.body.source()
+                    if (source.request(MAX_MANIFEST_BYTES + 1)) throw PluginHttpException("The add-on manifest is too large")
+                    source.buffer.readUtf8()
                 }
         val payload =
             runCatching { PluginJson.parseToJsonElement(body) }.getOrNull()?.let { manifestFields(it, url.toString()) }
@@ -261,25 +286,25 @@ private fun manifestFields(
 }
 
 /**
- * Resolves [host] and refuses any private, loopback, link-local or unspecified address. A hostname
+ * Resolve the request hostname and refuse private, loopback, link-local or unspecified addresses. A hostname
  * that *looks* public can still resolve into the local network, so the check runs on the addresses
  * the connection will actually use; inspection, media and license transports all go through it.
  */
-internal fun publicDns(): okhttp3.Dns =
-    okhttp3.Dns { hostname ->
-        val resolved = okhttp3.Dns.SYSTEM.lookup(hostname)
-        if (resolved.isEmpty()) throw java.net.UnknownHostException(hostname)
-        // A name that is itself a loopback destination is the caller's own local server; a public
-        // name that resolves into the local network is refused.
-        val literalLoopback = hostname.equals("localhost", ignoreCase = true) || hostname == "127.0.0.1" || hostname == "[::1]"
-        if (!literalLoopback && resolved.any { isPrivateAddress(it) }) {
-            throw java.net.UnknownHostException("$hostname resolves to a private address")
+internal fun OkHttpClient.Builder.publicPluginDestination(dns: Dns = publicDns()): OkHttpClient.Builder =
+    // HTTP CONNECT and SOCKS can resolve the destination remotely, outside this policy.
+    proxy(Proxy.NO_PROXY).dns(dns)
+
+internal fun publicDns(resolver: Dns = Dns.SYSTEM): Dns =
+    Dns { hostname ->
+        val resolved = resolver.lookup(hostname)
+        if (resolved.isEmpty() || resolved.any(::isPrivateAddress)) {
+            throw UnknownHostException("The destination did not resolve to public addresses")
         }
         resolved
     }
 
 /** Whether [address] is a loopback, link-local, site-local or otherwise non-public destination. */
-internal fun isPrivateAddress(address: java.net.InetAddress): Boolean {
+internal fun isPrivateAddress(address: InetAddress): Boolean {
     if (address.isLoopbackAddress || address.isAnyLocalAddress || address.isLinkLocalAddress ||
         address.isSiteLocalAddress || address.isMulticastAddress
     ) {
@@ -290,8 +315,9 @@ internal fun isPrivateAddress(address: java.net.InetAddress): Boolean {
         val first = bytes[0].toInt() and 0xff
         val second = bytes[1].toInt() and 0xff
         // 100.64/10 carrier-grade NAT, 0/8 and 198.18/15 benchmarking ranges.
-        if (first == 0 || (first == 100 && second in 64..127) || (first == 198 && second in 18..19)) return true
+        if (first == 0 || first >= 240 || (first == 100 && second in 64..127) || (first == 198 && second in 18..19)) return true
     }
+    if (bytes.size == 16 && (bytes[0].toInt() and 0xe0) != 0x20) return true
     return false
 }
 

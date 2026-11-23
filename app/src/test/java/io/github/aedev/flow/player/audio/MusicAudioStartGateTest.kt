@@ -5,6 +5,7 @@ import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.analytics.AnalyticsListener
+import androidx.media3.exoplayer.source.MediaSource.MediaPeriodId
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.CoroutineScope
@@ -27,7 +28,7 @@ import org.robolectric.annotation.Config
 @OptIn(ExperimentalCoroutinesApi::class)
 class MusicAudioStartGateTest {
     private class Fixture(
-        scope: kotlinx.coroutines.CoroutineScope,
+        scope: CoroutineScope,
         onHoldChanged: () -> Unit = {},
     ) {
         val rejections = mutableListOf<Pair<String, Long>>()
@@ -72,22 +73,26 @@ class MusicAudioStartGateTest {
             position = 0
         }
 
-        fun monitor() {
+        fun monitor(flag: Int = Player.EVENT_PLAYBACK_STATE_CHANGED) {
             gate.onEvents(
                 player,
                 Player.Events(
                     androidx.media3.common.FlagSet
                         .Builder()
-                        .add(Player.EVENT_PLAYBACK_STATE_CHANGED)
+                        .add(flag)
                         .build(),
                 ),
             )
         }
 
-        fun advance(window: Any = windowUid) {
+        fun advance(
+            window: Any = windowUid,
+            period: MediaPeriodId? = null,
+            currentPeriod: MediaPeriodId? = period,
+        ) {
             val eventTimeline = singleWindowTimeline(window)
             gate.onAudioPositionAdvancing(
-                AnalyticsListener.EventTime(0L, eventTimeline, 0, null, 0L, eventTimeline, 0, null, 0L, 0L),
+                AnalyticsListener.EventTime(0L, eventTimeline, 0, period, 0L, eventTimeline, 0, currentPeriod, 0L, 0L),
                 0L,
             )
         }
@@ -216,6 +221,65 @@ class MusicAudioStartGateTest {
             assertFalse(fixture.gate.confirmed("song-9"))
             fixture.advance("first")
             assertTrue(fixture.gate.confirmed("song-9"))
+        }
+
+    @Test
+    fun `a stale period cannot confirm a retry in the same window`() =
+        runTest {
+            val fixture = Fixture(backgroundScope)
+            fixture.open("repeated")
+            fixture.monitor()
+            fixture.gate.sourceReplaced("repeated")
+            fixture.monitor()
+
+            val previous = MediaPeriodId("period", 1L)
+            val current = MediaPeriodId("period", 2L)
+            fixture.advance(period = previous, currentPeriod = current)
+            assertFalse(fixture.gate.confirmed("repeated"))
+            fixture.advance(period = current)
+            assertTrue(fixture.gate.confirmed("repeated"))
+        }
+
+    @Test
+    fun `a duplicate recording in a different queue window must confirm its own output`() =
+        runTest {
+            val fixture = Fixture(backgroundScope)
+            fixture.open("duplicate")
+            fixture.monitor()
+            fixture.advance()
+            assertTrue(fixture.gate.confirmed("duplicate"))
+
+            val previous = fixture.windowUid
+            fixture.windowUid = "second-window"
+            fixture.monitor(Player.EVENT_TIMELINE_CHANGED)
+            fixture.advance(window = previous)
+            assertFalse(fixture.gate.confirmed("duplicate"))
+            fixture.advance()
+            assertTrue(fixture.gate.confirmed("duplicate"))
+        }
+
+    @Test
+    fun `pause while buffering cancels recovery and resume starts a full timeout`() =
+        runTest {
+            val fixture = Fixture(backgroundScope)
+            fixture.open("paused")
+            fixture.monitor()
+            runCurrent()
+            advanceTimeBy(15_000)
+            fixture.playWhenReady = false
+            fixture.monitor(Player.EVENT_PLAY_WHEN_READY_CHANGED)
+            advanceTimeBy(25_000)
+            runCurrent()
+            assertTrue(fixture.rejections.isEmpty())
+
+            fixture.playWhenReady = true
+            fixture.monitor(Player.EVENT_PLAY_WHEN_READY_CHANGED)
+            advanceTimeBy(19_999)
+            runCurrent()
+            assertTrue(fixture.rejections.isEmpty())
+            advanceTimeBy(1)
+            runCurrent()
+            assertEquals(listOf("paused" to 0L), fixture.rejections)
         }
 
     @Test

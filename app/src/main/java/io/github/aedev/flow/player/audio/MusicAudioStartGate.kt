@@ -31,51 +31,67 @@ internal class MusicAudioStartGate(
     private val startTimeoutMs: Long = START_TIMEOUT_MS,
 ) : AnalyticsListener,
     Player.Listener {
-    private var confirmedMediaId: String? = null
-    private var pendingMediaId: String? = null
-    private var pendingPositionMs: Long? = null
-    private var pendingWindowUid: Any? = null
+    private data class Occurrence(
+        val mediaId: String,
+        val windowUid: Any?,
+    )
+
+    private class Pending(
+        val occurrence: Occurrence,
+        var positionMs: Long,
+    )
+
+    private var confirmed: Occurrence? = null
+    private var pending: Pending? = null
     private var startupCheck: Job? = null
 
     /** Whether [mediaId]'s current open has confirmed audio output. */
-    fun confirmed(mediaId: String): Boolean = confirmedMediaId == mediaId
+    fun confirmed(mediaId: String): Boolean = confirmed?.mediaId == mediaId && confirmed == currentOccurrence()
 
-    /**
-     * The frozen position of [mediaId]'s unconfirmed open, for the exposed player to hold while the
-     * listener has requested audio and the output is still pending; null when confirmed.
-     */
-    fun pendingHold(mediaId: String): Long? = pendingPositionMs?.takeIf { pendingMediaId == mediaId }
+    /** The frozen position of the unconfirmed occurrence, while the decoder opens. */
+    fun pendingHold(mediaId: String): Long? =
+        pending?.takeIf { it.occurrence.mediaId == mediaId && it.occurrence == currentOccurrence() }?.positionMs
 
     /** The attempt changed: a later advancement or rejection cannot be attributed to the old one. */
     fun attemptChanged() {
-        val changed = pendingMediaId != null || confirmedMediaId != null
-        startupCheck?.cancel()
-        startupCheck = null
-        pendingMediaId = null
-        pendingPositionMs = null
-        pendingWindowUid = null
+        val changed = pending != null || confirmed != null
+        cancelWatchdog()
+        pending = null
+        confirmed = null
         if (changed) onHoldChanged()
     }
 
     /** The same item's source was replaced or re-prepared: its audio start must be re-confirmed. */
     fun sourceReplaced(mediaId: String) {
-        if (confirmedMediaId == mediaId) {
-            confirmedMediaId = null
-            onHoldChanged()
-        }
-        if (pendingMediaId == mediaId) attemptChanged()
+        if (confirmed?.mediaId == mediaId || pending?.occurrence?.mediaId == mediaId) attemptChanged()
     }
 
     override fun onAudioPositionAdvancing(
         eventTime: AnalyticsListener.EventTime,
         playoutStartSystemTimeMs: Long,
     ) {
-        val mediaId = player.currentMediaItem?.mediaId?.takeIf { it.isNotBlank() } ?: return
-        if (confirmedMediaId == mediaId || pendingMediaId != mediaId) return
-        // A callback carrying another window's identity belongs to a source this open replaced.
-        val uid = pendingWindowUid
-        if (uid != null && eventTimeWindowUid(eventTime) != uid) return
-        confirm(mediaId)
+        val opening = pending ?: return
+        val occurrence = opening.occurrence
+        if (occurrence != currentOccurrence() || eventTimeWindowUid(eventTime) != occurrence.windowUid) return
+        // A re-prepare can reuse its playlist window but has a new media-period sequence number.
+        val period = eventTime.mediaPeriodId
+        if (period != null && eventTime.currentMediaPeriodId != null && period != eventTime.currentMediaPeriodId) return
+        confirmed = occurrence
+        pending = null
+        cancelWatchdog()
+        onHoldChanged()
+    }
+
+    override fun onPositionDiscontinuity(
+        oldPosition: Player.PositionInfo,
+        newPosition: Player.PositionInfo,
+        reason: Int,
+    ) {
+        if (reason != Player.DISCONTINUITY_REASON_SEEK) return
+        val opening = pending ?: return
+        if (opening.occurrence != currentOccurrence()) return
+        opening.positionMs = newPosition.positionMs.coerceAtLeast(0L)
+        onHoldChanged()
     }
 
     override fun onEvents(
@@ -88,66 +104,65 @@ internal class MusicAudioStartGate(
                 Player.EVENT_TRACKS_CHANGED,
                 Player.EVENT_POSITION_DISCONTINUITY,
                 Player.EVENT_TIMELINE_CHANGED,
+                Player.EVENT_PLAY_WHEN_READY_CHANGED,
+                Player.EVENT_PLAYBACK_SUPPRESSION_REASON_CHANGED,
             )
         ) {
             return
         }
-        monitor(player)
+        monitor()
     }
 
-    private fun monitor(player: Player) {
-        val mediaId = player.currentMediaItem?.mediaId?.takeIf { it.isNotBlank() } ?: return
-        if (confirmed(mediaId)) return
-        val wantsAudio =
-            player.playWhenReady &&
-                player.playbackSuppressionReason == Player.PLAYBACK_SUPPRESSION_REASON_NONE
-        val rejected =
-            player.playbackState == Player.STATE_ENDED ||
-                (player.playbackState == Player.STATE_READY && !player.currentTracks.isTypeSelected(C.TRACK_TYPE_AUDIO))
-        if (pendingMediaId != mediaId) {
-            // A new item never inherits the previous item's pending position or window identity.
-            startupCheck?.cancel()
-            startupCheck = null
-            pendingMediaId = mediaId
-            pendingPositionMs = player.currentPosition.coerceAtLeast(0L)
-            pendingWindowUid = currentWindowUid()
-            onHoldChanged()
-        }
-        if (pendingPositionMs == null) pendingPositionMs = player.currentPosition.coerceAtLeast(0L)
-        if (!wantsAudio && !rejected) {
-            // Nothing the listener asked for yet: stay pending without a deadline, paused mid-open.
-            startupCheck?.cancel()
-            startupCheck = null
+    private fun monitor() {
+        val occurrence = currentOccurrence()
+        if (occurrence == null) {
+            attemptChanged()
             return
         }
+        if (confirmed == occurrence) return
+        confirmed = null
+        val opening =
+            pending?.takeIf { it.occurrence == occurrence } ?: Pending(occurrence, player.currentPosition.coerceAtLeast(0L)).also {
+                cancelWatchdog()
+                pending = it
+                onHoldChanged()
+            }
+        if (!wantsAudio()) {
+            cancelWatchdog()
+            return
+        }
+        val rejected = hasNoAudio()
         if (!rejected && startupCheck?.isActive == true) return
-        startupCheck?.cancel()
-        val positionAtSchedule = pendingPositionMs ?: player.currentPosition.coerceAtLeast(0L)
+        cancelWatchdog()
         startupCheck =
             scope.launch {
                 if (rejected) yield() else delay(startTimeoutMs)
-                if (player.currentMediaItem?.mediaId != mediaId || confirmed(mediaId) || pendingMediaId != mediaId) return@launch
-                // The immediate rejection needs the no-audio-track state to hold; the bound exists
-                // for a selected track that still never produced audio output.
-                if (rejected && player.playbackState != Player.STATE_ENDED &&
-                    !(player.playbackState == Player.STATE_READY && !player.currentTracks.isTypeSelected(C.TRACK_TYPE_AUDIO))
-                ) {
-                    return@launch
-                }
+                if (pending !== opening || currentOccurrence() != occurrence || !wantsAudio()) return@launch
+                if (rejected && !hasNoAudio()) return@launch
                 attemptChanged()
-                onSilentStart(mediaId, positionAtSchedule)
+                onSilentStart(occurrence.mediaId, opening.positionMs)
             }
     }
 
-    private fun confirm(mediaId: String) {
-        confirmedMediaId = mediaId
-        pendingMediaId = null
-        pendingPositionMs = null
-        pendingWindowUid = null
+    private fun wantsAudio(): Boolean =
+        player.playWhenReady &&
+            player.playbackSuppressionReason == Player.PLAYBACK_SUPPRESSION_REASON_NONE &&
+            player.playbackState != Player.STATE_IDLE
+
+    private fun hasNoAudio(): Boolean =
+        player.playbackState == Player.STATE_ENDED ||
+            (player.playbackState == Player.STATE_READY && !player.currentTracks.isTypeSelected(C.TRACK_TYPE_AUDIO))
+
+    private fun cancelWatchdog() {
         startupCheck?.cancel()
         startupCheck = null
-        onHoldChanged()
     }
+
+    private fun currentOccurrence(): Occurrence? =
+        player.currentMediaItem
+            ?.mediaId
+            ?.takeIf { it.isNotBlank() }
+            ?.let { Occurrence(it, currentWindowUid()) }
 
     private fun eventTimeWindowUid(eventTime: AnalyticsListener.EventTime): Any? {
         val windowIndex = eventTime.windowIndex

@@ -166,7 +166,7 @@ class Media3MusicService : MediaLibraryService() {
     internal var learnDurationMs = 0L
     internal var learnPlayedMs = 0L
     internal var learnPlayingSinceMs = -1L
-    private var accountHistoryListener: MusicAccountHistoryListener? = null
+    internal var accountHistoryListener: MusicAccountHistoryListener? = null
 
     @Inject
     lateinit var downloadUtil: DownloadUtil
@@ -559,10 +559,7 @@ class Media3MusicService : MediaLibraryService() {
     /** Whether this item's provider takes API 12 listen-lifecycle reports instead of cadence samples. */
     internal fun reportsListenLifecycle(mediaId: String): Boolean {
         if (!::pluginAudio.isInitialized) return false
-        val pluginId = pluginAudio.current(mediaId)?.pluginId ?: return false
-        val plugin = pluginRegistry.state.value.plugin(pluginId) ?: return false
-        return plugin.manifest.roles.audio
-            ?.reportPlayback == true && plugin.manifest.api.target >= 12
+        return pluginAudio.current(mediaId)?.let(pluginAudio::reportsListenLifecycle) == true
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaLibrarySession? = mediaLibrarySession

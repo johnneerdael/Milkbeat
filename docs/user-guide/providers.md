@@ -97,27 +97,27 @@ you from your account. Every other add-on is added from its own setup page:
    credentials, and shows its provider name, destination and declared add-on ID.
 4. Choose whether the add-on may use your Eclipse account access, then select **Approve**.
 
-Milkbeat records the approval for that destination and that add-on ID. Replacing a link keeps the
-connection and its saved matches but asks you to review again, because a changed destination or
-add-on ID is a different trust decision. **Test access** reports which of three things failed:
+Milkbeat records the approval for that destination and that add-on ID. Replacing a link asks you
+to review it again. Saved matches carry over when the full link and add-on ID stay the same.
+**Test access** reports which of three things failed:
 the manifest, your account's authorization for that add-on, or the track lookup.
 
-Only approved destinations receive requests, and only the Eclipse add-on you approved receives your
-short-lived Eclipse add-on token. Your Eclipse account session is never sent to an add-on's host.
+Only approved destinations receive content requests. Account access sends a short-lived token
+specific to the approved add-on. The first-party Eclipse API alone receives your account session.
 
 ### Quality and playback
 
-Eclipse asks each add-on for the best quality it offers and classifies what actually comes back, so
-an Atmos request can return Hi-Res FLAC. Clear and ordinarily licensed Widevine HLS and DASH play
-through Milkbeat's player. Dolby Atmos is requested only when the TV's own audio output reports a
-Dolby codec; otherwise Eclipse falls back to Hi-Res or lossless. A receiver or soundbar shows the
-Atmos indication when the TV passes the stream through, and the now-playing line reports the source
-encoding separately from the actual output.
+Eclipse uses your quality setting and classifies what the add-on actually returns. For Cloud, Auto
+and High can request Atmos when the TV reports a compatible Dolby output, then try Hi-Res and CD
+lossless if Atmos is refused. Clear and licensed Widevine HLS and DASH play through Milkbeat's
+player. A receiver or soundbar shows Atmos when the TV passes the stream through. The now-playing
+line reports the source encoding separately from the actual output.
 
 Eclipse tracks you listen to for a while are reported to your Eclipse account history when
 **Report Eclipse listening** is on in Eclipse's details page. One event is sent per finished listen,
-with how long you actually played and why it ended. It stays off until you turn it on, and turning it
-off discards anything not yet sent. HLS and DASH streams cannot be downloaded for offline playback.
+with how long you actually played and why it ended. A temporary delivery failure can be retried
+without creating a second event. Turning reporting off clears unsent history. HLS and DASH streams
+are streaming only.
 
 ## Install a plugin
 

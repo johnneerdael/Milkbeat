@@ -289,6 +289,53 @@ class MusicAccountHistoryListenerTest {
         }
 
     @Test
+    fun `automatic advance is natural and accounts for the last audible slice`() =
+        runTest {
+            val fixture = fixture(lifecycle = true)
+            pump()
+            advanceTimeBy(1_500)
+            pump()
+
+            fixture.player.transition(1, Player.DISCONTINUITY_REASON_AUTO_TRANSITION)
+            pump()
+
+            val first = fixture.reports.single { !it.second.progress }
+            assertEquals("first", first.first.videoId)
+            assertEquals("natural", first.second.endReason)
+            assertEquals(1_500L, first.second.playingMs)
+            assertEquals(1_500L, first.second.positionMs)
+            fixture.listener.close()
+        }
+
+    @Test
+    fun `same track recovery retains its session then a stop interrupts it`() =
+        runTest {
+            val fixture = fixture(lifecycle = true)
+            pump()
+            advanceTimeBy(1_500)
+            pump()
+            fixture.listener.sourceWillReopen("first")
+            fixture.player.idle()
+            pump()
+            val checkpoint = fixture.reports.last().second
+            assertTrue(checkpoint.progress)
+            assertEquals(1_500L, checkpoint.playingMs)
+
+            fixture.listener.onMediaItemTransition(fixture.player.currentMediaItem, Player.MEDIA_ITEM_TRANSITION_REASON_PLAYLIST_CHANGED)
+            fixture.player.ready()
+            pump()
+            advanceTimeBy(500)
+            pump()
+            fixture.player.idle()
+            pump()
+            val stopped = fixture.reports.single { !it.second.progress }.second
+            assertEquals(checkpoint.playbackSessionId, stopped.playbackSessionId)
+            assertEquals("interrupted", stopped.endReason)
+            assertEquals(2_000L, stopped.playingMs)
+            fixture.listener.close()
+        }
+
+    @Test
     fun `lifecycle sampling starts once the accepted provider resolves`() =
         runTest {
             // Unknown at listen start, as an uncached stream is; known from the second sample on.
@@ -415,12 +462,27 @@ class MusicAccountHistoryListenerTest {
 
         override fun getState(): State = value
 
-        fun transition(index: Int) {
+        fun transition(
+            index: Int,
+            reason: Int = Player.DISCONTINUITY_REASON_SEEK,
+        ) {
             value =
                 value
                     .buildUpon()
                     .setCurrentMediaItemIndex(index)
                     .setContentPositionMs(position(0, isPlaying))
+                    .setPositionDiscontinuity(reason, 0L)
+                    .build()
+            invalidateState()
+            value = value.buildUpon().clearPositionDiscontinuity().build()
+        }
+
+        fun idle() {
+            value =
+                value
+                    .buildUpon()
+                    .setContentPositionMs(currentPosition)
+                    .setPlaybackState(Player.STATE_IDLE)
                     .build()
             invalidateState()
         }
@@ -439,7 +501,7 @@ class MusicAccountHistoryListenerTest {
             value =
                 value
                     .buildUpon()
-                    .setContentPositionMs(currentPosition)
+                    .setContentPositionMs(position(currentPosition, playWhenReady))
                     .setPlaybackState(Player.STATE_READY)
                     .build()
             invalidateState()
@@ -477,8 +539,10 @@ class MusicAccountHistoryListenerTest {
                     .buildUpon()
                     .setCurrentMediaItemIndex(mediaItemIndex)
                     .setContentPositionMs(position(positionMs, isPlaying))
+                    .setPositionDiscontinuity(Player.DISCONTINUITY_REASON_SEEK, positionMs)
                     .build()
             invalidateState()
+            value = value.buildUpon().clearPositionDiscontinuity().build()
             return Futures.immediateVoidFuture()
         }
 

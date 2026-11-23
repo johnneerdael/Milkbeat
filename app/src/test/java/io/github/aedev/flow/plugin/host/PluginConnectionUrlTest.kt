@@ -1,8 +1,15 @@
 package io.github.aedev.flow.plugin.host
 
 import com.google.common.truth.Truth.assertThat
+import okhttp3.Dns
+import okhttp3.HttpUrl.Companion.toHttpUrl
+import okhttp3.OkHttpClient
 import org.junit.Assert.assertThrows
 import org.junit.Test
+import java.net.InetAddress
+import java.net.InetSocketAddress
+import java.net.Proxy
+import java.net.UnknownHostException
 
 class PluginConnectionUrlTest {
     @Test
@@ -26,13 +33,36 @@ class PluginConnectionUrlTest {
     fun `a hostname that resolves into the local network is refused`() {
         // A public-looking name can still resolve to a private address; the check runs on the
         // addresses the transport will use.
-        for (literal in listOf("127.0.0.1", "10.1.2.3", "192.168.0.9", "169.254.1.1", "100.64.0.1", "0.0.0.0")) {
-            val address = java.net.InetAddress.getByName(literal)
+        for (literal in listOf("127.0.0.1", "10.1.2.3", "192.168.0.9", "169.254.1.1", "100.64.0.1", "0.0.0.0", "fc00::1", "fd12::1")) {
+            val address = InetAddress.getByName(literal)
             assertThat(isPrivateAddress(address)).isTrue()
         }
-        for (literal in listOf("8.8.8.8", "1.1.1.1", "93.184.216.34")) {
-            assertThat(isPrivateAddress(java.net.InetAddress.getByName(literal))).isFalse()
+        for (literal in listOf("8.8.8.8", "1.1.1.1", "93.184.216.34", "2606:4700:4700::1111")) {
+            assertThat(isPrivateAddress(InetAddress.getByName(literal))).isFalse()
         }
+    }
+
+    @Test
+    fun `direct plugin transport rejects names with mixed public and private DNS answers`() {
+        val dns = publicDns(Dns { listOf(InetAddress.getByName("1.1.1.1"), InetAddress.getByName("fd12::1")) })
+        val proxy = Proxy(Proxy.Type.HTTP, InetSocketAddress.createUnresolved("proxy.example.org", 8080))
+        val client =
+            OkHttpClient
+                .Builder()
+                .proxy(proxy)
+                .publicPluginDestination(dns)
+                .build()
+        assertThat(client.proxy).isEqualTo(Proxy.NO_PROXY)
+        assertThrows(UnknownHostException::class.java) { client.dns.lookup("music.example.org") }
+    }
+
+    @Test
+    fun `a reviewed origin grants only its exact port`() {
+        val link = "https://music.example.org:8443/manifest.json".toHttpUrl()
+        val ordinary = "https://music.example.org/manifest.json".toHttpUrl()
+        assertThat(httpsDestinationAllowed(link, listOf(approvedOrigin(link)))).isTrue()
+        assertThat(httpsDestinationAllowed(ordinary, listOf(approvedOrigin(link)))).isFalse()
+        assertThat(httpsDestinationAllowed(link, listOf(approvedOrigin(ordinary)))).isFalse()
     }
 
     @Test

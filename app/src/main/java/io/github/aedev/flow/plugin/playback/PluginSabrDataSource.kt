@@ -4,9 +4,11 @@ import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.ResolvingDataSource
 import androidx.media3.datasource.okhttp.OkHttpDataSource
-import io.github.aedev.flow.plugin.host.hostAllowed
+import io.github.aedev.flow.plugin.host.httpsDestinationAllowed
 import io.github.aedev.flow.plugin.host.publicDns
+import io.github.aedev.flow.plugin.host.publicPluginDestination
 import okhttp3.CookieJar
+import okhttp3.Dns
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.Interceptor
@@ -24,7 +26,7 @@ internal fun checkedPluginMediaUrl(
     if (!url.isHttps || url.username.isNotEmpty() || url.password.isNotEmpty() || url.fragment != null) {
         throw IOException("Plugin media requires an HTTPS destination without user information or fragment")
     }
-    if (!hostAllowed(url.host, allowedHosts)) throw IOException("Plugin media destination is not granted")
+    if (!httpsDestinationAllowed(url, allowedHosts)) throw IOException("Plugin media destination is not granted")
     return url
 }
 
@@ -40,12 +42,22 @@ internal fun pluginSabrDataSourceFactory(
     headers: Map<String, String>,
     verifyCurrent: () -> Unit,
     allowedHosts: () -> List<String>,
+): DataSource.Factory = pluginSabrDataSourceFactory(base, headers, verifyCurrent, allowedHosts, publicDns())
+
+/** Explicit DNS injection lets HTTPS tests use their local server without changing the public policy. */
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
+internal fun pluginSabrDataSourceFactory(
+    base: OkHttpClient,
+    headers: Map<String, String>,
+    verifyCurrent: () -> Unit,
+    allowedHosts: () -> List<String>,
+    dns: Dns,
 ): DataSource.Factory {
     val acceptedHeaders = headers.toMap()
     val client =
         base
             .newBuilder()
-            .dns(publicDns())
+            .publicPluginDestination(dns)
             .cookieJar(CookieJar.NO_COOKIES)
             .followRedirects(true)
             .followSslRedirects(true)

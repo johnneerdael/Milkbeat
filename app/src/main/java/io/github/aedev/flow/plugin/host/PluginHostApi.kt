@@ -26,6 +26,7 @@ import nl.neerdael.milkbeat.plugin.PluginJson
 import nl.neerdael.milkbeat.plugin.RandomBytesResult
 import nl.neerdael.milkbeat.plugin.StorageEntry
 import nl.neerdael.milkbeat.plugin.StoredValue
+import okhttp3.HttpUrl
 import okhttp3.OkHttpClient
 import java.io.File
 import java.io.IOException
@@ -67,8 +68,9 @@ internal class PluginHostApi(
     private val webLogin: WebLoginRefresher? = null,
     private val microG: MicroGAccounts? = null,
     private val connectionOrigins: () -> List<String> = { emptyList() },
+    reviewedManifest: () -> HttpUrl? = { null },
 ) {
-    private val http = PluginHttp(client, { plugin.grantedNetwork + connectionOrigins() })
+    private val http = PluginHttp(client, { plugin.grantedNetwork + connectionOrigins() }, reviewedManifest = reviewedManifest)
     private val storage = PluginStore(File(dataDirectory, "storage.json"), plugin.manifest.permissions.storage)
     private val secrets =
         PluginStore(File(dataDirectory, "secrets.json"), SECRETS_QUOTA, seal = KeystoreSecretBox::seal, open = KeystoreSecretBox::open)

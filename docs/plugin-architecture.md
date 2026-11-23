@@ -32,6 +32,13 @@ and later key renewals use current URLs and headers without retargeting provisio
 Providers requiring DRM declare `api.min: 4`. HLS/DRM offline downloads are unsupported. The v1
 non-goals below describe the original proposal, not this implemented extension.
 
+Plugin API 12 adds reviewed external connections. Milkbeat fetches the HTTPS manifest without
+credentials or redirects. During approval, the plugin can confirm that exact URL with a
+credential-free GET. A successful save records an origin grant scoped to the installed signer,
+connection ID, hostname and port. Replacing or removing a connection withdraws its grant. Plugin
+network requests, media and licenses use direct connections so Milkbeat can reject private DNS
+answers before opening them. These transports bypass the app's HTTP and SOCKS proxy settings.
+
 ## 1. What we are building
 
 Milkbeat becomes a player with no content of its own. Everything it browses and streams comes from

@@ -34,6 +34,7 @@ import javax.inject.Singleton
 
 private const val EXPIRY_MARGIN_MS = 60_000L
 private const val DEFAULT_LIFETIME_MS = 5 * 60 * 60_000L
+private const val ECLIPSE_PLUGIN_ID = "nl.neerdael.eclipse"
 
 /**
  * Resolves tracks through the audio providers in the order [audioProviderAttempts] gives. A track no
@@ -100,10 +101,15 @@ class PluginAudio
         internal fun preparationVersion(): Any = streamContext() to cacheGeneration.get()
 
         private val resolutionLocks = ConcurrentHashMap<AudioIdentity, Mutex>()
-        private val failures = ConcurrentHashMap<AudioIdentity, StreamFailure>()
-        private val failureContexts = ConcurrentHashMap<AudioIdentity, Any>()
-        private val failureProviders = ConcurrentHashMap<AudioIdentity, String>()
+
+        private data class FailedAudio(
+            val failure: StreamFailure,
+            val accepted: ResolvedAudio?,
+        )
+
+        private val failures = ConcurrentHashMap<AudioIdentity, FailedAudio>()
         private val mediaFailures = PlaybackProviderFailures()
+        private val eclipseMatchFailures = PlaybackProviderFailures()
 
         /** The stream for [track], resolving it unless a still-valid one covers what is asked. */
         suspend fun resolve(
@@ -168,47 +174,53 @@ class PluginAudio
             val generation = cacheGeneration.get()
             val version = context to generation
             val key = track.audioIdentity()
-            val failedAudio = resolved[key]
-            val acceptedSabrFailure = failures[key] != null && resolved[key]?.stream?.serverAbr != null
-            if ((failures[key]?.serverAbrFailure != null || acceptedSabrFailure) && failureContexts[key] != null &&
-                failureContexts[key] != (failedAudio?.nativeBinding?.let { nativeContext(failedAudio.pluginId) } ?: context)
-            ) {
-                failures.remove(key)
-                failureContexts.remove(key)
+            val failed = failures[key]
+            val previous = resolved[key]?.takeIf { it.preparationContext == context || ownsNativeSource(it) }
+            val failedAcceptance =
+                failed?.accepted?.takeIf { audio ->
+                    if (audio.nativeBinding != null) ownsNativeSource(audio) else audio.preparationContext == context
+                }
+            val protocolRecovery = failed?.failure?.serverAbrFailure != null || failed?.accepted?.stream?.serverAbr != null
+            if (protocolRecovery && failed?.accepted != null && failedAcceptance == null) {
+                failures.remove(key, failed)
                 throw IOException("The accepted playback account or provider changed")
             }
             val state = registry.state.value
-            val previous = resolved[key]?.takeIf { it.preparationContext == context || ownsNativeSource(it) }
-            val pendingFailure = failures[key]
             val providers =
                 audioProviderAttempts(state, track, withPicture = picture != null, preferredProviderId = preferredProviderId)
-                    .filterNot { mediaFailures.exhausted(key, it.plugin.id, nativeContext(it.plugin.id)) }
-            val pinned =
-                previous
-                    ?.takeIf {
-                        picture != null || !it.isValidAt(System.currentTimeMillis(), SystemClock.elapsedRealtime()) ||
-                            it.runtimeReceipt?.isCurrent() == false
-                    }?.let { audio ->
-                        providers.firstOrNull { it.plugin.id == audio.pluginId }?.let { AudioProviderAttempt(it.plugin, audio.track) }
+                    .filterNot { provider ->
+                        val id = provider.plugin.id
+                        val canRematchEclipse = id == ECLIPSE_PLUGIN_ID && provider.direct == null
+                        !canRematchEclipse && mediaFailures.exhausted(key, id, nativeContext(id))
                     }
-                    // The failed acceptance is gone but its provider keeps one fresh attempt at the
-                    // same position before the normal fallback order takes over — only while the
-                    // account and provider context it failed in is still current.
-                    ?: pendingFailure
-                        ?.takeIf { failureContexts[key] == null || failureContexts[key] == context }
-                        ?.let { failureProviders[key] }
-                        ?.let { failedId ->
-                            providers.firstOrNull { it.plugin.id == failedId }?.let {
-                                AudioProviderAttempt(it.plugin, it.direct ?: track)
-                            }
+            val failedProvider = failedAcceptance?.let { audio -> providers.firstOrNull { it.plugin.id == audio.pluginId } }
+            // An Eclipse match identifies the actual add-on and recording. Exhaust that match
+            // before looking for another add-on, without changing the user's provider order.
+            val failedMatch =
+                failedProvider?.takeIf { it.plugin.id == ECLIPSE_PLUGIN_ID && it.direct == null }?.let { failedAcceptance?.track }
+            val excludedEclipseIds = eclipseMatchFailures.exhaustedProviders(key, nativeContext(ECLIPSE_PLUGIN_ID))
+            val pinned =
+                failedAcceptance
+                    ?.track
+                    ?.takeUnless { failedMatch != null && it.ref.providerId in excludedEclipseIds }
+                    ?.let { recording -> failedProvider?.let { AudioProviderAttempt(it.plugin, recording) } }
+                    ?: previous
+                        ?.takeIf {
+                            picture != null || !it.isValidAt(System.currentTimeMillis(), SystemClock.elapsedRealtime()) ||
+                                it.runtimeReceipt?.isCurrent() == false
+                        }?.let { audio ->
+                            providers
+                                .firstOrNull { provider ->
+                                    provider.plugin.id == audio.pluginId &&
+                                        (provider.plugin.id != ECLIPSE_PLUGIN_ID || audio.track.ref.providerId !in excludedEclipseIds)
+                                }?.let { AudioProviderAttempt(it.plugin, audio.track) }
                         }
-            val protocolRecovery = failures[key]?.serverAbrFailure != null || acceptedSabrFailure
+            val recoveryFirst = pinned ?: failedProvider?.takeIf { failedMatch != null }
             val attempts =
                 when {
-                    protocolRecovery && pinned != null -> listOf(pinned) + providers.filterNot { it.plugin.id == pinned.plugin.id }
-                    pinned == null -> providers
-                    picture != null -> listOf(pinned)
-                    else -> listOf(pinned) + providers.filterNot { it.plugin.id == pinned.plugin.id }
+                    recoveryFirst == null -> providers
+                    picture != null && !protocolRecovery -> listOf(recoveryFirst)
+                    else -> listOf(recoveryFirst) + providers.filterNot { it.plugin.id == recoveryFirst.plugin.id }
                 }
             val order = (if (picture != null) attempts else providers).map { "${it.plugin.id}:${it.plugin.manifest.versionCode}" }
             resolved[key]
@@ -254,16 +266,23 @@ class PluginAudio
                     preparePicture != null && picture == null &&
                         plugin.manifest.roles.audio
                             ?.musicVideo == true && plugin.manifest.api.target < 7
-                var playable =
-                    known
-                        ?: matcher.playbackMatch(
+                val matchedEclipse = plugin.id == ECLIPSE_PLUGIN_ID && directAudioTrack(track, plugin) == null
+
+                suspend fun matchRecording(excludedInAttempt: String? = null): TrackDescriptor? {
+                    val strategy = plugin.audioMatchStrategy()
+                    if (matchedEclipse && (excludedEclipseIds.isNotEmpty() || excludedInAttempt != null)) {
+                        return matcher.alternatePlaybackMatch(
                             track,
                             plugin.id,
+                            excludedEclipseIds + setOfNotNull(excludedInAttempt),
                             strict,
-                            strategy = plugin.audioMatchStrategy(),
-                            onProgress = matchProgress,
+                            strategy,
+                            matchProgress,
                         )
-                        ?: return null
+                    }
+                    return matcher.playbackMatch(track, plugin.id, strict, excludedInAttempt, strategy, matchProgress)
+                }
+                var playable = known ?: matchRecording() ?: return null
                 for (attempt in 0..1) {
                     val request =
                         ResolveAudioRequest(
@@ -272,7 +291,10 @@ class PluginAudio
                             video = picture != null || legacyPicture,
                             maxVideoHeight = (picture ?: preparePicture)?.maxHeight,
                             videoCodecs = (picture ?: preparePicture)?.codecs.orEmpty(),
-                            failure = pendingFailure?.takeIf { failureProviders[key] == plugin.id },
+                            failure =
+                                failed?.failure?.takeIf {
+                                    failedAcceptance?.pluginId == plugin.id && failedAcceptance.track.ref == playable.ref
+                                },
                             prepareVideo =
                                 preparePicture != null && plugin.manifest.roles.audio
                                     ?.musicVideo == true,
@@ -339,19 +361,10 @@ class PluginAudio
                             continue
                         }
                         if (e.error.code !in setOf(PluginErrorCode.UNAVAILABLE, PluginErrorCode.NOT_FOUND)) break
-                        if (known != null) break
+                        if (known != null && !(matchedEclipse && failedMatch?.ref == playable.ref)) break
                         matcher.invalidate(track, plugin.id)
                         if (attempt != 0) break
-                        playable =
-                            matcher.playbackMatch(
-                                track,
-                                plugin.id,
-                                strict,
-                                excludedId = playable.ref.providerId,
-                                strategy = plugin.audioMatchStrategy(),
-                                onProgress = matchProgress,
-                            )
-                                ?: break
+                        playable = matchRecording(excludedInAttempt = playable.ref.providerId) ?: break
                     } catch (e: IOException) {
                         if (context != streamContext() || generation != cacheGeneration.get()) throw e
                         last =
@@ -371,17 +384,12 @@ class PluginAudio
                 resolveAudioAttempts(
                     attempts,
                     concurrent =
-                        track.hasNoPlayingSource(attempts) && pinned == null && picture == null &&
+                        track.hasNoPlayingSource(attempts) && recoveryFirst == null && picture == null &&
                             attempts.none { it.plugin.id == preferredProviderId && it.direct != null },
                     resolve = ::resolveAttempt,
                 )
             outcome.audio?.let { accepted ->
-                pendingFailure?.let { failure ->
-                    if (failures.remove(key, failure)) {
-                        failureProviders.remove(key)
-                        failureContexts.remove(key)
-                    }
-                }
+                failed?.let { failures.remove(key, it) }
                 synchronized(resolved) {
                     if (generation == cacheGeneration.get() &&
                         (version == preparationVersion() || (accepted.stream.serverAbr != null && ownsNativeSource(accepted)))
@@ -525,14 +533,15 @@ class PluginAudio
             serverAbrFailure: ServerAbrFailure? = null,
         ) {
             val key = playbackIds[id] ?: return
-            resolved[key]?.let { audio ->
-                failureProviders[key] = audio.pluginId
+            val accepted = resolved[key]
+            accepted?.let { audio ->
                 if (serverAbrFailure !in setOf(ServerAbrFailure.URL_EXPIRED, ServerAbrFailure.PLAYBACK_CONTEXT_RELOAD)) {
-                    mediaFailures.record(key, audio.pluginId, nativeContext(audio.pluginId))
+                    val context = nativeContext(audio.pluginId)
+                    mediaFailures.record(key, audio.pluginId, context)
+                    if (audio.pluginId == ECLIPSE_PLUGIN_ID) eclipseMatchFailures.record(key, audio.track.ref.providerId, context)
                 }
-                (audio.nativeBinding ?: audio.preparationContext)?.let { failureContexts[key] = it }
             }
-            failures[key] = StreamFailure(url, status, reloadPlaybackContext, serverAbrFailure)
+            failures[key] = FailedAudio(StreamFailure(url, status, reloadPlaybackContext, serverAbrFailure), accepted)
             if (status == 403 || serverAbrFailure != null || resolved[key]?.stream?.serverAbr != null) {
                 forget(id)
             } else {
@@ -588,15 +597,22 @@ class PluginAudio
                 cacheGeneration.incrementAndGet()
                 resolved.clear()
                 failures.clear()
-                failureContexts.clear()
-                failureProviders.clear()
                 mediaFailures.clear()
+                eclipseMatchFailures.clear()
             }
             resolvedRevision.update { it + 1 }
         }
 
         /** The accepted resolution [track] plays from now; a queued report pins it before it is sent. */
         fun acceptedListen(track: TrackDescriptor): ResolvedAudio? = resolved[track.audioIdentity()]
+
+        internal fun reportsListenLifecycle(played: ResolvedAudio): Boolean {
+            val manifest =
+                registry.state.value
+                    .plugin(played.pluginId)
+                    ?.manifest ?: return false
+            return manifest.api.target >= 12 && manifest.roles.audio?.reportPlayback == true
+        }
 
         /** Reports a listen to the plugin that played it, when it reports listens and the listener allows it. */
         suspend fun reportListen(

@@ -9,11 +9,13 @@ import androidx.media3.datasource.cache.Cache
 import androidx.media3.datasource.cache.CacheDataSource
 import androidx.media3.datasource.okhttp.OkHttpDataSource
 import io.github.aedev.flow.plugin.host.publicDns
+import io.github.aedev.flow.plugin.host.publicPluginDestination
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import nl.neerdael.milkbeat.plugin.FormatType
 import nl.neerdael.milkbeat.plugin.MediaFormat
 import okhttp3.CookieJar
+import okhttp3.Dns
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import java.io.IOException
@@ -24,6 +26,16 @@ internal fun pluginAdaptiveDataSourceFactory(
     cache: Cache?,
     verifyCurrent: (ResolvedAudio) -> Unit,
     allowedHosts: () -> List<String>,
+): DataSource.Factory = pluginAdaptiveDataSourceFactory(base, binding, cache, verifyCurrent, allowedHosts, publicDns())
+
+/** Explicit DNS injection lets HTTPS tests use their local server without changing the public policy. */
+internal fun pluginAdaptiveDataSourceFactory(
+    base: OkHttpClient,
+    binding: BoundPluginAudio,
+    cache: Cache?,
+    verifyCurrent: (ResolvedAudio) -> Unit,
+    allowedHosts: () -> List<String>,
+    dns: Dns,
 ): DataSource.Factory {
     val initial = binding.initial
     val formats = listOfNotNull(initial.stream.audioFormat, initial.stream.video).associateBy { it.url }
@@ -31,7 +43,7 @@ internal fun pluginAdaptiveDataSourceFactory(
     val client =
         base
             .newBuilder()
-            .dns(publicDns())
+            .publicPluginDestination(dns)
             .cookieJar(CookieJar.NO_COOKIES)
             .addNetworkInterceptor(
                 Interceptor { chain ->

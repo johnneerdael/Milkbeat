@@ -63,9 +63,16 @@ internal class MusicAccountHistoryListener(
 
     private var listen: Listen? = null
     private var cadence: Job? = null
-    private var transitioned = false
+
+    private data class Discontinuity(
+        val outgoing: Player.PositionInfo,
+        val incoming: Player.PositionInfo,
+        val isSeek: Boolean,
+    )
+
     private var transitionReason: Int? = null
-    private var outgoingPosition: Player.PositionInfo? = null
+    private var discontinuity: Discontinuity? = null
+    private var reopeningMediaId: String? = null
     private var closed = false
 
     init {
@@ -77,7 +84,6 @@ internal class MusicAccountHistoryListener(
         mediaItem: MediaItem?,
         reason: Int,
     ) {
-        transitioned = true
         transitionReason = reason
     }
 
@@ -86,11 +92,26 @@ internal class MusicAccountHistoryListener(
         newPosition: Player.PositionInfo,
         reason: Int,
     ) {
-        if (oldPosition.mediaItem?.mediaId == listen?.mediaId) outgoingPosition = oldPosition
-        if (reason == Player.DISCONTINUITY_REASON_SEEK) rebase(newPosition.positionMs)
+        if (oldPosition.mediaItem?.mediaId != listen?.mediaId) return
+        val previous = discontinuity
+        val isSeek = reason == Player.DISCONTINUITY_REASON_SEEK || reason == Player.DISCONTINUITY_REASON_SEEK_ADJUSTMENT
+        discontinuity = Discontinuity(previous?.outgoing ?: oldPosition, newPosition, isSeek || previous?.isSeek == true)
     }
 
-    // Transition callbacks expose the *new* current position. The discontinuity callback owns the
+    /** Keep one listening occurrence when the service replaces its MediaSource at the same position. */
+    fun sourceWillReopen(mediaId: String) {
+        if (listen?.mediaId == mediaId) reopeningMediaId = mediaId
+    }
+
+    fun sourceRecoveryExhausted(mediaId: String) {
+        if (listen?.mediaId != mediaId) return
+        reopeningMediaId = null
+        refreshCurrent(audible = listen?.playingSinceMs != null)
+        closeSegment()
+        finish(reason = "interrupted")
+    }
+
+    // Transition callbacks expose the incoming position. The discontinuity callback owns the
     // outgoing position; wait for the whole event batch so callback order cannot erase it.
     override fun onEvents(
         player: Player,
@@ -98,46 +119,77 @@ internal class MusicAccountHistoryListener(
     ) {
         if (closed) return
         val previous = listen
+        val mediaId = player.currentMediaItem?.mediaId
+        val reason = transitionReason
+        val change = discontinuity
+        transitionReason = null
+        discontinuity = null
+
+        val reopening = previous != null && previous.mediaId == mediaId && mediaId == reopeningMediaId
+        val replacement = reopening && reason == Player.MEDIA_ITEM_TRANSITION_REASON_PLAYLIST_CHANGED
+        if ((reason != null && !replacement) || previous?.mediaId != mediaId) {
+            change?.let { markOutgoing(it) }
+            closeSegment()
+            reopeningMediaId = null
+            finish(
+                reason =
+                    if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO ||
+                        reason == Player.MEDIA_ITEM_TRANSITION_REASON_REPEAT
+                    ) {
+                        "natural"
+                    } else {
+                        "replaced"
+                    },
+            )
+            startCurrent(manual = reason == Player.MEDIA_ITEM_TRANSITION_REASON_SEEK)
+            return
+        }
+
+        val wasAudible = previous?.playingSinceMs != null
+        if (change != null) {
+            markOutgoing(change)
+            if (change.isSeek && !reopening) {
+                previous?.let {
+                    samplePosition(it, change.incoming.positionMs, audible = false)
+                    it.seekedToEnd = nearEnd(it)
+                }
+            }
+        }
+        refreshCurrent(audible = wasAudible && change == null)
         closeSegment()
-        outgoingPosition?.let { previous?.positionMs = it.positionMs.coerceAtLeast(0) }
-        if (transitioned || previous?.mediaId != player.currentMediaItem?.mediaId) {
-            finish(reason = endReasonForTransition(previous))
-            startCurrent(manual = manualTransition(transitionReason))
-        } else {
-            if (outgoingPosition != null) emit(progress = true)
-            refreshCurrent()
-            if (player.playbackState == Player.STATE_ENDED || player.playbackState == Player.STATE_IDLE) {
+        when {
+            player.playbackState == Player.STATE_ENDED -> {
                 finish(reason = "natural")
-            } else {
-                // Seek and pause boundaries are event-driven. Seek time never increases playedMs.
-                if (outgoingPosition != null || !player.isPlaying) emit(progress = true)
-                if (player.isPlaying) listen?.playingSinceMs = nowMs()
+            }
+
+            player.playbackState == Player.STATE_IDLE && !reopening && player.playerError == null -> {
+                finish(reason = "interrupted")
+            }
+
+            else -> {
+                if (change != null || !isAudible()) emitProgress()
+                if (isAudible()) {
+                    reopeningMediaId = null
+                    listen?.playingSinceMs = nowMs()
+                }
                 updateCadence()
             }
         }
-        transitioned = false
-        transitionReason = null
-        outgoingPosition = null
     }
 
     fun close() {
         if (closed) return
         closed = true
+        val change = discontinuity
+        if (change != null) markOutgoing(change) else refreshCurrent(audible = listen?.playingSinceMs != null)
         closeSegment()
-        outgoingPosition?.let { listen?.positionMs = it.positionMs.coerceAtLeast(0) }
-            ?: refreshCurrent()
         finish(reason = "interrupted")
         player.removeListener(this)
     }
 
-    private fun manualTransition(reason: Int?): Boolean = reason == Player.MEDIA_ITEM_TRANSITION_REASON_SEEK
-
-    private fun endReasonForTransition(previous: Listen?): String {
-        val endedNaturally = player.playbackState == Player.STATE_ENDED
-        return when {
-            endedNaturally -> if (previous?.seekedToEnd == true) "seek_out" else "natural"
-            else -> "replaced"
-        }
+    private fun markOutgoing(change: Discontinuity) {
+        val current = listen ?: return
+        samplePosition(current, change.outgoing.positionMs, audible = current.playingSinceMs != null)
     }
 
     private fun startCurrent(manual: Boolean = false) {
@@ -148,14 +200,15 @@ internal class MusicAccountHistoryListener(
                 it.lifecycle = lifecycleReporter(mediaId)
             }
         refreshCurrent()
-        if (player.isPlaying) listen?.playingSinceMs = nowMs()
+        if (isAudible()) listen?.playingSinceMs = nowMs()
         updateCadence()
     }
 
-    private fun refreshCurrent() {
+    private fun isAudible(): Boolean = player.isPlaying && listen?.mediaId?.let(confirmedAudio) == true
+
+    private fun refreshCurrent(audible: Boolean = isAudible()) {
         val current = listen ?: return
         if (current.mediaId != player.currentMediaItem?.mediaId) return
-        current.positionMs = player.currentPosition.coerceAtLeast(0)
         if (current.track == null) current.track = resolveTrack(current.mediaId)
         // The accepted provider is unknown until the uncached stream resolves, so decide again on
         // every refresh instead of freezing a pre-resolution answer.
@@ -174,32 +227,21 @@ internal class MusicAccountHistoryListener(
                 ?.toLong()
                 ?.times(1_000)
             ?: 0L
-        countPositionDelta(current)
+        samplePosition(current, player.currentPosition, audible)
     }
 
-    /**
-     * Real listening time: forward deltas up to two seconds count only while audio is actually
-     * playing and confirmed. A jump is a seek, never time, and a paused forward seek cannot add any.
-     */
-    private fun countPositionDelta(current: Listen) {
+    /** A bounded position delta counts only inside an audible segment. */
+    private fun samplePosition(
+        current: Listen,
+        positionMs: Long,
+        audible: Boolean,
+    ) {
         val last = current.lastPositionMs
-        current.lastPositionMs = current.positionMs
-        if (last == null) return
-        val delta = current.positionMs - last
-        val audible = player.isPlaying && confirmedAudio(current.mediaId)
-        when {
-            delta in 1..MAX_PROGRESS_DELTA_MS && audible -> current.playingMs += delta
-            delta != 0L -> current.seekedToEnd = nearEnd(current)
-        }
-    }
-
-    /** An explicit seek rebases the sample baseline, so the jump is never credited as listening. */
-    private fun rebase(positionMs: Long) {
-        val current = listen ?: return
-        if (current.mediaId != player.currentMediaItem?.mediaId) return
         current.positionMs = positionMs.coerceAtLeast(0)
         current.lastPositionMs = current.positionMs
-        current.seekedToEnd = nearEnd(current)
+        if (last == null || !audible) return
+        val delta = current.positionMs - last
+        if (delta in 1..MAX_PROGRESS_DELTA_MS) current.playingMs += delta
     }
 
     private fun nearEnd(current: Listen): Boolean =
@@ -213,24 +255,22 @@ internal class MusicAccountHistoryListener(
 
     private fun playedMs(current: Listen): Long = current.playedMs + (current.playingSinceMs?.let { (nowMs() - it).coerceAtLeast(0) } ?: 0)
 
-    private fun emit(progress: Boolean) {
+    private fun emitProgress() {
         val current = listen ?: return
         val track = current.track ?: return
-        refreshCurrent()
         val sample =
             AccountListenProgress(
                 playedMs(current),
                 current.durationMs,
                 current.positionMs,
-                progress,
+                progress = true,
                 current.playbackSessionId,
-                endReason = if (progress) null else "replaced",
                 playingMs = current.playingMs,
                 manual = current.manual,
             )
-        if (progress && !current.lifecycle && !countsAsPlay(sample.playedMs, sample.durationMs)) return
-        if (progress && sample == current.lastProgress) return
-        if (progress) current.lastProgress = sample
+        if (!current.lifecycle && !countsAsPlay(sample.playedMs, sample.durationMs)) return
+        if (sample == current.lastProgress) return
+        current.lastProgress = sample
         report(track, sample)
     }
 
@@ -238,14 +278,6 @@ internal class MusicAccountHistoryListener(
         cadence?.cancel()
         cadence = null
         val current = listen ?: return
-        // Credit the audible time since the last sample before closing the listen.
-        val wasPlaying = current.lifecycle && current.playedMs > 0
-        closeSegment()
-        refreshCurrent()
-        if (wasPlaying) {
-            val delta = current.positionMs - (current.lastPositionMs ?: current.positionMs)
-            if (delta in 1..MAX_PROGRESS_DELTA_MS) current.playingMs += delta
-        }
         val finalReason = if (reason == "natural" && current.seekedToEnd) "seek_out" else reason
         val track = current.track
         val sample =
@@ -266,7 +298,7 @@ internal class MusicAccountHistoryListener(
     }
 
     private fun updateCadence() {
-        if (listen == null || !player.isPlaying) {
+        if (!isAudible()) {
             cadence?.cancel()
             cadence = null
             return
@@ -276,17 +308,17 @@ internal class MusicAccountHistoryListener(
             scope.launch {
                 // The event callback re-arms the playing segment, so the loop is bounded by the
                 // listen and playback, not by that transient marker.
-                while (listen != null && player.isPlaying) {
+                while (isAudible()) {
                     val current = listen ?: break
                     // The branch is chosen per iteration, so a listen that turns out to be a
                     // lifecycle provider switches cadence without waiting for the next track.
                     if (current.lifecycle) {
                         delay(LIFECYCLE_SAMPLE_MS)
-                        if (!player.isPlaying || listen !== current) break
+                        if (!isAudible() || listen !== current) break
                         refreshCurrent()
                         if (current.playingMs - current.lastCheckpointMs >= LIFECYCLE_CHECKPOINT_MS) {
                             current.lastCheckpointMs = current.playingMs
-                            emit(progress = true)
+                            emitProgress()
                         }
                     } else {
                         val untilQualified = playThresholdMs(current.durationMs) - playedMs(current)
@@ -297,16 +329,16 @@ internal class MusicAccountHistoryListener(
                         while (waited < wait) {
                             delay(LIFECYCLE_SAMPLE_MS)
                             waited += LIFECYCLE_SAMPLE_MS
-                            if (!player.isPlaying || listen !== current) break
+                            if (!isAudible() || listen !== current) break
                             if (lifecycleReporter(current.mediaId)) {
                                 current.lifecycle = true
                                 break
                             }
                         }
-                        if (!player.isPlaying || listen !== current) break
+                        if (!isAudible() || listen !== current) break
                         if (current.lifecycle) continue
                         refreshCurrent()
-                        emit(progress = true)
+                        emitProgress()
                     }
                 }
             }
