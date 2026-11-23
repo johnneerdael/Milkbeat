@@ -35,7 +35,7 @@ internal fun pluginMediaDataSourceFactory(
                 if (chain.request().method != "GET") throw IOException("Plugin media requires a GET")
                 chain.proceed(chain.request())
             }.build()
-    val upstream = OkHttpDataSource.Factory(client)
+    val upstream = pluginRangedDataSourceFactory(OkHttpDataSource.Factory(client))
     return if (cache == null) {
         upstream
     } else {

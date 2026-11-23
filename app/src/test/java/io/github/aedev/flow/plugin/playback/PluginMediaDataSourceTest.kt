@@ -51,6 +51,48 @@ class PluginMediaDataSourceTest {
     }
 
     @Test
+    fun `a declared range policy still splits a bound open`() {
+        val tls = PluginSabrDataSourceTest().loopbackTls()
+        mockwebserver3.MockWebServer().use { server ->
+            server.useHttps(tls.first.socketFactory)
+            server.start()
+            repeat(3) { index ->
+                server.enqueue(
+                    mockwebserver3.MockResponse
+                        .Builder()
+                        .code(206)
+                        .addHeader("Content-Range", "bytes ${index * 4}-${index * 4 + 3}/10")
+                        .body("abcd")
+                        .build(),
+                )
+            }
+            val client = OkHttpClient.Builder().sslSocketFactory(tls.first.socketFactory, tls.second).build()
+            val source = pluginMediaDataSourceFactory(client, null, {}, { listOf("localhost") }, Dns.SYSTEM).createDataSource()
+            try {
+                val spec =
+                    DataSpec
+                        .Builder()
+                        .setUri(server.url("/audio").toString())
+                        .setLength(10)
+                        .build()
+                        .withRangePolicy(PluginRangePolicy.Declared(4))
+                assertThat(source.open(spec)).isEqualTo(10)
+                val bytes = ByteArray(10)
+                var read = 0
+                while (read < bytes.size) {
+                    val count = source.read(bytes, read, bytes.size - read)
+                    if (count <= 0) break
+                    read += count
+                }
+                assertThat(read).isEqualTo(10)
+            } finally {
+                source.close()
+            }
+            assertThat(server.requestCount).isEqualTo(3)
+        }
+    }
+
+    @Test
     fun `a withdrawn origin is refused before any connection`() {
         val source = pluginMediaDataSourceFactory(OkHttpClient(), null, {}, { listOf("cdn.example") }).createDataSource()
         assertThat(
