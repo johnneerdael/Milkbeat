@@ -21,9 +21,16 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 
 /** One short-lived HTTPS endpoint. Neither the cookie nor the pairing code is placed in a URL. */
+internal data class CookieImportMessages(
+    val requestRefused: String,
+    val checkInput: String,
+    val sent: String,
+)
+
 internal class CookieImportServer(
     private val host: String,
     private val page: String,
+    private val messages: CookieImportMessages,
     private val submit: suspend (String) -> Unit,
 ) {
     val pairingCode = ByteArray(6).also(SecureRandom()::nextBytes).joinToString("") { "%02X".format(it) }
@@ -59,7 +66,7 @@ internal class CookieImportServer(
                         if (call.request.headers[HttpHeaders.Origin] != expected || length == null ||
                             length !in 1..8192 || attempts.incrementAndGet() > 10
                         ) {
-                            call.respondText("Request refused.", status = HttpStatusCode.Forbidden)
+                            call.respondText(messages.requestRefused, status = HttpStatusCode.Forbidden)
                             return@post
                         }
                         val form = call.receiveParameters()
@@ -75,11 +82,11 @@ internal class CookieImportServer(
                         val invalidCookie = value.length !in 20..4096 || value.any { it <= ' ' || it == ';' || it == ',' }
                         val wrongCode = !MessageDigest.isEqual(code.toByteArray(), pairingCode.toByteArray())
                         if (wrongCode || invalidCookie || !used.compareAndSet(false, true)) {
-                            call.respondText("Check the pairing code and cookie, then try again.", status = HttpStatusCode.BadRequest)
+                            call.respondText(messages.checkInput, status = HttpStatusCode.BadRequest)
                             return@post
                         }
                         submit(value)
-                        call.respondText("Sent to Milkbeat. Check the TV for the result.")
+                        call.respondText(messages.sent)
                     }
                 }
             }

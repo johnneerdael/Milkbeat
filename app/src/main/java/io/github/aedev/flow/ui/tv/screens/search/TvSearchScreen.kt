@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -146,6 +147,9 @@ fun TvSearchScreen(
             modifier
                 .fillMaxSize()
                 .padding(top = dimens.overscanVertical)
+                // Edge-to-edge draws behind the system keyboard; without this the results sit under
+                // it and cannot be scrolled into view while typing.
+                .imePadding()
                 .focusProperties {
                     exit = { direction ->
                         if (direction == FocusDirection.Down) stripFocus ?: FocusRequester.Default else FocusRequester.Default

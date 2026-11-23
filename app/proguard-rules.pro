@@ -58,6 +58,35 @@
 -dontwarn io.ktor.**
 -keep class io.ktor.** { *; }
 
+## Netty's optional desktop integrations are not used by the local Android setup server.
+## TLS uses the JDK/Android provider without client certificates; there is no tcnative/OpenSSL,
+## JFR, LDAP hostname enhancement, Log4j adapter or BlockHound integration on Android.
+-dontwarn io.netty.internal.tcnative.**
+-dontwarn javax.naming.ldap.LdapName
+-dontwarn javax.naming.ldap.Rdn
+-dontwarn jdk.jfr.**
+-dontwarn org.apache.log4j.**
+-dontwarn org.apache.logging.log4j.**
+-dontwarn reactor.blockhound.integration.BlockHoundIntegration
+# Netty isolates signature-polymorphic VarHandle calls for pre-33 Android. R8 must not inline or
+# merge them into classes loaded at startup: older ART rejects their bytecode during verification.
+-keep class io.netty.buffer.VarHandleByteBufferAccess { *; }
+# Ktor gives Netty this channel class for reflective construction of the server socket.
+-keep class io.netty.channel.socket.nio.NioServerSocketChannel { public <init>(); }
+# Netty's allocator locates this fallback method and the nested node fields by name.
+-keep class io.netty.util.concurrent.ConcurrentSkipListIntObjMultimap { *; }
+-keep class io.netty.util.concurrent.ConcurrentSkipListIntObjMultimap$* { *; }
+# Netty discovers inherited handler sharing through this runtime annotation, including Ktor sinks.
+-keep @interface io.netty.channel.ChannelHandler$Sharable
+-keep,allowshrinking @io.netty.channel.ChannelHandler$Sharable class *
+# Netty's leak detector verifies these method names with getDeclaredMethods during class init.
+-keep class io.netty.util.ReferenceCountUtil { *** touch(...); }
+-keep class io.netty.buffer.AbstractByteBufAllocator { *** toLeakAwareBuffer(...); }
+-keep class io.netty.buffer.AdvancedLeakAwareByteBuf {
+    *** touch(...);
+    *** recordLeakNonRefCountingOperation(...);
+}
+
 ## Optional classes other libraries reference
 -dontwarn org.conscrypt.**
 -dontwarn com.google.re2j.**
