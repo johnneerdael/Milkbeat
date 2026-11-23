@@ -249,6 +249,57 @@ class TvSearchViewModelTest {
         }
 
     @Test
+    fun `a changed provider identity brings the dropped source back`() =
+        runTest(dispatcher) {
+            music.pages = {
+                Result.failure(
+                    PluginCallException(
+                        "nl.neerdael.eclipse",
+                        PluginError(PluginErrorCode.UNSUPPORTED, "Add Pulsar or Gravity to search from Eclipse"),
+                    ),
+                )
+            }
+            val vm = viewModel()
+            vm.retainSources(mapOf(MUSIC.key to "install-1"))
+            vm.showSource(MUSIC)
+            vm.onQueryChange("anyma")
+            advanceUntilIdle()
+            assertThat(vm.unsupported.value).containsExactly(MUSIC.key)
+
+            // Pulsar connected: the plugin's identity moved, so the chip is offered again.
+            vm.retainSources(mapOf(MUSIC.key to "install-2"))
+            assertThat(vm.unsupported.value).isEmpty()
+        }
+
+    @Test
+    fun `a successful answer clears an earlier unsupported mark`() =
+        runTest(dispatcher) {
+            music.pages = {
+                Result.failure(
+                    PluginCallException(
+                        "nl.neerdael.eclipse",
+                        PluginError(PluginErrorCode.UNSUPPORTED, "Add Pulsar or Gravity to search from Eclipse"),
+                    ),
+                )
+            }
+            val vm = viewModel()
+            vm.showSource(MUSIC)
+            vm.onQueryChange("anyma")
+            advanceUntilIdle()
+            assertThat(vm.unsupported.value).containsExactly(MUSIC.key)
+
+            music.pages = { Result.success(page(it.query)) }
+            vm.onQueryChange("shut down")
+            advanceUntilIdle()
+            assertThat(vm.unsupported.value).isEmpty()
+            assertThat(
+                vm.state.value
+                    .results(MUSIC)
+                    .blocks,
+            ).isNotEmpty()
+        }
+
+    @Test
     fun `an ordinary failure keeps the provider in the chips`() =
         runTest(dispatcher) {
             music.pages = { Result.failure(IllegalStateException("The network said no")) }
