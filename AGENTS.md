@@ -758,9 +758,10 @@ revision must pass the configured ktlint rules.
   with `app/src/nightly/assets/plugin-preview-download-catalog.json`; preserve each distributed
   preview version's original archive hash/URL, including harmless signature-envelope rebuilds.
   Every descriptor row states the package's verified `apiMin` and `format`.
-  Stable and Preview publish the same five providers: Beatport 0.1.3 / versionCode 4 (code 393),
+  Stable and Preview publish the same six providers: Beatport 0.1.3 / versionCode 4 (code 393),
   Spotify 0.2.3 / versionCode 7 (code 981), SoundCloud 0.2.1 / versionCode 3 (code 089), Deezer
-  0.2.1 / versionCode 3 (code 734, API 9 for its encrypted audio) and YouTube 0.1.6 / versionCode 7
+  0.2.1 / versionCode 3 (code 734, API 9 for its encrypted audio), Eclipse 0.6.0 / versionCode 7
+  (code 141, API 12; see the Eclipse metadata rules below) and YouTube 0.1.6 / versionCode 7
   (code 563; API 11 for MicroG-RE-TV sign-in; attaches its largest playback artwork; since 0.1.4 a
   refused TV stream suspends the TV player for 30 minutes and retries the other players; since 0.1.5 a
   VIDEOS match that finds no videos for artist plus title searches the title alone once; 0.1.6 searches dated Tomorrowland/TML sets by performer/festival/year and attaches bounded recording-description evidence). Preserve each
@@ -1049,6 +1050,24 @@ run that occupies a physical device, and the resulting diff is thousands of line
   restored open listen as `interrupted` with the same event id, and posts batches to
   `api.eclipsemusic.app/api/events/batch` with the account JWT. Keep the host qualification
   threshold for non-lifecycle providers. Focused tests: `--tests '*MusicAccountHistoryListenerTest'`.
+
+- Eclipse is also a metadata provider (plugin 0.5.0+: composed Home, Your library and Discover;
+  0.6.0 added album/artist/editorial-playlist pages and station radio). The plugin maps the
+  account's composed feed into Milkbeat's shelves through the existing `metadata` role, so the host
+  needs no Eclipse-specific UI. Catalogue and library items carry `applemusic`/`isrc` descriptors but
+  never an `eclipse` id: the host matches them through the audio role, and adding `eclipse` there
+  made direct `audio.resolve` calls fail. Detail pages resolve inside the plugin through each
+  add-on's own `search` plus `album/{id}`, `artist/{id}` or `playlist/{id}` (Cloud albums use its
+  captured `/api/addons/{slug}/music/album?id=` page); station cards build a track list with
+  `POST /api/generate/autoplay`. Search runs against every approved add-on that advertises lookup
+  (Cloud, Pulsar, Gravity and community links). Keep catalogue rows out of the UI when their
+  endpoint is uncaptured (the retired YouTube-linked playlists) instead of rendering dead cards.
+  Do not add a host-side Eclipse catalogue cache or a selected-provider concept; the plugin is the
+  only owner of its feed. Verified on the UGOOS TV (app 1.0.19, Eclipse 0.5.0): the tab showed
+  `For you / Your library / Discover` with `Recently Played` and `Daily Mixes`, a Daily Mix track
+  played with `provider_result success=1` and TLS SNI to `pulsar`/`gravity`, and an Eclipse-chip
+  search for `anyma` returned add-on results with `runtime_execution_finished category=search
+  success=1`.
 
 - Reuse `ui/components/shared/QrCodeImage.kt` for QR presentation across features; its existing
   ZXing rendering and quiet zone remain shared by device pairing and the web sign-in viewer.
