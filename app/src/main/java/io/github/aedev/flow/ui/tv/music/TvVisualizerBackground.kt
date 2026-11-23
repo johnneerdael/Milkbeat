@@ -10,7 +10,6 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
@@ -19,6 +18,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.aedev.flow.player.EnhancedMusicPlayerManager
 import io.github.aedev.flow.player.audio.visualizer.VisualizerSettings
+import io.github.aedev.flow.ui.theme.PlayerScrim
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 
@@ -45,7 +45,7 @@ internal fun TvVisualizerBackground(
 @Composable
 internal fun VisualizerDimLayer(brightness: Int) {
     if (brightness < 100) {
-        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 1f - brightness / 100f)))
+        Box(Modifier.fillMaxSize().background(PlayerScrim.copy(alpha = 1f - brightness / 100f)))
     }
 }
 
