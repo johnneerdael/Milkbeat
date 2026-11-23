@@ -905,7 +905,8 @@ On TVs whose WebView lacks MULTI_PROFILE, the Spotify web-cookie-only contract u
 HTTPS setup listener. The computer verifies the SHA-256 certificate fingerprint shown on the TV,
 then submits the session pairing code and sp_dc cookie. Keep the listener limited to the selected
 LAN address and its sign-in lifecycle, never log cookie values, and do not apply this fallback to
-plugins that need WebView extraction or refresh. The Ktor Netty engine is used because CIO 3.5.2
+plugins that need WebView extraction or refresh. Browser text and responses come from Android string
+resources; escape translated values before inserting them into the HTML template. The Ktor Netty engine is used because CIO 3.5.2
 rejects HTTPS connectors; preserve the existing phone-viewer behavior when changing it.
 
 ## Documentation and publishing

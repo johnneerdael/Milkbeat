@@ -45,13 +45,10 @@ class CookieImportDeviceTest {
     fun androidHttpsCookieSetup() =
         runBlocking {
             val context = InstrumentationRegistry.getInstrumentation().targetContext
-            val page =
-                context.assets
-                    .open("account-signin/cookie.html")
-                    .bufferedReader()
-                    .use { it.readText() }
+            val page = renderCookieImportPage(context)
+            assertTrue(!page.contains("{{"))
             var received: String? = null
-            val server = CookieImportServer("127.0.0.1", page) { received = it }
+            val server = CookieImportServer("127.0.0.1", page, CookieImportMessages("refused", "invalid", "sent")) { received = it }
             val port = server.start()
             var certificate: X509Certificate? = null
             val trust =

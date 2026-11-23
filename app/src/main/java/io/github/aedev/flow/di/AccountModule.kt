@@ -8,12 +8,14 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import io.github.aedev.flow.R
+import io.github.aedev.flow.data.account.signin.CookieImportMessages
 import io.github.aedev.flow.data.account.signin.CookieImportServer
 import io.github.aedev.flow.data.account.signin.PhoneChannel
 import io.github.aedev.flow.data.account.signin.PhoneFrame
 import io.github.aedev.flow.data.account.signin.PhoneInput
 import io.github.aedev.flow.data.account.signin.PhoneInputServer
 import io.github.aedev.flow.data.account.signin.PhoneStatus
+import io.github.aedev.flow.data.account.signin.renderCookieImportPage
 import io.github.aedev.flow.plugin.host.AndroidMicroGAccountGateway
 import io.github.aedev.flow.plugin.host.MicroGAccountGateway
 import io.github.aedev.flow.sync.transport.LanAddress
@@ -42,12 +44,14 @@ object AccountModule {
                 host: String,
                 onCookie: (String) -> Unit,
             ): CookieServerHandle {
-                val page =
-                    context.assets
-                        .open("account-signin/cookie.html")
-                        .bufferedReader()
-                        .use { it.readText() }
-                val server = CookieImportServer(host, page, onCookie)
+                val localizedPage = renderCookieImportPage(context)
+                val messages =
+                    CookieImportMessages(
+                        requestRefused = context.getString(R.string.spotify_cookie_request_refused),
+                        checkInput = context.getString(R.string.spotify_cookie_check_input),
+                        sent = context.getString(R.string.spotify_cookie_sent),
+                    )
+                val server = CookieImportServer(host, localizedPage, messages, onCookie)
                 val boundPort =
                     try {
                         withContext(Dispatchers.IO) { server.start() }
