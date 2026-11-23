@@ -68,6 +68,9 @@
 -dontwarn org.apache.log4j.**
 -dontwarn org.apache.logging.log4j.**
 -dontwarn reactor.blockhound.integration.BlockHoundIntegration
+# Netty isolates signature-polymorphic VarHandle calls for pre-33 Android. R8 must not inline or
+# merge them into classes loaded at startup: older ART rejects their bytecode during verification.
+-keep class io.netty.buffer.VarHandleByteBufferAccess { *; }
 
 ## Optional classes other libraries reference
 -dontwarn org.conscrypt.**
