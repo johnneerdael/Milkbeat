@@ -7,6 +7,8 @@ import io.github.aedev.flow.player.MusicPlaybackRecoveryPlanner
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
+private const val TAG = "Media3MusicService"
+
 internal fun Media3MusicService.isAudioRendererError(error: PlaybackException): Boolean =
     error.errorCode == PlaybackException.ERROR_CODE_AUDIO_TRACK_WRITE_FAILED ||
         error.errorCode == PlaybackException.ERROR_CODE_AUDIO_TRACK_INIT_FAILED

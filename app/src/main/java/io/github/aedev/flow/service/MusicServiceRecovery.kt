@@ -16,7 +16,7 @@ import kotlinx.coroutines.launch
 import java.util.Locale
 import kotlin.math.min
 
-internal const val TAG = "Media3MusicService"
+private const val TAG = "Media3MusicService"
 internal const val MAX_RETRY_PER_SONG = 5
 internal const val BASE_RETRY_DELAY_MS = 3000L
 private const val MAX_RETRY_DELAY_MS = 30000L
