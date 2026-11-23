@@ -165,6 +165,9 @@ fun TvSearchField(
                     keyboard?.hide()
                     typing = false
                     onSearch()
+                    // The keyboard had the D-pad until now; land in the page so the next press scrolls
+                    // results (and, at the end of them, reaches the now-playing strip).
+                    focusManager.moveFocus(FocusDirection.Down)
                 },
             )
         } else {
@@ -186,6 +189,9 @@ fun TvSearchField(
                     keyboard?.hide()
                     typing = false
                     onSearch()
+                    // The keyboard had the D-pad until now; land in the page so the next press scrolls
+                    // results (and, at the end of them, reaches the now-playing strip).
+                    focusManager.moveFocus(FocusDirection.Down)
                 },
             )
         }
