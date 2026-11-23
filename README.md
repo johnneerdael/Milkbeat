@@ -138,6 +138,7 @@ Add **third-party plugins** in **Settings → Plugins** with their downloader co
 | Spotify | **981** | 772 |
 | SoundCloud | **089** | — |
 | Deezer | **734** | — |
+| Eclipse | **141** | — |
 | YouTube | **563** | — |
 <!-- /plugin-codes -->
 
