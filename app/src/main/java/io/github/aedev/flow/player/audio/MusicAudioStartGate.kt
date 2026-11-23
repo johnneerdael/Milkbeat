@@ -3,7 +3,9 @@ package io.github.aedev.flow.player.audio
 import androidx.media3.common.C
 import androidx.media3.common.Player
 import androidx.media3.common.Timeline
+import androidx.media3.exoplayer.DecoderCounters
 import androidx.media3.exoplayer.analytics.AnalyticsListener
+import androidx.media3.exoplayer.audio.AudioSink
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -21,6 +23,11 @@ import kotlinx.coroutines.yield
  * pending attempt. A Ready audio-only attempt with no selected audio track, an attempt that ends
  * before audio starts, or one whose selected track never produces audio within the bound, is
  * rejected so the service can recover at the same position.
+ *
+ * Gapless queue changes are the exception to "advancement per open": Media3 keeps the same audio
+ * output running into the next window and its position tracker reports advancement only once, after
+ * output starts. A window change that arrives while that output is still playing is therefore
+ * already sounding and is confirmed by the continuous output itself.
  */
 internal class MusicAudioStartGate(
     private val player: Player,
@@ -45,6 +52,13 @@ internal class MusicAudioStartGate(
     private var pending: Pending? = null
     private var startupCheck: Job? = null
 
+    /**
+     * Whether the audio output has kept playing since [confirmed] was established. Pausing,
+     * seeking, disabling the renderer or rebuilding the track all end it; a gapless queue change
+     * does not, because it reuses the running output.
+     */
+    private var outputContinuous = false
+
     /** Whether [mediaId]'s current open has confirmed audio output. */
     fun confirmed(mediaId: String): Boolean = confirmed?.mediaId == mediaId && confirmed == currentOccurrence()
 
@@ -58,6 +72,7 @@ internal class MusicAudioStartGate(
         cancelWatchdog()
         pending = null
         confirmed = null
+        outputContinuous = false
         if (changed) onHoldChanged()
     }
 
@@ -70,6 +85,7 @@ internal class MusicAudioStartGate(
         eventTime: AnalyticsListener.EventTime,
         playoutStartSystemTimeMs: Long,
     ) {
+        outputContinuous = true
         val opening = pending ?: return
         val occurrence = opening.occurrence
         if (occurrence != currentOccurrence() || eventTimeWindowUid(eventTime) != occurrence.windowUid) return
@@ -82,11 +98,35 @@ internal class MusicAudioStartGate(
         onHoldChanged()
     }
 
+    override fun onAudioTrackInitialized(
+        eventTime: AnalyticsListener.EventTime,
+        audioTrackConfig: AudioSink.AudioTrackConfig,
+    ) {
+        // A rebuilt output restarts playout, so the next advancement must confirm the current open.
+        outputContinuous = false
+    }
+
+    override fun onAudioTrackReleased(
+        eventTime: AnalyticsListener.EventTime,
+        audioTrackConfig: AudioSink.AudioTrackConfig,
+    ) {
+        outputContinuous = false
+    }
+
+    override fun onAudioDisabled(
+        eventTime: AnalyticsListener.EventTime,
+        decoderCounters: DecoderCounters,
+    ) {
+        outputContinuous = false
+    }
+
     override fun onPositionDiscontinuity(
         oldPosition: Player.PositionInfo,
         newPosition: Player.PositionInfo,
         reason: Int,
     ) {
+        // Only a seamless automatic transition keeps the output playing through a window change.
+        if (reason != Player.DISCONTINUITY_REASON_AUTO_TRANSITION) outputContinuous = false
         if (reason != Player.DISCONTINUITY_REASON_SEEK) return
         val opening = pending ?: return
         if (opening.occurrence != currentOccurrence()) return
@@ -120,6 +160,15 @@ internal class MusicAudioStartGate(
             return
         }
         if (confirmed == occurrence) return
+        if (confirmed != null && outputContinuous && wantsAudio() && !hasNoAudio()) {
+            // Gapless playback kept the output running into this window; there is no second
+            // advancement to wait for, so the continuous output itself confirms the new open.
+            confirmed = occurrence
+            pending = null
+            cancelWatchdog()
+            onHoldChanged()
+            return
+        }
         confirmed = null
         val opening =
             pending?.takeIf { it.occurrence == occurrence } ?: Pending(occurrence, player.currentPosition.coerceAtLeast(0L)).also {

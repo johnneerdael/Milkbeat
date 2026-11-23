@@ -5,6 +5,7 @@ import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.analytics.AnalyticsListener
+import androidx.media3.exoplayer.audio.AudioSink
 import androidx.media3.exoplayer.source.MediaSource.MediaPeriodId
 import io.mockk.every
 import io.mockk.mockk
@@ -49,6 +50,8 @@ class MusicAudioStartGateTest {
         var position = 0L
         var windowUid: Any = "window-0"
         private val currentTimeline: androidx.media3.common.Timeline = singleWindowTimeline()
+        val eventTimeline: androidx.media3.common.Timeline
+            get() = singleWindowTimeline()
 
         init {
             every { player.currentMediaItem } answers { item }
@@ -208,6 +211,86 @@ class MusicAudioStartGateTest {
         }
 
     @Test
+    fun `a gapless queue change confirms the next item without another advancement`() =
+        runTest {
+            val fixture = Fixture(backgroundScope)
+            fixture.open("song-1")
+            fixture.state = Player.STATE_READY
+            fixture.audioSelected = true
+            fixture.monitor()
+            fixture.advance()
+            assertTrue(fixture.gate.confirmed("song-1"))
+
+            // The same output keeps playing into the next window; Media3 reports advancement
+            // once, when output first starts, not again per media item.
+            fixture.open("song-2")
+            fixture.windowUid = "second-window"
+            fixture.monitor(Player.EVENT_TIMELINE_CHANGED)
+            assertTrue(fixture.gate.confirmed("song-2"))
+            assertNull(fixture.gate.pendingHold("song-2"))
+
+            advanceTimeBy(20_000)
+            runCurrent()
+            assertTrue(fixture.rejections.isEmpty())
+        }
+
+    @Test
+    fun `a seek ends continuous output so the replacement confirms its own start`() =
+        runTest {
+            val fixture = Fixture(backgroundScope)
+            fixture.open("song-1")
+            fixture.state = Player.STATE_READY
+            fixture.audioSelected = true
+            fixture.monitor()
+            fixture.advance()
+            assertTrue(fixture.gate.confirmed("song-1"))
+
+            val position = positionInfo("song-1")
+            fixture.gate.onPositionDiscontinuity(position, position, Player.DISCONTINUITY_REASON_SEEK)
+            fixture.open("song-2")
+            fixture.windowUid = "second-window"
+            fixture.monitor(Player.EVENT_TIMELINE_CHANGED)
+            assertFalse(fixture.gate.confirmed("song-2"))
+            assertNotNull(fixture.gate.pendingHold("song-2"))
+
+            fixture.advance()
+            assertTrue(fixture.gate.confirmed("song-2"))
+            assertNull(fixture.gate.pendingHold("song-2"))
+        }
+
+    @Test
+    fun `a rebuilt audio output does not confirm the next item by continuity`() =
+        runTest {
+            val fixture = Fixture(backgroundScope)
+            fixture.open("song-1")
+            fixture.state = Player.STATE_READY
+            fixture.audioSelected = true
+            fixture.monitor()
+            fixture.advance()
+            assertTrue(fixture.gate.confirmed("song-1"))
+
+            fixture.gate.onAudioTrackInitialized(
+                AnalyticsListener.EventTime(0L, fixture.eventTimeline, 0, null, 0L, fixture.eventTimeline, 0, null, 0L, 0L),
+                AudioSink.AudioTrackConfig(androidx.media3.common.C.ENCODING_PCM_16BIT, 44_100, 12, false, false, 4_096),
+            )
+            fixture.open("song-2")
+            fixture.windowUid = "second-window"
+            fixture.monitor(Player.EVENT_TIMELINE_CHANGED)
+            assertFalse(fixture.gate.confirmed("song-2"))
+            assertNotNull(fixture.gate.pendingHold("song-2"))
+        }
+
+    private fun positionInfo(mediaId: String): Player.PositionInfo {
+        val item =
+            MediaItem
+                .Builder()
+                .setMediaId(mediaId)
+                .setUri("music://$mediaId")
+                .build()
+        return Player.PositionInfo("window-0", 0, item, "period", 0, 0L, 0L, C.INDEX_UNSET, C.INDEX_UNSET)
+    }
+
+    @Test
     fun `a callback from an earlier window cannot confirm its replacement`() =
         runTest {
             val fixture = Fixture(backgroundScope)
@@ -251,6 +334,9 @@ class MusicAudioStartGateTest {
 
             val previous = fixture.windowUid
             fixture.windowUid = "second-window"
+            // Seeking to the duplicate window flushes the output, so continuity cannot confirm it.
+            val position = positionInfo("duplicate")
+            fixture.gate.onPositionDiscontinuity(position, position, Player.DISCONTINUITY_REASON_SEEK)
             fixture.monitor(Player.EVENT_TIMELINE_CHANGED)
             fixture.advance(window = previous)
             assertFalse(fixture.gate.confirmed("duplicate"))
