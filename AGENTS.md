@@ -1014,6 +1014,42 @@ run that occupies a physical device, and the resulting diff is thousands of line
   Use `crypto.randomBytes` (SecureRandom, 1–256 bytes) for installation identities; never copy a
   captured identifier. Web-login compatibility remains required.
 
+- Plugin API 12 (Eclipse) adds three host capabilities. **Reviewed connections**: a plugin
+  declaring `permissions.connections` may own external add-on links; `PluginConnections` fetches a
+  candidate manifest itself (`connections.inspect`, no credentials, no redirects, public HTTPS only,
+  bounded body) and only then records an approval bound to the installed plugin and its signer
+  (`PluginRegistryState.connections`). Approved origins are merged into that plugin's grants by
+  `grantedHosts`, which every JSON, media, SABR and license transport reads per request, so a
+  revocation or replacement takes effect immediately; a differently signed reinstall, a link
+  replacement that changes the add-on ID, and plugin removal all withdraw the old origin. Never widen
+  a connection origin to a host pattern, follow a redirect to one, or let an unapproved origin reach
+  `PluginHttp`. **AudioDrm extensions**: optional `serviceCertificate` (base64, 128–32 768 bytes),
+  `multiSession` and a provider-declared `initialization` range whose two public track identifiers are
+  applied to exactly that byte range (`PluginDrmInitialization`, format-checked) before Media3 reads
+  it; `MusicMediaSourceFactory` routes a server-returned audio DASH manifest through
+  `DashMediaSource`. **ReportPlayback lifecycle**: `phase` (PROGRESS/END), `endReason`,
+  `occurrenceId`, `playingMs` and `manual`; providers targeting API 11 or older keep the previous
+  contract (checkpoint on the plugin's `manifest.api.target`, as `reportsListenLifecycle` does).
+  Regenerate the SDK with `./gradlew :plugin-api:test -PupdatePluginSchema`, then `npm run generate`
+  and `npm run check` in `plugins/sdk/`.
+- Playback reports Playing only after confirmed audio output. `MusicAudioStartGate` binds
+  confirmation to one open attempt via Media3's `onAudioPositionAdvancing`, rejects a Ready
+  audio-only source with no selected audio track, and bounds a selected track that never advances
+  (20 s); `OutputReportingPlayer` then holds the exposed state in buffering at the attempt's base
+  position instead of advancing a silent clock. `failOverSilentStart` refreshes the accepted
+  provider once at the same position and lets the normal provider order take over; pause stays
+  paused, and `refreshStreamMediaItemAt`/`restartFailedItem` re-arm the gate so a replaced source
+  must confirm its own start. Keep a 401 or 403 media refusal on the same-provider refresh path
+  before rejecting the provider. Focused tests: `--tests '*MusicAudioStartGate*'`.
+- Eclipse listening history is opt-in per plugin (`Report Eclipse listening`, plugin setting
+  `reportListening`) and reports exactly one terminal event per listen. `MusicAccountHistoryListener`
+  samples lifecycle providers every second and checkpoints every 5 s, counting only forward position
+  deltas of 1–2000 ms (seeks, buffering and recovery never add time); the plugin builds the event at
+  END, persists its open checkpoint and outbox in sealed secrets under the account, finishes a
+  restored open listen as `interrupted` with the same event id, and posts batches to
+  `api.eclipsemusic.app/api/events/batch` with the account JWT. Keep the host qualification
+  threshold for non-lifecycle providers. Focused tests: `--tests '*MusicAccountHistoryListenerTest'`.
+
 - Reuse `ui/components/shared/QrCodeImage.kt` for QR presentation across features; its existing
   ZXing rendering and quiet zone remain shared by device pairing and the web sign-in viewer.
 
