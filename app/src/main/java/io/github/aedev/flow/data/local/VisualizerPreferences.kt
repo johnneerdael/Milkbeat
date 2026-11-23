@@ -43,6 +43,10 @@ class VisualizerPreferences
             appContext.visualizerDataStore.edit { it[VisualizerKeys.ENABLED] = enabled }
         }
 
+        val brightness: Flow<Int> = appContext.visualizerDataStore.data.map { normalizeVisualizerBrightness(it[VisualizerKeys.BRIGHTNESS]) }
+
+        suspend fun setBrightness(value: Int) = set(VisualizerKeys.BRIGHTNESS, normalizeVisualizerBrightness(value))
+
         /** Whether the controls bar shows the engine's diagnostics under the audio meter. */
         val diagnostics: Flow<Boolean> = appContext.visualizerDataStore.data.map { it[VisualizerKeys.DIAGNOSTICS] ?: false }
 
@@ -159,9 +163,12 @@ private object VisualizerKeys {
     val FRAME_RATE_CAP = intPreferencesKey("frame_rate_cap")
     val MESH_LEVEL = intPreferencesKey("mesh_level")
     val NATIVE_TRAILS = intPreferencesKey("native_trails")
+    val BRIGHTNESS = intPreferencesKey("brightness_limit")
     val TIMING_OFFSET_MS = intPreferencesKey("timing_offset_ms")
     val ENABLED = booleanPreferencesKey("enabled")
     val DIAGNOSTICS = booleanPreferencesKey("diagnostics")
     val SHOW_MUSIC_VIDEOS = booleanPreferencesKey("show_music_videos")
     val NOW_PLAYING_VIEW = stringPreferencesKey("now_playing_view")
 }
+
+internal fun normalizeVisualizerBrightness(value: Int?): Int = value?.takeIf { it in listOf(100, 75, 50, 25) } ?: 100

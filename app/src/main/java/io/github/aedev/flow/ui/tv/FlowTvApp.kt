@@ -18,6 +18,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -71,6 +72,7 @@ fun FlowTvApp(
     val musicTabsViewModel: TvMusicTabsViewModel = hiltViewModel(activity)
     val musicTabs by musicTabsViewModel.state.collectAsStateWithLifecycle()
     val navController = rememberNavController()
+    val shellState = rememberSaveableStateHolder()
     // A plugin link opens Settings, where Plugins picks it up and asks the listener.
     LaunchedEffect(pluginLinkPending) {
         if (pluginLinkPending) {
@@ -244,27 +246,29 @@ fun FlowTvApp(
                         audioQuality = audioQualityViewModel,
                     )
                 } else if (video == null) {
-                    TvShell(
-                        navController = navController,
-                        pluginLinkPending = pluginLinkPending,
-                        onPlayTrack = ::playTrack,
-                        onPlayMix = ::playMix,
-                        onPlayCollection = ::playCollection,
-                        onPlayVideo = ::play,
-                        onPlayPlaylist = ::playPlaylist,
-                        activeMusicTrack = visibleMusicTrack,
-                        onExpandMusic = { musicExpanded = true },
-                        onDismissMusic = {
-                            musicExpanded = false
-                            musicSessionActive = false
-                            EnhancedMusicPlayerManager.clearCurrentTrack()
-                        },
-                        focusMusicStrip = focusMusicStrip,
-                        onMusicStripFocused = { focusMusicStrip = false },
-                        badged = TvDestination.SETTINGS.takeIf { settingsNeedsAttention },
-                        musicTabs = musicTabs,
-                        onSelectMusic = musicTabsViewModel::select,
-                    )
+                    shellState.SaveableStateProvider("tv-shell") {
+                        TvShell(
+                            navController = navController,
+                            pluginLinkPending = pluginLinkPending,
+                            onPlayTrack = ::playTrack,
+                            onPlayMix = ::playMix,
+                            onPlayCollection = ::playCollection,
+                            onPlayVideo = ::play,
+                            onPlayPlaylist = ::playPlaylist,
+                            activeMusicTrack = visibleMusicTrack,
+                            onExpandMusic = { musicExpanded = true },
+                            onDismissMusic = {
+                                musicExpanded = false
+                                musicSessionActive = false
+                                EnhancedMusicPlayerManager.clearCurrentTrack()
+                            },
+                            focusMusicStrip = focusMusicStrip,
+                            onMusicStripFocused = { focusMusicStrip = false },
+                            badged = TvDestination.SETTINGS.takeIf { settingsNeedsAttention },
+                            musicTabs = musicTabs,
+                            onSelectMusic = musicTabsViewModel::select,
+                        )
+                    }
                 } else {
                     TvPlayerScreen(
                         video = video,

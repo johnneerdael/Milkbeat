@@ -45,6 +45,8 @@ class TvVisualizerSettingsViewModel
             viewModelScope.launch { preferences.setEnabled(enabled) }
         }
 
+        val brightness = preferences.brightness.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 100)
+
         val timingOffsetMs: StateFlow<Int> =
             preferences.timingOffsetMs.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
 

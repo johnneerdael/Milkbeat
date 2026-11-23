@@ -5,6 +5,7 @@ import android.content.Intent
 import android.speech.RecognizerIntent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -20,8 +21,15 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -53,6 +61,7 @@ private const val RECENT_SUGGESTIONS = 3
  * the plugin's result page rendered as any catalog page is. Without a tab that can search, it says
  * how to add a plugin.
  */
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun TvSearchScreen(
     musicTabs: TvMusicTabsState,
@@ -60,6 +69,8 @@ fun TvSearchScreen(
     onOpenCatalog: (EntityRef, String) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: TvSearchViewModel = hiltViewModel(),
+    stripFocus: FocusRequester? = null,
+    contentFocus: FocusRequester? = null,
 ) {
     val context = LocalContext.current
     val dimens = LocalTvDimens.current
@@ -68,10 +79,9 @@ fun TvSearchScreen(
     val searchable = musicTabs.tabs.filter { it.source == MusicSource.Local || MetadataSurface.SEARCH in it.surfaces }
     val chips = searchable.map { it.source }
     val startSource = musicTabs.selected?.takeIf { it in chips } ?: chips.firstOrNull()
-    // Not saveable on purpose: every visit to Search starts on the music tab last shown.
-    // Unpicked, Search follows the start chip as the tabs settle; a picked chip that goes away gives way to it.
-    var picked by remember { mutableStateOf<MusicSource?>(null) }
-    val source = shownSearchSource(picked, chips, startSource)
+    // Keep the picked provider when the shell temporarily gives way to the player.
+    var pickedKey by rememberSaveable { mutableStateOf<String?>(null) }
+    val source = shownSearchSource(MusicSource.fromKey(pickedKey), chips, startSource)
     val chipIdentities = searchable.associate { it.source.key to it.identity }
     LaunchedEffect(chipIdentities) { viewModel.retainSources(chipIdentities) }
     LaunchedEffect(source) { source?.let(viewModel::showSource) }
@@ -132,7 +142,17 @@ fun TvSearchScreen(
     val chipPadding = PaddingValues(horizontal = dimens.overscanHorizontal)
 
     Column(
-        modifier = modifier.fillMaxSize().padding(top = dimens.overscanVertical),
+        modifier =
+            modifier
+                .fillMaxSize()
+                .padding(top = dimens.overscanVertical)
+                .focusProperties {
+                    exit = { direction ->
+                        if (direction == FocusDirection.Down) stripFocus ?: FocusRequester.Default else FocusRequester.Default
+                    }
+                }.then(if (contentFocus != null) Modifier.focusRequester(contentFocus) else Modifier)
+                .focusRestorer()
+                .focusGroup(),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         TvSearchField(
@@ -147,7 +167,7 @@ fun TvSearchScreen(
             key = { it.key },
             label = { chipLabel(it) },
             selected = { it == source },
-            onClick = { picked = it },
+            onClick = { pickedKey = it.key },
             contentPadding = chipPadding,
         )
         if (results.filters.isNotEmpty()) {
@@ -188,6 +208,7 @@ fun TvSearchScreen(
                     actions = actions,
                     onLoadMore = { viewModel.loadMore(source) },
                     modifier = Modifier.weight(1f),
+                    stripFocus = stripFocus,
                 )
             }
         }

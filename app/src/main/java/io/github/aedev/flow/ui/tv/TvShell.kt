@@ -88,8 +88,18 @@ fun TvShell(
     var railHasFocus by remember { mutableStateOf(false) }
     val railFocusRequester = remember { FocusRequester() }
     val musicStripFocusRequester = remember { FocusRequester() }
+    val searchFocusRequester = remember { FocusRequester() }
     val contentFocusRequester = remember { FocusRequester() }
     var contentFocusRequests by remember { mutableIntStateOf(0) }
+    var restoreAfterDismiss by remember { mutableStateOf(false) }
+
+    LaunchedEffect(restoreAfterDismiss, activeMusicTrack) {
+        if (!restoreAfterDismiss || activeMusicTrack != null) return@LaunchedEffect
+        withFrameNanos {}
+        val restored = runCatching { contentFocusRequester.requestFocus(FocusDirection.Enter) }.getOrDefault(false)
+        if (!restored) runCatching { railFocusRequester.requestFocus() }
+        restoreAfterDismiss = false
+    }
 
     // A rail press, even on the tab already shown, hands focus to the page's first item so the rail
     // closes and the remote is already on the content. A new tab cross-fades in and may still be
@@ -197,6 +207,8 @@ fun TvShell(
             Box(modifier = Modifier.weight(1f)) {
                 TvNavHost(
                     navController = navController,
+                    searchStripFocus = musicStripFocusRequester.takeIf { activeMusicTrack != null },
+                    searchContentFocus = searchFocusRequester,
                     pluginLinkPending = pluginLinkPending,
                     onPlayTrack = onPlayTrack,
                     onPlayMix = onPlayMix,
@@ -212,8 +224,19 @@ fun TvShell(
                 TvNowPlayingStrip(
                     track = track,
                     onExpand = onExpandMusic,
-                    onDismiss = onDismissMusic,
+                    onDismiss = {
+                        restoreAfterDismiss = true
+                        onDismissMusic()
+                    },
                     focusRequester = musicStripFocusRequester,
+                    upFocusRequester =
+                        searchFocusRequester.takeIf {
+                            currentRoute == TvDestination.SEARCH.route &&
+                                musicTabs.tabs.any {
+                                    it.source == MusicSource.Local ||
+                                        nl.neerdael.milkbeat.plugin.MetadataSurface.SEARCH in it.surfaces
+                                }
+                        },
                 )
             }
         }
