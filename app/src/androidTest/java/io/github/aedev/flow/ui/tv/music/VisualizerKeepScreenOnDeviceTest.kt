@@ -16,6 +16,7 @@ import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -42,6 +43,7 @@ class VisualizerKeepScreenOnDeviceTest {
         lateinit var player: ExoPlayer
         lateinit var view: SurfaceView
         val shown = mutableStateOf(true)
+        val renderReady = MutableStateFlow(true)
         compose.runOnUiThread {
             owner.registry.currentState = Lifecycle.State.STARTED
             player = ExoPlayer.Builder(compose.activity).build()
@@ -66,7 +68,7 @@ class VisualizerKeepScreenOnDeviceTest {
             }
             compose.setContent {
                 if (shown.value) {
-                    VisualizerKeepScreenOn(view, player, owner.lifecycle, renderReady = true)
+                    VisualizerKeepScreenOn(view, player, owner.lifecycle, renderReady)
                     AndroidView(factory = { view }, modifier = Modifier.fillMaxSize())
                 }
             }

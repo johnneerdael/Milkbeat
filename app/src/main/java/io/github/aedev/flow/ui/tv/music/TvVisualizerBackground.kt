@@ -58,7 +58,6 @@ private fun TvVisualizerSurface(
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val host = remember(viewModel) { TvVisualizerHost(context, viewModel, settings) }
-    val surfaceReady by host.surfaceReady.collectAsStateWithLifecycle()
     val timingOffsetMs by viewModel.timingOffsetMs.collectAsStateWithLifecycle()
     val players =
         remember {
@@ -86,7 +85,7 @@ private fun TvVisualizerSurface(
             host.close()
         }
     }
-    VisualizerKeepScreenOn(host.view, player, lifecycle, surfaceReady)
+    VisualizerKeepScreenOn(host.view, player, lifecycle, host.surfaceReady)
     AndroidView(factory = { host.view }, modifier = modifier.fillMaxSize())
 }
 

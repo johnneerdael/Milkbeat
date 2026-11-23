@@ -8,18 +8,22 @@ import android.view.SurfaceView
 import android.view.View
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.Player
+import kotlinx.coroutines.flow.StateFlow
 
 @Composable
 internal fun VisualizerKeepScreenOn(
     view: SurfaceView,
     player: Player?,
     lifecycle: Lifecycle,
-    renderReady: Boolean,
+    renderReady: StateFlow<Boolean>,
 ) {
-    DisposableEffect(lifecycle, view, player, renderReady) {
+    val ready by renderReady.collectAsStateWithLifecycle()
+    DisposableEffect(lifecycle, view, player, ready) {
         val policy = VisualizerScreenOn()
         val handler = Handler(Looper.getMainLooper())
         var started = lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)
@@ -35,7 +39,7 @@ internal fun VisualizerKeepScreenOn(
                         player.playWhenReady,
                         player.playbackSuppressionReason,
                         SystemClock.elapsedRealtime(),
-                        surfaceReady = renderReady && view.isAttachedToWindow && view.holder.surface.isValid,
+                        surfaceReady = renderReady.value && view.isAttachedToWindow && view.holder.surface.isValid,
                     )
             view.keepScreenOn = keep
             if (!started || !view.isAttachedToWindow || !view.holder.surface.isValid) policy.reset()
