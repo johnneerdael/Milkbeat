@@ -910,8 +910,9 @@ resources; escape translated values before inserting them into the HTML template
 rejects HTTPS connectors; preserve the existing phone-viewer behavior when changing it. Netty's
 optional desktop integrations require the narrowly scoped R8 rules in `app/proguard-rules.pro`;
 keep Netty's isolated VarHandle bytecode out of classes loaded on pre-33 Android, preserve the
-reflectively constructed NIO server channel and allocator fallback members, and validate the HTTPS
-listener in a shrunk Android build when changing the server or these rules.
+reflectively constructed NIO server channel, allocator fallback members and leak-detector method
+names, and validate the HTTPS listener in a shrunk Android build when changing the server or these
+rules.
 
 ## Documentation and publishing
 

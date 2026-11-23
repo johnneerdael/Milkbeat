@@ -76,6 +76,13 @@
 # Netty's allocator locates this fallback method and the nested node fields by name.
 -keep class io.netty.util.concurrent.ConcurrentSkipListIntObjMultimap { *; }
 -keep class io.netty.util.concurrent.ConcurrentSkipListIntObjMultimap$* { *; }
+# Netty's leak detector verifies these method names with getDeclaredMethods during class init.
+-keep class io.netty.util.ReferenceCountUtil { *** touch(...); }
+-keep class io.netty.buffer.AbstractByteBufAllocator { *** toLeakAwareBuffer(...); }
+-keep class io.netty.buffer.AdvancedLeakAwareByteBuf {
+    *** touch(...);
+    *** recordLeakNonRefCountingOperation(...);
+}
 
 ## Optional classes other libraries reference
 -dontwarn org.conscrypt.**
