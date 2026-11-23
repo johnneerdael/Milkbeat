@@ -220,6 +220,46 @@ configurations.matching { it.name.endsWith("UnitTestRuntimeClasspath") }.configu
     exclude(group = "org.conscrypt", module = "conscrypt-android")
 }
 
+// Robolectric otherwise downloads each android-all runtime from Maven Central during the test run,
+// outside Gradle's dependency cache and without retries; CI runners get HTTP 429 there. Gradle
+// resolves the runtimes instead and Robolectric reads them offline. Every SDK a test runs on
+// (targetSdk by default, plus each @Config sdk) needs its runtime in the version catalog.
+// One configuration per runtime: they share a module, so one configuration would keep only the newest.
+val robolectricRuntimes =
+    mapOf(
+        28 to libs.robolectric.android.all.sdk28,
+        34 to libs.robolectric.android.all.sdk34,
+        36 to libs.robolectric.android.all.sdk36,
+    ).map { (sdk, runtime) ->
+        configurations.create("robolectricRuntimeSdk$sdk") {
+            isCanBeConsumed = false
+            isTransitive = false
+            dependencies.addLater(runtime)
+        }
+    }
+
+val syncRobolectricRuntime =
+    tasks.register<Sync>("syncRobolectricRuntime") {
+        from(robolectricRuntimes)
+        into(layout.buildDirectory.dir("robolectric-runtime"))
+    }
+
+class RobolectricOfflineRuntime(
+    @get:InputFiles
+    @get:PathSensitive(PathSensitivity.NAME_ONLY)
+    val runtimeDir: FileCollection,
+) : CommandLineArgumentProvider {
+    override fun asArguments() =
+        listOf(
+            "-Drobolectric.offline=true",
+            "-Drobolectric.dependency.dir=${runtimeDir.singleFile.absolutePath}",
+        )
+}
+
+tasks.withType<Test>().configureEach {
+    jvmArgumentProviders.add(RobolectricOfflineRuntime(files(syncRobolectricRuntime)))
+}
+
 // ProjectM-TV's core engine AAR. "latest" follows ProjectM-TV's newest stable release (re-checked
 // daily, or with --refresh-dependencies); CI passes the exact version it resolved.
 val projectmCoreVersion = providers.gradleProperty("projectmCoreVersion").get()

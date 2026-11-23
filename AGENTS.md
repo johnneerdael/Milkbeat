@@ -713,6 +713,14 @@ revision must pass the configured ktlint rules.
   `app/src/test/resources/robolectric.properties` defaults unit tests to `android.app.Application`;
   override it with `@Config(application = …)` when testing application-owned startup. AGP-backed
   Robolectric ignores `Config.NONE`, so it does not isolate tests from `FlowApplication` startup.
+  `:app` unit tests run Robolectric offline (`robolectric.offline`): Gradle resolves each
+  `android-all-instrumented` runtime into `app/build/robolectric-runtime/` through one
+  `robolectricRuntimeSdkNN` configuration per SDK, because Robolectric's own Maven Central download
+  bypasses Gradle's cache and retries and failed CI with HTTP 429. The catalog pins the runtimes
+  Robolectric 4.16.1 maps to SDK 28, 34 and 36 (targetSdk, the default). A new `@Config(sdk = …)`
+  level or a Robolectric bump needs its runtime version from `DefaultSdkProvider` added to
+  `gradle/libs.versions.toml` and `app/build.gradle.kts`; a missing one fails with
+  `Unable to locate dependency`, never a download.
 - `:plugin-api` defines the plain Kotlin catalog/plugin contract; `:spike-plugin-runtime` contains
   runtime experiments. `:benchmark` is the Android baseline-profile and benchmark module
   configured in `settings.gradle.kts` (there is no `:baselineprofile` module).

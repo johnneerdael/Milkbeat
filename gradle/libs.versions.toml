@@ -39,6 +39,10 @@ uiautomator = "2.4.0"
 zxingCore = "3.5.4"
 webkit = "1.14.0"
 robolectric = "4.16.1"
+# android-all runtimes Robolectric 4.16.1 maps to each SDK the unit tests run on (DefaultSdkProvider).
+robolectricAndroidAll28 = "9-robolectric-4913185-2-i7"
+robolectricAndroidAll34 = "14-robolectric-10818077-i7"
+robolectricAndroidAll36 = "16-robolectric-13921718-i7"
 androidxTestCore = "1.7.0"
 androidxTestRunner = "1.7.0"
 quickjsKt = "1.0.15"
@@ -124,6 +128,9 @@ schema-kenerator-serialization = { group = "io.github.smiley4", name = "schema-k
 schema-kenerator-jsonschema = { group = "io.github.smiley4", name = "schema-kenerator-jsonschema", version.ref = "schemaKenerator" }
 rhino = { group = "org.mozilla", name = "rhino", version.ref = "rhino" }
 robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "robolectric" }
+robolectric-android-all-sdk28 = { group = "org.robolectric", name = "android-all-instrumented", version.ref = "robolectricAndroidAll28" }
+robolectric-android-all-sdk34 = { group = "org.robolectric", name = "android-all-instrumented", version.ref = "robolectricAndroidAll34" }
+robolectric-android-all-sdk36 = { group = "org.robolectric", name = "android-all-instrumented", version.ref = "robolectricAndroidAll36" }
 androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
 androidx-profileinstaller = { group = "androidx.profileinstaller", name = "profileinstaller", version.ref = "profileinstaller" }
 androidx-benchmark-macro-junit4 = { group = "androidx.benchmark", name = "benchmark-macro-junit4", version.ref = "benchmarkMacroJunit4" }
