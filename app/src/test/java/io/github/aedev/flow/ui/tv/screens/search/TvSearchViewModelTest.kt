@@ -7,6 +7,7 @@ import io.github.aedev.flow.data.local.SearchHistoryRepository
 import io.github.aedev.flow.data.local.SearchType
 import io.github.aedev.flow.data.stats.VideoStatsRecorder
 import io.github.aedev.flow.plugin.catalog.NoMetadataPluginException
+import io.github.aedev.flow.plugin.runtime.PluginCallException
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -32,6 +33,8 @@ import nl.neerdael.milkbeat.catalog.MetadataItem
 import nl.neerdael.milkbeat.catalog.MetadataPage
 import nl.neerdael.milkbeat.catalog.SearchRequest
 import nl.neerdael.milkbeat.catalog.Suggestions
+import nl.neerdael.milkbeat.plugin.PluginError
+import nl.neerdael.milkbeat.plugin.PluginErrorCode
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
@@ -219,6 +222,47 @@ class TvSearchViewModelTest {
                     .results(MUSIC)
                     .blocks,
             ).isEqualTo(page("new").blocks)
+        }
+
+    @Test
+    fun `a provider that cannot search is dropped from the chips`() =
+        runTest(dispatcher) {
+            music.pages = {
+                Result.failure(
+                    PluginCallException(
+                        "nl.neerdael.eclipse",
+                        PluginError(PluginErrorCode.UNSUPPORTED, "Add Pulsar or Gravity to search from Eclipse"),
+                    ),
+                )
+            }
+            val vm = viewModel()
+            vm.showSource(MUSIC)
+            vm.onQueryChange("anyma")
+            advanceUntilIdle()
+
+            assertThat(vm.unsupported.value).containsExactly(MUSIC.key)
+            assertThat(
+                vm.state.value
+                    .results(MUSIC)
+                    .error,
+            ).isNotNull()
+        }
+
+    @Test
+    fun `an ordinary failure keeps the provider in the chips`() =
+        runTest(dispatcher) {
+            music.pages = { Result.failure(IllegalStateException("The network said no")) }
+            val vm = viewModel()
+            vm.showSource(MUSIC)
+            vm.onQueryChange("anyma")
+            advanceUntilIdle()
+
+            assertThat(vm.unsupported.value).isEmpty()
+            assertThat(
+                vm.state.value
+                    .results(MUSIC)
+                    .error,
+            ).isEqualTo("The network said no")
         }
 
     @Test
