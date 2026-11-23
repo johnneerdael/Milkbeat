@@ -182,6 +182,12 @@ internal class MusicAudioStartGate(
         }
         val rejected = hasNoAudio()
         if (!rejected && startupCheck?.isActive == true) return
+        // Preparation includes provider matching, stream resolution and initial buffering, which can
+        // legitimately outlast the silent-output bound. Only a Ready open can be judged silent.
+        if (!rejected && player.playbackState != Player.STATE_READY) {
+            cancelWatchdog()
+            return
+        }
         cancelWatchdog()
         startupCheck =
             scope.launch {

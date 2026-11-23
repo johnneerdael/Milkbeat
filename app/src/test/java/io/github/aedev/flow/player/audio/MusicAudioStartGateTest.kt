@@ -157,6 +157,31 @@ class MusicAudioStartGateTest {
         }
 
     @Test
+    fun `a long preparation is not rejected before the player is ready`() =
+        runTest {
+            val fixture = Fixture(backgroundScope)
+            fixture.open("song-prep")
+            fixture.audioSelected = true
+            fixture.state = Player.STATE_BUFFERING
+            fixture.monitor()
+            // Provider matching, stream resolution and initial buffering may outlast the bound.
+            advanceTimeBy(90_000)
+            runCurrent()
+            assertTrue(fixture.rejections.isEmpty())
+            assertNotNull(fixture.gate.pendingHold("song-prep"))
+
+            // The silent-output deadline starts only once preparation reaches Ready.
+            fixture.state = Player.STATE_READY
+            fixture.monitor()
+            advanceTimeBy(19_999)
+            runCurrent()
+            assertTrue(fixture.rejections.isEmpty())
+            advanceTimeBy(1)
+            runCurrent()
+            assertEquals(listOf("song-prep" to 0L), fixture.rejections)
+        }
+
+    @Test
     fun `a selected track that never produces output is rejected after the bound`() =
         runTest {
             val fixture = Fixture(backgroundScope)
@@ -345,10 +370,12 @@ class MusicAudioStartGateTest {
         }
 
     @Test
-    fun `pause while buffering cancels recovery and resume starts a full timeout`() =
+    fun `pause while ready cancels recovery and resume starts a full timeout`() =
         runTest {
             val fixture = Fixture(backgroundScope)
             fixture.open("paused")
+            fixture.state = Player.STATE_READY
+            fixture.audioSelected = true
             fixture.monitor()
             runCurrent()
             advanceTimeBy(15_000)

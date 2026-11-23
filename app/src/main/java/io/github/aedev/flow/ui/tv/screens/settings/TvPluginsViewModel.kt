@@ -378,6 +378,8 @@ class TvPluginsViewModel
                     pluginConnections.remove(plugin, row)
                 } catch (e: Exception) {
                     updateConnections { it.copy(failure = e.message ?: context.getString(R.string.tv_plugins_connections_remove_failed)) }
+                    // Refreshing here would clear the message before it could be shown.
+                    return@launch
                 }
                 loadConnections()
             }
