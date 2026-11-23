@@ -127,7 +127,12 @@ class PluginHttpCancellationTest : PluginAudioFixture() {
                                 }
                             },
                         ).build()
-                val response = PluginHttp(observed, { listOf("localhost") }, okhttp3.Dns.SYSTEM).fetch(HttpRequest(server.url("/normal").toString()))
+                val response =
+                    PluginHttp(
+                        observed,
+                        { listOf("localhost") },
+                        okhttp3.Dns.SYSTEM,
+                    ).fetch(HttpRequest(server.url("/normal").toString()))
                 assertThat(response.status).isEqualTo(201)
                 assertThat(response.headers["x-result"]).isEqualTo("accepted")
                 assertThat(response.body).isEqualTo("complete body")
