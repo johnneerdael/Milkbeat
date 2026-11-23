@@ -73,6 +73,9 @@
 -keep class io.netty.buffer.VarHandleByteBufferAccess { *; }
 # Ktor gives Netty this channel class for reflective construction of the server socket.
 -keep class io.netty.channel.socket.nio.NioServerSocketChannel { public <init>(); }
+# Netty's allocator locates this fallback method and the nested node fields by name.
+-keep class io.netty.util.concurrent.ConcurrentSkipListIntObjMultimap { *; }
+-keep class io.netty.util.concurrent.ConcurrentSkipListIntObjMultimap$* { *; }
 
 ## Optional classes other libraries reference
 -dontwarn org.conscrypt.**
