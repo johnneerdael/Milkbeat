@@ -52,6 +52,7 @@ class TvPluginsViewModelStorageTest {
             mockk(relaxed = true),
             SavedStateHandle(),
             mockk(relaxed = true),
+            mockk(relaxed = true),
         )
 
     @Test

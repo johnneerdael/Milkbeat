@@ -84,6 +84,7 @@ fun TvPluginsSettingsPane(
         }
     }
 
+    val connectionsPage = state.connections.page
     // Back closes the page open inside Plugins before it may leave Settings, as a picker panel does.
     BackHandler(enabled = consent != null || choosing != null || openPlugin != null) {
         when {
@@ -95,11 +96,16 @@ fun TvPluginsSettingsPane(
                 choosing = null
             }
 
-            state.connections.page is ConnectionsPage.Review || state.connections.page is ConnectionsPage.EditUrl -> {
-                viewModel.editConnectionUrl((state.connections.page as? ConnectionsPage.EditUrl)?.connectionId)
+            connectionsPage is ConnectionsPage.Review -> {
+                // Back returns to the editor for the replaceable link, not the list.
+                viewModel.editConnectionUrl(connectionsPage.connectionId)
             }
 
-            state.connections.page != null -> {
+            connectionsPage is ConnectionsPage.EditUrl -> {
+                viewModel.showConnectionList()
+            }
+
+            connectionsPage != null -> {
                 viewModel.closeConnections()
             }
 

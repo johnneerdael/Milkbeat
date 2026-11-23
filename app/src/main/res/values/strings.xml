@@ -45,6 +45,11 @@
     <string name="tv_plugins_connections_test_unauthorized">%1$s: the account was not accepted for this add-on</string>
     <string name="tv_plugins_connections_test_manifest">%1$s: manifest could not be loaded</string>
     <string name="tv_plugins_connections_test_signed_out">Sign in first, then test this add-on again</string>
+    <string name="tv_plugins_connections_review_failed">Could not review the add-on</string>
+    <string name="tv_plugins_connections_save_failed">Could not save the add-on</string>
+    <string name="tv_plugins_connections_remove_failed">Could not remove the add-on</string>
+    <string name="tv_plugins_connections_test_failed">Could not reach the add-on</string>
+    <string name="tv_plugins_install_failed">Could not install the plugin</string>
     <string name="quality_auto">Auto</string>
     <!-- Save to Playlist Dialog -->
     <string name="watch_later">Watch later</string>

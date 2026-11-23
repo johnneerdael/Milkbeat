@@ -1,9 +1,11 @@
 package io.github.aedev.flow.ui.tv.screens.settings
 
+import android.content.Context
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.aedev.flow.R
 import io.github.aedev.flow.data.account.AccountPlayHistory
 import io.github.aedev.flow.data.update.AutoUpdater
@@ -114,6 +116,7 @@ class TvPluginsViewModel
         val preloadJobs: PlaylistPreloadJobs,
         private val savedState: SavedStateHandle,
         microGInstaller: MicroGInstaller,
+        @ApplicationContext private val context: Context,
     ) : ViewModel() {
         /** Whether this build can download and install MicroG-RE-TV for a plugin's Google account sign-in. */
         val microGDownloadable: Boolean = microGInstaller.isAvailable
@@ -211,7 +214,7 @@ class TvPluginsViewModel
                     } catch (e: PluginInstallException) {
                         AddPluginState.Failed(e.message.orEmpty(), e.messageResource)
                     } catch (e: IllegalStateException) {
-                        AddPluginState.Failed(e.message ?: "Could not install the plugin")
+                        AddPluginState.Failed(e.message ?: context.getString(R.string.tv_plugins_install_failed))
                     }
             }
         }
@@ -280,6 +283,11 @@ class TvPluginsViewModel
             connectionsState.value = PluginConnectionsState()
         }
 
+        /** Returns from the editor or review to the configured add-on list. */
+        fun showConnectionList() {
+            updateConnections { it.copy(page = ConnectionsPage.List, failure = null) }
+        }
+
         fun editConnectionUrl(connectionId: String?) {
             updateConnections { it.copy(page = ConnectionsPage.EditUrl(connectionId), failure = null) }
         }
@@ -308,7 +316,7 @@ class TvPluginsViewModel
                                     ),
                             )
                         } catch (e: Exception) {
-                            connectionsState.value.copy(busy = false, failure = e.message ?: "Could not review the add-on")
+                            connectionsState.value.copy(busy = false, failure = e.message ?: context.getString(R.string.tv_plugins_connections_review_failed))
                         }
                     connectionsState.value = next
                 }
@@ -339,7 +347,7 @@ class TvPluginsViewModel
                         loadConnections()
                     } catch (e: Exception) {
                         updateConnections {
-                            it.copy(busy = false, failure = e.message ?: "Could not save the add-on")
+                            it.copy(busy = false, failure = e.message ?: context.getString(R.string.tv_plugins_connections_save_failed))
                         }
                     }
                 }
@@ -365,7 +373,7 @@ class TvPluginsViewModel
                 try {
                     pluginConnections.remove(plugin, row)
                 } catch (e: Exception) {
-                    updateConnections { it.copy(failure = e.message ?: "Could not remove the add-on") }
+                    updateConnections { it.copy(failure = e.message ?: context.getString(R.string.tv_plugins_connections_remove_failed)) }
                 }
                 loadConnections()
             }
@@ -380,7 +388,7 @@ class TvPluginsViewModel
                     val result =
                         runCatching { pluginConnections.test(pluginId, id) }
                             .getOrElse { error ->
-                                updateConnections { it.copy(busy = false, failure = error.message ?: "Could not reach the add-on") }
+                                updateConnections { it.copy(busy = false, failure = error.message ?: context.getString(R.string.tv_plugins_connections_test_failed)) }
                                 return@launch
                             }
                     updateConnections { it.copy(busy = false, testResult = id to result.state) }
