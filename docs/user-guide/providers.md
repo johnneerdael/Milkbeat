@@ -137,6 +137,7 @@ are streaming only.
 | **981** | Spotify |
 | **089** | SoundCloud |
 | **734** | Deezer |
+| **141** | Eclipse |
 | **563** | YouTube |
 <!-- /plugin-codes -->
 
