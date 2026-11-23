@@ -56,14 +56,14 @@
     {
       "id": "nl.neerdael.eclipse",
       "name": "Eclipse",
-      "version": "0.6.0",
-      "versionCode": 7,
+      "version": "0.7.0",
+      "versionCode": 8,
       "apiMin": 12,
       "format": 1,
-      "sha256": "ff38b6c07ce51a0ce43ccaff1976f1098ada4e4ed4a3e77b30bb18f1eb3faedb",
-      "size": 27431,
+      "sha256": "8263aaa6c285b5c6ce2a53e4a50f15d994c50101c2e531814e9dba115502d340",
+      "size": 27561,
       "fingerprint": "39dca3d132c56262c0873ec96faf22cc8ed9ca30c7ed1f135049f8570b943adc",
-      "contentDigest": "71d8fba17c4f844d82a85ede44048f1dc10de7c529ff144a919e7cf352ad06a0",
+      "contentDigest": "b83b6285f5ee17bc49a356d2617d16f2dc0a9693753a5376e90c7985689ceda5",
       "code": "141"
     },
     {
