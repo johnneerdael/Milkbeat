@@ -68,7 +68,7 @@ internal class PluginHostApi(
     private val microG: MicroGAccounts? = null,
     private val connectionOrigins: () -> List<String> = { emptyList() },
 ) {
-    private val http = PluginHttp(client) { plugin.grantedNetwork + connectionOrigins() }
+    private val http = PluginHttp(client, { plugin.grantedNetwork + connectionOrigins() })
     private val storage = PluginStore(File(dataDirectory, "storage.json"), plugin.manifest.permissions.storage)
     private val secrets =
         PluginStore(File(dataDirectory, "secrets.json"), SECRETS_QUOTA, seal = KeystoreSecretBox::seal, open = KeystoreSecretBox::open)

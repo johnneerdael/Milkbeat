@@ -47,7 +47,7 @@ class PluginHttpCancellationTest : PluginAudioFixture() {
                     }
                 val fast = plugin.copy(manifest = plugin.manifest.copy(id = "fast"))
                 val slow = plugin.copy(manifest = plugin.manifest.copy(id = "slow"))
-                val http = PluginHttp(client) { listOf("localhost") }
+                val http = PluginHttp(client, { listOf("localhost") }, okhttp3.Dns.SYSTEM)
                 try {
                     val winner =
                         withTimeout(2000) {
@@ -88,9 +88,8 @@ class PluginHttpCancellationTest : PluginAudioFixture() {
                 )
                 val fetch =
                     async {
-                        PluginHttp(
-                            client,
-                        ) { listOf("localhost") }.fetch(HttpRequest(server.url("/slow").toString(), timeoutMs = 4000))
+                        PluginHttp(client, { listOf("localhost") }, okhttp3.Dns.SYSTEM)
+                            .fetch(HttpRequest(server.url("/slow").toString(), timeoutMs = 4000))
                     }
                 try {
                     withTimeout(2000) { bodyStarted.await() }
@@ -128,7 +127,7 @@ class PluginHttpCancellationTest : PluginAudioFixture() {
                                 }
                             },
                         ).build()
-                val response = PluginHttp(observed) { listOf("localhost") }.fetch(HttpRequest(server.url("/normal").toString()))
+                val response = PluginHttp(observed, { listOf("localhost") }, okhttp3.Dns.SYSTEM).fetch(HttpRequest(server.url("/normal").toString()))
                 assertThat(response.status).isEqualTo(201)
                 assertThat(response.headers["x-result"]).isEqualTo("accepted")
                 assertThat(response.body).isEqualTo("complete body")

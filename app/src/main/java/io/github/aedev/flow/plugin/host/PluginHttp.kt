@@ -46,11 +46,13 @@ class PluginHttpException(
 internal class PluginHttp(
     base: OkHttpClient,
     private val allowedHosts: () -> List<String>,
+    /** Public-destination policy; a test may pass the system resolver for its local server. */
+    dns: okhttp3.Dns = publicDns(),
 ) {
     private val client =
         base
             .newBuilder()
-            .dns(publicDns())
+            .dns(dns)
             .cookieJar(okhttp3.CookieJar.NO_COOKIES)
             .addNetworkInterceptor(Interceptor { chain -> chain.proceed(checked(chain.request())) })
             .build()

@@ -38,7 +38,7 @@ class PluginHttpTest {
                             .build()
                     }.build()
             val response =
-                PluginHttp(client) { listOf("images.example.com") }.fetch(
+                PluginHttp(client, { listOf("images.example.com") }, okhttp3.Dns.SYSTEM).fetch(
                     HttpRequest(
                         url = "https://images.example.com/cover",
                         method = "POST",
@@ -63,7 +63,7 @@ class PluginHttpTest {
                         called = true
                         error("Network must not be reached")
                     }.build()
-            val http = PluginHttp(client) { listOf("images.example.com") }
+            val http = PluginHttp(client, { listOf("images.example.com") }, okhttp3.Dns.SYSTEM)
             for (url in listOf("http://images.example.com/cover", "https://other.example.com/cover")) {
                 val failure =
                     runCatching {
