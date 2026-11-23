@@ -31,6 +31,7 @@
     <string name="tv_plugins_connections_hint">Paste the install link or manifest URL from the add-on’s setup page. Nothing is approved before you review it.</string>
     <string name="tv_plugins_connections_url_hint">Add-on install or manifest link</string>
     <string name="tv_plugins_connections_review">Review</string>
+    <string name="tv_plugins_connections_reviewing">Inspecting the add-on…</string>
     <string name="tv_plugins_connections_review_title">Review add-on access</string>
     <string name="tv_plugins_connections_addon_id">Add-on ID: %1$s</string>
     <string name="tv_plugins_connections_use_account">Use plugin account access</string>

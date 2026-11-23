@@ -80,6 +80,10 @@ internal fun LazyListScope.connectionItems(
                     onClick = { onUrl(connectionUrl) },
                 )
             }
+            item(key = "connection-edit-status") {
+                if (connections.busy) PluginStatusText(stringResource(R.string.tv_plugins_connections_reviewing))
+                connections.failure?.let { PluginStatusText(it, error = true) }
+            }
         }
 
         is ConnectionsPage.Review -> {
