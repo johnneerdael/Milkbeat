@@ -1,15 +1,26 @@
 package io.github.aedev.flow.plugin.playback
 
+import android.app.Application
+import androidx.media3.common.C
+import androidx.media3.datasource.ByteArrayDataSource
+import androidx.media3.datasource.DataSpec
 import com.google.common.truth.Truth.assertThat
 import nl.neerdael.milkbeat.plugin.AudioDrm
 import nl.neerdael.milkbeat.plugin.AudioDrmScheme
 import nl.neerdael.milkbeat.plugin.DrmInitialization
 import org.junit.Assert.assertThrows
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.nio.ByteBuffer
 import java.util.Base64
 
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [28], application = Application::class)
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 class PluginDrmInitializationTest {
     @Test
     fun `the licensed profile changes only the public track ids`() {
@@ -28,6 +39,56 @@ class PluginDrmInitializationTest {
         assertThrows(IOException::class.java) {
             PluginDrmInitialization.apply(original + box("mdat", ByteArray(8)), ids)
         }
+    }
+
+    @Test
+    fun `merged DASH requests map only the contained initialization range`() {
+        val shared = ByteArray(16) { 9 }
+        val original = initialization(shared, shared)
+        val ids = listOf(ByteArray(16) { 1 }, ByteArray(16) { 2 })
+        val mapped = initialization(ids[0], ids[1])
+        val prefix = box("ftyp", ByteArray(9))
+        val index = box("sidx", ByteArray(21) { it.toByte() })
+        val resource = prefix + original + index
+        val source =
+            pluginDrmInitDataSourceFactory(
+                { ByteArrayDataSource(resource) },
+                DrmInitialization("apple-cbcs-eac3-v1", "https://cdn.example/audio.mp4", prefix.size.toLong(), original.size, emptyList()),
+                ids,
+            ).createDataSource()
+
+        fun assertRequest(
+            position: Int,
+            length: Int,
+            expected: ByteArray,
+        ) {
+            val request =
+                DataSpec
+                    .Builder()
+                    .setUri("https://cdn.example/audio.mp4")
+                    .setPosition(position.toLong())
+                    .setLength(length.toLong())
+                    .build()
+            try {
+                assertThat(source.open(request)).isEqualTo(expected.size.toLong())
+                val result = ByteArrayOutputStream()
+                val buffer = ByteArray(13)
+                while (true) {
+                    val count = source.read(buffer, 0, buffer.size)
+                    if (count == C.RESULT_END_OF_INPUT) break
+                    result.write(buffer, 0, count)
+                }
+                assertThat(result.toByteArray()).isEqualTo(expected)
+            } finally {
+                source.close()
+            }
+        }
+
+        assertRequest(prefix.size, original.size, mapped)
+        assertRequest(prefix.size, original.size + index.size, mapped + index)
+        assertRequest(0, C.LENGTH_UNSET, prefix + mapped + index)
+        assertRequest(0, prefix.size + original.size - 1, prefix + original.copyOf(original.size - 1))
+        assertRequest(prefix.size + original.size, index.size, index)
     }
 
     @Test

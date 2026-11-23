@@ -58,8 +58,8 @@ internal fun validatedServiceCertificate(drm: AudioDrm): ByteArray? {
 }
 
 /**
- * Serves the licensed initialization range with its public track identifiers applied. Only the
- * exact declared range is rewritten; every other open passes the upstream bytes through untouched.
+ * Applies public track identifiers to the declared initialization bytes, even when Media3 merges
+ * the initialization and index ranges. Other bytes stream through without being buffered.
  */
 internal fun pluginDrmInitDataSourceFactory(
     upstream: DataSource.Factory,
@@ -85,12 +85,29 @@ private class MappedInitialization(
 ) : DataSource by upstream {
     private var data: ByteArray? = null
     private var cursor = 0
+    private var bytesBeforeInitialization: Long? = null
 
     override fun open(dataSpec: DataSpec): Long {
         data = null
         cursor = 0
+        bytesBeforeInitialization = null
         val upstreamLength = upstream.open(dataSpec)
-        if (dataSpec.uri != uri || dataSpec.position != offset || dataSpec.length != length.toLong()) return upstreamLength
+        if (dataSpec.uri != uri || dataSpec.position > offset) return upstreamLength
+        val prefix = offset - dataSpec.position
+        if (!containsInitialization(dataSpec.length, prefix) || !containsInitialization(upstreamLength, prefix)) {
+            return upstreamLength
+        }
+        bytesBeforeInitialization = prefix
+        if (prefix == 0L) mapInitialization()
+        return upstreamLength
+    }
+
+    private fun containsInitialization(
+        requestLength: Long,
+        prefix: Long,
+    ): Boolean = requestLength == C.LENGTH_UNSET.toLong() || (requestLength >= prefix && requestLength - prefix >= length)
+
+    private fun mapInitialization() {
         try {
             val bytes = ByteArray(length)
             var written = 0
@@ -101,7 +118,7 @@ private class MappedInitialization(
             }
             PluginDrmInitialization.apply(bytes, keyIds)
             data = bytes
-            return bytes.size.toLong()
+            bytesBeforeInitialization = null
         } catch (error: IOException) {
             runCatching { upstream.close() }
             throw error
@@ -113,17 +130,27 @@ private class MappedInitialization(
         offset: Int,
         length: Int,
     ): Int {
-        val bytes = data ?: return upstream.read(buffer, offset, length)
         if (length == 0) return 0
-        if (cursor == bytes.size) return C.RESULT_END_OF_INPUT
+        bytesBeforeInitialization?.let { remaining ->
+            if (remaining > 0) {
+                val count = upstream.read(buffer, offset, minOf(length.toLong(), remaining).toInt())
+                if (count == C.RESULT_END_OF_INPUT) throw IOException("Incomplete plugin audio initialization")
+                bytesBeforeInitialization = remaining - count
+                return count
+            }
+            mapInitialization()
+        }
+        val bytes = data ?: return upstream.read(buffer, offset, length)
         val count = minOf(length, bytes.size - cursor)
         bytes.copyInto(buffer, offset, cursor, cursor + count)
         cursor += count
+        if (cursor == bytes.size) data = null
         return count
     }
 
     override fun close() {
         data = null
+        bytesBeforeInitialization = null
         upstream.close()
     }
 }

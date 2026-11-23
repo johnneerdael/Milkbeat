@@ -29,6 +29,9 @@ License requests, redirects and provisioning use a separate transport that check
 plugin's current network grants before sending credentials. Clear descriptors remain compatible.
 Media and key requests share the same refreshable bound descriptor, so expired initial licenses
 and later key renewals use current URLs and headers without retargeting provisioning or redirects.
+Remote DASH manifests and their initialization and media segments receive the bound stream's media
+headers. When Media3 combines adjacent DASH initialization and index ranges, the licensed identifier
+mapping buffers and rewrites only the declared initialization bytes.
 Providers requiring DRM declare `api.min: 4`. HLS/DRM offline downloads are unsupported. The v1
 non-goals below describe the original proposal, not this implemented extension.
 

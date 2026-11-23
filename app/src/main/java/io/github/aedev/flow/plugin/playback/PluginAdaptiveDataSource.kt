@@ -40,6 +40,12 @@ internal fun pluginAdaptiveDataSourceFactory(
     val initial = binding.initial
     val formats = listOfNotNull(initial.stream.audioFormat, initial.stream.video).associateBy { it.url }
     val keyed = formats.values.associateBy(initial::adaptiveCacheKey)
+    val remoteDash =
+        initial.preparedDashManifest == null &&
+            initial.stream.mimeType
+                .substringBefore(';')
+                .trim()
+                .equals("application/dash+xml", ignoreCase = true)
     val client =
         base
             .newBuilder()
@@ -57,28 +63,32 @@ internal fun pluginAdaptiveDataSourceFactory(
         ResolvingDataSource.Factory(OkHttpDataSource.Factory(client)) { request ->
             if (request.httpMethod != DataSpec.HTTP_METHOD_GET) throw IOException("Adaptive media requires a GET")
             verifyCurrent(initial)
-            // A parsed remote manifest names its own segments; they were checked before this open.
-            val original = request.key?.let(keyed::get) ?: return@Factory request
+            val original = request.key?.let(keyed::get)
+            if (original == null && !remoteDash) return@Factory request
             val current = runBlocking(Dispatchers.IO) { binding.current() }
             verifyCurrent(current)
+            if (current.pluginId != initial.pluginId || current.track.ref != initial.track.ref ||
+                current.stream.cacheKey != initial.stream.cacheKey
+            ) {
+                throw IOException("The provider changed this adaptive source")
+            }
+            if (original == null) {
+                // Remote DASH supplies its own manifest and segment URLs. Keep those URLs and ranges
+                // while adding the bound stream's media headers to each uncached network request.
+                return@Factory request.withMediaHeaders(current.stream.headers).build()
+            }
             val format =
                 when (original.type) {
                     FormatType.AUDIO -> current.stream.audioFormat
                     FormatType.VIDEO -> current.stream.video
                 } ?: throw IOException("The provider removed this rendition")
-            if (format.id != original.id || format.initRange != original.initRange || format.indexRange != original.indexRange ||
-                current.pluginId != initial.pluginId || current.track.ref != initial.track.ref ||
-                current.stream.cacheKey != initial.stream.cacheKey
-            ) {
+            if (format.id != original.id || format.initRange != original.initRange || format.indexRange != original.indexRange) {
                 throw IOException("The provider changed this adaptive rendition")
             }
             checkedPluginMediaUrl(format.url, allowedHosts())
-            val extra = current.stream.headers + format.headers
-            val headers = request.httpRequestHeaders.filterKeys { name -> extra.keys.none { it.equals(name, ignoreCase = true) } } + extra
             request
-                .buildUpon()
+                .withMediaHeaders(current.stream.headers + format.headers)
                 .setUri(format.url)
-                .setHttpRequestHeaders(headers.filterKeys { !it.equals("Range", ignoreCase = true) })
                 .setKey(current.adaptiveCacheKey(format))
                 .build()
         }
@@ -107,6 +117,12 @@ internal fun pluginAdaptiveDataSourceFactory(
             request.buildUpon().setKey(initial.adaptiveCacheKey(original)).build()
         }
     }
+}
+
+private fun DataSpec.withMediaHeaders(providerHeaders: Map<String, String>): DataSpec.Builder {
+    val headers =
+        httpRequestHeaders.filterKeys { name -> providerHeaders.keys.none { it.equals(name, ignoreCase = true) } } + providerHeaders
+    return buildUpon().setHttpRequestHeaders(headers.filterKeys { !it.equals("Range", ignoreCase = true) })
 }
 
 internal fun ResolvedAudio.adaptiveCacheKey(format: MediaFormat): String = "$pluginId:${stream.cacheKey}:${format.id}"
