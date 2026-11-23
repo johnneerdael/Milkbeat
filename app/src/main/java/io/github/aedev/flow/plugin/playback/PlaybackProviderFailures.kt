@@ -45,5 +45,11 @@ internal class PlaybackProviderFailures(
         return old.count >= 2
     }
 
+    fun exhaustedProviders(
+        track: AudioIdentity,
+        context: Any,
+    ): Set<String> =
+        failures.keys.filter { it.track == track && exhausted(track, it.provider, context) }.mapTo(mutableSetOf()) { it.provider }
+
     fun clear() = failures.clear()
 }

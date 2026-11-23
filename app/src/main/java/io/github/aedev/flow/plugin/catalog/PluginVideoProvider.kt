@@ -88,12 +88,7 @@ class PluginVideoProvider
         internal fun playbackContext(): Any =
             Triple(registry.state.value.plugin(selected.orEmpty()), accounts.providerPlaybackContext(selected.orEmpty()), selected)
 
-        internal fun playbackGrants(pluginId: String): List<String> =
-            registry.state.value
-                .plugin(pluginId)
-                ?.takeIf { it.enabled }
-                ?.grantedNetwork
-                .orEmpty()
+        internal fun playbackGrants(pluginId: String): List<String> = registry.state.value.grantedHosts(pluginId)
 
         internal suspend fun resolveBound(
             pluginId: String,

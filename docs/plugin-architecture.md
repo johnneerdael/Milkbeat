@@ -29,8 +29,20 @@ License requests, redirects and provisioning use a separate transport that check
 plugin's current network grants before sending credentials. Clear descriptors remain compatible.
 Media and key requests share the same refreshable bound descriptor, so expired initial licenses
 and later key renewals use current URLs and headers without retargeting provisioning or redirects.
+Remote DASH manifests and their initialization and media segments receive the bound stream's media
+headers. When Media3 combines adjacent DASH initialization and index ranges, the licensed identifier
+mapping buffers and rewrites only the declared initialization bytes.
+Progressive playback applies the mapping after resolving the queue URI, including when the cache
+serves the original bytes.
 Providers requiring DRM declare `api.min: 4`. HLS/DRM offline downloads are unsupported. The v1
 non-goals below describe the original proposal, not this implemented extension.
+
+Plugin API 12 adds reviewed external connections. Milkbeat fetches the HTTPS manifest without
+credentials or redirects. During approval, the plugin can confirm that exact URL with a
+credential-free GET. A successful save records an origin grant scoped to the installed signer,
+connection ID, hostname and port. Replacing or removing a connection withdraws its grant. Plugin
+network requests, media and licenses use direct connections so Milkbeat can reject private DNS
+answers before opening them. These transports bypass the app's HTTP and SOCKS proxy settings.
 
 ## 1. What we are building
 

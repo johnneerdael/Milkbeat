@@ -70,21 +70,45 @@ fun TvPluginsSettingsPane(
     var openPlugin by rememberSaveable { mutableStateOf<String?>(null) }
     var choosing by rememberSaveable { mutableStateOf<ProviderRole?>(null) }
     var url by rememberSaveable { mutableStateOf("") }
+    var connectionUrl by rememberSaveable { mutableStateOf("") }
     val consent = state.adding as? AddPluginState.Consent
     LaunchedEffect(homeRevision) {
         if (viewModel.consumeHomeRequest(homeRevision)) {
             openPlugin = null
             choosing = null
             url = ""
+            connectionUrl = ""
         }
     }
 
+    val connectionsPage = state.connections.page
     // Back closes the page open inside Plugins before it may leave Settings, as a picker panel does.
     BackHandler(enabled = consent != null || choosing != null || openPlugin != null) {
         when {
-            consent != null -> viewModel.cancelAdd()
-            choosing != null -> choosing = null
-            else -> openPlugin = null
+            consent != null -> {
+                viewModel.cancelAdd()
+            }
+
+            choosing != null -> {
+                choosing = null
+            }
+
+            connectionsPage is ConnectionsPage.Review -> {
+                // Back returns to the editor for the replaceable link, not the list.
+                viewModel.editConnectionUrl(connectionsPage.connectionId)
+            }
+
+            connectionsPage is ConnectionsPage.EditUrl -> {
+                viewModel.showConnectionList()
+            }
+
+            connectionsPage != null -> {
+                viewModel.closeConnections()
+            }
+
+            else -> {
+                openPlugin = null
+            }
         }
     }
 
@@ -131,34 +155,62 @@ fun TvPluginsSettingsPane(
                 }
 
                 plugin != null -> {
-                    if (state.accounts[plugin.id] is ProviderAccount.SignedIn &&
-                        setOf(MetadataSurface.LIBRARY, MetadataSurface.TRACKS).all {
-                            it in
-                                plugin.manifest.roles.metadata
-                                    ?.surfaces
-                                    .orEmpty()
+                    val openConnections = state.connections.pluginId == plugin.id && state.connections.page != null
+                    if (openConnections) {
+                        connectionItems(
+                            plugin = plugin,
+                            connections = state.connections,
+                            account = state.accounts[plugin.id],
+                            connectionUrl = connectionUrl,
+                            onUrlChange = { connectionUrl = it },
+                            onUrl = viewModel::reviewConnection,
+                            onReviewAccount = viewModel::setConnectionReviewAccount,
+                            onApprove = viewModel::approveConnection,
+                            onEdit = {
+                                connectionUrl = ""
+                                viewModel.editConnectionUrl(it)
+                            },
+                            onEnabled = viewModel::setConnectionEnabled,
+                            onRemove = viewModel::removeConnection,
+                            onTest = viewModel::testConnection,
+                            onDone = viewModel::closeConnections,
+                        )
+                    } else {
+                        if (state.accounts[plugin.id] is ProviderAccount.SignedIn &&
+                            setOf(MetadataSurface.LIBRARY, MetadataSurface.TRACKS).all {
+                                it in
+                                    plugin.manifest.roles.metadata
+                                        ?.surfaces
+                                        .orEmpty()
+                            }
+                        ) {
+                            item(key = "preload-${plugin.id}") { TvPlaylistPreloadItem(plugin, viewModel.preloadJobs) }
                         }
-                    ) {
-                        item(key = "preload-${plugin.id}") { TvPlaylistPreloadItem(plugin, viewModel.preloadJobs) }
+                        detailItems(
+                            plugin = plugin,
+                            account = state.accounts[plugin.id],
+                            playHistory = playHistory,
+                            microGDownloadable = viewModel.microGDownloadable,
+                            replacementInstalled = { id -> state.plugins.any { it.id == id } },
+                            onAddReplacement = { code ->
+                                openPlugin = null
+                                viewModel.fetch(code)
+                            },
+                            onPlayHistoryChange = viewModel::setPlayHistoryEnabled,
+                            onSignIn = { method, download -> onSignIn(plugin.id, method, download) },
+                            onSignOut = { viewModel.signOut(plugin.id) },
+                            onConnections =
+                                if (plugin.manifest.permissions.connections) {
+                                    { viewModel.openConnections(plugin.id) }
+                                } else {
+                                    null
+                                },
+                            onRemove = {
+                                viewModel.remove(plugin.id)
+                                openPlugin = null
+                            },
+                        )
                     }
-                    detailItems(
-                        plugin = plugin,
-                        account = state.accounts[plugin.id],
-                        playHistory = playHistory,
-                        microGDownloadable = viewModel.microGDownloadable,
-                        replacementInstalled = { id -> state.plugins.any { it.id == id } },
-                        onAddReplacement = { code ->
-                            openPlugin = null
-                            viewModel.fetch(code)
-                        },
-                        onPlayHistoryChange = viewModel::setPlayHistoryEnabled,
-                        onSignIn = { method, download -> onSignIn(plugin.id, method, download) },
-                        onSignOut = { viewModel.signOut(plugin.id) },
-                        onRemove = {
-                            viewModel.remove(plugin.id)
-                            openPlugin = null
-                        },
-                    )
                 }
 
                 else -> {

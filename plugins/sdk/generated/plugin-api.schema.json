@@ -1,7 +1,7 @@
 {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "title": "MilkbeatPluginApi",
-    "description": "Plugin API v11, generated from the plugin-api module. Do not edit.",
+    "description": "Plugin API v12, generated from the plugin-api module. Do not edit.",
     "type": "object",
     "properties": {
         "manifest": {
@@ -510,6 +510,77 @@
                         "response"
                     ],
                     "additionalProperties": false
+                },
+                "connections.list": {
+                    "type": "object",
+                    "properties": {
+                        "response": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/$defs/nl.neerdael.milkbeat.plugin.PluginConnectionRow"
+                            }
+                        }
+                    },
+                    "required": [
+                        "response"
+                    ],
+                    "additionalProperties": false
+                },
+                "connections.save": {
+                    "type": "object",
+                    "properties": {
+                        "request": {
+                            "$ref": "#/$defs/nl.neerdael.milkbeat.plugin.PluginConnectionSave"
+                        },
+                        "response": {
+                            "$ref": "#/$defs/nl.neerdael.milkbeat.plugin.PluginConnectionSaved"
+                        }
+                    },
+                    "required": [
+                        "request",
+                        "response"
+                    ],
+                    "additionalProperties": false
+                },
+                "connections.remove": {
+                    "type": "object",
+                    "properties": {
+                        "request": {
+                            "$ref": "#/$defs/nl.neerdael.milkbeat.plugin.PluginConnectionRemove"
+                        }
+                    },
+                    "required": [
+                        "request"
+                    ],
+                    "additionalProperties": false
+                },
+                "connections.enabled": {
+                    "type": "object",
+                    "properties": {
+                        "request": {
+                            "$ref": "#/$defs/nl.neerdael.milkbeat.plugin.PluginConnectionEnabled"
+                        }
+                    },
+                    "required": [
+                        "request"
+                    ],
+                    "additionalProperties": false
+                },
+                "connections.test": {
+                    "type": "object",
+                    "properties": {
+                        "request": {
+                            "$ref": "#/$defs/nl.neerdael.milkbeat.plugin.PluginConnectionTest"
+                        },
+                        "response": {
+                            "$ref": "#/$defs/nl.neerdael.milkbeat.plugin.PluginConnectionTestResult"
+                        }
+                    },
+                    "required": [
+                        "request",
+                        "response"
+                    ],
+                    "additionalProperties": false
                 }
             },
             "required": [
@@ -546,7 +617,12 @@
                 "signIn.completeAccount",
                 "signIn.account",
                 "signIn.signOut",
-                "settings.options"
+                "settings.options",
+                "connections.list",
+                "connections.save",
+                "connections.remove",
+                "connections.enabled",
+                "connections.test"
             ],
             "additionalProperties": false
         },
@@ -2400,6 +2476,25 @@
                     "additionalProperties": {
                         "type": "string"
                     }
+                },
+                "serviceCertificate": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "multiSession": {
+                    "type": "boolean"
+                },
+                "initialization": {
+                    "oneOf": [
+                        {
+                            "type": "null"
+                        },
+                        {
+                            "$ref": "#/$defs/nl.neerdael.milkbeat.plugin.DrmInitialization"
+                        }
+                    ]
                 }
             },
             "title": "AudioDrm"
@@ -2996,6 +3091,41 @@
             ],
             "title": "DeviceCodeStatus"
         },
+        "nl.neerdael.milkbeat.plugin.DrmInitialization": {
+            "type": "object",
+            "required": [
+                "profile",
+                "url",
+                "offsetBytes",
+                "lengthBytes",
+                "keyIdsHex"
+            ],
+            "properties": {
+                "profile": {
+                    "type": "string"
+                },
+                "url": {
+                    "type": "string"
+                },
+                "offsetBytes": {
+                    "type": "integer",
+                    "minimum": -9223372036854775808,
+                    "maximum": 9223372036854775807
+                },
+                "lengthBytes": {
+                    "type": "integer",
+                    "minimum": -2147483648,
+                    "maximum": 2147483647
+                },
+                "keyIdsHex": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            },
+            "title": "DrmInitialization"
+        },
         "nl.neerdael.milkbeat.plugin.FormatType": {
             "enum": [
                 "AUDIO",
@@ -3101,6 +3231,12 @@
                         "string",
                         "null"
                     ]
+                },
+                "dolbyCodecs": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 }
             },
             "title": "HostEnvironment"
@@ -3450,9 +3586,146 @@
                     "type": "integer",
                     "minimum": -9223372036854775808,
                     "maximum": 9223372036854775807
+                },
+                "connections": {
+                    "type": "boolean"
                 }
             },
             "title": "Permissions"
+        },
+        "nl.neerdael.milkbeat.plugin.PluginConnectionEnabled": {
+            "type": "object",
+            "required": [
+                "id",
+                "enabled"
+            ],
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "enabled": {
+                    "type": "boolean"
+                }
+            },
+            "title": "PluginConnectionEnabled"
+        },
+        "nl.neerdael.milkbeat.plugin.PluginConnectionRemove": {
+            "type": "object",
+            "required": [
+                "id"
+            ],
+            "properties": {
+                "id": {
+                    "type": "string"
+                }
+            },
+            "title": "PluginConnectionRemove"
+        },
+        "nl.neerdael.milkbeat.plugin.PluginConnectionRow": {
+            "type": "object",
+            "required": [
+                "id",
+                "title",
+                "host"
+            ],
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "host": {
+                    "type": "string"
+                },
+                "addonId": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "enabled": {
+                    "type": "boolean"
+                }
+            },
+            "title": "PluginConnectionRow"
+        },
+        "nl.neerdael.milkbeat.plugin.PluginConnectionSave": {
+            "type": "object",
+            "required": [
+                "url",
+                "addonId"
+            ],
+            "properties": {
+                "id": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "url": {
+                    "type": "string"
+                },
+                "addonId": {
+                    "type": "string"
+                },
+                "useAccount": {
+                    "type": "boolean"
+                }
+            },
+            "title": "PluginConnectionSave"
+        },
+        "nl.neerdael.milkbeat.plugin.PluginConnectionSaved": {
+            "type": "object",
+            "required": [
+                "id"
+            ],
+            "properties": {
+                "id": {
+                    "type": "string"
+                }
+            },
+            "title": "PluginConnectionSaved"
+        },
+        "nl.neerdael.milkbeat.plugin.PluginConnectionTest": {
+            "type": "object",
+            "required": [
+                "id"
+            ],
+            "properties": {
+                "id": {
+                    "type": "string"
+                }
+            },
+            "title": "PluginConnectionTest"
+        },
+        "nl.neerdael.milkbeat.plugin.PluginConnectionTestResult": {
+            "type": "object",
+            "required": [
+                "state"
+            ],
+            "properties": {
+                "state": {
+                    "$ref": "#/$defs/nl.neerdael.milkbeat.plugin.PluginConnectionTestState"
+                },
+                "detail": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                }
+            },
+            "title": "PluginConnectionTestResult"
+        },
+        "nl.neerdael.milkbeat.plugin.PluginConnectionTestState": {
+            "enum": [
+                "VERIFIED",
+                "LOOKUP_FAILED",
+                "UNAUTHORIZED",
+                "MANIFEST_FAILED",
+                "SIGNED_OUT"
+            ],
+            "title": "PluginConnectionTestState"
         },
         "nl.neerdael.milkbeat.plugin.PluginError": {
             "type": "object",
@@ -3616,6 +3889,13 @@
             },
             "title": "RandomBytesResult"
         },
+        "nl.neerdael.milkbeat.plugin.ReportPhase": {
+            "enum": [
+                "PROGRESS",
+                "END"
+            ],
+            "title": "ReportPhase"
+        },
         "nl.neerdael.milkbeat.plugin.ReportPlaybackRequest": {
             "type": "object",
             "required": [
@@ -3656,6 +3936,42 @@
                 "playbackSessionId": {
                     "type": [
                         "string",
+                        "null"
+                    ]
+                },
+                "phase": {
+                    "oneOf": [
+                        {
+                            "type": "null"
+                        },
+                        {
+                            "$ref": "#/$defs/nl.neerdael.milkbeat.plugin.ReportPhase"
+                        }
+                    ]
+                },
+                "endReason": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "occurrenceId": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "playingMs": {
+                    "type": [
+                        "integer",
+                        "null"
+                    ],
+                    "minimum": -9223372036854775808,
+                    "maximum": 9223372036854775807
+                },
+                "manual": {
+                    "type": [
+                        "boolean",
                         "null"
                     ]
                 }

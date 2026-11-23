@@ -89,6 +89,16 @@ object PluginOperations {
     val settingOptions =
         PluginOperation("settings.options", SettingOptionsRequest.serializer(), ListSerializer(SettingOption.serializer()))
 
+    /** The plugin's reviewed external connections, for the host's connection settings (plugin API 12). */
+    val connectionsList =
+        PluginOperation("connections.list", Unit.serializer(), ListSerializer(PluginConnectionRow.serializer()))
+    val connectionsSave = PluginOperation("connections.save", PluginConnectionSave.serializer(), PluginConnectionSaved.serializer())
+    val connectionsRemove = PluginOperation("connections.remove", PluginConnectionRemove.serializer(), Unit.serializer())
+    val connectionsEnabled =
+        PluginOperation("connections.enabled", PluginConnectionEnabled.serializer(), Unit.serializer())
+    val connectionsTest =
+        PluginOperation("connections.test", PluginConnectionTest.serializer(), PluginConnectionTestResult.serializer())
+
     val all: List<PluginOperation<*, *>> =
         listOf(
             warmUp,
@@ -125,5 +135,10 @@ object PluginOperations {
             account,
             signOut,
             settingOptions,
+            connectionsList,
+            connectionsSave,
+            connectionsRemove,
+            connectionsEnabled,
+            connectionsTest,
         )
 }

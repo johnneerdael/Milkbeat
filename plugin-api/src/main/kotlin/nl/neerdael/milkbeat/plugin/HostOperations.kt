@@ -131,6 +131,12 @@ data class HostEnvironment(
     val pluginVersion: String,
     val osVersion: String? = null,
     val deviceModel: String? = null,
+    /**
+     * Dolby codecs this device can decode and pass to the active output, as MIME-independent names
+     * (`eac3`, `ac4`; plugin API 12). Empty when none are supported. Providers echo these in their
+     * stream requests instead of assuming device capability.
+     */
+    val dolbyCodecs: List<String> = emptyList(),
 )
 
 @Serializable

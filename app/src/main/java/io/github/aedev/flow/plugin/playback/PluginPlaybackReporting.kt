@@ -7,6 +7,7 @@ import io.github.aedev.flow.player.diagnostics.TraceField
 import io.github.aedev.flow.plugin.PluginHost
 import io.github.aedev.flow.plugin.registry.PluginRegistry
 import nl.neerdael.milkbeat.plugin.PluginOperations
+import nl.neerdael.milkbeat.plugin.ReportPhase
 import nl.neerdael.milkbeat.plugin.ReportPlaybackRequest
 
 internal suspend fun reportAcceptedListen(
@@ -18,6 +19,9 @@ internal suspend fun reportAcceptedListen(
     positionMs: Long?,
     progress: Boolean,
     playbackSessionId: String?,
+    endReason: String? = null,
+    playingMs: Long = 0L,
+    manual: Boolean = false,
 ) {
     val plugin = registry.state.value.plugin(played.pluginId) ?: return
     if (progress && plugin.manifest.api.target < 8) return
@@ -26,6 +30,7 @@ internal suspend fun reportAcceptedListen(
     ) {
         return
     }
+    val lifecycle = plugin.manifest.api.target >= 12
     val request =
         ReportPlaybackRequest(
             played.track.ref,
@@ -34,6 +39,20 @@ internal suspend fun reportAcceptedListen(
             durationMs,
             positionMs = positionMs.takeIf { plugin.manifest.api.target >= 8 },
             playbackSessionId = playbackSessionId.takeIf { plugin.manifest.api.target >= 8 },
+            phase =
+                if (lifecycle) {
+                    if (progress) {
+                        ReportPhase.PROGRESS
+                    } else {
+                        ReportPhase.END
+                    }
+                } else {
+                    null
+                },
+            endReason = endReason.takeIf { lifecycle && !progress },
+            occurrenceId = playbackSessionId.takeIf { lifecycle },
+            playingMs = playingMs.takeIf { lifecycle && it > 0 },
+            manual = manual.takeIf { lifecycle },
         )
     val send: suspend () -> Unit = {
         val trace = PlaybackTrace.start(TraceEvent.HISTORY_REPORT_STARTED, TraceCategory.HISTORY)

@@ -162,7 +162,14 @@ internal class PluginRuntime(
             try {
                 // Warm-up may compile large code (a player's solvers), so it gets the isolated warm-up's memory on
                 // the playback owner. It keeps the call's time budget: foreground calls queue behind it there.
-                call(PluginOperations.warmUp, Unit, WARM_UP_MEMORY_LIMIT)
+                if (plugin.manifest.api.target >= 12 && plugin.manifest.roles.audio
+                        ?.reportPlayback == true
+                ) {
+                    // Outbox recovery can request a new call. Wait outside QuickJS and its call budget.
+                    retryingTransient { call(PluginOperations.warmUp, Unit, WARM_UP_MEMORY_LIMIT) }
+                } else {
+                    call(PluginOperations.warmUp, Unit, WARM_UP_MEMORY_LIMIT)
+                }
                 Log.i(TAG, "Persistent warm-up of ${plugin.id} took ${SystemClock.elapsedRealtime() - startedMs} ms")
                 return
             } catch (e: PluginCallException) {

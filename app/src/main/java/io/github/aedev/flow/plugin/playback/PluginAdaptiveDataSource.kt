@@ -8,11 +8,14 @@ import androidx.media3.datasource.ResolvingDataSource
 import androidx.media3.datasource.cache.Cache
 import androidx.media3.datasource.cache.CacheDataSource
 import androidx.media3.datasource.okhttp.OkHttpDataSource
+import io.github.aedev.flow.plugin.host.publicDns
+import io.github.aedev.flow.plugin.host.publicPluginDestination
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import nl.neerdael.milkbeat.plugin.FormatType
 import nl.neerdael.milkbeat.plugin.MediaFormat
 import okhttp3.CookieJar
+import okhttp3.Dns
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import java.io.IOException
@@ -23,13 +26,30 @@ internal fun pluginAdaptiveDataSourceFactory(
     cache: Cache?,
     verifyCurrent: (ResolvedAudio) -> Unit,
     allowedHosts: () -> List<String>,
+): DataSource.Factory = pluginAdaptiveDataSourceFactory(base, binding, cache, verifyCurrent, allowedHosts, publicDns())
+
+/** Explicit DNS injection lets HTTPS tests use their local server without changing the public policy. */
+internal fun pluginAdaptiveDataSourceFactory(
+    base: OkHttpClient,
+    binding: BoundPluginAudio,
+    cache: Cache?,
+    verifyCurrent: (ResolvedAudio) -> Unit,
+    allowedHosts: () -> List<String>,
+    dns: Dns,
 ): DataSource.Factory {
     val initial = binding.initial
     val formats = listOfNotNull(initial.stream.audioFormat, initial.stream.video).associateBy { it.url }
     val keyed = formats.values.associateBy(initial::adaptiveCacheKey)
+    val remoteDash =
+        initial.preparedDashManifest == null &&
+            initial.stream.mimeType
+                .substringBefore(';')
+                .trim()
+                .equals("application/dash+xml", ignoreCase = true)
     val client =
         base
             .newBuilder()
+            .publicPluginDestination(dns)
             .cookieJar(CookieJar.NO_COOKIES)
             .addNetworkInterceptor(
                 Interceptor { chain ->
@@ -43,27 +63,39 @@ internal fun pluginAdaptiveDataSourceFactory(
         ResolvingDataSource.Factory(OkHttpDataSource.Factory(client)) { request ->
             if (request.httpMethod != DataSpec.HTTP_METHOD_GET) throw IOException("Adaptive media requires a GET")
             verifyCurrent(initial)
-            val original = keyed[request.key] ?: throw IOException("Unknown adaptive rendition")
+            val original = request.key?.let(keyed::get)
+            if (original == null && !remoteDash) return@Factory request
             val current = runBlocking(Dispatchers.IO) { binding.current() }
             verifyCurrent(current)
+            if (current.pluginId != initial.pluginId || current.track.ref != initial.track.ref ||
+                current.stream.cacheKey != initial.stream.cacheKey
+            ) {
+                throw IOException("The provider changed this adaptive source")
+            }
+            if (original == null) {
+                // Remote DASH supplies its own manifest and segment URLs. A renewed stream retargets
+                // its manifest open; segments keep their URLs and ranges, and the bound stream's
+                // media headers apply to every uncached network request.
+                val manifest =
+                    if (request.uri.toString() == initial.stream.url) {
+                        request.buildUpon().setUri(current.stream.url).build()
+                    } else {
+                        request
+                    }
+                return@Factory manifest.withMediaHeaders(current.stream.headers).build()
+            }
             val format =
                 when (original.type) {
                     FormatType.AUDIO -> current.stream.audioFormat
                     FormatType.VIDEO -> current.stream.video
                 } ?: throw IOException("The provider removed this rendition")
-            if (format.id != original.id || format.initRange != original.initRange || format.indexRange != original.indexRange ||
-                current.pluginId != initial.pluginId || current.track.ref != initial.track.ref ||
-                current.stream.cacheKey != initial.stream.cacheKey
-            ) {
+            if (format.id != original.id || format.initRange != original.initRange || format.indexRange != original.indexRange) {
                 throw IOException("The provider changed this adaptive rendition")
             }
             checkedPluginMediaUrl(format.url, allowedHosts())
-            val extra = current.stream.headers + format.headers
-            val headers = request.httpRequestHeaders.filterKeys { name -> extra.keys.none { it.equals(name, ignoreCase = true) } } + extra
             request
-                .buildUpon()
+                .withMediaHeaders(current.stream.headers + format.headers)
                 .setUri(format.url)
-                .setHttpRequestHeaders(headers.filterKeys { !it.equals("Range", ignoreCase = true) })
                 .setKey(current.adaptiveCacheKey(format))
                 .build()
         }
@@ -81,11 +113,23 @@ internal fun pluginAdaptiveDataSourceFactory(
         ResolvingDataSource(upstream.createDataSource()) { request ->
             if (request.httpMethod != DataSpec.HTTP_METHOD_GET) throw IOException("Adaptive media requires a GET")
             verifyCurrent(initial)
-            val original = formats[request.uri.toString()] ?: throw IOException("Unknown adaptive rendition")
+            val original = formats[request.uri.toString()]
+            if (original == null) {
+                // A parsed remote manifest's segments are not host-known formats; the URL it names
+                // must still be a currently granted destination.
+                checkedPluginMediaUrl(request.uri.toString(), allowedHosts())
+                return@ResolvingDataSource request
+            }
             checkedPluginMediaUrl(original.url, allowedHosts())
             request.buildUpon().setKey(initial.adaptiveCacheKey(original)).build()
         }
     }
+}
+
+private fun DataSpec.withMediaHeaders(providerHeaders: Map<String, String>): DataSpec.Builder {
+    val headers =
+        httpRequestHeaders.filterKeys { name -> providerHeaders.keys.none { it.equals(name, ignoreCase = true) } } + providerHeaders
+    return buildUpon().setHttpRequestHeaders(headers.filterKeys { !it.equals("Range", ignoreCase = true) })
 }
 
 internal fun ResolvedAudio.adaptiveCacheKey(format: MediaFormat): String = "$pluginId:${stream.cacheKey}:${format.id}"

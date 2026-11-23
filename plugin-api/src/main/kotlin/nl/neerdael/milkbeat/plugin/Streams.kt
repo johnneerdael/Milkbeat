@@ -128,6 +128,32 @@ data class AudioDrm(
     val scheme: AudioDrmScheme,
     val licenseUrl: String,
     val headers: Map<String, String> = emptyMap(),
+    /**
+     * Base64 service certificate the provider's license endpoint expects in the Widevine session
+     * (plugin API 12); null uses the device's default service certificate.
+     */
+    val serviceCertificate: String? = null,
+    /** Whether the Widevine session needs MediaDrm multi-session mode, as the provider declares. */
+    val multiSession: Boolean = false,
+    /**
+     * A provider-declared initialization range whose public track identifiers the license replaces
+     * (plugin API 12). Only the exact [DrmInitialization.url] byte range is rewritten; the stream's
+     * own bytes pass through untouched.
+     */
+    val initialization: DrmInitialization? = null,
+)
+
+/**
+ * The licensed profile's initialization data: one bounded byte range of [url], identified by
+ * [offsetBytes] and [lengthBytes], whose public track identifiers become [keyIdsHex].
+ */
+@Serializable
+data class DrmInitialization(
+    val profile: String,
+    val url: String,
+    val offsetBytes: Long,
+    val lengthBytes: Int,
+    val keyIdsHex: List<String>,
 )
 
 @Serializable
@@ -161,7 +187,30 @@ data class ReportPlaybackRequest(
     val positionMs: Long? = null,
     /** Opaque host listen identity; changes when the same recording starts a new listen. */
     val playbackSessionId: String? = null,
+    /** Plugin API 12: whether this sample is progress or the final sample of one listen. */
+    val phase: ReportPhase? = null,
+    /** Plugin API 12: why the listen ended, when [phase] is [ReportPhase.END]. */
+    val endReason: String? = null,
+    /**
+     * Plugin API 12: the queue occurrence this listen belongs to. Stable across a source refresh
+     * and same-track recovery, so one occurrence yields exactly one terminal event.
+     */
+    val occurrenceId: String? = null,
+    /** Plugin API 12: listening time measured from real position deltas, unchanged by seeks. */
+    val playingMs: Long? = null,
+    /** Plugin API 12: the listen began from a listener action rather than an automatic advance. */
+    val manual: Boolean? = null,
 )
+
+/** Plugin API 12: the lifecycle stage of a playback report. */
+@Serializable
+enum class ReportPhase {
+    /** A periodic sample while the listen continues. */
+    PROGRESS,
+
+    /** The final sample; no further report arrives for this occurrence. */
+    END,
+}
 
 /** A video to play in the video player. */
 @Serializable

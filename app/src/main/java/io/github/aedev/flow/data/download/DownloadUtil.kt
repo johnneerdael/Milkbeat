@@ -22,7 +22,6 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.aedev.flow.data.local.PlayerPreferences
 import io.github.aedev.flow.di.DownloadCache
 import io.github.aedev.flow.di.PlayerCache
-import io.github.aedev.flow.network.AppProxyManager
 import io.github.aedev.flow.player.MusicVideoItems
 import io.github.aedev.flow.player.datasource.BoundPluginMusicDataSourceFactory
 import io.github.aedev.flow.player.datasource.MusicFolderDataSourceFactory
@@ -32,21 +31,26 @@ import io.github.aedev.flow.player.datasource.bindCachedMusicRendition
 import io.github.aedev.flow.player.datasource.clearCachedMusicResources
 import io.github.aedev.flow.player.datasource.hasCompleteMusicDownload
 import io.github.aedev.flow.player.stream.VideoCodecUtils
+import io.github.aedev.flow.plugin.host.publicPluginDestination
 import io.github.aedev.flow.plugin.playback.BoundPluginAudio
 import io.github.aedev.flow.plugin.playback.PictureLimits
 import io.github.aedev.flow.plugin.playback.PluginAudio
 import io.github.aedev.flow.plugin.playback.PluginRangePolicy
 import io.github.aedev.flow.plugin.playback.QueuePreparationResult
 import io.github.aedev.flow.plugin.playback.ResolvedAudio
+import io.github.aedev.flow.plugin.playback.acquirePlaybackLease
 import io.github.aedev.flow.plugin.playback.adaptiveCacheKey
 import io.github.aedev.flow.plugin.playback.adaptiveDataSourceFactory
 import io.github.aedev.flow.plugin.playback.cacheIdentity
 import io.github.aedev.flow.plugin.playback.drmDataSourceFactory
+import io.github.aedev.flow.plugin.playback.pluginDrmInitDataSourceFactory
+import io.github.aedev.flow.plugin.playback.pluginMediaDataSourceFactory
 import io.github.aedev.flow.plugin.playback.pluginRangedDataSourceFactory
 import io.github.aedev.flow.plugin.playback.pluginRequestLength
 import io.github.aedev.flow.plugin.playback.pluginStripeCipherDataSourceFactory
 import io.github.aedev.flow.plugin.playback.prepareQueue
 import io.github.aedev.flow.plugin.playback.serverAbrDataSourceFactory
+import io.github.aedev.flow.plugin.playback.verifyBound
 import io.github.aedev.flow.plugin.playback.withRangePolicy
 import io.github.aedev.flow.service.ExoDownloadService
 import io.github.aedev.flow.utils.MusicVideoFormats
@@ -106,8 +110,9 @@ class DownloadUtil
         val downloads = MutableStateFlow<Map<String, Download>>(emptyMap())
 
         private val okHttpClient: OkHttpClient by lazy {
-            AppProxyManager
-                .applyTo(OkHttpClient.Builder())
+            OkHttpClient
+                .Builder()
+                .publicPluginDestination()
                 .connectTimeout(30, TimeUnit.SECONDS)
                 .readTimeout(60, TimeUnit.SECONDS)
                 .build()
@@ -226,8 +231,26 @@ class DownloadUtil
                     runBlocking(Dispatchers.IO) {
                         binding?.current() ?: resolveForPlayback(uri, picture)
                     }
-                val playbackCache = if (binding == null) cachedDataSourceFactory else playerCacheFactory
-                return ResolvingDataSource.Factory(playbackCache) { dataSpec ->
+                val playbackCache =
+                    if (binding == null) {
+                        cachedDataSourceFactory
+                    } else {
+                        // Progressive and HLS opens re-check the plugin's current grants, including redirects.
+                        pluginMediaDataSourceFactory(
+                            okHttpClient,
+                            playerCache,
+                            { pluginAudio.verifyBound(binding.initial) },
+                            { pluginAudio.playbackGrants(binding.initial.pluginId) },
+                        )
+                    }
+                val initialization =
+                    binding
+                        ?.initial
+                        ?.stream
+                        ?.drm
+                        ?.initialization
+                val media = initialization?.let { pluginDrmInitDataSourceFactory(playbackCache, it) } ?: playbackCache
+                return ResolvingDataSource.Factory(media) { dataSpec ->
                     if (dataSpec.uri.scheme in setOf("file", "content", "android.resource")) {
                         return@Factory dataSpec
                     }
@@ -270,6 +293,12 @@ class DownloadUtil
                     try {
                         if (playerCache.isCached(mediaId, dataSpec.position, CACHE_PROBE_LENGTH)) {
                             Log.d(TAG, "[Player] Serving from playerCache: $mediaId")
+                            // The cache key stays the queue ID. The initialization adapter still
+                            // needs the media URI to recognize matching bytes on an offline hit.
+                            if (initialization != null) {
+                                val url = removeRangeParameter(requireNotNull(binding).initial.stream.url)
+                                return@Factory dataSpec.withUri(url.toUri())
+                            }
                             return@Factory dataSpec
                         }
                     } catch (e: Exception) {
@@ -330,13 +359,18 @@ class DownloadUtil
                         audio.stream.serverAbr?.let { pluginAudio.serverAbrDataSourceFactory(audio, okHttpClient) },
                         audio.stream.serverAbr?.let { { pluginAudio.acquirePlaybackLease(audio) } },
                         adaptive =
-                            audio.stream.audioFormat?.let {
-                                pluginAudio.adaptiveDataSourceFactory(
-                                    binding,
-                                    okHttpClient,
-                                    playerCache,
-                                )
-                            },
+                            audio.stream
+                                .takeIf {
+                                    // Host-built and remote DASH both need the checked transport.
+                                    it.audioFormat != null ||
+                                        it.mimeType.substringBefore(';').equals("application/dash+xml", ignoreCase = true)
+                                }?.let {
+                                    pluginAudio.adaptiveDataSourceFactory(
+                                        binding,
+                                        okHttpClient,
+                                        playerCache,
+                                    )
+                                },
                     )
                 },
             )

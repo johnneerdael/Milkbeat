@@ -51,8 +51,24 @@ class PluginTrackMatcher
             onProgress: (TrackMatchProgress) -> Unit = {},
         ): TrackDescriptor? =
             try {
-                find(track, pluginId, excludedId, strategy, onProgress)
+                find(track, pluginId, setOfNotNull(excludedId), strategy, onProgress)
             } catch (e: PluginCallException) {
+                Log.w(TAG, "$pluginId could not search for ${track.title}: ${e.error.message}")
+                null
+            }
+
+        internal suspend fun alternatePlaybackMatch(
+            track: TrackDescriptor,
+            pluginId: String,
+            excludedIds: Set<String>,
+            strict: Boolean,
+            strategy: AudioMatchStrategy,
+            onProgress: (TrackMatchProgress) -> Unit,
+        ): TrackDescriptor? =
+            try {
+                find(track, pluginId, excludedIds, strategy, onProgress)
+            } catch (e: PluginCallException) {
+                if (strict) throw e
                 Log.w(TAG, "$pluginId could not search for ${track.title}: ${e.error.message}")
                 null
             }
@@ -60,19 +76,19 @@ class PluginTrackMatcher
         private suspend fun find(
             track: TrackDescriptor,
             pluginId: String,
-            excludedId: String?,
+            excludedIds: Set<String>,
             strategy: AudioMatchStrategy,
             onProgress: (TrackMatchProgress) -> Unit = {},
         ): TrackDescriptor? {
             val fingerprint = fingerprint(track)
             val version = versionOf(pluginId)
             validatedCache(track, fingerprint, pluginId, strategy, version)?.let {
-                if (excludedId == null || it.candidate?.ref?.providerId != excludedId) {
+                if (it.candidate?.ref?.providerId !in excludedIds) {
                     if (it.candidate != null) onProgress(TrackMatchProgress.SAVED_MATCH)
                     return it.candidate
                 }
             }
-            val key = "$pluginId@$version|$fingerprint|${strategy.name}|${excludedId.orEmpty()}"
+            val key = "$pluginId@$version|$fingerprint|${strategy.name}|${excludedIds.sorted()}"
             val mine = CompletableDeferred<TrackDescriptor?>()
             inFlight.putIfAbsent(key, mine)?.let { owner ->
                 onProgress(TrackMatchProgress.WAITING)
@@ -81,12 +97,12 @@ class PluginTrackMatcher
                 } catch (e: CancellationException) {
                     currentCoroutineContext().ensureActive()
                     inFlight.remove(key, owner)
-                    return find(track, pluginId, excludedId, strategy, onProgress)
+                    return find(track, pluginId, excludedIds, strategy, onProgress)
                 }
             }
             try {
                 onProgress(TrackMatchProgress.SEARCHING)
-                return lookup(track, fingerprint, pluginId, excludedId, strategy, version).also(mine::complete)
+                return lookup(track, fingerprint, pluginId, excludedIds, strategy, version).also(mine::complete)
             } catch (e: Throwable) {
                 mine.completeExceptionally(e)
                 throw e
@@ -100,7 +116,7 @@ class PluginTrackMatcher
             pluginId: String,
             excludedId: String? = null,
             strategy: AudioMatchStrategy = AudioMatchStrategy.SONGS,
-        ): TrackDescriptor? = find(track, pluginId, excludedId, strategy)
+        ): TrackDescriptor? = find(track, pluginId, setOfNotNull(excludedId), strategy)
 
         suspend fun invalidate(
             track: TrackDescriptor,
@@ -163,19 +179,19 @@ class PluginTrackMatcher
             track: TrackDescriptor,
             fingerprint: String,
             pluginId: String,
-            excludedId: String?,
+            excludedIds: Set<String>,
             strategy: AudioMatchStrategy,
             version: Int,
         ): TrackDescriptor? {
             val result = host.call(pluginId, PluginOperations.matchAudio, MatchAudioRequest(track, strategy))
             result.error?.let { throw PluginCallException(pluginId, it) }
             val candidates = result.candidates
-            val best = TrackMatchScore.best(track, candidates.filter { it.ref.providerId != excludedId })
+            val best = TrackMatchScore.best(track, candidates.filter { it.ref.providerId !in excludedIds })
             Log.d(
                 TAG,
                 "${track.title}: ${candidates.size} candidates from $pluginId, best ${best?.score?.let { "%.2f".format(it) } ?: "none"}",
             )
-            if (best == null && excludedId != null) return null
+            if (best == null && excludedIds.isNotEmpty()) return null
             return remember(fingerprint, pluginId, best, strategy, version)
         }
 

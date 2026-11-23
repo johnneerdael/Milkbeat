@@ -6,7 +6,7 @@ import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DataSource
-import androidx.media3.exoplayer.drm.DefaultDrmSessionManagerProvider
+import androidx.media3.exoplayer.dash.DashMediaSource
 import androidx.media3.exoplayer.hls.HlsMediaSource
 import androidx.media3.exoplayer.source.MediaSource
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
@@ -17,6 +17,9 @@ import io.github.aedev.flow.player.resolver.AudioOnlyHlsPlaylistParserFactory
 import io.github.aedev.flow.player.resolver.MediaSourceBuilder
 import io.github.aedev.flow.player.resolver.ResolvingMusicMediaSource
 import io.github.aedev.flow.plugin.playback.ResolvedAudio
+import io.github.aedev.flow.plugin.playback.pluginDrmInitDataSourceFactory
+import io.github.aedev.flow.plugin.playback.pluginDrmProvider
+import io.github.aedev.flow.plugin.playback.validatedServiceCertificate
 import nl.neerdael.milkbeat.plugin.AudioDrmScheme
 import nl.neerdael.milkbeat.sabr.SabrMediaSource
 
@@ -96,11 +99,14 @@ class MusicMediaSourceFactory(
                     .Factory(transport)
                     .setLivePresentationDelayMs(PlayerConfig.LIVE_EDGE_GAP_MS, true)
             if (audio.stream.drm != null) {
-                val provider = DefaultDrmSessionManagerProvider()
-                provider.setDrmHttpDataSourceFactory(
-                    requireNotNull(licenseFactory) { "Plugin DRM requires a permission-checked license transport" },
+                val streamDrm = audio.stream.drm
+                native.setDrmSessionManagerProvider(
+                    pluginDrmProvider(
+                        streamDrm?.let(::validatedServiceCertificate),
+                        streamDrm?.multiSession == true,
+                        requireNotNull(licenseFactory) { "Plugin DRM requires a permission-checked license transport" },
+                    ),
                 )
-                native.setDrmSessionManagerProvider(provider)
             }
             // The presentation already contains either audio-only formats or audio + picture.
             // Preserve the exact accepted item; never bolt progressive picture bytes onto SABR.
@@ -113,25 +119,38 @@ class MusicMediaSourceFactory(
                     .RuntimeHeldMediaSource(source, hold)
             }
         }
+        val adaptive = (sourceFactory as? BoundPluginMusicDataSourceFactory)?.adaptive
         audio?.preparedDashManifest?.let { manifest ->
-            val headers =
-                StreamRequestHeaders(
-                    audio.stream.headers,
-                    listOf(audio.stream.audioFormat!!, audio.stream.video!!).associate { it.url to it.headers },
-                )
-            val transport =
-                (sourceFactory as? BoundPluginMusicDataSourceFactory)?.adaptive ?: sourceFactory.withRequestHeaders(headers)
+            // Segments of a host-built manifest still pass the plugin's per-request grant check.
+            val transport = requireNotNull(adaptive) { "Plugin DASH requires the permission-checked adaptive transport" }
             return MediaSourceBuilder.buildDashSource(transport, manifest, Uri.parse(audio.stream.url), soundItem)
         }
+
         val progressive = ProgressiveMediaSource.Factory(sourceFactory)
         val hls = HlsMediaSource.Factory(sourceFactory)
+        val dashMime =
+            audio
+                ?.stream
+                ?.mimeType
+                ?.substringBefore(';')
+                ?.equals("application/dash+xml", ignoreCase = true) == true
+        val dash =
+            if (dashMime) {
+                val transport = requireNotNull(adaptive) { "Plugin DASH requires the permission-checked adaptive transport" }
+                val initialization = audio?.stream?.drm?.initialization
+                DashMediaSource.Factory(initialization?.let { pluginDrmInitDataSourceFactory(transport, it) } ?: transport)
+            } else {
+                null
+            }
         if (audio?.stream?.drm != null) {
-            val provider = DefaultDrmSessionManagerProvider()
-            provider.setDrmHttpDataSourceFactory(
-                requireNotNull(licenseFactory) { "Plugin DRM requires a permission-checked license transport" },
-            )
+            val streamDrm = audio.stream.drm
+            val certificate = streamDrm?.let(::validatedServiceCertificate)
+            val checkedLicense =
+                requireNotNull(licenseFactory) { "Plugin DRM requires a permission-checked license transport" }
+            val provider = pluginDrmProvider(certificate, streamDrm?.multiSession == true, checkedLicense)
             progressive.setDrmSessionManagerProvider(provider)
             hls.setDrmSessionManagerProvider(provider)
+            dash?.setDrmSessionManagerProvider(provider)
         }
         val withPicture = mediaItem.localConfiguration?.uri?.scheme == MusicVideoItems.SCHEME
         if (!withPicture || audio?.stream?.requireAudioOnlyHls == true) {
@@ -143,16 +162,28 @@ class MusicMediaSourceFactory(
             )
         }
         val sound =
-            if (audio
+            when (
+                audio
                     ?.stream
                     ?.mimeType
                     ?.substringBefore(';')
-                    ?.lowercase() in
-                setOf("application/x-mpegurl", "application/vnd.apple.mpegurl")
+                    ?.lowercase()
             ) {
-                hls.createMediaSource(soundItem)
-            } else {
-                progressive.createMediaSource(soundItem)
+                in setOf("application/x-mpegurl", "application/vnd.apple.mpegurl") -> {
+                    hls.createMediaSource(soundItem)
+                }
+
+                "application/dash+xml" -> {
+                    requireNotNull(dash).createMediaSource(
+                        // The manifest is fetched from the accepted stream URL; the queue's identity
+                        // and metadata stay on the item.
+                        soundItem.buildUpon().setUri(requireNotNull(audio).stream.url).build(),
+                    )
+                }
+
+                else -> {
+                    progressive.createMediaSource(soundItem)
+                }
             }
         // Separate progressive picture URLs cannot be prepared without fetching hidden bytes.
         // Audio remains available; picture needs a metadata-prepared DASH/HLS/SABR presentation.

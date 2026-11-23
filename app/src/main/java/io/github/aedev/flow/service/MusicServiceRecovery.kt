@@ -17,8 +17,8 @@ import java.util.Locale
 import kotlin.math.min
 
 private const val TAG = "Media3MusicService"
-private const val MAX_RETRY_PER_SONG = 5
-private const val BASE_RETRY_DELAY_MS = 3000L
+internal const val MAX_RETRY_PER_SONG = 5
+internal const val BASE_RETRY_DELAY_MS = 3000L
 private const val MAX_RETRY_DELAY_MS = 30000L
 private const val FAILED_SONGS_CACHE_SIZE = 50
 private const val MUSIC_URI_SCHEME = "music"
@@ -60,6 +60,7 @@ internal fun Media3MusicService.handlePlayerError(
             .playbackSessionLost(error)
     ) {
         retryJobCancel()
+        accountHistoryListener?.sourceRecoveryExhausted(mediaId)
         player.stop()
         notifyMusicWarning(getString(R.string.music_playback_warning_generic))
         return
@@ -119,7 +120,9 @@ internal fun Media3MusicService.handlePlayerError(
     val progressiveHttp =
         io.github.aedev.flow.player.error.StreamHttpFailure
             .of(error)
-    if (progressiveHttp != null && (progressiveHttp.second in setOf(403, 404, 410) || progressiveHttp.second >= 500)) {
+    // 401 and 403 media refusals refresh a fresh URL from the same provider once before it is
+    // rejected: a scoped token or signed URL may simply have expired for this open.
+    if (progressiveHttp != null && (progressiveHttp.second in setOf(401, 403, 404, 410) || progressiveHttp.second >= 500)) {
         pluginAudio.failed(mediaId, progressiveHttp.first, progressiveHttp.second)
         failed = failed.copy(refreshNativeSource = true)
     }
@@ -212,6 +215,7 @@ internal fun Media3MusicService.handleServerAbrFailure(
             downloadUtil.invalidateUrlCache(failed.mediaId)
             if (player.currentMediaItem?.mediaId == failed.mediaId) {
                 val playing = player.playWhenReady
+                accountHistoryListener?.sourceWillReopen(failed.mediaId)
                 player.stop()
                 if (refreshStreamMediaItem(failed, preservePicture = true)) {
                     player.prepare()
@@ -244,7 +248,6 @@ internal fun Media3MusicService.fallBackToSong(failed: MusicPlaybackRecoveryPlan
         .onVideoUnavailable(failed.mediaId)
     if (!refreshStreamMediaItemAt(index, failed.mediaId, failed.resumePositionMs)) return false
     player.prepare()
-    player.play()
     return true
 }
 
@@ -273,9 +276,10 @@ internal fun Media3MusicService.restartFailedItem(
         if (!refreshStreamMediaItemAt(index, failed.mediaId, position, preservePicture = true)) return
     } else {
         player.seekTo(index, position)
+        audioStartGate?.sourceReplaced(failed.mediaId)
     }
+    // Preparing the recovered source leaves the current play or pause request in effect.
     player.prepare()
-    player.play()
 }
 
 internal fun Media3MusicService.skipPastFailedItem(failed: MusicPlaybackRecoveryPlanner.FailedItem) {
@@ -285,19 +289,16 @@ internal fun Media3MusicService.skipPastFailedItem(failed: MusicPlaybackRecovery
         index == player.currentMediaItemIndex && player.hasNextMediaItem() -> {
             player.seekToNextMediaItem()
             player.prepare()
-            player.play()
         }
 
         index != MusicQueuePlanner.INDEX_UNSET && index + 1 < player.mediaItemCount -> {
             player.seekTo(index + 1, 0L)
             player.prepare()
-            player.play()
         }
 
         player.repeatMode == Player.REPEAT_MODE_ALL && player.mediaItemCount > 0 -> {
             player.seekTo(0, 0L)
             player.prepare()
-            player.play()
         }
     }
 }
@@ -337,32 +338,9 @@ internal fun Media3MusicService.isFileNotFoundError(error: PlaybackException): B
     error.errorCode == PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND ||
         (error.cause as? PlaybackException)?.errorCode == PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND
 
-internal fun Media3MusicService.isAudioRendererError(error: PlaybackException): Boolean =
-    error.errorCode == PlaybackException.ERROR_CODE_AUDIO_TRACK_WRITE_FAILED ||
-        error.errorCode == PlaybackException.ERROR_CODE_AUDIO_TRACK_INIT_FAILED
-
 internal fun Media3MusicService.isNetworkError(error: PlaybackException): Boolean =
     error.errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED ||
         error.errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT
-
-internal fun Media3MusicService.handleAudioRendererError(
-    failed: MusicPlaybackRecoveryPlanner.FailedItem,
-    currentRetry: Int,
-) {
-    retryCountMap[failed.mediaId] = currentRetry + 1
-    retryJobCancel()
-    pendingRetryJob =
-        lifecycleScope.launch {
-            try {
-                player.pause()
-                delay(BASE_RETRY_DELAY_MS * 3)
-                restartFailedItem(failed)
-            } catch (e: Exception) {
-                Log.e(TAG, "AudioTrack recovery failed", e)
-                handleFinalFailure(failed)
-            }
-        }
-}
 
 internal fun Media3MusicService.handleRangeNotSatisfiableError(
     failed: MusicPlaybackRecoveryPlanner.FailedItem,
@@ -410,11 +388,9 @@ internal fun Media3MusicService.handleExpiredUrlError(
             delay(BASE_RETRY_DELAY_MS)
             try {
                 downloadUtil.invalidateUrlCache(mediaId)
+                accountHistoryListener?.sourceWillReopen(mediaId)
                 player.stop()
-                if (refreshStreamMediaItem(failed, preservePicture = true)) {
-                    player.prepare()
-                    player.play()
-                }
+                if (refreshStreamMediaItem(failed, preservePicture = true)) player.prepare()
             } catch (e: Exception) {
                 Log.e(TAG, "Expired URL recovery failed", e)
             }
@@ -453,8 +429,11 @@ internal fun Media3MusicService.refreshStreamMediaItemAt(
             .setCustomCacheKey(mediaId)
             .build()
 
+    if (index == player.currentMediaItemIndex) accountHistoryListener?.sourceWillReopen(mediaId)
     player.replaceMediaItem(index, refreshedItem)
     player.seekTo(index, positionMs)
+    // A replaced source must confirm its own audio output before playback reports as started.
+    audioStartGate?.sourceReplaced(mediaId)
     return true
 }
 
@@ -529,6 +508,7 @@ internal fun Media3MusicService.handleFinalFailure(failed: MusicPlaybackRecovery
     val mediaId = failed.mediaId
     Log.w(TAG, "All retries exhausted for $mediaId, marking as failed")
     notifyMusicWarning(getString(R.string.music_playback_warning_final))
+    accountHistoryListener?.sourceRecoveryExhausted(mediaId)
     retryCountMap.remove(mediaId)
     lastPlaybackErrorAtMap.remove(mediaId)
     if (recentlyFailedSongs.size >= FAILED_SONGS_CACHE_SIZE) {

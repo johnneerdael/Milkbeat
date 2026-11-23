@@ -20,8 +20,8 @@
 ---
 
 Milkbeat plays music from your TV's storage, USB drives and network folders (SMB, WebDAV, SFTP
-and NFS) without any plugin or account. Optional plugins add YouTube, Spotify, Beatport, SoundCloud
-and Deezer, each as its own tab in the sidebar, and let one service's catalog play through another
+and NFS) without any plugin or account. Optional plugins add YouTube, Spotify, Beatport, SoundCloud,
+Deezer and Eclipse, each as its own tab in the sidebar, and let one service's catalog play through another
 service's audio. Behind the music runs [ProjectM TV](https://github.com/johnneerdael/ProjectM-TV),
 a MilkDrop visualizer up to 4K, or the music video, or the cover. Everything is built for the remote.
 
@@ -167,6 +167,12 @@ working without updates until you remove it.
 - **Deezer:** sign in for Home, Flow and your library. Stream availability and FLAC/MP3 quality
   depend on the account and recording. Deezer 0.2.1 needs plugin API 9; update Milkbeat first. With
   plugin API 10 it fetches each track in one request, so songs no longer pause mid-play.
+- **Eclipse:** a streaming-only audio provider for your Eclipse add-ons. Sign in with the TV code at
+  `eclipsemusic.app/tv`; Cloud is added from your account, and other add-ons are added under
+  **Add-on links** from their own install links, each reviewed and approved on the TV before
+  Milkbeat sends it anything. Atmos is requested only when the TV's output supports Dolby, and
+  **Report Eclipse listening** (off by default) sends one history event per finished listen.
+  Eclipse 0.1.0 needs plugin API 12; update Milkbeat first.
 
 Under **Audio**, put providers in priority order and choose which ones play other services'
 tracks; under **Video**, choose the video plugin. Every track follows the order, including tracks

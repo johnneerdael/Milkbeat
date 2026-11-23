@@ -78,6 +78,94 @@ class PluginDrmDataSourceTest {
     }
 
     @Test
+    fun `a certificate session opens its license through the bound transport`() {
+        // The same transport the standard Widevine path uses: an approved redirect succeeds, and a
+        // revoked grant refuses the open before any byte or header leaves the device.
+        var allowed = listOf("license.example", "approved.example")
+        val requests = mutableListOf<okhttp3.Request>()
+        val client =
+            OkHttpClient
+                .Builder()
+                .addInterceptor { chain ->
+                    val request = chain.request()
+                    requests += request
+                    Response
+                        .Builder()
+                        .request(request)
+                        .protocol(Protocol.HTTP_1_1)
+                        .code(if (request.url.host == "license.example") 307 else 200)
+                        .message("fixture")
+                        .header("Location", "https://approved.example/license")
+                        .body(byteArrayOf(4, 5, 6).toResponseBody())
+                        .build()
+                }.build()
+        val item =
+            androidx.media3.common.MediaItem
+                .Builder()
+                .setUri("music://candidate")
+                .setDrmConfiguration(
+                    androidx.media3.common.MediaItem.DrmConfiguration
+                        .Builder(C.WIDEVINE_UUID)
+                        .setLicenseUri("https://license.example/license")
+                        .setForceDefaultLicenseUri(true)
+                        .build(),
+                ).build()
+        val callback = checkedLicenseCallback(item, pluginDrmDataSourceFactory(client) { allowed })
+        val challenge = ByteArray(64) { it.toByte() }
+        val response = callback.executeKeyRequest(C.WIDEVINE_UUID, ExoMediaDrm.KeyRequest(challenge, ""))
+        assertThat(response.data).isEqualTo(byteArrayOf(4, 5, 6))
+        assertThat(requests.map { it.url.host }).containsExactly("license.example", "approved.example").inOrder()
+        // The license POST still carries the Widevine challenge body, as the standard path does.
+        requests.forEach { assertThat(it.method).isEqualTo("POST") }
+
+        // Revoking the grant refuses the next open without reaching the network.
+        allowed = emptyList()
+        val refused =
+            runCatching {
+                callback.executeKeyRequest(C.WIDEVINE_UUID, ExoMediaDrm.KeyRequest(challenge, ""))
+            }.exceptionOrNull()
+        assertThat(refused).isNotNull()
+        assertThat(requests).hasSize(2)
+    }
+
+    @Test
+    fun `a certificate session refuses a license destination it was not granted`() {
+        val item =
+            androidx.media3.common.MediaItem
+                .Builder()
+                .setUri("music://candidate")
+                .setDrmConfiguration(
+                    androidx.media3.common.MediaItem.DrmConfiguration
+                        .Builder(C.WIDEVINE_UUID)
+                        .setLicenseUri("https://evil.example/license")
+                        .setForceDefaultLicenseUri(true)
+                        .build(),
+                ).build()
+        val reached = mutableListOf<String>()
+        val client =
+            OkHttpClient
+                .Builder()
+                .addInterceptor { chain ->
+                    reached += chain.request().url.host
+                    Response
+                        .Builder()
+                        .request(chain.request())
+                        .protocol(Protocol.HTTP_1_1)
+                        .code(200)
+                        .message("fixture")
+                        .body(ByteArray(0).toResponseBody())
+                        .build()
+                }.build()
+        val callback = checkedLicenseCallback(item, pluginDrmDataSourceFactory(client) { listOf("gravity.eclipsemusic.app") })
+        assertThat(
+            runCatching {
+                callback.executeKeyRequest(C.WIDEVINE_UUID, ExoMediaDrm.KeyRequest(byteArrayOf(1), ""))
+            }.isFailure,
+        ).isTrue()
+        assertThat(reached).isEmpty()
+    }
+
+    @Test
     fun `redirect cannot send license headers or challenge to an ungranted destination`() {
         for (target in listOf("https://evil.example/license", "http://license.example/license")) {
             val reached = mutableListOf<String>()

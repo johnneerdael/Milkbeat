@@ -110,6 +110,13 @@ Streamed music loads well ahead of the playing position: Milkbeat keeps loading 
 
 Audio failures while picture is hidden use ordinary audio/network recovery and retain the Video choice. A playback failure while video is active can retry as audio; an explicitly unavailable picture also uses audio fallback. Refreshing an expired audio URL preserves optional picture preparation.
 
+Milkbeat also checks that a stream really started. A provider's source can be ready with its
+position moving while no audio reaches the output; Milkbeat keeps showing buffering and the last
+stable position instead of Play while that happens. If no audio arrives within about twenty
+seconds, or the source has no audio track at all, it asks that same provider for a fresh link once
+at the same position and then continues with your next configured provider for that track. A paused
+track stays paused through this.
+
 If normal decoded TV audio (PCM) stops advancing for about five seconds while the player still reports playback, Milkbeat freezes the displayed progress and reconnects the output from the last position where audio was advancing, keeping the same track and queue. It tries twice before leaving the track paused with **Audio output stopped. Press Play to retry.** Pause, seeking, choosing another track or Stop cancels a pending restart. Quiet passages do not trigger recovery, though a recovery may repeat a short stretch of the song. Hardware-offloaded audio and encoded HDMI passthrough are outside this check.
 
 ## Encrypted provider audio

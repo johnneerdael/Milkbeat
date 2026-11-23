@@ -3,6 +3,7 @@ package io.github.aedev.flow.plugin.playback
 import android.app.Application
 import androidx.media3.datasource.DataSpec
 import com.google.common.truth.Truth.assertThat
+import okhttp3.Dns
 import okhttp3.OkHttpClient
 import okhttp3.Protocol
 import okhttp3.Response
@@ -43,7 +44,7 @@ class PluginSabrDataSourceTest {
                         .body("fixture-envelope")
                         .build(),
                 )
-                val source = pluginSabrDataSourceFactory(client, accepted, {}, { listOf("localhost") }).createDataSource()
+                val source = pluginSabrDataSourceFactory(client, accepted, {}, { listOf("localhost") }, Dns.SYSTEM).createDataSource()
                 val protocol =
                     mapOf(
                         "Content-Type" to "application/x-protobuf",
@@ -234,8 +235,13 @@ class PluginSabrDataSourceTest {
                 )
                 val client = OkHttpClient.Builder().sslSocketFactory(tls.first.socketFactory, tls.second).build()
                 val source =
-                    pluginSabrDataSourceFactory(client, mapOf("Cookie" to "visitor=accepted"), {
-                    }, { listOf("localhost", "127.0.0.1") }).createDataSource()
+                    pluginSabrDataSourceFactory(
+                        client,
+                        mapOf("Cookie" to "visitor=accepted"),
+                        {},
+                        { listOf("localhost", "127.0.0.1") },
+                        Dns.SYSTEM,
+                    ).createDataSource()
                 val body = byteArrayOf(0, 1, -1)
                 source.open(
                     DataSpec
@@ -267,6 +273,7 @@ class PluginSabrDataSourceTest {
                         mapOf("Cookie" to "visitor=private"),
                         {},
                         { listOf("localhost") },
+                        Dns.SYSTEM,
                     ).createDataSource()
                 assertThat(
                     runCatching {

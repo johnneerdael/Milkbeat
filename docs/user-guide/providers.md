@@ -75,6 +75,50 @@ no video. Its encrypted streams cannot be downloaded for offline playback. On a 
 plugin API 10, Deezer 0.2.1 fetches each track in one request, so playback no longer pauses and
 resumes during a song.
 
+## Eclipse
+
+**Eclipse 0.1.0** is a streaming-only audio provider. It keeps Milkbeat's own catalog, queue and
+metadata, and returns lossless or Atmos audio from the Eclipse add-ons you connect. Install it on a
+Milkbeat build supporting plugin API 12, then sign in with the TV code shown at
+`eclipsemusic.app/tv`.
+
+Eclipse needs a subscription or account entitlement of its own; Milkbeat's other providers are
+unaffected and remain available as fallbacks in [Audio](#set-audio-priority).
+
+### Add-on links
+
+Eclipse streams through add-ons you connect yourself. After signing in, Cloud is usually added for
+you from your account. Every other add-on is added from its own setup page:
+
+1. Open **Settings → Plugins → Eclipse → Add-on links**.
+2. Select **Add add-on link** and paste the install link or manifest URL from the add-on's setup
+   page.
+3. Select **Review**. Milkbeat fetches that add-on's public manifest itself, without any of your
+   credentials, and shows its provider name, destination and declared add-on ID.
+4. Choose whether the add-on may use your Eclipse account access, then select **Approve**.
+
+Milkbeat records the approval for that destination and that add-on ID. Replacing a link asks you
+to review it again. Saved matches carry over when the full link and add-on ID stay the same.
+**Test access** reports which of three things failed:
+the manifest, your account's authorization for that add-on, or the track lookup.
+
+Only approved destinations receive content requests. Account access sends a short-lived token
+specific to the approved add-on. The first-party Eclipse API alone receives your account session.
+
+### Quality and playback
+
+Eclipse uses your quality setting and classifies what the add-on actually returns. For Cloud, Auto
+and High can request Atmos when the TV reports a compatible Dolby output, then try Hi-Res and CD
+lossless if Atmos is refused. Clear and licensed Widevine HLS and DASH play through Milkbeat's
+player. A receiver or soundbar shows Atmos when the TV passes the stream through. The now-playing
+line reports the source encoding separately from the actual output.
+
+Eclipse tracks you listen to for a while are reported to your Eclipse account history when
+**Report Eclipse listening** is on in Eclipse's details page. One event is sent per finished listen,
+with how long you actually played and why it ended. A temporary delivery failure can be retried
+without creating a second event. Turning reporting off clears unsent history. HLS and DASH streams
+are streaming only.
+
 ## Install a plugin
 
 1. Open **Settings → Plugins** and scroll to **Add a plugin**.
@@ -148,6 +192,8 @@ Select an installed plugin to see its version, description and account, and to s
 | *Plugin* **is retired** / **Add YouTube** | Retired YouTube Music and YouTube Video plugins only: see [Retired plugins](#retired-plugins) |
 | **Download MicroG-RE-TV** | Stable GitHub build, plugins that sign in with a [Google account](#sign-in), while not signed in |
 | **Report plays to** *provider* | Tracks you listen to for 30 seconds or more, or for half of a track shorter than a minute, are reported to that provider. Compatible API 8 music providers receive updates during playback and at pause/seek/final boundaries; older providers report when the listen ends. Unknown-length tracks require 30 seconds. Skipped sections do not count as listening |
+| **Add-on links** | Plugins that stream through their own connected services (Eclipse): opens the page to add, review, replace, enable, test or remove an add-on link |
+| **Report Eclipse listening** | Eclipse only, off by default: sends one history event per finished listen, with real playing time and the end reason, to your Eclipse account |
 | **Signed in as** / **Not signed in** | The account state. *Signed out: sign in again* means the provider confirmed the session expired |
 | **Sign in** / **Sign out** | Starts the provider's [sign-in method](#sign-in) or forgets the session |
 | **Remove** | Uninstalls the plugin and its tab |
@@ -158,6 +204,7 @@ Completed indexing matches are kept when you cancel. Index again after changing 
 
 - **YouTube:** sign-in is optional; Home works signed out. Signing in with the Google account in MicroG-RE-TV gives you your own Home, library and history. It works only in the stable app, not in Milkbeat Preview or debug builds. YouTube 0.1.6 needs a Milkbeat build with plugin API 11.
 - **Deezer:** sign in through the phone web viewer for your catalog, Flow and read-only library. Audio availability and quality depend on the account and recording. Deezer 0.2.1 needs a Milkbeat build with plugin API 9.
+- **Eclipse:** sign in with the TV code at `eclipsemusic.app/tv`. Cloud is added from your account; other add-ons come from their own install links and are reviewed one by one. Eclipse 0.1.0 needs a Milkbeat build with plugin API 12.
 - **Spotify:** a catalog with **no audio source**. Its value is your personalized feed, playlists, Liked Songs and library after signing in. Keep at least one audio provider enabled.
 - **Beatport:** sign in for the catalog and your library. Beatport's own full-length audio needs an active streaming subscription; otherwise SoundCloud or YouTube can match the recording. A free account does not guarantee a match.
 - **SoundCloud:** sign in for personalized Home, playlists, Liked Songs, history and Artists. Public search and catalog pages can work anonymously. Full-track availability depends on the recording and your listening subscription; Artist Pro does not grant Go+ listening rights. Preview-only or restricted recordings can appear but cannot supply full-track audio, so keep another audio provider as a fallback. SoundCloud plugin 0.2.0 needs a Milkbeat build with plugin API 5. TV-paired accounts currently play clear HLS streams only; protected-only recordings cannot play with this session, and plays from a TV-paired account are not reported to SoundCloud. Existing web sessions keep their Widevine playback path where the account and device allow it.

@@ -34,6 +34,7 @@ import javax.inject.Singleton
 
 private const val EXPIRY_MARGIN_MS = 60_000L
 private const val DEFAULT_LIFETIME_MS = 5 * 60 * 60_000L
+internal const val ECLIPSE_PLUGIN_ID = "nl.neerdael.eclipse"
 
 /**
  * Resolves tracks through the audio providers in the order [audioProviderAttempts] gives. A track no
@@ -46,8 +47,8 @@ private const val DEFAULT_LIFETIME_MS = 5 * 60 * 60_000L
 class PluginAudio
     @Inject
     constructor(
-        private val host: PluginHost,
-        private val registry: PluginRegistry,
+        internal val host: PluginHost,
+        internal val registry: PluginRegistry,
         private val matcher: PluginTrackMatcher,
         private val accounts: PluginAccounts,
     ) {
@@ -81,29 +82,26 @@ class PluginAudio
                         .toSet()
                 }.distinctUntilChanged()
 
-        private fun streamContext(): Any = Triple(registry.state.value, accounts.playbackIdentitySnapshot(), accounts.playbackEpoch.value)
+        internal fun streamContext(): Any = Triple(registry.state.value, accounts.playbackIdentitySnapshot(), accounts.playbackEpoch.value)
 
-        private fun nativeContext(pluginId: String): Any =
+        internal fun nativeContext(pluginId: String): Any =
             registry.state.value.plugin(pluginId) to accounts.providerPlaybackContext(pluginId)
 
         private fun ownsNativeSource(audio: ResolvedAudio): Boolean =
             audio.nativeBinding != null && audio.nativeBinding == nativeContext(audio.pluginId)
 
-        internal fun needsQueueMatching(
-            track: TrackDescriptor,
-            preferredProviderId: String? = null,
-        ): Boolean =
-            audioProviderAttempts(registry.state.value, track, preferredProviderId = preferredProviderId)
-                .firstOrNull()
-                ?.let { it.direct == null } ?: false
-
         internal fun preparationVersion(): Any = streamContext() to cacheGeneration.get()
 
         private val resolutionLocks = ConcurrentHashMap<AudioIdentity, Mutex>()
-        private val failures = ConcurrentHashMap<AudioIdentity, StreamFailure>()
-        private val failureContexts = ConcurrentHashMap<AudioIdentity, Any>()
-        private val failureProviders = ConcurrentHashMap<AudioIdentity, String>()
+
+        private data class FailedAudio(
+            val failure: StreamFailure,
+            val accepted: ResolvedAudio?,
+        )
+
+        private val failures = ConcurrentHashMap<AudioIdentity, FailedAudio>()
         private val mediaFailures = PlaybackProviderFailures()
+        private val eclipseMatchFailures = PlaybackProviderFailures()
 
         /** The stream for [track], resolving it unless a still-valid one covers what is asked. */
         suspend fun resolve(
@@ -168,38 +166,38 @@ class PluginAudio
             val generation = cacheGeneration.get()
             val version = context to generation
             val key = track.audioIdentity()
-            val failedAudio = resolved[key]
-            val acceptedSabrFailure = failures[key] != null && resolved[key]?.stream?.serverAbr != null
-            if ((failures[key]?.serverAbrFailure != null || acceptedSabrFailure) && failureContexts[key] != null &&
-                failureContexts[key] != (failedAudio?.nativeBinding?.let { nativeContext(failedAudio.pluginId) } ?: context)
-            ) {
-                failures.remove(key)
-                failureContexts.remove(key)
+            val failed = failures[key]
+            val previous = resolved[key]?.takeIf { it.preparationContext == context || ownsNativeSource(it) }
+            val failedAcceptance =
+                failed?.accepted?.takeIf { audio ->
+                    if (audio.nativeBinding != null) ownsNativeSource(audio) else audio.preparationContext == context
+                }
+            val protocolRecovery = failed?.failure?.serverAbrFailure != null || failed?.accepted?.stream?.serverAbr != null
+            if (protocolRecovery && failed?.accepted != null && failedAcceptance == null) {
+                failures.remove(key, failed)
                 throw IOException("The accepted playback account or provider changed")
             }
             val state = registry.state.value
-            val previous = resolved[key]?.takeIf { it.preparationContext == context || ownsNativeSource(it) }
-            val pendingFailure = failures[key]
-            val providers =
-                audioProviderAttempts(state, track, withPicture = picture != null, preferredProviderId = preferredProviderId)
-                    .filterNot { mediaFailures.exhausted(key, it.plugin.id, nativeContext(it.plugin.id)) }
-            val pinned =
-                previous
-                    ?.takeIf {
-                        picture != null || !it.isValidAt(System.currentTimeMillis(), SystemClock.elapsedRealtime()) ||
-                            it.runtimeReceipt?.isCurrent() == false
-                    }?.let { audio ->
-                        providers.firstOrNull { it.plugin.id == audio.pluginId }?.let { AudioProviderAttempt(it.plugin, audio.track) }
-                    }
-            val protocolRecovery = failures[key]?.serverAbrFailure != null || acceptedSabrFailure
-            val attempts =
-                when {
-                    protocolRecovery && pinned != null -> listOf(pinned) + providers.filterNot { it.plugin.id == pinned.plugin.id }
-                    pinned == null -> providers
-                    picture != null -> listOf(pinned)
-                    else -> listOf(pinned) + providers.filterNot { it.plugin.id == pinned.plugin.id }
-                }
-            val order = (if (picture != null) attempts else providers).map { "${it.plugin.id}:${it.plugin.manifest.versionCode}" }
+            val routing =
+                playbackAttemptRouting(
+                    key,
+                    state,
+                    track,
+                    picture,
+                    preferredProviderId,
+                    failedAcceptance,
+                    previous,
+                    protocolRecovery,
+                    mediaFailures,
+                    eclipseMatchFailures,
+                    ::nativeContext,
+                )
+            val providers = routing.providers
+            val attempts = routing.attempts
+            val recoveryFirst = routing.recoveryFirst
+            val failedMatch = routing.failedMatch
+            val excludedEclipseIds = routing.excludedEclipseIds
+            val order = routing.order
             resolved[key]
                 ?.takeIf {
                     it.coversResolution(
@@ -243,16 +241,23 @@ class PluginAudio
                     preparePicture != null && picture == null &&
                         plugin.manifest.roles.audio
                             ?.musicVideo == true && plugin.manifest.api.target < 7
-                var playable =
-                    known
-                        ?: matcher.playbackMatch(
+                val matchedEclipse = plugin.id == ECLIPSE_PLUGIN_ID && directAudioTrack(track, plugin) == null
+
+                suspend fun matchRecording(excludedInAttempt: String? = null): TrackDescriptor? {
+                    val strategy = plugin.audioMatchStrategy()
+                    if (matchedEclipse && (excludedEclipseIds.isNotEmpty() || excludedInAttempt != null)) {
+                        return matcher.alternatePlaybackMatch(
                             track,
                             plugin.id,
+                            excludedEclipseIds + setOfNotNull(excludedInAttempt),
                             strict,
-                            strategy = plugin.audioMatchStrategy(),
-                            onProgress = matchProgress,
+                            strategy,
+                            matchProgress,
                         )
-                        ?: return null
+                    }
+                    return matcher.playbackMatch(track, plugin.id, strict, excludedInAttempt, strategy, matchProgress)
+                }
+                var playable = known ?: matchRecording() ?: return null
                 for (attempt in 0..1) {
                     val request =
                         ResolveAudioRequest(
@@ -261,7 +266,10 @@ class PluginAudio
                             video = picture != null || legacyPicture,
                             maxVideoHeight = (picture ?: preparePicture)?.maxHeight,
                             videoCodecs = (picture ?: preparePicture)?.codecs.orEmpty(),
-                            failure = pendingFailure?.takeIf { failureProviders[key] == plugin.id },
+                            failure =
+                                failed?.failure?.takeIf {
+                                    failedAcceptance?.pluginId == plugin.id && failedAcceptance.track.ref == playable.ref
+                                },
                             prepareVideo =
                                 preparePicture != null && plugin.manifest.roles.audio
                                     ?.musicVideo == true,
@@ -291,10 +299,7 @@ class PluginAudio
                         validateServerAbr(
                             stream.serverAbr,
                             picture != null,
-                            registry.state.value
-                                .plugin(plugin.id)
-                                ?.grantedNetwork
-                                .orEmpty(),
+                            state.grantedHosts(plugin.id),
                             allowPicture = request.video || request.prepareVideo,
                         )
                         val boundPresentation = stream.serverAbr != null || stream.audioFormat != null
@@ -331,19 +336,10 @@ class PluginAudio
                             continue
                         }
                         if (e.error.code !in setOf(PluginErrorCode.UNAVAILABLE, PluginErrorCode.NOT_FOUND)) break
-                        if (known != null) break
+                        if (known != null && !(matchedEclipse && failedMatch?.ref == playable.ref)) break
                         matcher.invalidate(track, plugin.id)
                         if (attempt != 0) break
-                        playable =
-                            matcher.playbackMatch(
-                                track,
-                                plugin.id,
-                                strict,
-                                excludedId = playable.ref.providerId,
-                                strategy = plugin.audioMatchStrategy(),
-                                onProgress = matchProgress,
-                            )
-                                ?: break
+                        playable = matchRecording(excludedInAttempt = playable.ref.providerId) ?: break
                     } catch (e: IOException) {
                         if (context != streamContext() || generation != cacheGeneration.get()) throw e
                         last =
@@ -363,17 +359,12 @@ class PluginAudio
                 resolveAudioAttempts(
                     attempts,
                     concurrent =
-                        track.hasNoPlayingSource(attempts) && pinned == null && picture == null &&
+                        track.hasNoPlayingSource(attempts) && recoveryFirst == null && picture == null &&
                             attempts.none { it.plugin.id == preferredProviderId && it.direct != null },
                     resolve = ::resolveAttempt,
                 )
             outcome.audio?.let { accepted ->
-                pendingFailure?.let { failure ->
-                    if (failures.remove(key, failure)) {
-                        failureProviders.remove(key)
-                        failureContexts.remove(key)
-                    }
-                }
+                failed?.let { failures.remove(key, it) }
                 synchronized(resolved) {
                     if (generation == cacheGeneration.get() &&
                         (version == preparationVersion() || (accepted.stream.serverAbr != null && ownsNativeSource(accepted)))
@@ -415,10 +406,7 @@ class PluginAudio
             validateServerAbr(
                 stream.serverAbr,
                 audio.withPicture,
-                registry.state.value
-                    .plugin(audio.pluginId)
-                    ?.grantedNetwork
-                    .orEmpty(),
+                registry.state.value.grantedHosts(audio.pluginId),
                 allowPicture = request.video || request.prepareVideo,
             )
             val previousHls =
@@ -463,47 +451,7 @@ class PluginAudio
             )
         }
 
-        internal fun verifyBound(audio: ResolvedAudio) {
-            if (audio.runtimeReceipt?.isCurrent() == false) throw PluginPlaybackSessionLost()
-            if (audio.nativeBinding?.let { it != nativeContext(audio.pluginId) }
-                ?: (audio.preparationContext != null && audio.preparationContext != streamContext())
-            ) {
-                throw IOException("The accepted playback account or provider changed")
-            }
-        }
-
-        internal suspend fun acquirePlaybackLease(audio: ResolvedAudio): PluginPlaybackLease {
-            verifyBound(audio)
-            val held = host.playbackLease(audio.pluginId)
-            try {
-                audio.runtimeReceipt?.let(held::verify)
-                verifyBound(audio)
-                return held
-            } catch (error: Throwable) {
-                held.close()
-                throw error
-            }
-        }
-
-        internal fun playbackGrants(pluginId: String): List<String> =
-            registry.state.value
-                .plugin(pluginId)
-                ?.takeIf { it.enabled }
-                ?.grantedNetwork
-                .orEmpty()
-
-        /** How the first audio plugin that would play [track] delivers its streams. */
-        fun deliveryFor(
-            track: TrackDescriptor,
-            preferredProviderId: String? = null,
-        ): AudioDelivery =
-            audioProviderAttempts(registry.state.value, track, preferredProviderId = preferredProviderId)
-                .firstOrNull()
-                ?.plugin
-                ?.manifest
-                ?.roles
-                ?.audio
-                ?.delivery ?: AudioDelivery.PROGRESSIVE
+        internal fun playbackGrants(pluginId: String): List<String> = registry.state.value.grantedHosts(pluginId)
 
         fun knownAliases(track: TrackDescriptor): Set<String> {
             val native = resolved[track.audioIdentity()]?.track ?: return emptySet()
@@ -525,14 +473,15 @@ class PluginAudio
             serverAbrFailure: ServerAbrFailure? = null,
         ) {
             val key = playbackIds[id] ?: return
-            resolved[key]?.let { audio ->
-                failureProviders[key] = audio.pluginId
+            val accepted = resolved[key]
+            accepted?.let { audio ->
                 if (serverAbrFailure !in setOf(ServerAbrFailure.URL_EXPIRED, ServerAbrFailure.PLAYBACK_CONTEXT_RELOAD)) {
-                    mediaFailures.record(key, audio.pluginId, nativeContext(audio.pluginId))
+                    val context = nativeContext(audio.pluginId)
+                    mediaFailures.record(key, audio.pluginId, context)
+                    if (audio.pluginId == ECLIPSE_PLUGIN_ID) eclipseMatchFailures.record(key, audio.track.ref.providerId, context)
                 }
-                (audio.nativeBinding ?: audio.preparationContext)?.let { failureContexts[key] = it }
             }
-            failures[key] = StreamFailure(url, status, reloadPlaybackContext, serverAbrFailure)
+            failures[key] = FailedAudio(StreamFailure(url, status, reloadPlaybackContext, serverAbrFailure), accepted)
             if (status == 403 || serverAbrFailure != null || resolved[key]?.stream?.serverAbr != null) {
                 forget(id)
             } else {
@@ -588,15 +537,22 @@ class PluginAudio
                 cacheGeneration.incrementAndGet()
                 resolved.clear()
                 failures.clear()
-                failureContexts.clear()
-                failureProviders.clear()
                 mediaFailures.clear()
+                eclipseMatchFailures.clear()
             }
             resolvedRevision.update { it + 1 }
         }
 
         /** The accepted resolution [track] plays from now; a queued report pins it before it is sent. */
         fun acceptedListen(track: TrackDescriptor): ResolvedAudio? = resolved[track.audioIdentity()]
+
+        internal fun reportsListenLifecycle(played: ResolvedAudio): Boolean {
+            val manifest =
+                registry.state.value
+                    .plugin(played.pluginId)
+                    ?.manifest ?: return false
+            return manifest.api.target >= 12 && manifest.roles.audio?.reportPlayback == true
+        }
 
         /** Reports a listen to the plugin that played it, when it reports listens and the listener allows it. */
         suspend fun reportListen(
@@ -619,5 +575,20 @@ class PluginAudio
             positionMs: Long? = null,
             progress: Boolean = false,
             playbackSessionId: String? = null,
-        ) = reportAcceptedListen(host, registry, played, playedMs, durationMs, positionMs, progress, playbackSessionId)
+            endReason: String? = null,
+            playingMs: Long = 0L,
+            manual: Boolean = false,
+        ) = reportAcceptedListen(
+            host,
+            registry,
+            played,
+            playedMs,
+            durationMs,
+            positionMs,
+            progress,
+            playbackSessionId,
+            endReason,
+            playingMs,
+            manual,
+        )
     }

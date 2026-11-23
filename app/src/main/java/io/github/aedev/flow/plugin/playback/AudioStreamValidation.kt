@@ -56,6 +56,8 @@ internal fun validateAudioStream(
     val drm = stream.drm ?: return
     try {
         checkedPluginDrmUrl(drm.licenseUrl, allowedHosts)
+        drm.serviceCertificate?.let { validatedServiceCertificate(drm) }
+        drm.initialization?.let { validatedInitialization(drm, allowedHosts) }
     } catch (error: IOException) {
         throw PluginCallException(pluginId, PluginError(PluginErrorCode.UNSUPPORTED, error.message ?: "Invalid plugin DRM destination"))
     }

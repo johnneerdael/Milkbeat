@@ -22,8 +22,10 @@ internal class MusicOutputRecovery(
     private val output: AudioOutputProbe,
     private val clockMs: () -> Long,
     private val onWarning: (Boolean) -> Unit = {},
+    audioStartHold: () -> Long? = { null },
 ) : AutoCloseable {
-    val reportedPlayer = OutputReportingPlayer(player, ::onPlayRequest, ::onSeekRequest, { cancel(clearHold = true) })
+    val reportedPlayer =
+        OutputReportingPlayer(player, ::onPlayRequest, ::onSeekRequest, { cancel(clearHold = true) }, audioStartHold)
     var isRecovering = false
         private set
     val hasOutputFailure: Boolean get() = heldPositionMs != null

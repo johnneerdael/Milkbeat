@@ -31,15 +31,18 @@ export type PluginErrorCode =
   | 'TIMEOUT'
   | 'UNSUPPORTED'
   | 'INTERNAL';
+export type ReportPhase = 'PROGRESS' | 'END';
 export type VideoKind = 'VOD' | 'LIVE' | 'UPCOMING';
 export type DeviceCodeStatus = 'pending' | 'signedIn' | 'expired' | 'denied';
 export type ProviderAccount = ProviderAccountAnonymous | ProviderAccountExpired | ProviderAccountSignedIn;
+export type PluginConnectionTestState =
+  'VERIFIED' | 'LOOKUP_FAILED' | 'UNAUTHORIZED' | 'MANIFEST_FAILED' | 'SIGNED_OUT';
 export type HttpBodyEncoding = 'UTF8' | 'BASE64';
 export type HashAlgorithm = 'SHA1' | 'SHA256' | 'MD5';
 export type LogLevel = 'DEBUG' | 'INFO' | 'WARN' | 'ERROR';
 
 /**
- * Plugin API v11, generated from the plugin-api module. Do not edit.
+ * Plugin API v12, generated from the plugin-api module. Do not edit.
  */
 export interface MilkbeatPluginApi {
   manifest: PluginManifest;
@@ -166,6 +169,23 @@ export interface MilkbeatPluginApi {
     'settings.options': {
       request: SettingOptionsRequest;
       response: SettingOption[];
+    };
+    'connections.list': {
+      response: PluginConnectionRow[];
+    };
+    'connections.save': {
+      request: PluginConnectionSave;
+      response: PluginConnectionSaved;
+    };
+    'connections.remove': {
+      request: PluginConnectionRemove;
+    };
+    'connections.enabled': {
+      request: PluginConnectionEnabled;
+    };
+    'connections.test': {
+      request: PluginConnectionTest;
+      response: PluginConnectionTestResult;
     };
   };
   host: {
@@ -329,6 +349,7 @@ export interface Permissions {
   network?: string[];
   browser?: string[];
   storage?: number;
+  connections?: boolean;
 }
 export interface SettingDefinition {
   key: string;
@@ -600,6 +621,16 @@ export interface AudioDrm {
   headers?: {
     [k: string]: string;
   };
+  serviceCertificate?: string | null;
+  multiSession?: boolean;
+  initialization?: null | DrmInitialization;
+}
+export interface DrmInitialization {
+  profile: string;
+  url: string;
+  offsetBytes: number;
+  lengthBytes: number;
+  keyIdsHex: string[];
 }
 export interface ServerAbrPlayback {
   url: string;
@@ -665,6 +696,11 @@ export interface ReportPlaybackRequest {
   durationMs?: number | null;
   positionMs?: number | null;
   playbackSessionId?: string | null;
+  phase?: null | ReportPhase;
+  endReason?: string | null;
+  occurrenceId?: string | null;
+  playingMs?: number | null;
+  manual?: boolean | null;
 }
 export interface ResolveVideoRequest {
   entity: EntityRef;
@@ -808,6 +844,36 @@ export interface AndroidAccountSignIn {
 export interface SettingOptionsRequest {
   key: string;
 }
+export interface PluginConnectionRow {
+  id: string;
+  title: string;
+  host: string;
+  addonId?: string | null;
+  enabled?: boolean;
+}
+export interface PluginConnectionSave {
+  id?: string | null;
+  url: string;
+  addonId: string;
+  useAccount?: boolean;
+}
+export interface PluginConnectionSaved {
+  id: string;
+}
+export interface PluginConnectionRemove {
+  id: string;
+}
+export interface PluginConnectionEnabled {
+  id: string;
+  enabled: boolean;
+}
+export interface PluginConnectionTest {
+  id: string;
+}
+export interface PluginConnectionTestResult {
+  state: PluginConnectionTestState;
+  detail?: string | null;
+}
 export interface HttpRequest {
   url: string;
   method?: string;
@@ -878,6 +944,7 @@ export interface HostEnvironment {
   pluginVersion: string;
   osVersion?: string | null;
   deviceModel?: string | null;
+  dolbyCodecs?: string[];
 }
 export interface LogRequest {
   level: LogLevel;

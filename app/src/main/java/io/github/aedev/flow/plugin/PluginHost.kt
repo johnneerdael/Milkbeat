@@ -5,6 +5,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.aedev.flow.plugin.host.MicroGAccounts
 import io.github.aedev.flow.plugin.host.PluginBrowser
 import io.github.aedev.flow.plugin.host.PluginHostApi
+import io.github.aedev.flow.plugin.host.PluginHttpException
 import io.github.aedev.flow.plugin.host.WebLoginRefresher
 import io.github.aedev.flow.plugin.registry.InstalledPlugin
 import io.github.aedev.flow.plugin.registry.PluginRegistry
@@ -19,12 +20,17 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import nl.neerdael.milkbeat.plugin.PluginConnectionSave
+import nl.neerdael.milkbeat.plugin.PluginConnectionSaved
 import nl.neerdael.milkbeat.plugin.PluginError
 import nl.neerdael.milkbeat.plugin.PluginErrorCode
 import nl.neerdael.milkbeat.plugin.PluginOperation
+import nl.neerdael.milkbeat.plugin.PluginOperations
+import okhttp3.HttpUrl
 import okhttp3.OkHttpClient
 import java.io.File
 import java.util.Locale
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -46,6 +52,7 @@ class PluginHost
         private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         private val lock = Mutex()
         private val runtimes = mutableMapOf<String, PluginRuntime>()
+        private val reviewedManifests = ConcurrentHashMap<InstalledPlugin, HttpUrl>()
 
         init {
             scope.launch {
@@ -68,6 +75,25 @@ class PluginHost
             operation: PluginOperation<Request, Response>,
             request: Request,
         ): Response = runtime(pluginId).call(operation, request)
+
+        internal suspend fun saveReviewedConnection(
+            reviewedPlugin: InstalledPlugin,
+            url: HttpUrl,
+            request: PluginConnectionSave,
+        ): PluginConnectionSaved {
+            val active = runtime(reviewedPlugin.id)
+            if (active.plugin.installation != reviewedPlugin.installation ||
+                active.plugin.signerFingerprint != reviewedPlugin.signerFingerprint
+            ) {
+                throw PluginHttpException("The plugin changed. Review the add-on again")
+            }
+            check(reviewedManifests.putIfAbsent(active.plugin, url) == null)
+            return try {
+                active.call(PluginOperations.connectionsSave, request)
+            } finally {
+                reviewedManifests.remove(active.plugin, url)
+            }
+        }
 
         /** Keeps [pluginId] started while something depends on it, such as its audio playing. */
         suspend fun hold(pluginId: String) = runtime(pluginId).hold()
@@ -129,6 +155,10 @@ class PluginHost
                     appLocale = Locale::getDefault,
                     webLogin = webLogin,
                     microG = microG,
+                    connectionOrigins = {
+                        registry.state.value.connectionOrigins(plugin.id, plugin.signerFingerprint)
+                    },
+                    reviewedManifest = { reviewedManifests[plugin] },
                 )
             return PluginRuntime(
                 plugin = plugin,

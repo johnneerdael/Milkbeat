@@ -54,6 +54,22 @@ class AccountPlayHistoryReportingTest {
         }
 
     @Test
+    fun `lifecycle providers receive early checkpoints and endings`() =
+        runTest {
+            val played = mockk<ResolvedAudio>()
+            every { audio.acceptedListen(any()) } returns played
+            every { audio.reportsListenLifecycle(played) } returns true
+            val history = AccountPlayHistory(MemoryPreferences(), audio, video, backgroundScope)
+            history.onListened(track, 5_000, 600_000, 5_000, true, "listen", playingMs = 5_000)
+            history.onListened(track, 6_000, 600_000, 6_000, false, "listen", "interrupted", 6_000)
+            runCurrent()
+            coVerify(exactly = 1) { audio.reportPinnedListen(played, 5_000, 600_000, 5_000, true, "listen", null, 5_000, false) }
+            coVerify(exactly = 1) {
+                audio.reportPinnedListen(played, 6_000, 600_000, 6_000, false, "listen", "interrupted", 6_000, false)
+            }
+        }
+
+    @Test
     fun `disabled history suppresses qualified progress and final listens`() =
         runTest {
             val history = AccountPlayHistory(MemoryPreferences(), audio, video, backgroundScope)

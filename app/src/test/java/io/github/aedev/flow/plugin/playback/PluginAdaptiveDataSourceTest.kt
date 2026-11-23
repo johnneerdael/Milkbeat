@@ -12,6 +12,7 @@ import nl.neerdael.milkbeat.plugin.AudioStream
 import nl.neerdael.milkbeat.plugin.ByteRange
 import nl.neerdael.milkbeat.plugin.FormatType
 import nl.neerdael.milkbeat.plugin.MediaFormat
+import okhttp3.Dns
 import okhttp3.OkHttpClient
 import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.Test
@@ -133,7 +134,7 @@ class PluginAdaptiveDataSourceTest {
             val initial = resolved(server.url("/audio").toString(), server.url("/video").toString())
             val binding = BoundPluginAudio(initial, { error("No refresh") })
             val client = OkHttpClient.Builder().sslSocketFactory(tls.first.socketFactory, tls.second).build()
-            val factory = pluginAdaptiveDataSourceFactory(client, binding, null, {}, { listOf("localhost") })
+            val factory = pluginAdaptiveDataSourceFactory(client, binding, null, {}, { listOf("localhost") }, Dns.SYSTEM)
             val source = factory.createDataSource()
             source.open(
                 DataSpec
@@ -150,6 +151,68 @@ class PluginAdaptiveDataSourceTest {
             assertThat(request.headers["User-Agent"]).isEqualTo("VISIONOS-fixture")
             assertThat(request.headers["X-Format"]).isEqualTo("picture")
             assertThat(server.requestCount).isEqualTo(1)
+        }
+    }
+
+    @Test
+    fun `remote DASH manifest and initialization segment use the bound media headers`() {
+        val tls = PluginSabrDataSourceTest().loopbackTls()
+        mockwebserver3.MockWebServer().use { server ->
+            server.useHttps(tls.first.socketFactory)
+            server.start()
+            server.enqueue(
+                mockwebserver3.MockResponse
+                    .Builder()
+                    .body("manifest")
+                    .build(),
+            )
+            server.enqueue(
+                mockwebserver3.MockResponse
+                    .Builder()
+                    .code(206)
+                    .addHeader("Content-Range", "bytes 12-15/100")
+                    .body("init")
+                    .build(),
+            )
+            val manifest = server.url("/source.mpd").toString()
+            val segment = server.url("/audio.mp4").toString()
+            val track = TrackDescriptor(EntityRef(EntityKind.TRACK, "matched"), "Matched")
+            val stream = AudioStream(manifest, "matched", "dash", "application/dash+xml", headers = mapOf("Authorization" to "Bearer old"))
+            val initial = ResolvedAudio("eclipse", track, stream, 0, false)
+            val refreshed =
+                ResolvedAudio(
+                    "eclipse",
+                    track,
+                    stream.copy(headers = mapOf("Authorization" to "Bearer refreshed", "Referer" to "https://cdn.example")),
+                    Long.MAX_VALUE,
+                    false,
+                )
+            val binding = BoundPluginAudio(initial, { refreshed })
+            val client = OkHttpClient.Builder().sslSocketFactory(tls.first.socketFactory, tls.second).build()
+            val source = pluginAdaptiveDataSourceFactory(client, binding, null, {}, { listOf("localhost") }, Dns.SYSTEM).createDataSource()
+            source.open(DataSpec.Builder().setUri(manifest).build())
+            source.close()
+            source.open(
+                DataSpec
+                    .Builder()
+                    .setUri(segment)
+                    .setHttpRequestHeaders(mapOf("authorization" to "Bearer stale", "X-Test" to "retain", "Range" to "bytes=0-1"))
+                    .setPosition(12)
+                    .setLength(4)
+                    .build(),
+            )
+            source.close()
+
+            val manifestRequest = server.takeRequest()
+            assertThat(manifestRequest.target).isEqualTo("/source.mpd")
+            assertThat(manifestRequest.headers["Authorization"]).isEqualTo("Bearer refreshed")
+            assertThat(manifestRequest.headers["Referer"]).isEqualTo("https://cdn.example")
+            val segmentRequest = server.takeRequest()
+            assertThat(segmentRequest.target).isEqualTo("/audio.mp4")
+            assertThat(segmentRequest.headers.values("Authorization")).containsExactly("Bearer refreshed")
+            assertThat(segmentRequest.headers["Referer"]).isEqualTo("https://cdn.example")
+            assertThat(segmentRequest.headers["X-Test"]).isEqualTo("retain")
+            assertThat(segmentRequest.headers["Range"]).isEqualTo("bytes=12-15")
         }
     }
 

@@ -46,6 +46,11 @@ class MusicMediaSourceFactoryTest {
             .setMediaId("spotify-song")
             .build()
 
+    private fun checkedBound(
+        license: DataSource.Factory? = null,
+        adaptive: DataSource.Factory? = mockk(),
+    ) = BoundPluginMusicDataSourceFactory(mockk<DataSource.Factory>(), license, adaptive = adaptive)
+
     @Test
     fun `prepared direct audio and picture share one DASH source`() {
         val sound =
@@ -82,7 +87,7 @@ class MusicMediaSourceFactoryTest {
                 Long.MAX_VALUE,
                 false,
             )
-        val source = factory.resolvedSource(item.buildUpon().setUri("musicvideo://spotify-song").build(), resolution)
+        val source = factory.resolvedSource(item.buildUpon().setUri("musicvideo://spotify-song").build(), resolution, checkedBound())
         assertThat(source).isInstanceOf(DashMediaSource::class.java)
         assertThat(source.mediaItem.mediaId).isEqualTo(item.mediaId)
     }
@@ -124,6 +129,51 @@ class MusicMediaSourceFactoryTest {
     }
 
     @Test
+    fun `a server-returned audio DASH manifest plays through a DASH source`() {
+        val source = factory.resolvedSource(item, audio("application/dash+xml"), checkedBound())
+        assertThat(source).isInstanceOf(DashMediaSource::class.java)
+        // The manifest request uses the accepted stream URL, not the queue's music:// URI.
+        assertThat(
+            source.mediaItem.localConfiguration!!
+                .uri
+                .toString(),
+        ).isEqualTo("https://fixture/audio")
+        assertThat(source.mediaItem.mediaId).isEqualTo(item.mediaId)
+        assertThat(
+            factory.resolvedSource(item, audio("application/dash+xml; charset=utf-8"), checkedBound()),
+        ).isInstanceOf(DashMediaSource::class.java)
+    }
+
+    @Test
+    fun `Gravity's licensed Atmos profile carries its service certificate and init mapping`() {
+        val certificate =
+            java.util.Base64
+                .getEncoder()
+                .encodeToString(ByteArray(128) { 1 })
+        val drm =
+            AudioDrm(
+                AudioDrmScheme.WIDEVINE,
+                "https://gravity.eclipsemusic.app/license",
+                serviceCertificate = certificate,
+                multiSession = true,
+                initialization =
+                    nl.neerdael.milkbeat.plugin.DrmInitialization(
+                        profile = "apple-cbcs-eac3-v1",
+                        url = "https://media.mzstatic.com/audio.mp4",
+                        offsetBytes = 12,
+                        lengthBytes = 100,
+                        keyIdsHex = listOf("02".repeat(16), "03".repeat(16)),
+                    ),
+            )
+        val bound = checkedBound(mockk())
+        val source = factory.resolvedSource(item, audio("application/dash+xml", drm), sourceFactory = bound)
+        assertThat(source).isInstanceOf(DashMediaSource::class.java)
+        val configuration = source.mediaItem.localConfiguration!!.drmConfiguration
+        assertThat(configuration!!.scheme).isEqualTo(C.WIDEVINE_UUID)
+        assertThat(configuration.forceDefaultLicenseUri).isTrue()
+    }
+
+    @Test
     fun `YouTube and downloaded audio retain progressive sources`() {
         assertThat(factory.resolvedSource(item, audio("audio/mp4"))).isInstanceOf(ProgressiveMediaSource::class.java)
         assertThat(factory.resolvedSource(item, null)).isInstanceOf(ProgressiveMediaSource::class.java)
@@ -132,7 +182,7 @@ class MusicMediaSourceFactoryTest {
     @Test
     fun `encrypted HLS uses the provider license rather than a manifest license`() {
         val drm = AudioDrm(AudioDrmScheme.WIDEVINE, "https://license.example/playback", mapOf("Authorization" to "fixture"))
-        val bound = BoundPluginMusicDataSourceFactory(mockk<DataSource.Factory>(), mockk<DataSource.Factory>())
+        val bound = checkedBound(mockk())
         val source = factory.resolvedSource(item, audio("application/x-mpegURL", drm), sourceFactory = bound)
         val configuration = source.mediaItem.localConfiguration!!.drmConfiguration
         assertThat(configuration).isNotNull()
@@ -143,10 +193,69 @@ class MusicMediaSourceFactoryTest {
     }
 
     @Test
+    fun `DASH fails closed without the permission-checked adaptive transport`() {
+        assertThat(runCatching { factory.resolvedSource(item, audio("application/dash+xml")) }.exceptionOrNull())
+            .isInstanceOf(IllegalArgumentException::class.java)
+        assertThat(
+            runCatching {
+                factory.resolvedSource(item, audio("application/dash+xml"), checkedBound(adaptive = null))
+            }.exceptionOrNull(),
+        ).isInstanceOf(IllegalArgumentException::class.java)
+    }
+
+    @Test
     fun `DRM source creation fails closed without a dedicated license transport`() {
         val drm = AudioDrm(AudioDrmScheme.WIDEVINE, "https://license.example/playback")
         assertThat(runCatching { factory.resolvedSource(item, audio("application/x-mpegURL", drm)) }.exceptionOrNull())
             .isInstanceOf(IllegalArgumentException::class.java)
+    }
+
+    @Test
+    fun `a certificate session cannot be built without the checked license transport`() {
+        val certificate =
+            java.util.Base64
+                .getEncoder()
+                .encodeToString(ByteArray(128) { 1 })
+        val drm =
+            AudioDrm(
+                AudioDrmScheme.WIDEVINE,
+                "https://gravity.eclipsemusic.app/license",
+                serviceCertificate = certificate,
+            )
+        // Both Widevine paths take the bound transport; a plain factory must never be substituted.
+        assertThat(runCatching { factory.resolvedSource(item, audio("application/dash+xml", drm)) }.exceptionOrNull())
+            .isInstanceOf(IllegalArgumentException::class.java)
+    }
+
+    @Test
+    fun `a certificate session uses the bound license transport it was given`() {
+        val certificate =
+            java.util.Base64
+                .getEncoder()
+                .encodeToString(ByteArray(128) { 1 })
+        val drm =
+            AudioDrm(
+                AudioDrmScheme.WIDEVINE,
+                "https://gravity.eclipsemusic.app/license",
+                serviceCertificate = certificate,
+            )
+        val license = mockk<DataSource.Factory>()
+        val bound = checkedBound(license)
+        val source = factory.resolvedSource(item, audio("application/dash+xml", drm), sourceFactory = bound)
+        assertThat(source).isInstanceOf(DashMediaSource::class.java)
+        assertThat(
+            source.mediaItem.localConfiguration!!
+                .drmConfiguration!!
+                .licenseUri
+                .toString(),
+        ).isEqualTo(drm.licenseUrl)
+        // Construction alone opens no session; the key request it would make is the bound
+        // transport the session manager was built with, never a plain client.
+        assertThat(
+            source.mediaItem.localConfiguration!!
+                .drmConfiguration!!
+                .forceDefaultLicenseUri,
+        ).isTrue()
     }
 
     @Test

@@ -12,6 +12,7 @@ import com.google.common.truth.Truth.assertThat
 import io.github.aedev.flow.data.music.model.MusicTrack
 import io.github.aedev.flow.service.Media3MusicService
 import io.github.aedev.flow.service.fallBackToSong
+import io.github.aedev.flow.service.restartFailedItem
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -264,9 +265,10 @@ class MusicPlaybackVideoTest {
     }
 
     @Test
-    fun `missing picture recovery preserves the source identity and playback position`() {
+    fun `missing picture recovery preserves the source identity position and pause`() {
         capability(setOf(track.videoId))
         manager.setVideoMode(true)
+        every { player.playWhenReady } returns false
         val service =
             Media3MusicService().apply {
                 player = this@MusicPlaybackVideoTest.player
@@ -284,7 +286,21 @@ class MusicPlaybackVideoTest {
         assertThat(manager.videoShown.value).isFalse()
         verify(exactly = 1) { player.seekTo(0, 12_345L) }
         verify(exactly = 1) { player.prepare() }
-        verify(exactly = 1) { player.play() }
+        verify(exactly = 0) { player.play() }
+        verify(exactly = 0) { player.playWhenReady = any() }
+    }
+
+    @Test
+    fun `retry prepares the same track without changing a pause requested during recovery`() {
+        every { player.playWhenReady } returns false
+        val service = Media3MusicService().apply { player = this@MusicPlaybackVideoTest.player }
+
+        service.restartFailedItem(MusicPlaybackRecoveryPlanner.FailedItem(0, track.videoId, 12_345L))
+
+        verify(exactly = 1) { player.seekTo(0, 12_345L) }
+        verify(exactly = 1) { player.prepare() }
+        verify(exactly = 0) { player.play() }
+        verify(exactly = 0) { player.playWhenReady = any() }
     }
 
     @Test

@@ -4,6 +4,7 @@ import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.test.runTest
 import nl.neerdael.milkbeat.plugin.HttpBodyEncoding
 import nl.neerdael.milkbeat.plugin.HttpRequest
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Protocol
@@ -38,7 +39,7 @@ class PluginHttpTest {
                             .build()
                     }.build()
             val response =
-                PluginHttp(client, listOf("images.example.com")).fetch(
+                PluginHttp(client, { listOf("images.example.com") }, okhttp3.Dns.SYSTEM).fetch(
                     HttpRequest(
                         url = "https://images.example.com/cover",
                         method = "POST",
@@ -63,7 +64,7 @@ class PluginHttpTest {
                         called = true
                         error("Network must not be reached")
                     }.build()
-            val http = PluginHttp(client, listOf("images.example.com"))
+            val http = PluginHttp(client, { listOf("images.example.com") }, okhttp3.Dns.SYSTEM)
             for (url in listOf("http://images.example.com/cover", "https://other.example.com/cover")) {
                 val failure =
                     runCatching {
@@ -72,5 +73,37 @@ class PluginHttpTest {
                 assertThat(failure).isInstanceOf(PluginHttpException::class.java)
             }
             assertThat(called).isFalse()
+        }
+
+    @Test
+    fun `a pending approval permits only the credential-free manifest and expires after confirmation`() =
+        runTest {
+            val url = "https://music.example.org/manifest.json?cap=fixture"
+            var reviewed = url.toHttpUrl()
+            val requested = mutableListOf<String>()
+            val base =
+                OkHttpClient
+                    .Builder()
+                    .addInterceptor { chain ->
+                        requested += chain.request().url.toString()
+                        Response
+                            .Builder()
+                            .request(chain.request())
+                            .protocol(Protocol.HTTP_1_1)
+                            .code(200)
+                            .message("OK")
+                            .body("{}".toResponseBody())
+                            .build()
+                    }.build()
+            val http = PluginHttp(base, { emptyList() }, reviewedManifest = { reviewed })
+            assertThat(http.fetch(HttpRequest(url = url, headers = mapOf("Accept" to "application/json"))).status).isEqualTo(200)
+            val credentialed = HttpRequest(url = url, headers = mapOf("Authorization" to "fixture"))
+            val resource = HttpRequest(url = "https://music.example.org/lookup")
+            for (request in listOf(credentialed, resource)) {
+                assertThat(runCatching { http.fetch(request) }.exceptionOrNull()).isInstanceOf(PluginHttpException::class.java)
+            }
+            reviewed = "https://other.example.org/manifest.json".toHttpUrl()
+            assertThat(runCatching { http.fetch(HttpRequest(url = url)) }.exceptionOrNull()).isInstanceOf(PluginHttpException::class.java)
+            assertThat(requested).containsExactly(url)
         }
 }

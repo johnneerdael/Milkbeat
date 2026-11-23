@@ -22,6 +22,7 @@ internal fun LazyListScope.detailItems(
     onPlayHistoryChange: (Boolean) -> Unit,
     onSignIn: (methodId: String, downloadMicroG: Boolean) -> Unit,
     onSignOut: () -> Unit,
+    onConnections: (() -> Unit)?,
     onRemove: () -> Unit,
 ) {
     item(key = "detail-title") { TvSectionHeader(plugin.manifest.name) }
@@ -93,6 +94,15 @@ internal fun LazyListScope.detailItems(
                     )
                 }
             }
+        }
+    }
+    onConnections?.let { open ->
+        item(key = "detail-connections") {
+            TvNavRow(
+                label = stringResource(R.string.tv_plugins_connections_entry),
+                supportingText = stringResource(R.string.tv_plugins_connections_entry_summary),
+                onClick = open,
+            )
         }
     }
     item(key = "detail-remove") { TvNavRow(label = stringResource(R.string.remove), onClick = onRemove) }
