@@ -30,6 +30,8 @@ object KnownProviders {
     private val providers =
         mapOf(
             "nl.neerdael.beatport" to Provider(R.drawable.ic_provider_beatport_mono),
+            "nl.neerdael.deezer" to Provider(R.drawable.ic_provider_deezer_mono),
+            "nl.neerdael.eclipse" to Provider(R.drawable.ic_provider_eclipse_mono),
             "nl.neerdael.soundcloud" to Provider(R.drawable.ic_provider_soundcloud_mono),
             "nl.neerdael.spotify" to Provider(R.drawable.ic_provider_spotify_mono),
             YOUTUBE_PLUGIN to
