@@ -291,10 +291,7 @@ class PluginAudio
                         validateServerAbr(
                             stream.serverAbr,
                             picture != null,
-                            registry.state.value
-                                .plugin(plugin.id)
-                                ?.grantedNetwork
-                                .orEmpty(),
+                            state.grantedHosts(plugin.id),
                             allowPicture = request.video || request.prepareVideo,
                         )
                         val boundPresentation = stream.serverAbr != null || stream.audioFormat != null
@@ -415,10 +412,7 @@ class PluginAudio
             validateServerAbr(
                 stream.serverAbr,
                 audio.withPicture,
-                registry.state.value
-                    .plugin(audio.pluginId)
-                    ?.grantedNetwork
-                    .orEmpty(),
+                registry.state.value.grantedHosts(audio.pluginId),
                 allowPicture = request.video || request.prepareVideo,
             )
             val previousHls =
@@ -485,12 +479,7 @@ class PluginAudio
             }
         }
 
-        internal fun playbackGrants(pluginId: String): List<String> =
-            registry.state.value
-                .plugin(pluginId)
-                ?.takeIf { it.enabled }
-                ?.grantedNetwork
-                .orEmpty()
+        internal fun playbackGrants(pluginId: String): List<String> = registry.state.value.grantedHosts(pluginId)
 
         /** How the first audio plugin that would play [track] delivers its streams. */
         fun deliveryFor(
@@ -619,5 +608,20 @@ class PluginAudio
             positionMs: Long? = null,
             progress: Boolean = false,
             playbackSessionId: String? = null,
-        ) = reportAcceptedListen(host, registry, played, playedMs, durationMs, positionMs, progress, playbackSessionId)
+            endReason: String? = null,
+            playingMs: Long = 0L,
+            manual: Boolean = false,
+        ) = reportAcceptedListen(
+            host,
+            registry,
+            played,
+            playedMs,
+            durationMs,
+            positionMs,
+            progress,
+            playbackSessionId,
+            endReason,
+            playingMs,
+            manual,
+        )
     }

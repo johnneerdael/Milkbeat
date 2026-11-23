@@ -4,7 +4,7 @@ import kotlinx.serialization.Serializable
 import nl.neerdael.milkbeat.catalog.EntityKind
 
 /** The newest plugin API this host implements; a plugin whose [ApiRange.min] is higher cannot run. */
-const val PLUGIN_API_VERSION = 11
+const val PLUGIN_API_VERSION = 12
 
 /** The container format this host reads. */
 const val PLUGIN_FORMAT_VERSION = 1
@@ -121,6 +121,12 @@ data class Permissions(
     val network: List<String> = emptyList(),
     val browser: List<String> = emptyList(),
     val storage: Long = 1_048_576,
+    /**
+     * The plugin owns external connections the listener reviews one by one (plugin API 12): it may
+     * ask the host to fetch an unapproved origin's manifest, and the origins the listener approved
+     * join its network grants. Off by default, so older manifests keep their static grant list only.
+     */
+    val connections: Boolean = false,
 )
 
 @Serializable

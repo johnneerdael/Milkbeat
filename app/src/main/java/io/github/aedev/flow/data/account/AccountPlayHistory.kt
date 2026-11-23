@@ -79,6 +79,9 @@ class AccountPlayHistory
             val positionMs: Long?,
             val progress: Boolean,
             val playbackSessionId: String?,
+            val endReason: String? = null,
+            val playingMs: Long = 0L,
+            val manual: Boolean = false,
         )
 
         // A seek flush followed by its new baseline must retain order across suspended plugin calls.
@@ -100,6 +103,9 @@ class AccountPlayHistory
                                 listen.positionMs,
                                 listen.progress,
                                 listen.playbackSessionId,
+                                listen.endReason,
+                                listen.playingMs,
+                                listen.manual,
                             )
                         }
                         // A dropped cadence sample is recovered by the next cumulative one; nothing
@@ -135,8 +141,13 @@ class AccountPlayHistory
             positionMs: Long? = null,
             progress: Boolean = false,
             playbackSessionId: String? = null,
+            endReason: String? = null,
+            playingMs: Long = 0L,
+            manual: Boolean = false,
         ) {
-            if (!countsAsPlay(playedMs, durationMs)) return
+            // A lifecycle report carries its own qualification: the plugin decides from real
+            // position-delta listening time, not the host's cumulative elapsed threshold.
+            if (endReason == null && !countsAsPlay(playedMs, durationMs)) return
             // Pinned now: an account or quality change before the send or a retry must not redirect it.
             val played = pluginAudio.acceptedListen(MusicVideoItems.descriptor(track)) ?: return
             PlaybackTrace.event(
@@ -146,7 +157,9 @@ class AccountPlayHistory
                 TraceField.PROGRESS to if (progress) 1L else 0L,
                 category = TraceCategory.HISTORY,
             )
-            listens.trySend(ListenReport(track, played, playedMs, durationMs, positionMs, progress, playbackSessionId))
+            listens.trySend(
+                ListenReport(track, played, playedMs, durationMs, positionMs, progress, playbackSessionId, endReason, playingMs, manual),
+            )
         }
 
         /**

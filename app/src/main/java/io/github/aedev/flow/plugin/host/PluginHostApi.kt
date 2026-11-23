@@ -1,5 +1,6 @@
 package io.github.aedev.flow.plugin.host
 
+import android.media.MediaCodecList
 import android.os.Build
 import android.util.Log
 import io.github.aedev.flow.BuildConfig
@@ -12,6 +13,8 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.JsonElement
 import nl.neerdael.milkbeat.plugin.AssetText
+import nl.neerdael.milkbeat.plugin.ConnectionInspectRequest
+import nl.neerdael.milkbeat.plugin.ConnectionManifest
 import nl.neerdael.milkbeat.plugin.HashAlgorithm
 import nl.neerdael.milkbeat.plugin.HashResult
 import nl.neerdael.milkbeat.plugin.HostEnvironment
@@ -65,8 +68,9 @@ internal class PluginHostApi(
     private val appLocale: () -> Locale,
     private val webLogin: WebLoginRefresher? = null,
     private val microG: MicroGAccounts? = null,
+    private val connectionOrigins: () -> List<String> = { emptyList() },
 ) {
-    private val http = PluginHttp(client, plugin.grantedNetwork)
+    private val http = PluginHttp(client) { plugin.grantedNetwork + connectionOrigins() }
     private val storage = PluginStore(File(dataDirectory, "storage.json"), plugin.manifest.permissions.storage)
     private val secrets =
         PluginStore(File(dataDirectory, "secrets.json"), SECRETS_QUOTA, seal = KeystoreSecretBox::seal, open = KeystoreSecretBox::open)
@@ -131,6 +135,12 @@ internal class PluginHostApi(
                 microG?.invalidate(plugin, request)
                     ?: throw HostCallException(PluginErrorCode.UNSUPPORTED, "Account sign-in is unavailable")
             },
+            handler(HostOperations.connectionsInspect) { request ->
+                if (!plugin.manifest.permissions.connections) {
+                    throw HostCallException(PluginErrorCode.UNSUPPORTED, "This plugin may not review external connections")
+                }
+                inspectConnectionManifest(client, request)
+            },
         )
 
     /** Runs host function [path] with [requestJson] and answers with its envelope; never throws. */
@@ -180,7 +190,22 @@ internal class PluginHostApi(
             pluginVersion = plugin.manifest.version,
             osVersion = Build.VERSION.RELEASE,
             deviceModel = Build.MODEL,
+            dolbyCodecs = outputDolbyCodecs(),
         )
+    }
+
+    /** The device's decodable Dolby codecs (A06), as the stream requests of API 12 plugins echo. */
+    private fun outputDolbyCodecs(): List<String> {
+        val types =
+            MediaCodecList(MediaCodecList.REGULAR_CODECS)
+                .codecInfos
+                .filterNot { it.isEncoder }
+                .flatMap { it.supportedTypes.asList() }
+                .toSet()
+        return buildList {
+            if ("audio/eac3" in types || "audio/eac3-joc" in types) add("eac3")
+            if ("audio/ac4" in types) add("ac4")
+        }
     }
 
     private fun <Request, Response> handler(

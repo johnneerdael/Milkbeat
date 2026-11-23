@@ -6,11 +6,15 @@ import io.github.aedev.flow.player.diagnostics.TraceField
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import nl.neerdael.milkbeat.plugin.ConnectionInspectRequest
+import nl.neerdael.milkbeat.plugin.ConnectionManifest
 import nl.neerdael.milkbeat.plugin.HttpBodyEncoding
 import nl.neerdael.milkbeat.plugin.HttpRequest
 import nl.neerdael.milkbeat.plugin.HttpResponse
+import nl.neerdael.milkbeat.plugin.PluginJson
 import okhttp3.Call
 import okhttp3.Callback
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.Interceptor
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.OkHttpClient
@@ -26,6 +30,7 @@ import kotlin.coroutines.resumeWithException
 private const val DEFAULT_TIMEOUT_MS = 20_000L
 private const val MAX_TIMEOUT_MS = 60_000L
 private const val MAX_RESPONSE_BYTES = 16L * 1024 * 1024
+private const val MAX_MANIFEST_BYTES = 2L * 1024 * 1024
 private val BODYLESS_METHODS = setOf("GET", "HEAD")
 
 class PluginHttpException(
@@ -35,11 +40,12 @@ class PluginHttpException(
 /**
  * `mb.http.fetch` for one plugin: the app's HTTP client, restricted to the hosts the listener granted.
  * The check runs on every hop, so a redirect cannot lead a plugin anywhere it was not allowed to go.
- * Plugins handle their own cookies through headers; nothing is shared between plugins.
+ * [allowedHosts] is read per hop, so an approval or revocation that just changed takes effect on the
+ * next request. Plugins handle their own cookies through headers; nothing is shared between plugins.
  */
 internal class PluginHttp(
     base: OkHttpClient,
-    private val allowedHosts: List<String>,
+    private val allowedHosts: () -> List<String>,
 ) {
     private val client =
         base
@@ -127,7 +133,7 @@ internal class PluginHttp(
     private fun checked(request: Request): Request {
         val url = request.url
         if (!url.isHttps) throw PluginHttpException("Plugins may only use HTTPS: ${url.host}")
-        if (!hostAllowed(url.host, allowedHosts)) throw PluginHttpException("${url.host} is not in the plugin's permissions")
+        if (!hostAllowed(url.host, allowedHosts())) throw PluginHttpException("${url.host} is not in the plugin's permissions")
         return request
     }
 }
@@ -163,3 +169,103 @@ private suspend fun <T> Call.readResponse(read: (Response) -> T): T =
             },
         )
     }
+
+/**
+ * `connections.inspect`: the host fetches a candidate connection's manifest itself, with no plugin
+ * credentials and no redirects, so an origin the listener has not approved yet can still be
+ * reviewed. Only public HTTPS destinations with no user information qualify; the body is bounded.
+ */
+internal suspend fun inspectConnectionManifest(
+    base: OkHttpClient,
+    request: ConnectionInspectRequest,
+): ConnectionManifest =
+    withContext(Dispatchers.IO) {
+        val url = normalizedManifestUrl(request.url)
+        val body =
+            base
+                .newBuilder()
+                .followRedirects(false)
+                .followSslRedirects(false)
+                .callTimeout(30, TimeUnit.SECONDS)
+                .build()
+                .newCall(
+                    Request
+                        .Builder()
+                        .url(url)
+                        .header("Accept", "application/json")
+                        .build(),
+                ).readResponse { response ->
+                    if (response.code !in 200..299) throw PluginHttpException("The add-on answered HTTP ${response.code}")
+                    if (response.body.contentLength() > MAX_MANIFEST_BYTES) throw PluginHttpException("The add-on manifest is too large")
+                    response.body.string().also {
+                        if (it.toByteArray().size > MAX_MANIFEST_BYTES) throw PluginHttpException("The add-on manifest is too large")
+                    }
+                }
+        val payload =
+            runCatching { PluginJson.parseToJsonElement(body) }.getOrNull()?.let { manifestFields(it, url.toString()) }
+        payload ?: throw PluginHttpException("The add-on did not return a manifest")
+    }
+
+/** The install link's manifest address (A01): a trailing `manifest.json`, exactly once. */
+internal fun normalizedManifestUrl(input: String): okhttp3.HttpUrl {
+    if (input.length > 8192) throw PluginHttpException("A connection link is too long")
+    val trimmed = input.trim()
+    val base =
+        trimmed
+            .toHttpUrlOrNull()
+            ?.takeIf { it.isHttps }
+            ?: throw PluginHttpException("A connection link must be an HTTPS URL")
+    if (base.username.isNotEmpty() || base.password.isNotEmpty() || base.fragment != null) {
+        throw PluginHttpException("A connection link carries no user information or fragment")
+    }
+    if (isPrivateConnectionHost(base.host)) throw PluginHttpException("A connection link must name a public destination")
+    val segments = base.pathSegments.filter { it.isNotEmpty() }
+    if (segments.size > 12 || segments.any { part -> part.any { char -> char.isISOControl() || char == '/' || char == '\\' } }) {
+        throw PluginHttpException("A connection link's path is not a manifest address")
+    }
+    val stem = segments.dropLastWhile { it.equals("manifest.json", ignoreCase = true) }
+    return base
+        .newBuilder()
+        .encodedPath("/")
+        .apply { stem.forEach(::addPathSegment) }
+        .addPathSegment("manifest.json")
+        .build()
+}
+
+private fun manifestFields(
+    payload: kotlinx.serialization.json.JsonElement,
+    url: String,
+): ConnectionManifest? {
+    val obj = payload as? kotlinx.serialization.json.JsonObject ?: return null
+
+    fun primitive(value: kotlinx.serialization.json.JsonElement?): String? =
+        (value as? kotlinx.serialization.json.JsonPrimitive)
+            ?.takeIf { it.isString }
+            ?.content
+            ?.trim()
+            ?.ifEmpty { null }
+    val id = primitive(obj["id"])
+    if (id == null || id.length > 200) return null
+    val name = primitive(obj["name"])?.filterNot { it.isISOControl() }?.take(70)
+
+    fun strings(key: String): List<String> =
+        (obj[key] as? kotlinx.serialization.json.JsonArray)
+            ?.mapNotNull { entry ->
+                primitive(entry) ?: (entry as? kotlinx.serialization.json.JsonObject)?.let { nested -> primitive(nested["name"]) }
+            }.orEmpty()
+    return ConnectionManifest(url = url, id = id, name = name, resources = strings("resources"), drmSystems = strings("drmSystems"))
+}
+
+/** Public DNS destinations only: private and link-local literals never receive connection approval. */
+internal fun isPrivateConnectionHost(host: String): Boolean {
+    val name = host.lowercase().trimEnd('.')
+    if (name == "localhost" || name.endsWith(".localhost") || name.endsWith(".internal")) return true
+    val labels = name.split('.')
+    val octets = labels.map { it.toIntOrNull() }
+    if (labels.size == 4 && octets.all { it != null && it in 0..255 }) {
+        val (a, b) = octets[0]!! to octets[1]!!
+        return a == 0 || a == 10 || a == 127 || (a == 100 && b in 64..127) ||
+            (a == 169 && b == 254) || (a == 172 && b in 16..31) || (a == 192 && b == 168)
+    }
+    return name.startsWith("[") || name.contains(":")
+}

@@ -119,7 +119,9 @@ internal fun Media3MusicService.handlePlayerError(
     val progressiveHttp =
         io.github.aedev.flow.player.error.StreamHttpFailure
             .of(error)
-    if (progressiveHttp != null && (progressiveHttp.second in setOf(403, 404, 410) || progressiveHttp.second >= 500)) {
+    // 401 and 403 media refusals refresh a fresh URL from the same provider once before it is
+    // rejected: a scoped token or signed URL may simply have expired for this open.
+    if (progressiveHttp != null && (progressiveHttp.second in setOf(401, 403, 404, 410) || progressiveHttp.second >= 500)) {
         pluginAudio.failed(mediaId, progressiveHttp.first, progressiveHttp.second)
         failed = failed.copy(refreshNativeSource = true)
     }
@@ -248,6 +250,35 @@ internal fun Media3MusicService.fallBackToSong(failed: MusicPlaybackRecoveryPlan
     return true
 }
 
+/**
+ * A media open that reached Ready without ever producing audio output — no selected audio track, or
+ * a selected track that never advanced — is rejected before playback counts as started. The same
+ * queue occurrence is retried at the same position with fresh media: the accepted provider resolves
+ * a fresh URL first, and the normal configured order takes over if it cannot.
+ */
+internal fun Media3MusicService.failOverSilentStart(
+    mediaId: String,
+    positionMs: Long,
+) {
+    Log.w(TAG, "Rejecting a silent start for $mediaId at ${positionMs}ms; recovering with fresh media")
+    val accepted = pluginAudio.current(mediaId)
+    accepted?.let { pluginAudio.failed(mediaId, it.stream.url, null) }
+    val index =
+        MusicQueuePlanner.currentQueueIndex(
+            queueIds = playerMediaIds(),
+            playerIndex = player.currentMediaItemIndex,
+            currentTrackId = mediaId,
+        )
+    if (index == MusicQueuePlanner.INDEX_UNSET) return
+    audioStartGate?.attemptChanged()
+    downloadUtil.invalidateUrlCache(mediaId)
+    if (refreshStreamMediaItemAt(index, mediaId, positionMs, preservePicture = true)) {
+        player.prepare()
+        // Pause stays pause: recovery only reopens the source at the requested position.
+        player.playWhenReady = player.playWhenReady
+    }
+}
+
 internal fun Media3MusicService.playerMediaIds(): List<String> = List(player.mediaItemCount) { player.getMediaItemAt(it).mediaId }
 
 /**
@@ -273,6 +304,7 @@ internal fun Media3MusicService.restartFailedItem(
         if (!refreshStreamMediaItemAt(index, failed.mediaId, position, preservePicture = true)) return
     } else {
         player.seekTo(index, position)
+        audioStartGate?.sourceReplaced(failed.mediaId)
     }
     player.prepare()
     player.play()
@@ -455,6 +487,8 @@ internal fun Media3MusicService.refreshStreamMediaItemAt(
 
     player.replaceMediaItem(index, refreshedItem)
     player.seekTo(index, positionMs)
+    // A replaced source must confirm its own audio output before playback reports as started.
+    audioStartGate?.sourceReplaced(mediaId)
     return true
 }
 

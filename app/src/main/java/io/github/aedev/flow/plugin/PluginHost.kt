@@ -129,6 +129,9 @@ class PluginHost
                     appLocale = Locale::getDefault,
                     webLogin = webLogin,
                     microG = microG,
+                    connectionOrigins = {
+                        registry.state.value.connectionOrigins(plugin.id, plugin.signerFingerprint)
+                    },
                 )
             return PluginRuntime(
                 plugin = plugin,

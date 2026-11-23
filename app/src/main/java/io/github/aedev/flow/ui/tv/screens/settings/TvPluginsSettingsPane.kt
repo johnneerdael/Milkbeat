@@ -44,10 +44,13 @@ import io.github.aedev.flow.ui.tv.components.TvNavRow
 import io.github.aedev.flow.ui.tv.components.TvSearchField
 import io.github.aedev.flow.ui.tv.components.TvSectionHeader
 import io.github.aedev.flow.ui.tv.components.TvSelectionRow
+import io.github.aedev.flow.ui.tv.components.TvToggleRow
 import io.github.aedev.flow.ui.tv.focus.ProvideTvColumnPivot
 import io.github.aedev.flow.ui.tv.focus.tvInitialFocus
 import nl.neerdael.milkbeat.catalog.ProviderAccount
 import nl.neerdael.milkbeat.plugin.MetadataSurface
+import nl.neerdael.milkbeat.plugin.PluginConnectionRow
+import nl.neerdael.milkbeat.plugin.PluginConnectionTestState
 import nl.neerdael.milkbeat.plugin.PluginManifest
 
 private enum class ProviderRole { AUDIO, VIDEO }
@@ -70,21 +73,39 @@ fun TvPluginsSettingsPane(
     var openPlugin by rememberSaveable { mutableStateOf<String?>(null) }
     var choosing by rememberSaveable { mutableStateOf<ProviderRole?>(null) }
     var url by rememberSaveable { mutableStateOf("") }
+    var connectionUrl by rememberSaveable { mutableStateOf("") }
     val consent = state.adding as? AddPluginState.Consent
     LaunchedEffect(homeRevision) {
         if (viewModel.consumeHomeRequest(homeRevision)) {
             openPlugin = null
             choosing = null
             url = ""
+            connectionUrl = ""
         }
     }
 
     // Back closes the page open inside Plugins before it may leave Settings, as a picker panel does.
     BackHandler(enabled = consent != null || choosing != null || openPlugin != null) {
         when {
-            consent != null -> viewModel.cancelAdd()
-            choosing != null -> choosing = null
-            else -> openPlugin = null
+            consent != null -> {
+                viewModel.cancelAdd()
+            }
+
+            choosing != null -> {
+                choosing = null
+            }
+
+            state.connections.page is ConnectionsPage.Review || state.connections.page is ConnectionsPage.EditUrl -> {
+                viewModel.editConnectionUrl((state.connections.page as? ConnectionsPage.EditUrl)?.connectionId)
+            }
+
+            state.connections.page != null -> {
+                viewModel.closeConnections()
+            }
+
+            else -> {
+                openPlugin = null
+            }
         }
     }
 
@@ -131,34 +152,62 @@ fun TvPluginsSettingsPane(
                 }
 
                 plugin != null -> {
-                    if (state.accounts[plugin.id] is ProviderAccount.SignedIn &&
-                        setOf(MetadataSurface.LIBRARY, MetadataSurface.TRACKS).all {
-                            it in
-                                plugin.manifest.roles.metadata
-                                    ?.surfaces
-                                    .orEmpty()
+                    val openConnections = state.connections.pluginId == plugin.id && state.connections.page != null
+                    if (openConnections) {
+                        connectionItems(
+                            plugin = plugin,
+                            connections = state.connections,
+                            account = state.accounts[plugin.id],
+                            connectionUrl = connectionUrl,
+                            onUrlChange = { connectionUrl = it },
+                            onUrl = viewModel::reviewConnection,
+                            onReviewAccount = viewModel::setConnectionReviewAccount,
+                            onApprove = viewModel::approveConnection,
+                            onEdit = {
+                                connectionUrl = ""
+                                viewModel.editConnectionUrl(it)
+                            },
+                            onEnabled = viewModel::setConnectionEnabled,
+                            onRemove = viewModel::removeConnection,
+                            onTest = viewModel::testConnection,
+                            onDone = viewModel::closeConnections,
+                        )
+                    } else {
+                        if (state.accounts[plugin.id] is ProviderAccount.SignedIn &&
+                            setOf(MetadataSurface.LIBRARY, MetadataSurface.TRACKS).all {
+                                it in
+                                    plugin.manifest.roles.metadata
+                                        ?.surfaces
+                                        .orEmpty()
+                            }
+                        ) {
+                            item(key = "preload-${plugin.id}") { TvPlaylistPreloadItem(plugin, viewModel.preloadJobs) }
                         }
-                    ) {
-                        item(key = "preload-${plugin.id}") { TvPlaylistPreloadItem(plugin, viewModel.preloadJobs) }
+                        detailItems(
+                            plugin = plugin,
+                            account = state.accounts[plugin.id],
+                            playHistory = playHistory,
+                            microGDownloadable = viewModel.microGDownloadable,
+                            replacementInstalled = { id -> state.plugins.any { it.id == id } },
+                            onAddReplacement = { code ->
+                                openPlugin = null
+                                viewModel.fetch(code)
+                            },
+                            onPlayHistoryChange = viewModel::setPlayHistoryEnabled,
+                            onSignIn = { method, download -> onSignIn(plugin.id, method, download) },
+                            onSignOut = { viewModel.signOut(plugin.id) },
+                            onConnections =
+                                if (plugin.manifest.permissions.connections) {
+                                    { viewModel.openConnections(plugin.id) }
+                                } else {
+                                    null
+                                },
+                            onRemove = {
+                                viewModel.remove(plugin.id)
+                                openPlugin = null
+                            },
+                        )
                     }
-                    detailItems(
-                        plugin = plugin,
-                        account = state.accounts[plugin.id],
-                        playHistory = playHistory,
-                        microGDownloadable = viewModel.microGDownloadable,
-                        replacementInstalled = { id -> state.plugins.any { it.id == id } },
-                        onAddReplacement = { code ->
-                            openPlugin = null
-                            viewModel.fetch(code)
-                        },
-                        onPlayHistoryChange = viewModel::setPlayHistoryEnabled,
-                        onSignIn = { method, download -> onSignIn(plugin.id, method, download) },
-                        onSignOut = { viewModel.signOut(plugin.id) },
-                        onRemove = {
-                            viewModel.remove(plugin.id)
-                            openPlugin = null
-                        },
-                    )
                 }
 
                 else -> {
@@ -382,6 +431,154 @@ internal fun PluginStatusText(
         color = if (error) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
     )
 }
+
+private fun LazyListScope.connectionItems(
+    plugin: InstalledPlugin,
+    connections: PluginConnectionsState,
+    account: ProviderAccount?,
+    connectionUrl: String,
+    onUrlChange: (String) -> Unit,
+    onUrl: (String) -> Unit,
+    onReviewAccount: (Boolean) -> Unit,
+    onApprove: () -> Unit,
+    onEdit: (String?) -> Unit,
+    onEnabled: (String, Boolean) -> Unit,
+    onRemove: (PluginConnectionRow) -> Unit,
+    onTest: (String) -> Unit,
+    onDone: () -> Unit,
+) {
+    when (val page = connections.page) {
+        is ConnectionsPage.EditUrl -> {
+            item(key = "connection-edit-title") {
+                TvSectionHeader(
+                    stringResource(
+                        if (page.connectionId == null) R.string.tv_plugins_connections_add else R.string.tv_plugins_connections_replace,
+                        plugin.manifest.name,
+                    ),
+                )
+            }
+            item(key = "connection-edit-hint") {
+                PluginStatusText(stringResource(R.string.tv_plugins_connections_hint))
+            }
+            item(key = "connection-edit-url") {
+                TvSearchField(
+                    query = connectionUrl,
+                    onQueryChange = onUrlChange,
+                    onSearch = { onUrl(connectionUrl) },
+                    placeholder = stringResource(R.string.tv_plugins_connections_url_hint),
+                    leadingIcon = Icons.Outlined.Link,
+                    keyboardType = KeyboardType.Uri,
+                    imeAction = ImeAction.Go,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            item(key = "connection-edit-review") {
+                TvNavRow(
+                    label = stringResource(R.string.tv_plugins_connections_review),
+                    leadingIcon = Icons.Outlined.Add,
+                    onClick = { onUrl(connectionUrl) },
+                )
+            }
+        }
+
+        is ConnectionsPage.Review -> {
+            item(key = "connection-review-title") { TvSectionHeader(stringResource(R.string.tv_plugins_connections_review_title)) }
+            item(key = "connection-review-name") {
+                PluginStatusText(page.manifest.name ?: page.manifest.id)
+            }
+            item(key = "connection-review-origin") {
+                PluginStatusText(originOf(page.manifest.url))
+            }
+            item(key = "connection-review-id") {
+                PluginStatusText(stringResource(R.string.tv_plugins_connections_addon_id, page.manifest.id))
+            }
+            if (account is ProviderAccount.SignedIn) {
+                item(key = "connection-review-account") {
+                    TvToggleRow(
+                        label = stringResource(R.string.tv_plugins_connections_use_account),
+                        supportingText = stringResource(R.string.tv_plugins_connections_use_account_summary),
+                        checked = page.useAccount,
+                        onCheckedChange = onReviewAccount,
+                    )
+                }
+            }
+            item(key = "connection-review-status") {
+                if (connections.busy) PluginStatusText(stringResource(R.string.tv_plugins_connections_saving))
+                connections.failure?.let { PluginStatusText(it, error = true) }
+            }
+            item(key = "connection-review-actions") {
+                val approveFocus = remember { FocusRequester() }
+                LaunchedEffect(page) {
+                    withFrameNanos { }
+                    runCatching { approveFocus.requestFocus() }
+                }
+                Row(modifier = Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    TvButton(
+                        text = stringResource(R.string.tv_plugins_connections_approve),
+                        onClick = onApprove,
+                        modifier = Modifier.focusRequester(approveFocus),
+                    )
+                    TvButton(text = stringResource(R.string.cancel), onClick = { onEdit(page.connectionId) })
+                }
+            }
+        }
+
+        else -> {
+            item(key = "connections-title") {
+                TvSectionHeader(stringResource(R.string.tv_plugins_connections, plugin.manifest.name))
+            }
+            if (connections.busy && !connections.loaded) {
+                item(key = "connections-loading") { PluginStatusText(stringResource(R.string.tv_plugins_connections_loading)) }
+            } else if (connections.rows.isEmpty() && connections.loaded) {
+                item(key = "connections-none") { PluginStatusText(stringResource(R.string.tv_plugins_connections_none)) }
+            }
+            connections.rows.forEach { row ->
+                item(key = "connection-toggle-${row.id}") {
+                    TvToggleRow(
+                        label = row.title,
+                        supportingText = row.host,
+                        checked = row.enabled,
+                        onCheckedChange = { onEnabled(row.id, it) },
+                    )
+                }
+                item(key = "connection-actions-${row.id}") {
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        TvButton(text = stringResource(R.string.tv_plugins_connections_test), onClick = { onTest(row.id) })
+                        TvButton(text = stringResource(R.string.tv_plugins_connections_replace_short), onClick = { onEdit(row.id) })
+                        TvButton(text = stringResource(R.string.remove), onClick = { onRemove(row) })
+                    }
+                }
+                connections.testResult?.takeIf { it.first == row.id }?.let { (_, result) ->
+                    item(key = "connection-test-${row.id}") {
+                        PluginStatusText(
+                            stringResource(
+                                when (result) {
+                                    PluginConnectionTestState.VERIFIED -> R.string.tv_plugins_connections_test_verified
+                                    PluginConnectionTestState.LOOKUP_FAILED -> R.string.tv_plugins_connections_test_lookup
+                                    PluginConnectionTestState.UNAUTHORIZED -> R.string.tv_plugins_connections_test_unauthorized
+                                    PluginConnectionTestState.MANIFEST_FAILED -> R.string.tv_plugins_connections_test_manifest
+                                    PluginConnectionTestState.SIGNED_OUT -> R.string.tv_plugins_connections_test_signed_out
+                                },
+                                row.title,
+                            ),
+                        )
+                    }
+                }
+            }
+            connections.failure?.let { item(key = "connections-failure") { PluginStatusText(it, error = true) } }
+            item(key = "connection-add") {
+                TvNavRow(
+                    label = stringResource(R.string.tv_plugins_connections_add_short),
+                    leadingIcon = Icons.Outlined.Add,
+                    onClick = { onEdit(null) },
+                )
+            }
+            item(key = "connection-done") { TvNavRow(label = stringResource(R.string.done), onClick = onDone) }
+        }
+    }
+}
+
+private fun originOf(url: String): String = url.removePrefix("https://").takeIf { url.startsWith("https://") }?.substringBefore('/') ?: url
 
 @Composable
 private fun rolesLabel(manifest: PluginManifest): String =

@@ -8,6 +8,7 @@ import io.github.aedev.flow.R
 import io.github.aedev.flow.data.account.AccountPlayHistory
 import io.github.aedev.flow.data.update.AutoUpdater
 import io.github.aedev.flow.plugin.catalog.PluginAccounts
+import io.github.aedev.flow.plugin.host.PluginConnections
 import io.github.aedev.flow.plugin.install.BrowserVerification
 import io.github.aedev.flow.plugin.install.BrowserVerificationRequiredException
 import io.github.aedev.flow.plugin.install.PendingInstall
@@ -33,6 +34,9 @@ import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import nl.neerdael.milkbeat.catalog.ProviderAccount
+import nl.neerdael.milkbeat.plugin.ConnectionManifest
+import nl.neerdael.milkbeat.plugin.PluginConnectionRow
+import nl.neerdael.milkbeat.plugin.PluginConnectionTestState
 import java.io.IOException
 import javax.inject.Inject
 
@@ -66,6 +70,32 @@ data class TvPluginsState(
     val accounts: Map<String, ProviderAccount> = emptyMap(),
     val adding: AddPluginState = AddPluginState.Idle,
     val updates: PluginUpdatesState = PluginUpdatesState.Idle,
+    val connections: PluginConnectionsState = PluginConnectionsState(),
+)
+
+/** Where a plugin's reviewed external connections stand on the TV. */
+sealed interface ConnectionsPage {
+    data object List : ConnectionsPage
+
+    data class EditUrl(
+        val connectionId: String?,
+    ) : ConnectionsPage
+
+    data class Review(
+        val manifest: ConnectionManifest,
+        val connectionId: String?,
+        val useAccount: Boolean,
+    ) : ConnectionsPage
+}
+
+data class PluginConnectionsState(
+    val pluginId: String? = null,
+    val rows: List<PluginConnectionRow> = emptyList(),
+    val page: ConnectionsPage? = null,
+    val loaded: Boolean = false,
+    val busy: Boolean = false,
+    val failure: String? = null,
+    val testResult: Pair<String, PluginConnectionTestState>? = null,
 )
 
 /** Settings, Plugins: what is installed, which plugin provides what, adding, signing in and removing. */
@@ -78,6 +108,7 @@ class TvPluginsViewModel
         private val pluginUpdater: PluginAutoUpdater,
         private val accounts: PluginAccounts,
         private val playHistory: AccountPlayHistory,
+        private val pluginConnections: PluginConnections,
         autoUpdater: AutoUpdater,
         links: PluginLinks,
         val preloadJobs: PlaylistPreloadJobs,
@@ -88,6 +119,8 @@ class TvPluginsViewModel
         val microGDownloadable: Boolean = microGInstaller.isAvailable
 
         private val adding = MutableStateFlow<AddPluginState>(AddPluginState.Idle)
+        private val connectionsState = MutableStateFlow(PluginConnectionsState())
+        private var connectionsJob: Job? = null
 
         /** Whether this build installs Milkbeat updates itself, so a plugin needing a newer app can point there. */
         val appUpdatesAvailable: Boolean = autoUpdater.isAvailable
@@ -99,8 +132,9 @@ class TvPluginsViewModel
                 accounts.accounts,
                 adding,
                 pluginUpdater.state,
-            ) { registryState, known, add, found ->
-                TvPluginsState(registryState.plugins, registryState.selection, known, add, found)
+                connectionsState,
+            ) { registryState, known, add, found, pluginConnections ->
+                TvPluginsState(registryState.plugins, registryState.selection, known, add, found, pluginConnections)
             }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), TvPluginsState())
 
         init {
@@ -232,5 +266,138 @@ class TvPluginsViewModel
                     adding.value = AddPluginState.Failed(e.message.orEmpty(), R.string.tv_plugins_storage_failed)
                 }
             }
+        }
+
+        /** Opens a plugin's reviewed external connections, loading what it has configured. */
+        fun openConnections(pluginId: String) {
+            connectionsJob?.cancel()
+            connectionsState.value = PluginConnectionsState(pluginId = pluginId, page = ConnectionsPage.List)
+            loadConnections()
+        }
+
+        fun closeConnections() {
+            connectionsJob?.cancel()
+            connectionsState.value = PluginConnectionsState()
+        }
+
+        fun editConnectionUrl(connectionId: String?) {
+            updateConnections { it.copy(page = ConnectionsPage.EditUrl(connectionId), failure = null) }
+        }
+
+        /** Reviews a pasted link: the host fetches the manifest itself, before anything is approved. */
+        fun reviewConnection(url: String) {
+            val pluginId = connectionsState.value.pluginId ?: return
+            val trimmed = url.trim()
+            if (trimmed.isEmpty()) return
+            connectionsJob?.cancel()
+            connectionsState.value = connectionsState.value.copy(busy = true, failure = null)
+            connectionsJob =
+                viewModelScope.launch {
+                    val next =
+                        try {
+                            val manifest = pluginConnections.inspect(trimmed)
+                            connectionsState.value.copy(
+                                busy = false,
+                                page =
+                                    ConnectionsPage.Review(
+                                        manifest,
+                                        connectionsState.value.page
+                                            .let { it as? ConnectionsPage.EditUrl }
+                                            ?.connectionId,
+                                        false,
+                                    ),
+                            )
+                        } catch (e: Exception) {
+                            connectionsState.value.copy(busy = false, failure = e.message ?: "Could not review the add-on")
+                        }
+                    connectionsState.value = next
+                }
+        }
+
+        fun setConnectionReviewAccount(useAccount: Boolean) {
+            updateConnections { state ->
+                val page = state.page as? ConnectionsPage.Review ?: return@updateConnections state
+                state.copy(page = page.copy(useAccount = useAccount))
+            }
+        }
+
+        /** Records the approval and hands the reviewed link to the plugin. */
+        fun approveConnection() {
+            val pluginId = connectionsState.value.pluginId ?: return
+            val plugin =
+                registry.state.value.plugins
+                    .firstOrNull { it.id == pluginId } ?: return
+            val page = connectionsState.value.page as? ConnectionsPage.Review ?: return
+            connectionsJob?.cancel()
+            connectionsState.value = connectionsState.value.copy(busy = true, failure = null)
+            connectionsJob =
+                viewModelScope.launch {
+                    try {
+                        pluginConnections.approve(plugin, page.manifest, page.useAccount)
+                        loadConnections()
+                    } catch (e: Exception) {
+                        updateConnections {
+                            it.copy(busy = false, failure = e.message ?: "Could not save the add-on")
+                        }
+                    }
+                }
+        }
+
+        fun setConnectionEnabled(
+            id: String,
+            enabled: Boolean,
+        ) {
+            val pluginId = connectionsState.value.pluginId ?: return
+            viewModelScope.launch {
+                runCatching { pluginConnections.setEnabled(pluginId, id, enabled) }
+                loadConnections()
+            }
+        }
+
+        fun removeConnection(row: PluginConnectionRow) {
+            val pluginId = connectionsState.value.pluginId ?: return
+            val plugin =
+                registry.state.value.plugins
+                    .firstOrNull { it.id == pluginId } ?: return
+            viewModelScope.launch {
+                try {
+                    pluginConnections.remove(plugin, row)
+                } catch (e: Exception) {
+                    updateConnections { it.copy(failure = e.message ?: "Could not remove the add-on") }
+                }
+                loadConnections()
+            }
+        }
+
+        fun testConnection(id: String) {
+            val pluginId = connectionsState.value.pluginId ?: return
+            connectionsJob?.cancel()
+            connectionsState.value = connectionsState.value.copy(busy = true, failure = null, testResult = null)
+            connectionsJob =
+                viewModelScope.launch {
+                    val result =
+                        runCatching { pluginConnections.test(pluginId, id) }
+                            .getOrElse { error ->
+                                updateConnections { it.copy(busy = false, failure = error.message ?: "Could not reach the add-on") }
+                                return@launch
+                            }
+                    updateConnections { it.copy(busy = false, testResult = id to result.state) }
+                }
+        }
+
+        private fun updateConnections(change: (PluginConnectionsState) -> PluginConnectionsState) {
+            connectionsState.value = change(connectionsState.value)
+        }
+
+        private fun loadConnections() {
+            val pluginId = connectionsState.value.pluginId ?: return
+            connectionsJob?.cancel()
+            connectionsState.value = connectionsState.value.copy(busy = true, failure = null)
+            connectionsJob =
+                viewModelScope.launch {
+                    val rows =
+                        runCatching { pluginConnections.list(pluginId) }.getOrElse { emptyList() }
+                    updateConnections { it.copy(rows = rows, busy = false, loaded = true, page = ConnectionsPage.List) }
+                }
         }
     }

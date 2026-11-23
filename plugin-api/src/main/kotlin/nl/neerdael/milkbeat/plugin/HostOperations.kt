@@ -131,6 +131,12 @@ data class HostEnvironment(
     val pluginVersion: String,
     val osVersion: String? = null,
     val deviceModel: String? = null,
+    /**
+     * Dolby codecs this device can decode and pass to the active output, as MIME-independent names
+     * (`eac3`, `ac4`; plugin API 12). Empty when none are supported. Providers echo these in their
+     * stream requests instead of assuming device capability.
+     */
+    val dolbyCodecs: List<String> = emptyList(),
 )
 
 @Serializable
@@ -216,6 +222,8 @@ object HostOperations {
     val signInRefresh = HostOperation("signIn.refresh", WebLoginRefreshRequest.serializer(), WebLoginResult.serializer())
     val signInToken = HostOperation("signIn.token", AccountTokenRequest.serializer(), AccountToken.serializer())
     val signInInvalidateToken = HostOperation("signIn.invalidateToken", AccountTokenInvalidation.serializer(), Unit.serializer())
+    val connectionsInspect =
+        HostOperation("connections.inspect", ConnectionInspectRequest.serializer(), ConnectionManifest.serializer())
 
     val all: List<HostOperation<*, *>> =
         listOf(
@@ -241,5 +249,6 @@ object HostOperations {
             signInRefresh,
             signInToken,
             signInInvalidateToken,
+            connectionsInspect,
         )
 }

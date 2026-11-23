@@ -7,7 +7,7 @@ import io.github.aedev.flow.player.audio.MusicOutputRecovery
 
 internal fun Media3MusicService.initializeOutputRecovery() {
     outputRecovery =
-        MusicOutputRecovery(player, lifecycleScope, audioOutputProbe, SystemClock::elapsedRealtime) { recovering ->
+        MusicOutputRecovery(player, lifecycleScope, audioOutputProbe, SystemClock::elapsedRealtime, { recovering ->
             val message =
                 if (recovering) {
                     R.string.music_playback_warning_audio_recovering
@@ -17,5 +17,7 @@ internal fun Media3MusicService.initializeOutputRecovery() {
             notifyMusicWarning(
                 getString(message),
             )
-        }
+        }, { audioStartHold() })
 }
+
+private fun Media3MusicService.audioStartHold(): Long? = player.currentMediaItem?.mediaId?.let { audioStartGate?.pendingHold(it) }

@@ -36,6 +36,21 @@ data class InstalledPlugin(
 }
 
 /**
+ * One external origin the listener approved for a plugin's reviewed connection (plugin API 12).
+ * Bound to the plugin and its signer: a reinstalled or re-signed plugin starts with no approvals.
+ */
+@Serializable
+data class PluginConnectionGrant(
+    val pluginId: String,
+    val signerFingerprint: String,
+    /** The approved HTTPS origin, as `host` or `host:port`. */
+    val origin: String,
+    /** The add-on identity the listener reviewed for this origin, when the protocol declared one. */
+    val addonId: String? = null,
+    val approvedAtMs: Long,
+)
+
+/**
  * Which plugins the listener chose: audio in the order every track tries, and one for video. Enabled
  * audio plugins outside that order play only their own tracks. Music tabs need no choice.
  */
@@ -50,8 +65,24 @@ data class PluginRegistryState(
     val plugins: List<InstalledPlugin> = emptyList(),
     val selection: ProviderSelection = ProviderSelection(),
     val migrations: Set<String> = emptySet(),
+    val connections: List<PluginConnectionGrant> = emptyList(),
 ) {
     fun plugin(id: String?): InstalledPlugin? = plugins.firstOrNull { it.id == id && it.enabled }
+
+    /** The approved connection origins for one installed plugin; a different signer holds none. */
+    fun connectionOrigins(
+        pluginId: String,
+        signerFingerprint: String,
+    ): List<String> =
+        connections
+            .filter { it.pluginId == pluginId && it.signerFingerprint == signerFingerprint }
+            .map { it.origin }
+
+    /** Every host pattern this plugin may reach right now: its static grants plus approved connections. */
+    fun grantedHosts(pluginId: String): List<String> =
+        plugin(pluginId)
+            ?.let { plugin -> plugin.grantedNetwork + connectionOrigins(plugin.id, plugin.signerFingerprint) }
+            .orEmpty()
 }
 
 /** An install refused because [installed], a newer version of the same plugin, went in after it was offered. */
@@ -132,7 +163,15 @@ class PluginRegistry
                 withContext(Dispatchers.IO) { unpack(installed, pack.files) }
                 update { state ->
                     val others = state.plugins.filterNot { it.id == installed.id }
-                    state.copy(plugins = others + installed, selection = withDefaults(state.selection, current, installed))
+                    state.copy(
+                        plugins = others + installed,
+                        selection = withDefaults(state.selection, current, installed),
+                        // A differently signed copy of the same plugin id holds no one's approvals.
+                        connections =
+                            state.connections.filterNot {
+                                it.pluginId == installed.id && it.signerFingerprint != installed.signerFingerprint
+                            },
+                    )
                 }
                 withContext(Dispatchers.IO) { pruneVersions(installed) }
                 installed
@@ -148,12 +187,51 @@ class PluginRegistry
                                 audio = state.selection.audio - id,
                                 video = state.selection.video.takeUnless { it == id },
                             ),
+                        // A removed plugin's approved origins die with it; a reinstall starts clean.
+                        connections = state.connections.filterNot { it.pluginId == id },
                     )
                 }
                 withContext(Dispatchers.IO) { File(root, id).deleteRecursively() }
             }
 
         suspend fun select(selection: ProviderSelection) = mutex.withLock { update { it.copy(selection = selection) } }
+
+        /**
+         * Records the listener's approval of [origin] for [plugin]'s connections. Replacing a link
+         * for the same [addonId] moves the approval; other origins keep theirs.
+         */
+        suspend fun approveConnection(
+            plugin: InstalledPlugin,
+            origin: String,
+            addonId: String?,
+        ): Unit =
+            mutex.withLock {
+                update { state ->
+                    state.copy(
+                        connections =
+                            state.connections.filterNot {
+                                it.pluginId == plugin.id && it.signerFingerprint == plugin.signerFingerprint &&
+                                    (it.origin == origin || (addonId != null && it.addonId == addonId))
+                            } +
+                                PluginConnectionGrant(
+                                    pluginId = plugin.id,
+                                    signerFingerprint = plugin.signerFingerprint,
+                                    origin = origin,
+                                    addonId = addonId,
+                                    approvedAtMs = System.currentTimeMillis(),
+                                ),
+                    )
+                }
+            }
+
+        /** Withdraws one approved origin, so JSON, media and license transports refuse it again. */
+        suspend fun revokeConnection(
+            pluginId: String,
+            origin: String,
+        ): Unit =
+            mutex.withLock {
+                update { state -> state.copy(connections = state.connections.filterNot { it.pluginId == pluginId && it.origin == origin }) }
+            }
 
         suspend fun updateSelection(change: (ProviderSelection) -> ProviderSelection) =
             mutex.withLock {

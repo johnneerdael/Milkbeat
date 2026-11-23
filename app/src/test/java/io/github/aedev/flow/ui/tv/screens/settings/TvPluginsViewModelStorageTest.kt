@@ -47,6 +47,7 @@ class TvPluginsViewModelStorageTest {
             accounts,
             mockk(relaxed = true),
             mockk(relaxed = true),
+            mockk(relaxed = true),
             links,
             mockk(relaxed = true),
             SavedStateHandle(),

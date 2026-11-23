@@ -19,14 +19,26 @@ internal data class AccountListenProgress(
     val positionMs: Long,
     val progress: Boolean,
     val playbackSessionId: String,
+    /** Plugin API 12 lifecycle: why the listen ended, when [progress] is false. */
+    val endReason: String? = null,
+    /** Plugin API 12 lifecycle: listening time measured from real position deltas, seek-free. */
+    val playingMs: Long = 0L,
+    /** Plugin API 12 lifecycle: the listen began from a listener action rather than an advance. */
+    val manual: Boolean = false,
 )
 
-/** Bounded history cadence on the session player, including its output-recovery holds. */
+/**
+ * Bounded history cadence on the session player, including its output-recovery holds. A provider
+ * that opted into API 12 lifecycle reporting is sampled every second and checkpointed every five,
+ * with playing time measured from position deltas so seeks never count; other providers keep the
+ * plain thirty-second cumulative cadence.
+ */
 internal class MusicAccountHistoryListener(
     private val player: Player,
     private val scope: CoroutineScope,
     private val resolveTrack: (String) -> MusicTrack?,
     private val report: (MusicTrack, AccountListenProgress) -> Unit,
+    private val lifecycleReporter: (String) -> Boolean = { false },
     private val nowMs: () -> Long = SystemClock::elapsedRealtime,
 ) : Player.Listener {
     private class Listen(
@@ -39,11 +51,18 @@ internal class MusicAccountHistoryListener(
         var durationMs = 0L
         var positionMs = 0L
         var lastProgress: AccountListenProgress? = null
+        var lifecycle = false
+        var playingMs = 0L
+        var lastPositionMs: Long? = null
+        var seekedToEnd = false
+        var manual = false
+        var lastCheckpointMs = 0L
     }
 
     private var listen: Listen? = null
     private var cadence: Job? = null
     private var transitioned = false
+    private var transitionReason: Int? = null
     private var outgoingPosition: Player.PositionInfo? = null
     private var closed = false
 
@@ -57,6 +76,7 @@ internal class MusicAccountHistoryListener(
         reason: Int,
     ) {
         transitioned = true
+        transitionReason = reason
     }
 
     override fun onPositionDiscontinuity(
@@ -78,13 +98,13 @@ internal class MusicAccountHistoryListener(
         closeSegment()
         outgoingPosition?.let { previous?.positionMs = it.positionMs.coerceAtLeast(0) }
         if (transitioned || previous?.mediaId != player.currentMediaItem?.mediaId) {
-            finish()
-            startCurrent()
+            finish(reason = endReasonForTransition(previous))
+            startCurrent(manual = manualTransition(transitionReason))
         } else {
             if (outgoingPosition != null) emit(progress = true)
             refreshCurrent()
             if (player.playbackState == Player.STATE_ENDED || player.playbackState == Player.STATE_IDLE) {
-                finish()
+                finish(reason = "natural")
             } else {
                 // Seek and pause boundaries are event-driven. Seek time never increases playedMs.
                 if (outgoingPosition != null || !player.isPlaying) emit(progress = true)
@@ -93,6 +113,7 @@ internal class MusicAccountHistoryListener(
             }
         }
         transitioned = false
+        transitionReason = null
         outgoingPosition = null
     }
 
@@ -102,13 +123,27 @@ internal class MusicAccountHistoryListener(
         closeSegment()
         outgoingPosition?.let { listen?.positionMs = it.positionMs.coerceAtLeast(0) }
             ?: refreshCurrent()
-        finish()
+        finish(reason = "interrupted")
         player.removeListener(this)
     }
 
-    private fun startCurrent() {
+    private fun manualTransition(reason: Int?): Boolean = reason == Player.MEDIA_ITEM_TRANSITION_REASON_SEEK
+
+    private fun endReasonForTransition(previous: Listen?): String {
+        val endedNaturally = player.playbackState == Player.STATE_ENDED
+        return when {
+            endedNaturally -> if (previous?.seekedToEnd == true) "seek_out" else "natural"
+            else -> "replaced"
+        }
+    }
+
+    private fun startCurrent(manual: Boolean = false) {
         val mediaId = player.currentMediaItem?.mediaId?.takeIf { it.isNotBlank() } ?: return
-        listen = Listen(mediaId, resolveTrack(mediaId))
+        listen =
+            Listen(mediaId, resolveTrack(mediaId)).also {
+                it.manual = manual
+                it.lifecycle = lifecycleReporter(mediaId)
+            }
         refreshCurrent()
         if (player.isPlaying) listen?.playingSinceMs = nowMs()
         updateCadence()
@@ -126,7 +161,23 @@ internal class MusicAccountHistoryListener(
                 ?.toLong()
                 ?.times(1_000)
             ?: 0L
+        countPositionDelta(current)
     }
+
+    /** Real listening time: forward deltas up to two seconds count; a jump is a seek, never time. */
+    private fun countPositionDelta(current: Listen) {
+        val last = current.lastPositionMs
+        current.lastPositionMs = current.positionMs
+        if (last == null) return
+        val delta = current.positionMs - last
+        when {
+            delta in 1..MAX_PROGRESS_DELTA_MS -> current.playingMs += delta
+            delta != 0L -> current.seekedToEnd = nearEnd(current)
+        }
+    }
+
+    private fun nearEnd(current: Listen): Boolean =
+        current.durationMs > 0 && current.positionMs >= (current.durationMs - END_TOLERANCE_MS).coerceAtLeast(0)
 
     private fun closeSegment() {
         val current = listen ?: return
@@ -139,18 +190,46 @@ internal class MusicAccountHistoryListener(
     private fun emit(progress: Boolean) {
         val current = listen ?: return
         val track = current.track ?: return
-        val sample = AccountListenProgress(playedMs(current), current.durationMs, current.positionMs, progress, current.playbackSessionId)
-        if (!countsAsPlay(sample.playedMs, sample.durationMs)) return
+        refreshCurrent()
+        val sample =
+            AccountListenProgress(
+                playedMs(current),
+                current.durationMs,
+                current.positionMs,
+                progress,
+                current.playbackSessionId,
+                endReason = if (progress) null else "replaced",
+                playingMs = current.playingMs,
+                manual = current.manual,
+            )
+        if (progress && !current.lifecycle && !countsAsPlay(sample.playedMs, sample.durationMs)) return
         if (progress && sample == current.lastProgress) return
         if (progress) current.lastProgress = sample
         report(track, sample)
     }
 
-    private fun finish() {
+    private fun finish(reason: String) {
         cadence?.cancel()
         cadence = null
-        emit(progress = false)
+        val current = listen ?: return
+        refreshCurrent()
+        val finalReason = if (reason == "natural" && current.seekedToEnd) "seek_out" else reason
+        val track = current.track
+        val sample =
+            AccountListenProgress(
+                playedMs(current),
+                current.durationMs,
+                current.positionMs,
+                progress = false,
+                playbackSessionId = current.playbackSessionId,
+                endReason = finalReason,
+                playingMs = current.playingMs,
+                manual = current.manual,
+            )
         listen = null
+        if (track == null) return
+        if (!current.lifecycle && !countsAsPlay(sample.playedMs, sample.durationMs)) return
+        report(track, sample)
     }
 
     private fun updateCadence() {
@@ -160,25 +239,52 @@ internal class MusicAccountHistoryListener(
             return
         }
         if (cadence?.isActive == true) return
+        val lifecycle = listen?.lifecycle == true
         cadence =
             scope.launch {
                 while (listen?.playingSinceMs != null && player.isPlaying) {
                     val current = listen ?: break
-                    val untilQualified = playThresholdMs(current.durationMs) - playedMs(current)
-                    delay(if (untilQualified > 0) minOf(REPORT_INTERVAL_MS, untilQualified) else REPORT_INTERVAL_MS)
-                    if (!player.isPlaying || listen !== current) break
-                    refreshCurrent()
-                    emit(progress = true)
+                    if (lifecycle) {
+                        // Sample every second so deltas land under the bound; report every five.
+                        delay(LIFECYCLE_SAMPLE_MS)
+                        if (!player.isPlaying || listen !== current) break
+                        refreshCurrent()
+                        val sinceCheckpoint = current.playingMs - current.lastCheckpointMs
+                        if (sinceCheckpoint >= LIFECYCLE_CHECKPOINT_MS) {
+                            current.lastCheckpointMs = current.playingMs
+                            emit(progress = true)
+                        }
+                    } else {
+                        val untilQualified = playThresholdMs(current.durationMs) - playedMs(current)
+                        delay(if (untilQualified > 0) minOf(REPORT_INTERVAL_MS, untilQualified) else REPORT_INTERVAL_MS)
+                        if (!player.isPlaying || listen !== current) break
+                        refreshCurrent()
+                        emit(progress = true)
+                    }
                 }
             }
     }
 
     private companion object {
         const val REPORT_INTERVAL_MS = 30_000L
+        const val LIFECYCLE_SAMPLE_MS = 1_000L
+        const val LIFECYCLE_CHECKPOINT_MS = 5_000L
+        const val MAX_PROGRESS_DELTA_MS = 2_000L
+        const val END_TOLERANCE_MS = 3_000L
     }
 }
 
 internal fun AccountPlayHistory.reportProgress(
     track: MusicTrack,
     progress: AccountListenProgress,
-) = onListened(track, progress.playedMs, progress.durationMs, progress.positionMs, progress.progress, progress.playbackSessionId)
+) = onListened(
+    track,
+    progress.playedMs,
+    progress.durationMs,
+    progress.positionMs,
+    progress.progress,
+    progress.playbackSessionId,
+    progress.endReason,
+    progress.playingMs,
+    progress.manual,
+)

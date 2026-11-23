@@ -12,6 +12,7 @@ internal class OutputReportingPlayer(
     private val onPlayRequest: (Boolean) -> Unit = {},
     private val onSeekRequest: () -> Boolean = { false },
     private val onStopRequest: () -> Unit = {},
+    private val audioStartHold: () -> Long? = { null },
 ) : ForwardingSimpleBasePlayer(player) {
     private var heldPositionMs: Long? = null
     private var retrying = false
@@ -32,14 +33,31 @@ internal class OutputReportingPlayer(
 
     override fun getState(): State {
         val state = super.getState()
-        val position = heldPositionMs ?: return state
+        val position = heldPositionMs ?: return withAudioStartHold(state)
         if (state.playerError != null || state.timeline.isEmpty) return state
+        return withAudioStartHold(
+            state
+                .buildUpon()
+                .setContentPositionMs(position)
+                .setPlaybackState(if (retrying) Player.STATE_BUFFERING else Player.STATE_READY)
+                .setPlayWhenReady(retrying && state.playWhenReady, state.playWhenReadyChangeReason)
+                .setIsLoading(retrying && state.isLoading)
+                .build(),
+        )
+    }
+
+    /**
+     * While the listener has requested audio and the open has not confirmed output, the exposed
+     * state buffers at the attempt's base position instead of advancing a silent clock.
+     */
+    private fun withAudioStartHold(state: State): State {
+        val pending = audioStartHold() ?: return state
+        if (state.playerError != null || state.timeline.isEmpty || state.playbackState == Player.STATE_IDLE) return state
         return state
             .buildUpon()
-            .setContentPositionMs(position)
-            .setPlaybackState(if (retrying) Player.STATE_BUFFERING else Player.STATE_READY)
-            .setPlayWhenReady(retrying && state.playWhenReady, state.playWhenReadyChangeReason)
-            .setIsLoading(retrying && state.isLoading)
+            .setContentPositionMs(pending)
+            .setPlaybackState(Player.STATE_BUFFERING)
+            .setIsLoading(true)
             .build()
     }
 

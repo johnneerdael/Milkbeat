@@ -93,6 +93,7 @@ class Media3MusicService : MediaLibraryService() {
     internal lateinit var player: ExoPlayer
     internal val audioOutputProbe = MusicAudioTrackProbe()
     internal lateinit var outputRecovery: MusicOutputRecovery
+    internal var audioStartGate: io.github.aedev.flow.player.audio.MusicAudioStartGate? = null
     internal val sessionPlayer: Player get() = if (::outputRecovery.isInitialized) outputRecovery.reportedPlayer else player
     internal val outputRecoveryActive: Boolean get() = ::outputRecovery.isInitialized && outputRecovery.isRecovering
     internal val outputFailureHeld: Boolean get() = ::outputRecovery.isInitialized && outputRecovery.hasOutputFailure
@@ -388,6 +389,11 @@ class Media3MusicService : MediaLibraryService() {
         io.github.aedev.flow.player.musicVideoJoinGate
             .bind(player)
         player.addAnalyticsListener(PlaybackOutputTrace(audioOutputProbe))
+        audioStartGate =
+            io.github.aedev.flow.player.audio.MusicAudioStartGate(player, lifecycleScope, ::failOverSilentStart).also {
+                player.addAnalyticsListener(it)
+                player.addListener(it)
+            }
         observeAudioQuality()
         player.trackSelectionParameters =
             player.trackSelectionParameters
@@ -408,6 +414,7 @@ class Media3MusicService : MediaLibraryService() {
                 lifecycleScope,
                 ::resolveLearnTrack,
                 accountPlayHistory::reportProgress,
+                lifecycleReporter = ::reportsListenLifecycle,
             )
         sessionPlayer.addListener(VisualizerClockListener(visualizerTap))
         lifecycleScope.launch { followPlayerClock(visualizerTap, sessionPlayer) }
@@ -539,6 +546,15 @@ class Media3MusicService : MediaLibraryService() {
     // device with a former seekTo(0)-on-transition). Wall-clock time while isPlaying is
     // pause-free and seek-immune; a repeat loop finalizes and restarts a session,
     // so relistens still count once each.
+
+    /** Whether this item's provider takes API 12 listen-lifecycle reports instead of cadence samples. */
+    internal fun reportsListenLifecycle(mediaId: String): Boolean {
+        if (!::pluginAudio.isInitialized) return false
+        val pluginId = pluginAudio.current(mediaId)?.pluginId ?: return false
+        val plugin = pluginRegistry.state.value.plugin(pluginId) ?: return false
+        return plugin.manifest.roles.audio
+            ?.reportPlayback == true && plugin.manifest.api.target >= 12
+    }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaLibrarySession? = mediaLibrarySession
 

@@ -124,6 +124,41 @@ class MusicMediaSourceFactoryTest {
     }
 
     @Test
+    fun `a server-returned audio DASH manifest plays through a DASH source`() {
+        assertThat(factory.resolvedSource(item, audio("application/dash+xml"))).isInstanceOf(DashMediaSource::class.java)
+        assertThat(factory.resolvedSource(item, audio("application/dash+xml; charset=utf-8"))).isInstanceOf(DashMediaSource::class.java)
+    }
+
+    @Test
+    fun `Gravity's licensed Atmos profile carries its service certificate and init mapping`() {
+        val certificate =
+            java.util.Base64
+                .getEncoder()
+                .encodeToString(ByteArray(128) { 1 })
+        val drm =
+            AudioDrm(
+                AudioDrmScheme.WIDEVINE,
+                "https://gravity.eclipsemusic.app/license",
+                serviceCertificate = certificate,
+                multiSession = true,
+                initialization =
+                    nl.neerdael.milkbeat.plugin.DrmInitialization(
+                        profile = "apple-cbcs-eac3-v1",
+                        url = "https://media.mzstatic.com/audio.mp4",
+                        offsetBytes = 12,
+                        lengthBytes = 100,
+                        keyIdsHex = listOf("02".repeat(16), "03".repeat(16)),
+                    ),
+            )
+        val bound = BoundPluginMusicDataSourceFactory(mockk<DataSource.Factory>(), mockk<DataSource.Factory>())
+        val source = factory.resolvedSource(item, audio("application/dash+xml", drm), sourceFactory = bound)
+        assertThat(source).isInstanceOf(DashMediaSource::class.java)
+        val configuration = source.mediaItem.localConfiguration!!.drmConfiguration
+        assertThat(configuration!!.scheme).isEqualTo(C.WIDEVINE_UUID)
+        assertThat(configuration.forceDefaultLicenseUri).isTrue()
+    }
+
+    @Test
     fun `YouTube and downloaded audio retain progressive sources`() {
         assertThat(factory.resolvedSource(item, audio("audio/mp4"))).isInstanceOf(ProgressiveMediaSource::class.java)
         assertThat(factory.resolvedSource(item, null)).isInstanceOf(ProgressiveMediaSource::class.java)

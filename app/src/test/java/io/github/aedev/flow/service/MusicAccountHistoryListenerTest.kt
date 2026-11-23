@@ -213,7 +213,83 @@ class MusicAccountHistoryListenerTest {
             fixture.listener.close()
         }
 
-    private fun TestScope.fixture(durationMs: Long = 600_000): Fixture {
+    @Test
+    fun `a lifecycle listen counts real position deltas across a seek, buffering and a refreshed source`() =
+        runTest {
+            val fixture = fixture(lifecycle = true)
+            pump()
+            // One second of real playback.
+            advanceTimeBy(1_000)
+            fixture.player.positionMs = 1_000
+            pump()
+            // A seek far forwards is not listening time.
+            fixture.player.seekTo(300_000)
+            pump()
+            advanceTimeBy(1_000)
+            fixture.player.positionMs = 301_000
+            pump()
+            // Buffering stops the clock; a reopened source resumes at the same position.
+            fixture.player.buffering()
+            pump()
+            advanceTimeBy(10_000)
+            pump()
+            fixture.player.play()
+            pump()
+            advanceTimeBy(2_000)
+            fixture.player.positionMs = 303_000
+            pump()
+            // Natural end yields exactly one final report, with the measured playing time only.
+            fixture.player.end()
+            pump()
+            val samples = fixture.reports
+            assertTrue(samples.any { it.second.progress })
+            val final = samples.last().second
+            assertFalse(final.progress)
+            assertEquals("natural", final.endReason)
+            assertEquals(4_000L, final.playingMs)
+            assertEquals(303_000L, final.positionMs)
+            assertEquals(1, samples.count { !it.second.progress })
+            fixture.listener.close()
+        }
+
+    @Test
+    fun `a lifecycle listen reports a seek to the end as seek_out and a replace as replaced`() =
+        runTest {
+            val fixture = fixture(lifecycle = true)
+            pump()
+            advanceTimeBy(2_000)
+            fixture.player.positionMs = 2_000
+            pump()
+            fixture.player.seekTo(599_000)
+            pump()
+            fixture.player.end()
+            pump()
+            assertEquals(
+                "seek_out",
+                fixture.reports
+                    .last()
+                    .second.endReason,
+            )
+
+            fixture.player.ready()
+            fixture.player.transition(1)
+            pump()
+            advanceTimeBy(3_000)
+            fixture.player.positionMs = 3_000
+            pump()
+            // Leaving the item before it ends is a replacement, not a natural finish.
+            fixture.player.transition(0)
+            pump()
+            val replaced = fixture.reports.last().second
+            assertEquals("replaced", replaced.endReason)
+            assertEquals(3_000L, replaced.playingMs)
+            fixture.listener.close()
+        }
+
+    private fun TestScope.fixture(
+        durationMs: Long = 600_000,
+        lifecycle: Boolean = false,
+    ): Fixture {
         val player = HistoryTestPlayer(durationMs) { testScheduler.currentTime }
         val reports = mutableListOf<Pair<MusicTrack, AccountListenProgress>>()
         val listener =
@@ -222,7 +298,8 @@ class MusicAccountHistoryListenerTest {
                 backgroundScope,
                 { id -> MusicTrack(id, id, "artist", "", (durationMs / 1_000).toInt()) },
                 { track, progress -> reports += track to progress },
-                { testScheduler.currentTime },
+                { lifecycle },
+                nowMs = { testScheduler.currentTime },
             )
         return Fixture(player, listener, reports)
     }
@@ -297,6 +374,26 @@ class MusicAccountHistoryListenerTest {
                     .buildUpon()
                     .setContentPositionMs(currentPosition)
                     .setPlaybackState(Player.STATE_BUFFERING)
+                    .build()
+            invalidateState()
+        }
+
+        fun ready() {
+            value =
+                value
+                    .buildUpon()
+                    .setContentPositionMs(currentPosition)
+                    .setPlaybackState(Player.STATE_READY)
+                    .build()
+            invalidateState()
+        }
+
+        fun end() {
+            value =
+                value
+                    .buildUpon()
+                    .setContentPositionMs(currentPosition)
+                    .setPlaybackState(Player.STATE_ENDED)
                     .build()
             invalidateState()
         }
