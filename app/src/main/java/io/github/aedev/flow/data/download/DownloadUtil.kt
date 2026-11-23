@@ -44,11 +44,13 @@ import io.github.aedev.flow.plugin.playback.adaptiveDataSourceFactory
 import io.github.aedev.flow.plugin.playback.cacheIdentity
 import io.github.aedev.flow.plugin.playback.drmDataSourceFactory
 import io.github.aedev.flow.plugin.playback.pluginDrmInitDataSourceFactory
+import io.github.aedev.flow.plugin.playback.pluginMediaDataSourceFactory
 import io.github.aedev.flow.plugin.playback.pluginRangedDataSourceFactory
 import io.github.aedev.flow.plugin.playback.pluginRequestLength
 import io.github.aedev.flow.plugin.playback.pluginStripeCipherDataSourceFactory
 import io.github.aedev.flow.plugin.playback.prepareQueue
 import io.github.aedev.flow.plugin.playback.serverAbrDataSourceFactory
+import io.github.aedev.flow.plugin.playback.verifyBound
 import io.github.aedev.flow.plugin.playback.withRangePolicy
 import io.github.aedev.flow.service.ExoDownloadService
 import io.github.aedev.flow.utils.MusicVideoFormats
@@ -229,7 +231,18 @@ class DownloadUtil
                     runBlocking(Dispatchers.IO) {
                         binding?.current() ?: resolveForPlayback(uri, picture)
                     }
-                val playbackCache = if (binding == null) cachedDataSourceFactory else playerCacheFactory
+                val playbackCache =
+                    if (binding == null) {
+                        cachedDataSourceFactory
+                    } else {
+                        // Progressive and HLS opens re-check the plugin's current grants, including redirects.
+                        pluginMediaDataSourceFactory(
+                            okHttpClient,
+                            playerCache,
+                            { pluginAudio.verifyBound(binding.initial) },
+                            { pluginAudio.playbackGrants(binding.initial.pluginId) },
+                        )
+                    }
                 val initialization =
                     binding
                         ?.initial

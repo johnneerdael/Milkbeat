@@ -11,6 +11,7 @@ import io.github.aedev.flow.data.account.AccountPlayHistory
 import io.github.aedev.flow.data.update.AutoUpdater
 import io.github.aedev.flow.plugin.catalog.PluginAccounts
 import io.github.aedev.flow.plugin.host.PluginConnections
+import io.github.aedev.flow.plugin.host.PluginHttpException
 import io.github.aedev.flow.plugin.install.BrowserVerification
 import io.github.aedev.flow.plugin.install.BrowserVerificationRequiredException
 import io.github.aedev.flow.plugin.install.PendingInstall
@@ -312,6 +313,13 @@ class TvPluginsViewModel
                             connectionsState.value.copy(
                                 busy = false,
                                 page = ConnectionsPage.Review(manifest, editor.connectionId, false),
+                            )
+                        } catch (e: PluginHttpException) {
+                            connectionsState.value.copy(
+                                busy = false,
+                                failure =
+                                    e.messageResource?.let(context::getString)
+                                        ?: context.getString(R.string.tv_plugins_connections_review_failed),
                             )
                         } catch (e: Exception) {
                             connectionsState.value.copy(

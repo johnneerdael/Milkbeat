@@ -1,5 +1,6 @@
 package io.github.aedev.flow.plugin.host
 
+import io.github.aedev.flow.R
 import io.github.aedev.flow.player.diagnostics.PlaybackTrace
 import io.github.aedev.flow.player.diagnostics.TraceEvent
 import io.github.aedev.flow.player.diagnostics.TraceField
@@ -42,6 +43,8 @@ private object ReviewedManifestRequest
 
 class PluginHttpException(
     message: String,
+    /** A resource for the message when it is shown to the listener; [message] stays diagnostic. */
+    val messageResource: Int? = null,
 ) : IOException(message)
 
 /**
@@ -224,33 +227,50 @@ internal suspend fun inspectConnectionManifest(
                         .header("Accept", "application/json")
                         .build(),
                 ).readResponse { response ->
-                    if (response.code !in 200..299) throw PluginHttpException("The add-on answered HTTP ${response.code}")
-                    if (response.body.contentLength() > MAX_MANIFEST_BYTES) throw PluginHttpException("The add-on manifest is too large")
+                    if (response.code !in 200..299) {
+                        throw PluginHttpException(
+                            "The add-on answered HTTP ${response.code}",
+                            R.string.tv_plugins_connections_link_unreachable,
+                        )
+                    }
+                    if (response.body.contentLength() > MAX_MANIFEST_BYTES) {
+                        throw PluginHttpException("The add-on manifest is too large", R.string.tv_plugins_connections_manifest_large)
+                    }
                     val source = response.body.source()
-                    if (source.request(MAX_MANIFEST_BYTES + 1)) throw PluginHttpException("The add-on manifest is too large")
+                    if (source.request(MAX_MANIFEST_BYTES + 1)) {
+                        throw PluginHttpException("The add-on manifest is too large", R.string.tv_plugins_connections_manifest_large)
+                    }
                     source.buffer.readUtf8()
                 }
         val payload =
             runCatching { PluginJson.parseToJsonElement(body) }.getOrNull()?.let { manifestFields(it, url.toString()) }
-        payload ?: throw PluginHttpException("The add-on did not return a manifest")
+        payload ?: throw PluginHttpException("The add-on did not return a manifest", R.string.tv_plugins_connections_manifest_invalid)
     }
 
 /** The install link's manifest address (A01): a trailing `manifest.json`, exactly once. */
 internal fun normalizedManifestUrl(input: String): okhttp3.HttpUrl {
-    if (input.length > 8192) throw PluginHttpException("A connection link is too long")
+    if (input.length > 8192) throw PluginHttpException("A connection link is too long", R.string.tv_plugins_connections_link_invalid)
     val trimmed = input.trim()
     val base =
         trimmed
             .toHttpUrlOrNull()
             ?.takeIf { it.isHttps }
-            ?: throw PluginHttpException("A connection link must be an HTTPS URL")
+            ?: throw PluginHttpException("A connection link must be an HTTPS URL", R.string.tv_plugins_connections_link_invalid)
     if (base.username.isNotEmpty() || base.password.isNotEmpty() || base.fragment != null) {
-        throw PluginHttpException("A connection link carries no user information or fragment")
+        throw PluginHttpException(
+            "A connection link carries no user information or fragment",
+            R.string.tv_plugins_connections_link_invalid,
+        )
     }
-    if (isPrivateConnectionHost(base.host)) throw PluginHttpException("A connection link must name a public destination")
+    if (isPrivateConnectionHost(base.host)) {
+        throw PluginHttpException(
+            "A connection link must name a public destination",
+            R.string.tv_plugins_connections_link_invalid,
+        )
+    }
     val segments = base.pathSegments.filter { it.isNotEmpty() }
     if (segments.size > 12 || segments.any { part -> part.any { char -> char.isISOControl() || char == '/' || char == '\\' } }) {
-        throw PluginHttpException("A connection link's path is not a manifest address")
+        throw PluginHttpException("A connection link's path is not a manifest address", R.string.tv_plugins_connections_link_invalid)
     }
     val stem = segments.dropLastWhile { it.equals("manifest.json", ignoreCase = true) }
     return base

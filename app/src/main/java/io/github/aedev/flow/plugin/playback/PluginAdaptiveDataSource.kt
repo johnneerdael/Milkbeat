@@ -73,9 +73,16 @@ internal fun pluginAdaptiveDataSourceFactory(
                 throw IOException("The provider changed this adaptive source")
             }
             if (original == null) {
-                // Remote DASH supplies its own manifest and segment URLs. Keep those URLs and ranges
-                // while adding the bound stream's media headers to each uncached network request.
-                return@Factory request.withMediaHeaders(current.stream.headers).build()
+                // Remote DASH supplies its own manifest and segment URLs. A renewed stream retargets
+                // its manifest open; segments keep their URLs and ranges, and the bound stream's
+                // media headers apply to every uncached network request.
+                val manifest =
+                    if (request.uri.toString() == initial.stream.url) {
+                        request.buildUpon().setUri(current.stream.url).build()
+                    } else {
+                        request
+                    }
+                return@Factory manifest.withMediaHeaders(current.stream.headers).build()
             }
             val format =
                 when (original.type) {
