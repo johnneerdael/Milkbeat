@@ -89,17 +89,20 @@ internal fun LazyListScope.catalogBlocks(
 ) {
     val firstTable = blocks.firstOrNull { it.isTrackTable }
     val firstShelf = blocks.firstOrNull { it is CollectionBlock && !it.isTrackTable }
+    val lastActionable = if (endFocus != null) lastActionableBlockIndex(blocks, gridBlockId, actions) else -1
     var trackOffset = 0
     blocks.forEachIndexed { index, block ->
         val blockModifier = if (index == 0) firstBlockModifier else Modifier
         when (block) {
             is EntityHeader -> {
-                item(key = block.id) { TvCatalogEntityHeader(block, blocks, actions, blockModifier) }
+                item(
+                    key = block.id,
+                ) { TvCatalogEntityHeader(block, blocks, actions, blockModifier.tvEndFocus(index == lastActionable, endFocus)) }
             }
 
             is CollectionBlock -> {
                 if (block.id == gridBlockId) {
-                    catalogGrid(block, actions, horizontalPadding, endFocus, index == blocks.lastIndex)
+                    catalogGrid(block, actions, horizontalPadding, endFocus, index == lastActionable)
                 } else if (block.layout == CollectionLayout.TRACK_TABLE) {
                     val queueId = (pageHeader?.tracks ?: block.showAll)?.providerId
                     val source = block.header?.title ?: pageHeader?.title.orEmpty()
@@ -116,7 +119,7 @@ internal fun LazyListScope.catalogBlocks(
                         paneFocus = tables?.paneFocus,
                         playingTrackPosition = tables?.playingTrackPosition?.minus(trackOffset),
                         endFocus = endFocus,
-                        isLastBlock = index == blocks.lastIndex,
+                        isLastBlock = index == lastActionable,
                     )
                     trackOffset += block.items.size
                 } else {
@@ -130,7 +133,50 @@ internal fun LazyListScope.catalogBlocks(
                         }
                     item(
                         key = block.id,
-                    ) { TvCatalogShelfBlock(block, actions, shelfModifier.tvEndFocus(index == blocks.lastIndex, endFocus)) }
+                    ) { TvCatalogShelfBlock(block, actions, shelfModifier.tvEndFocus(index == lastActionable, endFocus)) }
+                }
+            }
+        }
+    }
+}
+
+internal fun lastActionableBlockIndex(
+    blocks: List<PageBlock>,
+    gridBlockId: String?,
+    actions: TvCatalogActions,
+): Int {
+    val firstTable = blocks.firstOrNull { it.isTrackTable } as? CollectionBlock
+    val hasPlayableTracks = firstTable?.items?.any { actions.trackFor(it) != null } == true
+    return blocks.indexOfLast { block ->
+        when (block) {
+            is EntityHeader -> {
+                hasPlayableTracks || (block.entity.kind == EntityKind.ARTIST && actions.follow != null)
+            }
+
+            is CollectionBlock -> {
+                val header = block.header
+                val headerAction =
+                    header != null &&
+                        (block.showAll != null || (block.showAllFilterId != null && actions.onShowAllFilter != null))
+                when {
+                    block.id == gridBlockId -> {
+                        block.items.isNotEmpty()
+                    }
+
+                    block.isTrackTable -> {
+                        block.items.isNotEmpty() || headerAction
+                    }
+
+                    else -> {
+                        block.items.isNotEmpty() ||
+                            (
+                                header != null &&
+                                    (
+                                        header.target?.kind?.isBrowsable == true ||
+                                            (block.showAllFilterId != null && actions.onShowAllFilter != null)
+                                    )
+                            )
+                    }
                 }
             }
         }

@@ -3,6 +3,8 @@ package io.github.aedev.flow.ui.tv.music
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
+import android.view.SurfaceHolder
+import android.view.SurfaceView
 import android.view.View
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -12,11 +14,12 @@ import androidx.media3.common.Player
 
 @Composable
 internal fun VisualizerKeepScreenOn(
-    view: View,
+    view: SurfaceView,
     player: Player?,
     lifecycle: Lifecycle,
+    renderReady: Boolean,
 ) {
-    DisposableEffect(lifecycle, view, player) {
+    DisposableEffect(lifecycle, view, player, renderReady) {
         val policy = VisualizerScreenOn()
         val handler = Handler(Looper.getMainLooper())
         var started = lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)
@@ -32,8 +35,10 @@ internal fun VisualizerKeepScreenOn(
                         player.playWhenReady,
                         player.playbackSuppressionReason,
                         SystemClock.elapsedRealtime(),
+                        surfaceReady = renderReady && view.isAttachedToWindow && view.holder.surface.isValid,
                     )
             view.keepScreenOn = keep
+            if (!started || !view.isAttachedToWindow || !view.holder.surface.isValid) policy.reset()
             if (keep && player != null && !player.isPlaying) {
                 handler.postDelayed(timeout, policy.remainingBufferingMs(SystemClock.elapsedRealtime()))
             }
@@ -48,6 +53,35 @@ internal fun VisualizerKeepScreenOn(
                 }
             }
         player?.addListener(listener)
+        val surfaceCallback =
+            object : SurfaceHolder.Callback {
+                override fun surfaceCreated(holder: SurfaceHolder) = updateScreenOn()
+
+                override fun surfaceChanged(
+                    holder: SurfaceHolder,
+                    format: Int,
+                    width: Int,
+                    height: Int,
+                ) = updateScreenOn()
+
+                override fun surfaceDestroyed(holder: SurfaceHolder) {
+                    handler.removeCallbacks(timeout)
+                    policy.reset()
+                    view.keepScreenOn = false
+                }
+            }
+        val attachListener =
+            object : View.OnAttachStateChangeListener {
+                override fun onViewAttachedToWindow(v: View) = updateScreenOn()
+
+                override fun onViewDetachedFromWindow(v: View) {
+                    handler.removeCallbacks(timeout)
+                    policy.reset()
+                    view.keepScreenOn = false
+                }
+            }
+        view.holder.addCallback(surfaceCallback)
+        view.addOnAttachStateChangeListener(attachListener)
         val observer =
             LifecycleEventObserver { _, event ->
                 when (event) {
@@ -73,6 +107,8 @@ internal fun VisualizerKeepScreenOn(
         onDispose {
             handler.removeCallbacks(timeout)
             player?.removeListener(listener)
+            view.holder.removeCallback(surfaceCallback)
+            view.removeOnAttachStateChangeListener(attachListener)
             view.keepScreenOn = false
             lifecycle.removeObserver(observer)
         }

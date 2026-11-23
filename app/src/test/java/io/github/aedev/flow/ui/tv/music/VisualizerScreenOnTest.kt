@@ -7,6 +7,22 @@ import org.junit.Test
 
 class VisualizerScreenOnTest {
     @Test
+    fun `surface loss releases screen and discards buffering grace`() {
+        val policy = VisualizerScreenOn()
+
+        fun check(
+            playing: Boolean,
+            state: Int,
+            ready: Boolean,
+        ) = policy.update(playing, state, true, Player.PLAYBACK_SUPPRESSION_REASON_NONE, 0L, surfaceReady = ready)
+        assertThat(check(true, Player.STATE_READY, false)).isFalse()
+        assertThat(check(true, Player.STATE_READY, true)).isTrue()
+        assertThat(check(false, Player.STATE_BUFFERING, false)).isFalse()
+        assertThat(check(false, Player.STATE_BUFFERING, true)).isFalse()
+        assertThat(check(true, Player.STATE_READY, true)).isTrue()
+    }
+
+    @Test
     fun `unknown brightness preferences use the unmodified visualizer`() {
         assertThat(normalizeVisualizerBrightness(null)).isEqualTo(100)
         assertThat(normalizeVisualizerBrightness(0)).isEqualTo(100)

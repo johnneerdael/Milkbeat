@@ -276,7 +276,7 @@ private fun TvCatalogTrackColumns(
 }
 
 /** What the TV app has a page for; a listener's profile has none yet. */
-private val EntityKind.isBrowsable: Boolean
+internal val EntityKind.isBrowsable: Boolean
     get() = this == EntityKind.ARTIST || this == EntityKind.ALBUM || this == EntityKind.PLAYLIST
 
 private const val TRACK_ROWS = 4

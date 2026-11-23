@@ -56,7 +56,7 @@ internal fun LazyListScope.catalogTrackTable(
                 onShowAll =
                     collection.showAll?.let { target -> { onOpen(target) } }
                         ?: collection.showAllFilterId?.let { filterId -> onShowAllFilter?.let { show -> { show(filterId) } } },
-                modifier = padding,
+                modifier = padding.tvEndFocus(isLastBlock && collection.items.isEmpty(), endFocus),
             )
         }
     }

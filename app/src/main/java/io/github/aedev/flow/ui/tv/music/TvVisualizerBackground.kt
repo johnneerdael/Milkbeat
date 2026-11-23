@@ -19,6 +19,8 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.aedev.flow.player.EnhancedMusicPlayerManager
 import io.github.aedev.flow.player.audio.visualizer.VisualizerSettings
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 
 /**
  * The projectM visualizer as the now-playing backdrop. It runs for as long as now-playing is open,
@@ -56,9 +58,13 @@ private fun TvVisualizerSurface(
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val host = remember(viewModel) { TvVisualizerHost(context, viewModel, settings) }
+    val surfaceReady by host.surfaceReady.collectAsStateWithLifecycle()
     val timingOffsetMs by viewModel.timingOffsetMs.collectAsStateWithLifecycle()
-    val playerState by EnhancedMusicPlayerManager.playerState.collectAsStateWithLifecycle()
-    val player = remember(playerState) { EnhancedMusicPlayerManager.player }
+    val players =
+        remember {
+            EnhancedMusicPlayerManager.playerState.map { EnhancedMusicPlayerManager.player }.distinctUntilChanged()
+        }
+    val player by players.collectAsStateWithLifecycle(initialValue = EnhancedMusicPlayerManager.player)
     SideEffect {
         host.timingOffsetUs = timingOffsetMs * 1_000L
         host.apply(settings)
@@ -80,7 +86,7 @@ private fun TvVisualizerSurface(
             host.close()
         }
     }
-    VisualizerKeepScreenOn(host.view, player, lifecycle)
+    VisualizerKeepScreenOn(host.view, player, lifecycle, surfaceReady)
     AndroidView(factory = { host.view }, modifier = modifier.fillMaxSize())
 }
 

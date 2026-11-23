@@ -1,9 +1,11 @@
 package io.github.aedev.flow.ui.tv.music
 
 import android.net.Uri
-import android.view.View
+import android.view.SurfaceView
 import androidx.activity.ComponentActivity
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
@@ -38,7 +40,7 @@ class VisualizerKeepScreenOnDeviceTest {
                 override val lifecycle: Lifecycle get() = registry
             }
         lateinit var player: ExoPlayer
-        lateinit var view: View
+        lateinit var view: SurfaceView
         val shown = mutableStateOf(true)
         compose.runOnUiThread {
             owner.registry.currentState = Lifecycle.State.STARTED
@@ -48,7 +50,7 @@ class VisualizerKeepScreenOnDeviceTest {
             player.setMediaItem(MediaItem.fromUri(Uri.fromFile(audio)))
             player.prepare()
             player.play()
-            view = View(compose.activity)
+            view = SurfaceView(compose.activity)
         }
         try {
             fun ready(): Boolean {
@@ -64,8 +66,8 @@ class VisualizerKeepScreenOnDeviceTest {
             }
             compose.setContent {
                 if (shown.value) {
-                    VisualizerKeepScreenOn(view, player, owner.lifecycle)
-                    AndroidView(factory = { view })
+                    VisualizerKeepScreenOn(view, player, owner.lifecycle, renderReady = true)
+                    AndroidView(factory = { view }, modifier = Modifier.fillMaxSize())
                 }
             }
             compose.waitUntil(30_000) { ready() }

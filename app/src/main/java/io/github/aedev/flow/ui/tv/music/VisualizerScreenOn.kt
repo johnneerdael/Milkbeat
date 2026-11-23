@@ -12,7 +12,12 @@ internal class VisualizerScreenOn {
         playWhenReady: Boolean,
         suppressionReason: Int,
         nowMs: Long,
+        surfaceReady: Boolean = true,
     ): Boolean {
+        if (!surfaceReady) {
+            reset()
+            return false
+        }
         if (isPlaying) {
             wasPlaying = true
             bufferingSince = null
