@@ -192,12 +192,16 @@ class PluginAudio
                         providers.firstOrNull { it.plugin.id == audio.pluginId }?.let { AudioProviderAttempt(it.plugin, audio.track) }
                     }
                     // The failed acceptance is gone but its provider keeps one fresh attempt at the
-                    // same position before the normal fallback order takes over.
-                    ?: pendingFailure?.let { failureProviders[key] }?.let { failedId ->
-                        providers.firstOrNull { it.plugin.id == failedId }?.let {
-                            AudioProviderAttempt(it.plugin, it.direct ?: track)
+                    // same position before the normal fallback order takes over — only while the
+                    // account and provider context it failed in is still current.
+                    ?: pendingFailure
+                        ?.takeIf { failureContexts[key] == null || failureContexts[key] == context }
+                        ?.let { failureProviders[key] }
+                        ?.let { failedId ->
+                            providers.firstOrNull { it.plugin.id == failedId }?.let {
+                                AudioProviderAttempt(it.plugin, it.direct ?: track)
+                            }
                         }
-                    }
             val protocolRecovery = failures[key]?.serverAbrFailure != null || acceptedSabrFailure
             val attempts =
                 when {

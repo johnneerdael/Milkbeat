@@ -269,7 +269,10 @@ internal fun publicDns(): okhttp3.Dns =
     okhttp3.Dns { hostname ->
         val resolved = okhttp3.Dns.SYSTEM.lookup(hostname)
         if (resolved.isEmpty()) throw java.net.UnknownHostException(hostname)
-        if (resolved.any { isPrivateAddress(it) }) {
+        // A name that is itself a loopback destination is the caller's own local server; a public
+        // name that resolves into the local network is refused.
+        val literalLoopback = hostname.equals("localhost", ignoreCase = true) || hostname == "127.0.0.1" || hostname == "[::1]"
+        if (!literalLoopback && resolved.any { isPrivateAddress(it) }) {
             throw java.net.UnknownHostException("$hostname resolves to a private address")
         }
         resolved
