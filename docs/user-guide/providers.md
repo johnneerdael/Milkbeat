@@ -77,13 +77,16 @@ resumes during a song.
 
 ## Eclipse
 
-**Eclipse 0.4.0** returns lossless or Atmos audio from the Eclipse add-ons you connect and adds an
+**Eclipse 0.6.0** returns lossless or Atmos audio from the Eclipse add-ons you connect and adds an
 Eclipse music tab. Its **For you** shelves follow the Eclipse account's composed feed — new
-releases, Daily Mixes with their tracks, album shelves that open the add-on's own album, top and
-trending tracks — alongside your Cloud playlists, Liked Songs and Discover. A composed or library
-track is matched to an Eclipse recording before it plays; when no approved add-on holds that
-recording, another provider in your audio order plays it instead. Install it on a Milkbeat build
-supporting plugin API 12, then sign in with the TV code shown at `eclipsemusic.app/tv`.
+releases, Daily Mixes with their tracks, album and artist shelves that open the add-on's own page,
+editorial playlists, stations and trending tracks — alongside your Cloud playlists, Liked Songs and
+Discover. A station card starts a generated radio from the track it names. Search in that tab covers
+every approved add-on, so one query returns Cloud, Pulsar, Gravity and community results together. A
+composed or library track is matched to an Eclipse recording before it plays; when no approved
+add-on holds that recording, another provider in your audio order plays it instead. Install it on a
+Milkbeat build supporting plugin API 12, then sign in with the TV code shown at
+`eclipsemusic.app/tv`.
 
 Eclipse needs a subscription or account entitlement of its own; Milkbeat's other providers are
 unaffected and remain available as fallbacks in [Audio](#set-audio-priority).
@@ -208,7 +211,7 @@ Completed indexing matches are kept when you cancel. Index again after changing 
 
 - **YouTube:** sign-in is optional; Home works signed out. Signing in with the Google account in MicroG-RE-TV gives you your own Home, library and history. It works only in the stable app, not in Milkbeat Preview or debug builds. YouTube 0.1.6 needs a Milkbeat build with plugin API 11.
 - **Deezer:** sign in through the phone web viewer for your catalog, Flow and read-only library. Audio availability and quality depend on the account and recording. Deezer 0.2.1 needs a Milkbeat build with plugin API 9.
-- **Eclipse:** sign in with the TV code at `eclipsemusic.app/tv`. Cloud is added from your account; other add-ons come from their own install links and are reviewed one by one. Eclipse 0.1.0 needs a Milkbeat build with plugin API 12.
+- **Eclipse:** sign in with the TV code at `eclipsemusic.app/tv`. Cloud is added from your account; other add-ons come from their own install links and are reviewed one by one. Its tab supplies Home, Your library, Discover and search from your approved add-ons. Eclipse 0.6.0 needs a Milkbeat build with plugin API 12.
 - **Spotify:** a catalog with **no audio source**. Its value is your personalized feed, playlists, Liked Songs and library after signing in. Keep at least one audio provider enabled.
 - **Beatport:** sign in for the catalog and your library. Beatport's own full-length audio needs an active streaming subscription; otherwise SoundCloud or YouTube can match the recording. A free account does not guarantee a match.
 - **SoundCloud:** sign in for personalized Home, playlists, Liked Songs, history and Artists. Public search and catalog pages can work anonymously. Full-track availability depends on the recording and your listening subscription; Artist Pro does not grant Go+ listening rights. Preview-only or restricted recordings can appear but cannot supply full-track audio, so keep another audio provider as a fallback. SoundCloud plugin 0.2.0 needs a Milkbeat build with plugin API 5. TV-paired accounts currently play clear HLS streams only; protected-only recordings cannot play with this session, and plays from a TV-paired account are not reported to SoundCloud. Existing web sessions keep their Widevine playback path where the account and device allow it.
