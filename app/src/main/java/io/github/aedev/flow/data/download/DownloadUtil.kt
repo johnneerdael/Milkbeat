@@ -332,13 +332,18 @@ class DownloadUtil
                         audio.stream.serverAbr?.let { pluginAudio.serverAbrDataSourceFactory(audio, okHttpClient) },
                         audio.stream.serverAbr?.let { { pluginAudio.acquirePlaybackLease(audio) } },
                         adaptive =
-                            audio.stream.audioFormat?.let {
-                                pluginAudio.adaptiveDataSourceFactory(
-                                    binding,
-                                    okHttpClient,
-                                    playerCache,
-                                )
-                            },
+                            audio.stream
+                                .takeIf {
+                                    // Host-built and remote DASH both need the checked transport.
+                                    it.audioFormat != null ||
+                                        it.mimeType.substringBefore(';').equals("application/dash+xml", ignoreCase = true)
+                                }?.let {
+                                    pluginAudio.adaptiveDataSourceFactory(
+                                        binding,
+                                        okHttpClient,
+                                        playerCache,
+                                    )
+                                },
                     )
                 },
             )

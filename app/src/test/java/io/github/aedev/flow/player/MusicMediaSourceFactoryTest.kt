@@ -46,6 +46,11 @@ class MusicMediaSourceFactoryTest {
             .setMediaId("spotify-song")
             .build()
 
+    private fun checkedBound(
+        license: DataSource.Factory? = null,
+        adaptive: DataSource.Factory? = mockk(),
+    ) = BoundPluginMusicDataSourceFactory(mockk<DataSource.Factory>(), license, adaptive = adaptive)
+
     @Test
     fun `prepared direct audio and picture share one DASH source`() {
         val sound =
@@ -82,7 +87,7 @@ class MusicMediaSourceFactoryTest {
                 Long.MAX_VALUE,
                 false,
             )
-        val source = factory.resolvedSource(item.buildUpon().setUri("musicvideo://spotify-song").build(), resolution)
+        val source = factory.resolvedSource(item.buildUpon().setUri("musicvideo://spotify-song").build(), resolution, checkedBound())
         assertThat(source).isInstanceOf(DashMediaSource::class.java)
         assertThat(source.mediaItem.mediaId).isEqualTo(item.mediaId)
     }
@@ -125,8 +130,10 @@ class MusicMediaSourceFactoryTest {
 
     @Test
     fun `a server-returned audio DASH manifest plays through a DASH source`() {
-        assertThat(factory.resolvedSource(item, audio("application/dash+xml"))).isInstanceOf(DashMediaSource::class.java)
-        assertThat(factory.resolvedSource(item, audio("application/dash+xml; charset=utf-8"))).isInstanceOf(DashMediaSource::class.java)
+        assertThat(factory.resolvedSource(item, audio("application/dash+xml"), checkedBound())).isInstanceOf(DashMediaSource::class.java)
+        assertThat(
+            factory.resolvedSource(item, audio("application/dash+xml; charset=utf-8"), checkedBound()),
+        ).isInstanceOf(DashMediaSource::class.java)
     }
 
     @Test
@@ -150,7 +157,7 @@ class MusicMediaSourceFactoryTest {
                         keyIdsHex = listOf("02".repeat(16), "03".repeat(16)),
                     ),
             )
-        val bound = BoundPluginMusicDataSourceFactory(mockk<DataSource.Factory>(), mockk<DataSource.Factory>())
+        val bound = checkedBound(mockk())
         val source = factory.resolvedSource(item, audio("application/dash+xml", drm), sourceFactory = bound)
         assertThat(source).isInstanceOf(DashMediaSource::class.java)
         val configuration = source.mediaItem.localConfiguration!!.drmConfiguration
@@ -167,7 +174,7 @@ class MusicMediaSourceFactoryTest {
     @Test
     fun `encrypted HLS uses the provider license rather than a manifest license`() {
         val drm = AudioDrm(AudioDrmScheme.WIDEVINE, "https://license.example/playback", mapOf("Authorization" to "fixture"))
-        val bound = BoundPluginMusicDataSourceFactory(mockk<DataSource.Factory>(), mockk<DataSource.Factory>())
+        val bound = checkedBound(mockk())
         val source = factory.resolvedSource(item, audio("application/x-mpegURL", drm), sourceFactory = bound)
         val configuration = source.mediaItem.localConfiguration!!.drmConfiguration
         assertThat(configuration).isNotNull()
@@ -175,6 +182,17 @@ class MusicMediaSourceFactoryTest {
         assertThat(configuration.licenseUri.toString()).isEqualTo(drm.licenseUrl)
         assertThat(configuration.licenseRequestHeaders).isEmpty()
         assertThat(configuration.forceDefaultLicenseUri).isTrue()
+    }
+
+    @Test
+    fun `DASH fails closed without the permission-checked adaptive transport`() {
+        assertThat(runCatching { factory.resolvedSource(item, audio("application/dash+xml")) }.exceptionOrNull())
+            .isInstanceOf(IllegalArgumentException::class.java)
+        assertThat(
+            runCatching {
+                factory.resolvedSource(item, audio("application/dash+xml"), checkedBound(adaptive = null))
+            }.exceptionOrNull(),
+        ).isInstanceOf(IllegalArgumentException::class.java)
     }
 
     @Test
@@ -214,7 +232,7 @@ class MusicMediaSourceFactoryTest {
                 serviceCertificate = certificate,
             )
         val license = mockk<DataSource.Factory>()
-        val bound = BoundPluginMusicDataSourceFactory(mockk<DataSource.Factory>(), license)
+        val bound = checkedBound(license)
         val source = factory.resolvedSource(item, audio("application/dash+xml", drm), sourceFactory = bound)
         assertThat(source).isInstanceOf(DashMediaSource::class.java)
         assertThat(

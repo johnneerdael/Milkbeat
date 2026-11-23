@@ -129,13 +129,14 @@ private class MappedInitialization(
 }
 
 /**
- * A Widevine session manager that presents the provider's service certificate to the license
- * server. It takes the same permission-checked, refresh-aware license transport as the standard
- * Widevine path, so a certificate session keeps destination checks, grant revocation, license
- * headers and a fresh license URL on every open.
+ * A Widevine session manager for a provider stream. An optional service certificate is presented
+ * to the license server, and the provider's declared session mode applies with or without it. It
+ * takes the same permission-checked, refresh-aware license transport as the standard Widevine
+ * path, so a certificate session keeps destination checks, grant revocation, license headers and a
+ * fresh license URL on every open.
  */
-internal fun pluginServiceCertificateDrmProvider(
-    certificate: ByteArray,
+internal fun pluginDrmProvider(
+    serviceCertificate: ByteArray?,
     multiSession: Boolean,
     licenseFactory: DataSource.Factory,
 ): DrmSessionManagerProvider =
@@ -145,7 +146,7 @@ internal fun pluginServiceCertificateDrmProvider(
                 val drm =
                     runCatching { FrameworkMediaDrm.newInstance(uuid) }.getOrNull()
                         ?: throw IOException("This device cannot open a Widevine session")
-                drm.setPropertyByteArray("serviceCertificate", certificate)
+                serviceCertificate?.let { drm.setPropertyByteArray("serviceCertificate", it) }
                 drm
             }
         DefaultDrmSessionManager

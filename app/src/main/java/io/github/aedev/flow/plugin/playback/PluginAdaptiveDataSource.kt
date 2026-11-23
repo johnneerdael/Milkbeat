@@ -57,7 +57,8 @@ internal fun pluginAdaptiveDataSourceFactory(
         ResolvingDataSource.Factory(OkHttpDataSource.Factory(client)) { request ->
             if (request.httpMethod != DataSpec.HTTP_METHOD_GET) throw IOException("Adaptive media requires a GET")
             verifyCurrent(initial)
-            val original = keyed[request.key] ?: throw IOException("Unknown adaptive rendition")
+            // A parsed remote manifest names its own segments; they were checked before this open.
+            val original = request.key?.let(keyed::get) ?: return@Factory request
             val current = runBlocking(Dispatchers.IO) { binding.current() }
             verifyCurrent(current)
             val format =
@@ -95,7 +96,13 @@ internal fun pluginAdaptiveDataSourceFactory(
         ResolvingDataSource(upstream.createDataSource()) { request ->
             if (request.httpMethod != DataSpec.HTTP_METHOD_GET) throw IOException("Adaptive media requires a GET")
             verifyCurrent(initial)
-            val original = formats[request.uri.toString()] ?: throw IOException("Unknown adaptive rendition")
+            val original = formats[request.uri.toString()]
+            if (original == null) {
+                // A parsed remote manifest's segments are not host-known formats; the URL it names
+                // must still be a currently granted destination.
+                checkedPluginMediaUrl(request.uri.toString(), allowedHosts())
+                return@ResolvingDataSource request
+            }
             checkedPluginMediaUrl(original.url, allowedHosts())
             request.buildUpon().setKey(initial.adaptiveCacheKey(original)).build()
         }
