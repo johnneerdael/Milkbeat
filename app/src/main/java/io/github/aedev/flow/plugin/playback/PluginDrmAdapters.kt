@@ -159,7 +159,7 @@ internal fun pluginServiceCertificateDrmProvider(
  * Key and provisioning requests both go through the bound license transport, never a plain client:
  * the transport re-checks the destination and reads the current accepted license on every open.
  */
-private fun checkedLicenseCallback(
+internal fun checkedLicenseCallback(
     mediaItem: androidx.media3.common.MediaItem,
     licenseFactory: DataSource.Factory,
 ): androidx.media3.exoplayer.drm.MediaDrmCallback {
