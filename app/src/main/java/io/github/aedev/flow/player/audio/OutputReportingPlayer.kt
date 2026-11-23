@@ -31,6 +31,11 @@ internal class OutputReportingPlayer(
         invalidateState()
     }
 
+    /** The audio-start hold changed outside the player (confirmed, replaced, or abandoned). */
+    fun refreshAudioHold() {
+        invalidateState()
+    }
+
     override fun getState(): State {
         val state = super.getState()
         val position = heldPositionMs ?: return withAudioStartHold(state)

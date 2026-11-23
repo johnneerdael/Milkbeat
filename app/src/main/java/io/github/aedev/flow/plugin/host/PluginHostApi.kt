@@ -13,8 +13,6 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.JsonElement
 import nl.neerdael.milkbeat.plugin.AssetText
-import nl.neerdael.milkbeat.plugin.ConnectionInspectRequest
-import nl.neerdael.milkbeat.plugin.ConnectionManifest
 import nl.neerdael.milkbeat.plugin.HashAlgorithm
 import nl.neerdael.milkbeat.plugin.HashResult
 import nl.neerdael.milkbeat.plugin.HostEnvironment
@@ -134,12 +132,6 @@ internal class PluginHostApi(
             handler(HostOperations.signInInvalidateToken) { request ->
                 microG?.invalidate(plugin, request)
                     ?: throw HostCallException(PluginErrorCode.UNSUPPORTED, "Account sign-in is unavailable")
-            },
-            handler(HostOperations.connectionsInspect) { request ->
-                if (!plugin.manifest.permissions.connections) {
-                    throw HostCallException(PluginErrorCode.UNSUPPORTED, "This plugin may not review external connections")
-                }
-                inspectConnectionManifest(client, request)
             },
         )
 

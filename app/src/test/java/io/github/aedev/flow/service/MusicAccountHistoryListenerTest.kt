@@ -234,6 +234,7 @@ class MusicAccountHistoryListenerTest {
             advanceTimeBy(10_000)
             pump()
             fixture.player.play()
+            fixture.player.ready()
             pump()
             advanceTimeBy(2_000)
             fixture.player.positionMs = 303_000
@@ -246,6 +247,7 @@ class MusicAccountHistoryListenerTest {
             val final = samples.last().second
             assertFalse(final.progress)
             assertEquals("natural", final.endReason)
+            // Both audible stretches count; the buffered gap does not.
             assertEquals(4_000L, final.playingMs)
             assertEquals(303_000L, final.positionMs)
             assertEquals(1, samples.count { !it.second.progress })
@@ -286,9 +288,64 @@ class MusicAccountHistoryListenerTest {
             fixture.listener.close()
         }
 
+    @Test
+    fun `lifecycle sampling starts once the accepted provider resolves`() =
+        runTest {
+            // Unknown at listen start, as an uncached stream is; known from the second sample on.
+            var resolved = false
+            val fixture = fixture(lifecycle = { resolved })
+            pump()
+            var position = 0L
+            repeat(10) {
+                advanceTimeBy(1_000)
+                position += 1_000
+                fixture.player.positionMs = position
+                pump()
+                if (position == 2_000L) resolved = true
+            }
+            // Early checkpoints are not filtered by the generic thirty-second threshold, and the
+            // accepted provider's listening time is measured from the real deltas.
+            assertTrue(fixture.reports.any { it.second.progress })
+            assertTrue(
+                fixture.reports
+                    .last()
+                    .second.playingMs >= 5_000L,
+            )
+            fixture.listener.close()
+        }
+
+    @Test
+    fun `a short forward seek while paused adds no listening time`() =
+        runTest {
+            val fixture = fixture(lifecycle = true)
+            pump()
+            advanceTimeBy(2_000)
+            fixture.player.positionMs = 2_000
+            pump()
+            fixture.player.pause()
+            pump()
+            // 1.5 s forward, paused: under the two-second delta bound but not listening.
+            fixture.player.seekTo(3_500)
+            pump()
+            advanceTimeBy(1_000)
+            pump()
+            assertEquals(
+                2_000L,
+                fixture.reports
+                    .last()
+                    .second.playingMs,
+            )
+            fixture.listener.close()
+        }
+
     private fun TestScope.fixture(
         durationMs: Long = 600_000,
         lifecycle: Boolean = false,
+    ): Fixture = fixture(durationMs) { lifecycle }
+
+    private fun TestScope.fixture(
+        durationMs: Long = 600_000,
+        lifecycle: () -> Boolean,
     ): Fixture {
         val player = HistoryTestPlayer(durationMs) { testScheduler.currentTime }
         val reports = mutableListOf<Pair<MusicTrack, AccountListenProgress>>()
@@ -298,7 +355,7 @@ class MusicAccountHistoryListenerTest {
                 backgroundScope,
                 { id -> MusicTrack(id, id, "artist", "", (durationMs / 1_000).toInt()) },
                 { track, progress -> reports += track to progress },
-                { lifecycle },
+                { lifecycle() },
                 nowMs = { testScheduler.currentTime },
             )
         return Fixture(player, listener, reports)

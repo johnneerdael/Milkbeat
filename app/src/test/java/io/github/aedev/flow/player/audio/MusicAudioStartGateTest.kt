@@ -28,16 +28,26 @@ import org.robolectric.annotation.Config
 class MusicAudioStartGateTest {
     private class Fixture(
         scope: kotlinx.coroutines.CoroutineScope,
+        onHoldChanged: () -> Unit = {},
     ) {
         val rejections = mutableListOf<Pair<String, Long>>()
         val player = mockk<Player>(relaxed = true)
-        val gate = MusicAudioStartGate(player, scope, { mediaId, position -> rejections.add(mediaId to position) }, startTimeoutMs = 20_000)
+        val gate =
+            MusicAudioStartGate(
+                player,
+                scope,
+                { mediaId, position -> rejections.add(mediaId to position) },
+                onHoldChanged,
+                startTimeoutMs = 20_000,
+            )
 
         var item: MediaItem? = null
         var audioSelected = false
         var state = Player.STATE_BUFFERING
         var playWhenReady = true
         var position = 0L
+        var windowUid: Any = "window-0"
+        private val currentTimeline: androidx.media3.common.Timeline = singleWindowTimeline()
 
         init {
             every { player.currentMediaItem } answers { item }
@@ -48,6 +58,8 @@ class MusicAudioStartGateTest {
             every { player.playWhenReady } answers { playWhenReady }
             every { player.playbackSuppressionReason } returns Player.PLAYBACK_SUPPRESSION_REASON_NONE
             every { player.currentPosition } answers { position }
+            every { player.currentTimeline } returns currentTimeline
+            every { player.currentMediaItemIndex } returns 0
         }
 
         fun open(mediaId: String) {
@@ -72,9 +84,39 @@ class MusicAudioStartGateTest {
             )
         }
 
-        fun advance() {
-            gate.onAudioPositionAdvancing(mockk(relaxed = true), 0L)
+        fun advance(window: Any = windowUid) {
+            val eventTimeline = singleWindowTimeline(window)
+            gate.onAudioPositionAdvancing(
+                AnalyticsListener.EventTime(0L, eventTimeline, 0, null, 0L, eventTimeline, 0, null, 0L, 0L),
+                0L,
+            )
         }
+
+        private fun singleWindowTimeline(uid: Any? = null): androidx.media3.common.Timeline =
+            object : androidx.media3.common.Timeline() {
+                override fun getWindowCount(): Int = 1
+
+                override fun getWindow(
+                    windowIndex: Int,
+                    window: androidx.media3.common.Timeline.Window,
+                    defaultPositionProjectionUs: Long,
+                ): androidx.media3.common.Timeline.Window {
+                    window.uid = uid ?: this@Fixture.windowUid
+                    return window
+                }
+
+                override fun getPeriodCount(): Int = 1
+
+                override fun getPeriod(
+                    periodIndex: Int,
+                    period: androidx.media3.common.Timeline.Period,
+                    setIds: Boolean,
+                ): androidx.media3.common.Timeline.Period = period
+
+                override fun getIndexOfPeriod(uid: Any): Int = 0
+
+                override fun getUidOfPeriod(periodIndex: Int): Any = "period"
+            }
     }
 
     @Test
@@ -158,6 +200,35 @@ class MusicAudioStartGateTest {
             fixture.monitor()
             runCurrent()
             assertEquals(listOf("song-6" to 0L), fixture.rejections)
+        }
+
+    @Test
+    fun `a callback from an earlier window cannot confirm its replacement`() =
+        runTest {
+            val fixture = Fixture(backgroundScope)
+            fixture.open("song-9")
+            fixture.windowUid = "first"
+            fixture.state = Player.STATE_READY
+            // A selected but not-yet-advancing track: only advancement may confirm.
+            fixture.audioSelected = true
+            fixture.monitor()
+            fixture.advance("other")
+            assertFalse(fixture.gate.confirmed("song-9"))
+            fixture.advance("first")
+            assertTrue(fixture.gate.confirmed("song-9"))
+        }
+
+    @Test
+    fun `confirmation refreshes the exposed state without another player event`() =
+        runTest {
+            var refreshes = 0
+            val fixture = Fixture(backgroundScope, onHoldChanged = { refreshes++ })
+            fixture.open("song-10")
+            fixture.monitor()
+            val scheduled = refreshes
+            fixture.advance()
+            assertTrue(fixture.gate.confirmed("song-10"))
+            assertTrue(refreshes > scheduled)
         }
 
     @Test

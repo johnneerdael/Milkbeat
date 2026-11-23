@@ -943,22 +943,6 @@
                         "request"
                     ],
                     "additionalProperties": false
-                },
-                "connections.inspect": {
-                    "type": "object",
-                    "properties": {
-                        "request": {
-                            "$ref": "#/$defs/nl.neerdael.milkbeat.plugin.ConnectionInspectRequest"
-                        },
-                        "response": {
-                            "$ref": "#/$defs/nl.neerdael.milkbeat.plugin.ConnectionManifest"
-                        }
-                    },
-                    "required": [
-                        "request",
-                        "response"
-                    ],
-                    "additionalProperties": false
                 }
             },
             "required": [
@@ -983,8 +967,7 @@
                 "time.sleep",
                 "signIn.refresh",
                 "signIn.token",
-                "signIn.invalidateToken",
-                "connections.inspect"
+                "signIn.invalidateToken"
             ],
             "additionalProperties": false
         },
@@ -2998,52 +2981,6 @@
                 }
             },
             "title": "CodeLoadResult"
-        },
-        "nl.neerdael.milkbeat.plugin.ConnectionInspectRequest": {
-            "type": "object",
-            "required": [
-                "url"
-            ],
-            "properties": {
-                "url": {
-                    "type": "string"
-                }
-            },
-            "title": "ConnectionInspectRequest"
-        },
-        "nl.neerdael.milkbeat.plugin.ConnectionManifest": {
-            "type": "object",
-            "required": [
-                "url",
-                "id"
-            ],
-            "properties": {
-                "url": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": [
-                        "string",
-                        "null"
-                    ]
-                },
-                "resources": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "drmSystems": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                }
-            },
-            "title": "ConnectionManifest"
         },
         "nl.neerdael.milkbeat.plugin.DeviceCodeBeginRequest": {
             "type": "object",

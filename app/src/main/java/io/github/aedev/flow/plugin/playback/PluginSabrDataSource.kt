@@ -5,6 +5,7 @@ import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.ResolvingDataSource
 import androidx.media3.datasource.okhttp.OkHttpDataSource
 import io.github.aedev.flow.plugin.host.hostAllowed
+import io.github.aedev.flow.plugin.host.publicDns
 import okhttp3.CookieJar
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
@@ -44,6 +45,7 @@ internal fun pluginSabrDataSourceFactory(
     val client =
         base
             .newBuilder()
+            .dns(publicDns())
             .cookieJar(CookieJar.NO_COOKIES)
             .followRedirects(true)
             .followSslRedirects(true)

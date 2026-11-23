@@ -108,7 +108,11 @@ class DownloadUtil
         private val okHttpClient: OkHttpClient by lazy {
             AppProxyManager
                 .applyTo(OkHttpClient.Builder())
-                .connectTimeout(30, TimeUnit.SECONDS)
+                // Plugin media and downloads never follow a hostname into the local network.
+                .dns(
+                    io.github.aedev.flow.plugin.host
+                        .publicDns(),
+                ).connectTimeout(30, TimeUnit.SECONDS)
                 .readTimeout(60, TimeUnit.SECONDS)
                 .build()
         }

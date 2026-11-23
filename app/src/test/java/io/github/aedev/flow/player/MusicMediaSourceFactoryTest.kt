@@ -185,6 +185,54 @@ class MusicMediaSourceFactoryTest {
     }
 
     @Test
+    fun `a certificate session cannot be built without the checked license transport`() {
+        val certificate =
+            java.util.Base64
+                .getEncoder()
+                .encodeToString(ByteArray(128) { 1 })
+        val drm =
+            AudioDrm(
+                AudioDrmScheme.WIDEVINE,
+                "https://gravity.eclipsemusic.app/license",
+                serviceCertificate = certificate,
+            )
+        // Both Widevine paths take the bound transport; a plain factory must never be substituted.
+        assertThat(runCatching { factory.resolvedSource(item, audio("application/dash+xml", drm)) }.exceptionOrNull())
+            .isInstanceOf(IllegalArgumentException::class.java)
+    }
+
+    @Test
+    fun `a certificate session uses the bound license transport it was given`() {
+        val certificate =
+            java.util.Base64
+                .getEncoder()
+                .encodeToString(ByteArray(128) { 1 })
+        val drm =
+            AudioDrm(
+                AudioDrmScheme.WIDEVINE,
+                "https://gravity.eclipsemusic.app/license",
+                serviceCertificate = certificate,
+            )
+        val license = mockk<DataSource.Factory>()
+        val bound = BoundPluginMusicDataSourceFactory(mockk<DataSource.Factory>(), license)
+        val source = factory.resolvedSource(item, audio("application/dash+xml", drm), sourceFactory = bound)
+        assertThat(source).isInstanceOf(DashMediaSource::class.java)
+        assertThat(
+            source.mediaItem.localConfiguration!!
+                .drmConfiguration!!
+                .licenseUri
+                .toString(),
+        ).isEqualTo(drm.licenseUrl)
+        // Construction alone opens no session; the key request it would make is the bound
+        // transport the session manager was built with, never a plain client.
+        assertThat(
+            source.mediaItem.localConfiguration!!
+                .drmConfiguration!!
+                .forceDefaultLicenseUri,
+        ).isTrue()
+    }
+
+    @Test
     fun `clear streams retain their media item without DRM`() {
         for (mime in listOf("application/x-mpegURL", "audio/mp4")) {
             val source = factory.resolvedSource(item, audio(mime))

@@ -128,10 +128,16 @@ private class MappedInitialization(
     }
 }
 
-/** A Widevine session manager that presents the provider's service certificate to the license server. */
+/**
+ * A Widevine session manager that presents the provider's service certificate to the license
+ * server. It takes the same permission-checked, refresh-aware license transport as the standard
+ * Widevine path, so a certificate session keeps destination checks, grant revocation, license
+ * headers and a fresh license URL on every open.
+ */
 internal fun pluginServiceCertificateDrmProvider(
     certificate: ByteArray,
     multiSession: Boolean,
+    licenseFactory: DataSource.Factory,
 ): DrmSessionManagerProvider =
     DrmSessionManagerProvider { mediaItem ->
         val provider =
@@ -146,16 +152,24 @@ internal fun pluginServiceCertificateDrmProvider(
             .Builder()
             .setUuidAndExoMediaDrmProvider(C.WIDEVINE_UUID, provider)
             .setMultiSession(multiSession)
-            .build(
-                mediaItem.localConfiguration?.drmConfiguration?.let(::licenseCallback)
-                    ?: throw IOException("The stream declares no license"),
-            )
+            .build(checkedLicenseCallback(mediaItem, licenseFactory))
     }
 
-private fun licenseCallback(configuration: androidx.media3.common.MediaItem.DrmConfiguration) =
-    androidx.media3.exoplayer.drm.HttpMediaDrmCallback(
-        configuration.licenseUri?.toString() ?: throw IOException("The stream declares no license"),
-        true,
-        androidx.media3.datasource.DefaultHttpDataSource
-            .Factory(),
-    )
+/**
+ * Key and provisioning requests both go through the bound license transport, never a plain client:
+ * the transport re-checks the destination and reads the current accepted license on every open.
+ */
+private fun checkedLicenseCallback(
+    mediaItem: androidx.media3.common.MediaItem,
+    licenseFactory: DataSource.Factory,
+): androidx.media3.exoplayer.drm.MediaDrmCallback {
+    val license =
+        mediaItem.localConfiguration
+            ?.drmConfiguration
+            ?.licenseUri
+            ?.toString()
+            ?: throw IOException("The stream declares no license")
+    // Provisioning carries no license URL of its own; the transport keeps it on the same source.
+    return androidx.media3.exoplayer.drm
+        .HttpMediaDrmCallback(license, true, licenseFactory)
+}

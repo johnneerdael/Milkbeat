@@ -138,15 +138,13 @@ class MusicMediaSourceFactory(
         if (audio?.stream?.drm != null) {
             val streamDrm = audio.stream.drm
             val certificate = streamDrm?.let(::validatedServiceCertificate)
+            val checkedLicense =
+                requireNotNull(licenseFactory) { "Plugin DRM requires a permission-checked license transport" }
             val provider =
                 if (certificate != null && streamDrm != null) {
-                    pluginServiceCertificateDrmProvider(certificate, streamDrm.multiSession)
+                    pluginServiceCertificateDrmProvider(certificate, streamDrm.multiSession, checkedLicense)
                 } else {
-                    DefaultDrmSessionManagerProvider().also {
-                        it.setDrmHttpDataSourceFactory(
-                            requireNotNull(licenseFactory) { "Plugin DRM requires a permission-checked license transport" },
-                        )
-                    }
+                    DefaultDrmSessionManagerProvider().also { it.setDrmHttpDataSourceFactory(checkedLicense) }
                 }
             progressive.setDrmSessionManagerProvider(provider)
             hls.setDrmSessionManagerProvider(provider)

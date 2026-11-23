@@ -222,8 +222,6 @@ object HostOperations {
     val signInRefresh = HostOperation("signIn.refresh", WebLoginRefreshRequest.serializer(), WebLoginResult.serializer())
     val signInToken = HostOperation("signIn.token", AccountTokenRequest.serializer(), AccountToken.serializer())
     val signInInvalidateToken = HostOperation("signIn.invalidateToken", AccountTokenInvalidation.serializer(), Unit.serializer())
-    val connectionsInspect =
-        HostOperation("connections.inspect", ConnectionInspectRequest.serializer(), ConnectionManifest.serializer())
 
     val all: List<HostOperation<*, *>> =
         listOf(
@@ -249,6 +247,5 @@ object HostOperations {
             signInRefresh,
             signInToken,
             signInInvalidateToken,
-            connectionsInspect,
         )
 }

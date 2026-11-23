@@ -39,6 +39,8 @@ internal class MusicAccountHistoryListener(
     private val resolveTrack: (String) -> MusicTrack?,
     private val report: (MusicTrack, AccountListenProgress) -> Unit,
     private val lifecycleReporter: (String) -> Boolean = { false },
+    /** Whether the open has actually produced audio; a silent open accrues no listening time. */
+    private val confirmedAudio: (String) -> Boolean = { true },
     private val nowMs: () -> Long = SystemClock::elapsedRealtime,
 ) : Player.Listener {
     private class Listen(
@@ -85,6 +87,7 @@ internal class MusicAccountHistoryListener(
         reason: Int,
     ) {
         if (oldPosition.mediaItem?.mediaId == listen?.mediaId) outgoingPosition = oldPosition
+        if (reason == Player.DISCONTINUITY_REASON_SEEK) rebase(newPosition.positionMs)
     }
 
     // Transition callbacks expose the *new* current position. The discontinuity callback owns the
@@ -154,6 +157,16 @@ internal class MusicAccountHistoryListener(
         if (current.mediaId != player.currentMediaItem?.mediaId) return
         current.positionMs = player.currentPosition.coerceAtLeast(0)
         if (current.track == null) current.track = resolveTrack(current.mediaId)
+        // The accepted provider is unknown until the uncached stream resolves, so decide again on
+        // every refresh instead of freezing a pre-resolution answer.
+        if (!current.lifecycle && lifecycleReporter(current.mediaId)) {
+            // The accepted provider just became known: restart the cadence on the lifecycle path so
+            // early checkpoints are not lost to the generic thirty-second interval.
+            current.lifecycle = true
+            cadence?.cancel()
+            cadence = null
+            updateCadence()
+        }
         current.durationMs = player.duration.takeIf { it > 0 }
             ?: current.track
                 ?.duration
@@ -164,16 +177,29 @@ internal class MusicAccountHistoryListener(
         countPositionDelta(current)
     }
 
-    /** Real listening time: forward deltas up to two seconds count; a jump is a seek, never time. */
+    /**
+     * Real listening time: forward deltas up to two seconds count only while audio is actually
+     * playing and confirmed. A jump is a seek, never time, and a paused forward seek cannot add any.
+     */
     private fun countPositionDelta(current: Listen) {
         val last = current.lastPositionMs
         current.lastPositionMs = current.positionMs
         if (last == null) return
         val delta = current.positionMs - last
+        val audible = player.isPlaying && confirmedAudio(current.mediaId)
         when {
-            delta in 1..MAX_PROGRESS_DELTA_MS -> current.playingMs += delta
+            delta in 1..MAX_PROGRESS_DELTA_MS && audible -> current.playingMs += delta
             delta != 0L -> current.seekedToEnd = nearEnd(current)
         }
+    }
+
+    /** An explicit seek rebases the sample baseline, so the jump is never credited as listening. */
+    private fun rebase(positionMs: Long) {
+        val current = listen ?: return
+        if (current.mediaId != player.currentMediaItem?.mediaId) return
+        current.positionMs = positionMs.coerceAtLeast(0)
+        current.lastPositionMs = current.positionMs
+        current.seekedToEnd = nearEnd(current)
     }
 
     private fun nearEnd(current: Listen): Boolean =
@@ -212,7 +238,14 @@ internal class MusicAccountHistoryListener(
         cadence?.cancel()
         cadence = null
         val current = listen ?: return
+        // Credit the audible time since the last sample before closing the listen.
+        val wasPlaying = current.lifecycle && current.playedMs > 0
+        closeSegment()
         refreshCurrent()
+        if (wasPlaying) {
+            val delta = current.positionMs - (current.lastPositionMs ?: current.positionMs)
+            if (delta in 1..MAX_PROGRESS_DELTA_MS) current.playingMs += delta
+        }
         val finalReason = if (reason == "natural" && current.seekedToEnd) "seek_out" else reason
         val track = current.track
         val sample =
@@ -233,31 +266,45 @@ internal class MusicAccountHistoryListener(
     }
 
     private fun updateCadence() {
-        if (listen?.playingSinceMs == null) {
+        if (listen == null || !player.isPlaying) {
             cadence?.cancel()
             cadence = null
             return
         }
         if (cadence?.isActive == true) return
-        val lifecycle = listen?.lifecycle == true
         cadence =
             scope.launch {
-                while (listen?.playingSinceMs != null && player.isPlaying) {
+                // The event callback re-arms the playing segment, so the loop is bounded by the
+                // listen and playback, not by that transient marker.
+                while (listen != null && player.isPlaying) {
                     val current = listen ?: break
-                    if (lifecycle) {
-                        // Sample every second so deltas land under the bound; report every five.
+                    // The branch is chosen per iteration, so a listen that turns out to be a
+                    // lifecycle provider switches cadence without waiting for the next track.
+                    if (current.lifecycle) {
                         delay(LIFECYCLE_SAMPLE_MS)
                         if (!player.isPlaying || listen !== current) break
                         refreshCurrent()
-                        val sinceCheckpoint = current.playingMs - current.lastCheckpointMs
-                        if (sinceCheckpoint >= LIFECYCLE_CHECKPOINT_MS) {
+                        if (current.playingMs - current.lastCheckpointMs >= LIFECYCLE_CHECKPOINT_MS) {
                             current.lastCheckpointMs = current.playingMs
                             emit(progress = true)
                         }
                     } else {
                         val untilQualified = playThresholdMs(current.durationMs) - playedMs(current)
-                        delay(if (untilQualified > 0) minOf(REPORT_INTERVAL_MS, untilQualified) else REPORT_INTERVAL_MS)
+                        val wait = if (untilQualified > 0) minOf(REPORT_INTERVAL_MS, untilQualified) else REPORT_INTERVAL_MS
+                        // Wait in one-second steps so a provider that only becomes known after the
+                        // uncached stream resolves still moves onto the lifecycle path promptly.
+                        var waited = 0L
+                        while (waited < wait) {
+                            delay(LIFECYCLE_SAMPLE_MS)
+                            waited += LIFECYCLE_SAMPLE_MS
+                            if (!player.isPlaying || listen !== current) break
+                            if (lifecycleReporter(current.mediaId)) {
+                                current.lifecycle = true
+                                break
+                            }
+                        }
                         if (!player.isPlaying || listen !== current) break
+                        if (current.lifecycle) continue
                         refreshCurrent()
                         emit(progress = true)
                     }

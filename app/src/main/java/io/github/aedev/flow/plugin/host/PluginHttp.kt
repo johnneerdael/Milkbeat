@@ -50,6 +50,7 @@ internal class PluginHttp(
     private val client =
         base
             .newBuilder()
+            .dns(publicDns())
             .cookieJar(okhttp3.CookieJar.NO_COOKIES)
             .addNetworkInterceptor(Interceptor { chain -> chain.proceed(checked(chain.request())) })
             .build()
@@ -184,6 +185,7 @@ internal suspend fun inspectConnectionManifest(
         val body =
             base
                 .newBuilder()
+                .dns(publicDns())
                 .followRedirects(false)
                 .followSslRedirects(false)
                 .callTimeout(30, TimeUnit.SECONDS)
@@ -254,6 +256,38 @@ private fun manifestFields(
                 primitive(entry) ?: (entry as? kotlinx.serialization.json.JsonObject)?.let { nested -> primitive(nested["name"]) }
             }.orEmpty()
     return ConnectionManifest(url = url, id = id, name = name, resources = strings("resources"), drmSystems = strings("drmSystems"))
+}
+
+/**
+ * Resolves [host] and refuses any private, loopback, link-local or unspecified address. A hostname
+ * that *looks* public can still resolve into the local network, so the check runs on the addresses
+ * the connection will actually use; inspection, media and license transports all go through it.
+ */
+internal fun publicDns(): okhttp3.Dns =
+    okhttp3.Dns { hostname ->
+        val resolved = okhttp3.Dns.SYSTEM.lookup(hostname)
+        if (resolved.isEmpty()) throw java.net.UnknownHostException(hostname)
+        if (resolved.any { isPrivateAddress(it) }) {
+            throw java.net.UnknownHostException("$hostname resolves to a private address")
+        }
+        resolved
+    }
+
+/** Whether [address] is a loopback, link-local, site-local or otherwise non-public destination. */
+internal fun isPrivateAddress(address: java.net.InetAddress): Boolean {
+    if (address.isLoopbackAddress || address.isAnyLocalAddress || address.isLinkLocalAddress ||
+        address.isSiteLocalAddress || address.isMulticastAddress
+    ) {
+        return true
+    }
+    val bytes = address.address
+    if (bytes.size == 4) {
+        val first = bytes[0].toInt() and 0xff
+        val second = bytes[1].toInt() and 0xff
+        // 100.64/10 carrier-grade NAT, 0/8 and 198.18/15 benchmarking ranges.
+        if (first == 0 || (first == 100 && second in 64..127) || (first == 198 && second in 18..19)) return true
+    }
+    return false
 }
 
 /** Public DNS destinations only: private and link-local literals never receive connection approval. */

@@ -39,25 +39,44 @@ class PluginConnections
         suspend fun inspect(url: String): ConnectionManifest = inspectConnectionManifest(client, ConnectionInspectRequest(url))
 
         /**
-         * Approves the reviewed manifest and saves it with the plugin. The grant lands before the
-         * plugin is asked, so its confirming fetch of the same manifest already runs granted.
+         * Approves the reviewed manifest and saves it with the plugin, as one replacement: the
+         * connection id carries over so the plugin replaces its row instead of adding a duplicate,
+         * and a plugin failure restores the previous destination approval and withdraws the new one
+         * rather than leaving the two out of sync.
          */
         suspend fun approve(
             plugin: InstalledPlugin,
             manifest: ConnectionManifest,
             useAccount: Boolean,
+            connectionId: String? = null,
         ): PluginConnectionSaved {
             require(plugin.manifest.permissions.connections) { "${plugin.manifest.name} reviews no external connections" }
             val url =
                 manifest.url.toHttpUrlOrNull()
                     ?: throw PluginHttpException("The reviewed add-on has no manifest address")
             val origin = if (url.port == 443) url.host else "${url.host}:${url.port}"
+            // The reviewed destination must be reachable for the plugin's own confirming fetch.
+            val previous =
+                registry.state.value.connections.filter {
+                    it.pluginId == plugin.id && it.signerFingerprint == plugin.signerFingerprint && it.addonId == manifest.id
+                }
             registry.approveConnection(plugin, origin, manifest.id)
-            return host.call(
-                plugin.id,
-                PluginOperations.connectionsSave,
-                PluginConnectionSave(url = manifest.url, addonId = manifest.id, useAccount = useAccount),
-            )
+            return try {
+                host.call(
+                    plugin.id,
+                    PluginOperations.connectionsSave,
+                    PluginConnectionSave(
+                        id = connectionId,
+                        url = manifest.url,
+                        addonId = manifest.id,
+                        useAccount = useAccount,
+                    ),
+                )
+            } catch (failure: Throwable) {
+                registry.revokeConnection(plugin.id, origin)
+                previous.forEach { grant -> registry.approveConnection(plugin, grant.origin, grant.addonId) }
+                throw failure
+            }
         }
 
         suspend fun setEnabled(

@@ -8,6 +8,7 @@ import androidx.media3.datasource.ResolvingDataSource
 import androidx.media3.datasource.cache.Cache
 import androidx.media3.datasource.cache.CacheDataSource
 import androidx.media3.datasource.okhttp.OkHttpDataSource
+import io.github.aedev.flow.plugin.host.publicDns
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import nl.neerdael.milkbeat.plugin.FormatType
@@ -30,6 +31,7 @@ internal fun pluginAdaptiveDataSourceFactory(
     val client =
         base
             .newBuilder()
+            .dns(publicDns())
             .cookieJar(CookieJar.NO_COOKIES)
             .addNetworkInterceptor(
                 Interceptor { chain ->

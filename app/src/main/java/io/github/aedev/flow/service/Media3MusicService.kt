@@ -390,10 +390,18 @@ class Media3MusicService : MediaLibraryService() {
             .bind(player)
         player.addAnalyticsListener(PlaybackOutputTrace(audioOutputProbe))
         audioStartGate =
-            io.github.aedev.flow.player.audio.MusicAudioStartGate(player, lifecycleScope, ::failOverSilentStart).also {
-                player.addAnalyticsListener(it)
-                player.addListener(it)
-            }
+            io.github.aedev.flow.player.audio
+                .MusicAudioStartGate(
+                    player,
+                    lifecycleScope,
+                    ::failOverSilentStart,
+                    onHoldChanged = {
+                        if (::outputRecovery.isInitialized) outputRecovery.reportedPlayer.refreshAudioHold()
+                    },
+                ).also {
+                    player.addAnalyticsListener(it)
+                    player.addListener(it)
+                }
         observeAudioQuality()
         player.trackSelectionParameters =
             player.trackSelectionParameters
@@ -415,6 +423,7 @@ class Media3MusicService : MediaLibraryService() {
                 ::resolveLearnTrack,
                 accountPlayHistory::reportProgress,
                 lifecycleReporter = ::reportsListenLifecycle,
+                confirmedAudio = { mediaId -> audioStartGate?.confirmed(mediaId) == true },
             )
         sessionPlayer.addListener(VisualizerClockListener(visualizerTap))
         lifecycleScope.launch { followPlayerClock(visualizerTap, sessionPlayer) }

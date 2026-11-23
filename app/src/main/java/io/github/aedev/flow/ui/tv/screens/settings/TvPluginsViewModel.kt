@@ -333,7 +333,9 @@ class TvPluginsViewModel
             connectionsJob =
                 viewModelScope.launch {
                     try {
-                        pluginConnections.approve(plugin, page.manifest, page.useAccount)
+                        // The reviewed connection id carries through a Replace Link, so the plugin
+                        // replaces its row and its approval instead of adding a second one.
+                        pluginConnections.approve(plugin, page.manifest, page.useAccount, page.connectionId)
                         loadConnections()
                     } catch (e: Exception) {
                         updateConnections {
