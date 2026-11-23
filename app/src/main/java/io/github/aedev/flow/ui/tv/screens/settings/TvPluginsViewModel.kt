@@ -285,16 +285,21 @@ class TvPluginsViewModel
 
         /** Returns from the editor or review to the configured add-on list. */
         fun showConnectionList() {
-            updateConnections { it.copy(page = ConnectionsPage.List, failure = null) }
+            // Leaving the editor abandons the manifest inspection it started.
+            connectionsJob?.cancel()
+            connectionsJob = null
+            updateConnections { it.copy(page = ConnectionsPage.List, failure = null, busy = false) }
         }
 
         fun editConnectionUrl(connectionId: String?) {
-            updateConnections { it.copy(page = ConnectionsPage.EditUrl(connectionId), failure = null) }
+            connectionsJob?.cancel()
+            connectionsJob = null
+            updateConnections { it.copy(page = ConnectionsPage.EditUrl(connectionId), failure = null, busy = false) }
         }
 
         /** Reviews a pasted link: the host fetches the manifest itself, before anything is approved. */
         fun reviewConnection(url: String) {
-            val pluginId = connectionsState.value.pluginId ?: return
+            val editor = connectionsState.value.page as? ConnectionsPage.EditUrl ?: return
             val trimmed = url.trim()
             if (trimmed.isEmpty()) return
             connectionsJob?.cancel()
@@ -306,14 +311,7 @@ class TvPluginsViewModel
                             val manifest = pluginConnections.inspect(trimmed)
                             connectionsState.value.copy(
                                 busy = false,
-                                page =
-                                    ConnectionsPage.Review(
-                                        manifest,
-                                        connectionsState.value.page
-                                            .let { it as? ConnectionsPage.EditUrl }
-                                            ?.connectionId,
-                                        false,
-                                    ),
+                                page = ConnectionsPage.Review(manifest, editor.connectionId, false),
                             )
                         } catch (e: Exception) {
                             connectionsState.value.copy(
@@ -322,6 +320,8 @@ class TvPluginsViewModel
                                     e.message ?: context.getString(R.string.tv_plugins_connections_review_failed),
                             )
                         }
+                    // Back, another row's editor or leaving the plugin wins over a late inspection.
+                    if (connectionsState.value.page != editor) return@launch
                     connectionsState.value = next
                 }
         }
