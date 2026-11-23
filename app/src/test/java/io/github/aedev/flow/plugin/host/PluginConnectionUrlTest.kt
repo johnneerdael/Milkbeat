@@ -43,6 +43,21 @@ class PluginConnectionUrlTest {
     }
 
     @Test
+    fun `numeric literals use the same non-public classification as resolved addresses`() {
+        for (literal in listOf("198.18.0.1", "198.19.255.254", "224.0.0.1", "240.0.0.1", "255.255.255.255", "0.0.0.0")) {
+            assertThat(isPrivateConnectionHost(literal)).isTrue()
+        }
+        for (literal in listOf("8.8.8.8", "1.1.1.1", "93.184.216.34")) {
+            assertThat(isPrivateConnectionHost(literal)).isFalse()
+            assertThat(isPrivateAddress(InetAddress.getByName(literal))).isFalse()
+        }
+        assertThat(isPrivateAddress(InetAddress.getByName("198.18.0.1"))).isTrue()
+        assertThrows(PluginHttpException::class.java) {
+            normalizedManifestUrl("https://198.18.0.1/manifest.json")
+        }
+    }
+
+    @Test
     fun `direct plugin transport rejects names with mixed public and private DNS answers`() {
         val dns = publicDns(Dns { listOf(InetAddress.getByName("1.1.1.1"), InetAddress.getByName("fd12::1")) })
         val proxy = Proxy(Proxy.Type.HTTP, InetSocketAddress.createUnresolved("proxy.example.org", 8080))

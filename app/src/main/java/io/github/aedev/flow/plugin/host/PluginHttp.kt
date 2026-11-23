@@ -303,6 +303,21 @@ internal fun publicDns(resolver: Dns = Dns.SYSTEM): Dns =
         resolved
     }
 
+/**
+ * The non-public IPv4 ranges, shared by resolved addresses and dotted literals so a numeric URL
+ * cannot slip past the DNS guard.
+ */
+private fun isNonPublicIpv4(
+    first: Int,
+    second: Int,
+): Boolean =
+    first == 0 || first == 10 || first == 127 || first >= 224 ||
+        (first == 100 && second in 64..127) ||
+        (first == 169 && second == 254) ||
+        (first == 172 && second in 16..31) ||
+        (first == 192 && second == 168) ||
+        (first == 198 && second in 18..19)
+
 /** Whether [address] is a loopback, link-local, site-local or otherwise non-public destination. */
 internal fun isPrivateAddress(address: InetAddress): Boolean {
     if (address.isLoopbackAddress || address.isAnyLocalAddress || address.isLinkLocalAddress ||
@@ -312,10 +327,7 @@ internal fun isPrivateAddress(address: InetAddress): Boolean {
     }
     val bytes = address.address
     if (bytes.size == 4) {
-        val first = bytes[0].toInt() and 0xff
-        val second = bytes[1].toInt() and 0xff
-        // 100.64/10 carrier-grade NAT, 0/8 and 198.18/15 benchmarking ranges.
-        if (first == 0 || first >= 240 || (first == 100 && second in 64..127) || (first == 198 && second in 18..19)) return true
+        return isNonPublicIpv4(bytes[0].toInt() and 0xff, bytes[1].toInt() and 0xff)
     }
     if (bytes.size == 16 && (bytes[0].toInt() and 0xe0) != 0x20) return true
     return false
@@ -327,10 +339,10 @@ internal fun isPrivateConnectionHost(host: String): Boolean {
     if (name == "localhost" || name.endsWith(".localhost") || name.endsWith(".internal")) return true
     val labels = name.split('.')
     val octets = labels.map { it.toIntOrNull() }
+    // OkHttp connects to a numeric literal without consulting Dns, so classify it exactly as a
+    // resolved address here instead of relying on the DNS guard.
     if (labels.size == 4 && octets.all { it != null && it in 0..255 }) {
-        val (a, b) = octets[0]!! to octets[1]!!
-        return a == 0 || a == 10 || a == 127 || (a == 100 && b in 64..127) ||
-            (a == 169 && b == 254) || (a == 172 && b in 16..31) || (a == 192 && b == 168)
+        return isNonPublicIpv4(octets[0]!!, octets[1]!!)
     }
     return name.startsWith("[") || name.contains(":")
 }
