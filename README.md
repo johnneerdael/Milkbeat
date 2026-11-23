@@ -169,13 +169,13 @@ working without updates until you remove it.
   depend on the account and recording. Deezer 0.2.1 needs plugin API 9; update Milkbeat first. With
   plugin API 10 it fetches each track in one request, so songs no longer pause mid-play.
 - **Eclipse:** lossless and Atmos audio from your Eclipse add-ons, plus an Eclipse music tab with
-  the composed **For you** shelves (new releases, Daily Mixes with their tracks, album shelves that
-  open the add-on album, top and trending tracks), your Cloud playlists, Liked Songs, a Discover
-  feed and a search across the approved add-ons. Sign in with the TV code at `eclipsemusic.app/tv`; Cloud is added from your account, and
+  the composed **For you** shelves (new releases, Daily Mixes with their tracks, album and artist
+  shelves that open the add-on page, editorial playlists and stations), your Cloud playlists, Liked
+  Songs, a Discover feed and a search across the approved add-ons. Sign in with the TV code at `eclipsemusic.app/tv`; Cloud is added from your account, and
   other add-ons are added under **Add-on links** from their own install links, each reviewed and
   approved on the TV before Milkbeat sends it anything. Atmos is requested only when the TV's output
   supports Dolby, and **Report Eclipse listening** (off by default) sends one history event per
-  finished listen. Eclipse 0.4.0 needs plugin API 12; update Milkbeat first.
+  finished listen. Eclipse 0.6.0 needs plugin API 12; update Milkbeat first.
 
 Under **Audio**, put providers in priority order and choose which ones play other services'
 tracks; under **Video**, choose the video plugin. Every track follows the order, including tracks
