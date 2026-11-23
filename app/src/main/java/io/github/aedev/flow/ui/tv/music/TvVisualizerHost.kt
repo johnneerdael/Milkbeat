@@ -6,15 +6,19 @@ import android.content.res.Configuration
 import android.opengl.GLSurfaceView
 import android.os.Handler
 import android.os.Looper
+import android.view.SurfaceHolder
 import io.github.aedev.flow.player.audio.visualizer.VisualizerRenderStats
 import io.github.aedev.flow.player.audio.visualizer.VisualizerSettings
 import io.github.aedev.flow.player.audio.visualizer.WaveformLeveler
 import io.github.aedev.flow.player.audio.visualizer.frameDivisor
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import nl.neerdael.projectm.core.DisplayInfo
 import nl.neerdael.projectm.core.ProjectMJNI
 import nl.neerdael.projectm.core.QualityController
 import nl.neerdael.projectm.core.VisualizerRenderer
 import nl.neerdael.projectm.core.VisualizerView
+import java.util.concurrent.atomic.AtomicLong
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 import kotlin.math.roundToInt
@@ -38,6 +42,9 @@ internal class TvVisualizerHost(
     private var closed = false
     private var applyingSettings = false
     private var budgetGeneration = 0L
+    private val surfaceGeneration = AtomicLong()
+    private val surfaceReadyState = MutableStateFlow(false)
+    val surfaceReady = surfaceReadyState.asStateFlow()
     private val renderer =
         VisualizerRenderer(
             object : VisualizerRenderer.BudgetStatsListener {
@@ -78,16 +85,48 @@ internal class TvVisualizerHost(
 
     // Keep the visible GL surface above the video surface being prepared underneath it.
     val view = VisualizerView(context).apply { setZOrderMediaOverlay(true) }
+    private val surfaceCallback =
+        object : SurfaceHolder.Callback {
+            override fun surfaceCreated(holder: SurfaceHolder) {
+                surfaceGeneration.incrementAndGet()
+                surfaceReadyState.value = false
+            }
+
+            override fun surfaceChanged(
+                holder: SurfaceHolder,
+                format: Int,
+                width: Int,
+                height: Int,
+            ) = Unit
+
+            override fun surfaceDestroyed(holder: SurfaceHolder) {
+                surfaceGeneration.incrementAndGet()
+                surfaceReadyState.value = false
+            }
+        }
 
     /** The user's timing offset; read by the render thread every frame. */
     @Volatile
     var timingOffsetUs = 0L
 
     init {
+        view.holder.addCallback(surfaceCallback)
         engine.start(settings)
         quality = createQuality()
         val displayDelayUs = (DISPLAY_DELAY_VSYNCS * MICROS_PER_SECOND / display.refreshRate).toLong()
-        view.start(AudioFedRenderer(renderer) { window -> viewModel.readAudible(window, displayDelayUs + timingOffsetUs) })
+        view.start(
+            AudioFedRenderer(
+                renderer,
+                surfaceGeneration,
+                onFirstFrame = { generation ->
+                    main.post {
+                        if (!closed && surfaceGeneration.get() == generation && view.isAttachedToWindow && view.holder.surface.isValid) {
+                            surfaceReadyState.value = true
+                        }
+                    }
+                },
+            ) { window -> viewModel.readAudible(window, displayDelayUs + timingOffsetUs) },
+        )
         // The view's render mode needs the GL thread that start() creates.
         applyFrameRateCap(settings.frameRateCap)
         ProjectMJNI.setForceHardCut(false)
@@ -159,6 +198,8 @@ internal class TvVisualizerHost(
     fun close() {
         if (closed) return
         closed = true
+        surfaceReadyState.value = false
+        view.holder.removeCallback(surfaceCallback)
         pause()
         engine.renderStats = null
         main.removeCallbacksAndMessages(null)
@@ -218,12 +259,15 @@ private const val DISPLAY_DELAY_VSYNCS = 2
 
 private class AudioFedRenderer(
     private val delegate: VisualizerRenderer,
+    private val surfaceGeneration: AtomicLong,
+    private val onFirstFrame: (Long) -> Unit,
     private val readAudible: (ShortArray) -> Boolean,
 ) : GLSurfaceView.Renderer {
     private val window = ShortArray(WINDOW_SAMPLES)
     private val waveform = ByteArray(WINDOW_SAMPLES)
     private val leveler = WaveformLeveler()
     private var lastFrameNanos = 0L
+    private var reportedGeneration = -1L
 
     override fun onSurfaceCreated(
         gl: GL10,
@@ -237,11 +281,16 @@ private class AudioFedRenderer(
     ) = delegate.onSurfaceChanged(gl, width, height)
 
     override fun onDrawFrame(gl: GL10) {
+        val generation = surfaceGeneration.get()
         val now = System.nanoTime()
         val seconds = if (lastFrameNanos == 0L) 0f else (now - lastFrameNanos) / NANOS_PER_SECOND
         lastFrameNanos = now
         if (readAudible(window)) leveler.level(window, waveform, seconds) else waveform.fill(SILENCE)
         ProjectMJNI.addWaveform(waveform, WINDOW_SAMPLES)
         delegate.onDrawFrame(gl)
+        if (reportedGeneration != generation) {
+            reportedGeneration = generation
+            onFirstFrame(generation)
+        }
     }
 }

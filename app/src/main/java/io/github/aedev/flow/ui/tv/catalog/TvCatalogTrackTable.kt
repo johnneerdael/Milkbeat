@@ -21,6 +21,7 @@ import io.github.aedev.flow.R
 import io.github.aedev.flow.ui.tv.components.TvButton
 import io.github.aedev.flow.ui.tv.components.TvMusicTrackRow
 import io.github.aedev.flow.ui.tv.components.TvSectionHeader
+import io.github.aedev.flow.ui.tv.focus.tvEndFocus
 import nl.neerdael.milkbeat.catalog.CollectionBlock
 import nl.neerdael.milkbeat.catalog.EntityRef
 import nl.neerdael.milkbeat.catalog.MetadataItem
@@ -42,6 +43,8 @@ internal fun LazyListScope.catalogTrackTable(
     playingTrackFocus: FocusRequester? = null,
     paneFocus: FocusRequester? = null,
     playingTrackPosition: Int? = null,
+    endFocus: FocusRequester? = null,
+    isLastBlock: Boolean = false,
 ) {
     // A column most rows leave empty is noise; YouTube names the album only on some playlist tracks.
     val showAlbum = collection.items.count { it.album != null } * 2 >= collection.items.size
@@ -53,7 +56,7 @@ internal fun LazyListScope.catalogTrackTable(
                 onShowAll =
                     collection.showAll?.let { target -> { onOpen(target) } }
                         ?: collection.showAllFilterId?.let { filterId -> onShowAllFilter?.let { show -> { show(filterId) } } },
-                modifier = padding,
+                modifier = padding.tvEndFocus(isLastBlock && collection.items.isEmpty(), endFocus),
             )
         }
     }
@@ -73,11 +76,13 @@ internal fun LazyListScope.catalogTrackTable(
             showAlbum = showAlbum,
             onClick = { onItemClick(item) },
             modifier =
-                if (playingTrackFocus != null && isPlaying) {
-                    rowModifier.focusRequester(playingTrackFocus)
-                } else {
-                    rowModifier
-                },
+                (
+                    if (playingTrackFocus != null && isPlaying) {
+                        rowModifier.focusRequester(playingTrackFocus)
+                    } else {
+                        rowModifier
+                    }
+                ).tvEndFocus(isLastBlock && index == collection.items.lastIndex, endFocus),
         )
     }
 }

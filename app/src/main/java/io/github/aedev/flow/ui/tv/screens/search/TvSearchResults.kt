@@ -12,6 +12,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import io.github.aedev.flow.R
@@ -71,6 +72,7 @@ internal fun TvSearchResultsPane(
     actions: TvCatalogActions,
     onLoadMore: () -> Unit,
     modifier: Modifier = Modifier,
+    stripFocus: FocusRequester? = null,
 ) {
     val blocks = results.blocks
     when {
@@ -99,7 +101,7 @@ internal fun TvSearchResultsPane(
         }
 
         else -> {
-            TvSearchResultList(blocks, results.isLoadingMore, results.nextCursor != null, actions, onLoadMore, modifier)
+            TvSearchResultList(blocks, results.isLoadingMore, results.nextCursor != null, actions, onLoadMore, modifier, stripFocus)
         }
     }
 }
@@ -112,6 +114,7 @@ private fun TvSearchResultList(
     actions: TvCatalogActions,
     onLoadMore: () -> Unit,
     modifier: Modifier,
+    stripFocus: FocusRequester?,
 ) {
     val dimens = LocalTvDimens.current
     val listState = rememberLazyListState()
@@ -131,7 +134,7 @@ private fun TvSearchResultList(
             modifier = modifier.fillMaxSize(),
             contentPadding = PaddingValues(top = 8.dp, bottom = dimens.overscanVertical),
         ) {
-            catalogBlocks(blocks, actions, horizontalPadding = dimens.overscanHorizontal, gridBlockId = gridId)
+            catalogBlocks(blocks, actions, horizontalPadding = dimens.overscanHorizontal, gridBlockId = gridId, endFocus = stripFocus)
             if (isLoadingMore) {
                 item(key = "search-loading-more") { TvShimmerRow(showHeader = false) }
             }

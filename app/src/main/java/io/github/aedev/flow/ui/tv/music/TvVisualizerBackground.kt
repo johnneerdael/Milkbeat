@@ -1,5 +1,7 @@
 package io.github.aedev.flow.ui.tv.music
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -14,7 +16,11 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import io.github.aedev.flow.player.EnhancedMusicPlayerManager
 import io.github.aedev.flow.player.audio.visualizer.VisualizerSettings
+import io.github.aedev.flow.ui.theme.PlayerScrim
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 
 /**
  * The projectM visualizer as the now-playing backdrop. It runs for as long as now-playing is open,
@@ -27,7 +33,20 @@ internal fun TvVisualizerBackground(
     modifier: Modifier = Modifier,
 ) {
     val settings by viewModel.settings.collectAsStateWithLifecycle()
-    settings?.let { TvVisualizerSurface(viewModel, it, modifier) }
+    val brightness by viewModel.brightness.collectAsStateWithLifecycle()
+    settings?.let {
+        Box(modifier.fillMaxSize()) {
+            TvVisualizerSurface(viewModel, it, Modifier)
+            VisualizerDimLayer(brightness)
+        }
+    }
+}
+
+@Composable
+internal fun VisualizerDimLayer(brightness: Int) {
+    if (brightness < 100) {
+        Box(Modifier.fillMaxSize().background(PlayerScrim.copy(alpha = 1f - brightness / 100f)))
+    }
 }
 
 @Composable
@@ -40,6 +59,11 @@ private fun TvVisualizerSurface(
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val host = remember(viewModel) { TvVisualizerHost(context, viewModel, settings) }
     val timingOffsetMs by viewModel.timingOffsetMs.collectAsStateWithLifecycle()
+    val players =
+        remember {
+            EnhancedMusicPlayerManager.playerState.map { EnhancedMusicPlayerManager.player }.distinctUntilChanged()
+        }
+    val player by players.collectAsStateWithLifecycle(initialValue = EnhancedMusicPlayerManager.player)
     SideEffect {
         host.timingOffsetUs = timingOffsetMs * 1_000L
         host.apply(settings)
@@ -61,6 +85,7 @@ private fun TvVisualizerSurface(
             host.close()
         }
     }
+    VisualizerKeepScreenOn(host.view, player, lifecycle, host.surfaceReady)
     AndroidView(factory = { host.view }, modifier = modifier.fillMaxSize())
 }
 

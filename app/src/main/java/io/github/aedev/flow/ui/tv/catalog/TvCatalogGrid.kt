@@ -11,9 +11,11 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.aedev.flow.ui.tv.components.TV_GRID_COLUMNS
+import io.github.aedev.flow.ui.tv.focus.tvEndFocus
 import io.github.aedev.flow.ui.tv.focus.tvRowFocus
 import io.github.aedev.flow.ui.tv.theme.LocalTvDimens
 import nl.neerdael.milkbeat.catalog.CollectionBlock
@@ -31,14 +33,19 @@ internal fun LazyListScope.catalogGrid(
     collection: CollectionBlock,
     actions: TvCatalogActions,
     horizontalPadding: Dp,
+    endFocus: FocusRequester? = null,
+    isLastBlock: Boolean = false,
 ) {
     val rows = collection.items.chunked(TV_GRID_COLUMNS)
-    itemsIndexed(rows, key = { index, _ -> "${collection.id}/row$index" }) { _, row ->
+    itemsIndexed(rows, key = { index, _ -> "${collection.id}/row$index" }) { index, row ->
         TvCatalogGridRow(
             items = row,
             defaultView = collection.defaultItemView,
             onItemClick = actions::pick,
-            modifier = Modifier.padding(horizontal = horizontalPadding, vertical = GridRowHeadroom),
+            modifier =
+                Modifier
+                    .padding(horizontal = horizontalPadding, vertical = GridRowHeadroom)
+                    .tvEndFocus(isLastBlock && index == rows.lastIndex, endFocus),
         )
     }
 }
