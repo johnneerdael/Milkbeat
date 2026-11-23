@@ -76,6 +76,9 @@
 # Netty's allocator locates this fallback method and the nested node fields by name.
 -keep class io.netty.util.concurrent.ConcurrentSkipListIntObjMultimap { *; }
 -keep class io.netty.util.concurrent.ConcurrentSkipListIntObjMultimap$* { *; }
+# Netty discovers inherited handler sharing through this runtime annotation, including Ktor sinks.
+-keep @interface io.netty.channel.ChannelHandler$Sharable
+-keep,allowshrinking @io.netty.channel.ChannelHandler$Sharable class *
 # Netty's leak detector verifies these method names with getDeclaredMethods during class init.
 -keep class io.netty.util.ReferenceCountUtil { *** touch(...); }
 -keep class io.netty.buffer.AbstractByteBufAllocator { *** toLeakAwareBuffer(...); }
