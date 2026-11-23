@@ -114,8 +114,9 @@ specific to the approved add-on. The first-party Eclipse API alone receives your
 ### Quality and playback
 
 Eclipse uses your quality setting and classifies what the add-on actually returns. For Cloud, Auto
-and High can request Atmos when the TV reports a compatible Dolby output, then try Hi-Res and CD
-lossless if Atmos is refused. Clear and licensed Widevine HLS and DASH play through Milkbeat's
+and High can request Atmos when the TV reports an Atmos decoder of its own (E-AC-3 with Joint Object
+Coding), then try Hi-Res and CD lossless if Atmos is refused. A TV whose Dolby decoder handles plain
+Dolby Digital Plus does not take the Atmos tier. Clear and licensed Widevine HLS and DASH play through Milkbeat's
 player. A receiver or soundbar shows Atmos when the TV passes the stream through. The now-playing
 line reports the source encoding separately from the actual output.
 
